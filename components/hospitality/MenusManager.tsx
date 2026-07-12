@@ -1,15 +1,13 @@
 'use client'
 
-/** Menus list + create. Each menu opens the menu editor to add items. */
+/** Menus list + create, studio grammar. Each menu opens the menu editor to add items. */
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, BookOpen, Trash2, Leaf, Upload } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -35,6 +33,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Statement } from '@/components/studio/statement'
+import { BigNumber } from '@/components/studio/big-number'
+import { PillButton } from '@/components/studio/pill-button'
+import { FactList, type FactRowItem } from '@/components/studio/fact-list'
 import { useToast } from '@/hooks/use-toast'
 import { useHospitalityMenus } from '@/hooks/data/useHospitalityMenus'
 import { useHospitalityVenues } from '@/hooks/data/useHospitalityVenues'
@@ -102,98 +104,71 @@ export function MenusManager() {
     }
   }
 
+  const rows: FactRowItem[] = menus.map((menu) => {
+    const itemCount = `${menu.item_count} ${menu.item_count === 1 ? 'item' : 'items'}`
+    return {
+      id: String(menu.id),
+      title: menu.name,
+      hint: menu.venue_name ? `${menu.venue_name} · ${itemCount}` : itemCount,
+      chip: menu.avg_co2e != null ? undefined : { tone: 'quiet' as const, label: 'No calculated items' },
+      value: menu.avg_co2e != null ? fmt(menu.avg_co2e) : undefined,
+      unit: menu.avg_co2e != null ? 'KG CO₂E AVG / COVER' : undefined,
+      href: `/hospitality/menus/${menu.id}`,
+      trailing: (
+        <button
+          type="button"
+          aria-label={`Remove ${menu.name}`}
+          className="rounded px-2 py-1 text-base leading-none text-muted-foreground transition-colors duration-150 hover:text-studio-stale"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setPendingDelete(menu)
+          }}
+        >
+          &times;
+        </button>
+      ),
+    }
+  })
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">Menus</h2>
-          <p className="text-sm text-muted-foreground">
-            Collect meals and drinks into a menu and see its average impact per cover.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setImportOpen(true)}>
-            <Upload className="mr-2 h-4 w-4" />
-            Import from menu
-          </Button>
-          <Button onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" />
-            New menu
-          </Button>
-        </div>
+    <div className="space-y-8">
+      <div className="min-w-0">
+        <Statement eyebrow="THE WORKBENCH · MENUS" headline="The menus.">
+          <BigNumber size="display" value={menus.length} label={menus.length === 1 ? 'Menu' : 'Menus'} />
+          <div className="flex items-center gap-2">
+            <PillButton variant="outline" onClick={() => setImportOpen(true)}>
+              Import from menu
+            </PillButton>
+            <PillButton variant="room" onClick={openCreate}>
+              New menu
+            </PillButton>
+          </div>
+        </Statement>
+        <p className="mt-3 max-w-xl text-sm text-muted-foreground">
+          Collect meals and drinks into a menu and see its average impact per cover.
+        </p>
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p className="text-sm text-studio-stale">{error}</p>}
 
       {isLoading ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-3 border-t border-border pt-6">
           {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-28 w-full rounded-lg" />
+            <Skeleton key={i} className="h-12 w-full rounded-[6px]" />
           ))}
         </div>
       ) : menus.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
-          <BookOpen className="mb-3 h-8 w-8 text-muted-foreground" />
-          <p className="font-medium">No menus yet</p>
-          <p className="mb-4 text-sm text-muted-foreground">
-            Create a menu, then add meals, drinks and your own wines to it.
+        <div className="border-t border-border pt-6">
+          <p className="text-sm text-muted-foreground">
+            No menus yet. Create a menu, then add meals, drinks and your own wines to it.
           </p>
-          <Button onClick={openCreate} variant="outline">
-            <Plus className="mr-2 h-4 w-4" />
+          <PillButton variant="room" className="mt-4" onClick={openCreate}>
             New menu
-          </Button>
+          </PillButton>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {menus.map((menu) => (
-            <div
-              key={menu.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => router.push(`/hospitality/menus/${menu.id}`)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') router.push(`/hospitality/menus/${menu.id}`)
-              }}
-              className="group flex cursor-pointer flex-col rounded-lg border bg-card p-4 shadow-sm transition-colors hover:border-primary"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5 text-muted-foreground" />
-                  <span className="font-medium">{menu.name}</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-destructive opacity-0 transition-opacity group-hover:opacity-100"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setPendingDelete(menu)
-                  }}
-                  aria-label="Delete menu"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {menu.venue_name && <Badge variant="secondary">{menu.venue_name}</Badge>}
-                <Badge variant="outline">
-                  {menu.item_count} {menu.item_count === 1 ? 'item' : 'items'}
-                </Badge>
-              </div>
-              <div className="mt-3">
-                {menu.avg_co2e != null ? (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Leaf className="h-4 w-4 text-primary" />
-                    <span className="font-semibold">{fmt(menu.avg_co2e)} kg CO₂e</span>
-                    <span className="text-muted-foreground">avg / cover</span>
-                  </div>
-                ) : (
-                  <span className="text-sm text-muted-foreground">No calculated items yet</span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+        <FactList items={rows} className="border-t border-border" />
       )}
 
       <MenuImportDialog

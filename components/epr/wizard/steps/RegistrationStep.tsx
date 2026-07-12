@@ -7,7 +7,8 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, ArrowRight, SkipForward, Loader2, KeyRound } from 'lucide-react'
+import { PillButton } from '@/components/studio/pill-button'
+import { ArrowLeft, ArrowRight, SkipForward, KeyRound } from 'lucide-react'
 
 interface RegistrationStepProps {
   onComplete: () => void
@@ -52,7 +53,9 @@ export function RegistrationStep({ onComplete, onBack, onSkip }: RegistrationSte
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-neon-lime animate-spin" />
+        <span className="font-mono text-xs uppercase tracking-[0.18em] text-studio-dim">
+          Loading...
+        </span>
       </div>
     )
   }
@@ -62,10 +65,10 @@ export function RegistrationStep({ onComplete, onBack, onSkip }: RegistrationSte
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-neon-lime/20 backdrop-blur-md border border-neon-lime/30 rounded-2xl flex items-center justify-center">
-            <KeyRound className="w-8 h-8 text-neon-lime" />
+          <div className="mx-auto w-16 h-16 rounded-[6px] border border-studio-hairline bg-studio-paper flex items-center justify-center">
+            <KeyRound className="w-8 h-8 text-room-accent" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-foreground">
+          <h3 className="text-xl font-display font-bold text-foreground">
             RPD Registration Details
           </h3>
           <p className="text-sm text-muted-foreground">
@@ -74,7 +77,7 @@ export function RegistrationStep({ onComplete, onBack, onSkip }: RegistrationSte
         </div>
 
         {/* Form card */}
-        <div className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl p-6 space-y-5">
+        <div className="rounded-[6px] border border-studio-hairline bg-studio-paper p-6 space-y-5">
           {/* RPD Organisation ID */}
           <div className="space-y-2">
             <Label htmlFor="epr-rpd-org-id" className="text-sm font-medium text-muted-foreground">
@@ -86,7 +89,6 @@ export function RegistrationStep({ onComplete, onBack, onSkip }: RegistrationSte
               value={rpdOrgId}
               onChange={(e) => setRpdOrgId(e.target.value)}
               disabled={isSaving}
-              className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50"
             />
             <p className="text-xs text-muted-foreground/70">
               Found in your RPD portal account. Usually a 6-digit number.
@@ -105,7 +107,6 @@ export function RegistrationStep({ onComplete, onBack, onSkip }: RegistrationSte
               value={rpdSubId}
               onChange={(e) => setRpdSubId(e.target.value)}
               disabled={isSaving}
-              className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50"
             />
             <p className="text-xs text-muted-foreground/70">
               Only required if your organisation has multiple subsidiaries registered with RPD.
@@ -140,23 +141,16 @@ export function RegistrationStep({ onComplete, onBack, onSkip }: RegistrationSte
                 Skip
               </Button>
             )}
-            <Button
-              onClick={handleContinue}
-              disabled={isSaving}
-              className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl"
-            >
+            <PillButton variant="ink" onClick={handleContinue} disabled={isSaving}>
               {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
+                'Saving...'
               ) : (
                 <>
                   Continue
-                  <ArrowRight className="w-4 h-4 ml-2" />
+                  <ArrowRight className="w-4 h-4" />
                 </>
               )}
-            </Button>
+            </PillButton>
           </div>
         </div>
       </div>

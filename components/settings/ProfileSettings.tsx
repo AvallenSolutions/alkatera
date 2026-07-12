@@ -5,7 +5,7 @@ import { useProfile } from '@/hooks/data/useProfile'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Eyebrow, Panel } from '@/components/studio'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/hooks/use-toast'
@@ -73,18 +73,18 @@ export function ProfileSettings({ showHeader = true }: ProfileSettingsProps) {
             <Skeleton className="h-5 w-96" />
           </div>
         )}
-        <Card>
-          <CardHeader>
+        <Panel className="space-y-4">
+          <div className="space-y-2">
             <Skeleton className="h-6 w-48" />
             <Skeleton className="h-4 w-72" />
-          </CardHeader>
-          <CardContent className="space-y-4">
+          </div>
+          <div className="space-y-4">
             <Skeleton className="h-20 w-full" />
             <Skeleton className="h-20 w-full" />
             <Skeleton className="h-20 w-full" />
             <Skeleton className="h-10 w-32" />
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
       </div>
     )
   }
@@ -114,25 +114,25 @@ export function ProfileSettings({ showHeader = true }: ProfileSettingsProps) {
     <div className="space-y-6">
       {showHeader && (
         <div className="space-y-1">
-          <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-            Profile Settings
+          <h1 className="font-display text-3xl lg:text-4xl font-bold tracking-[-0.02em] text-foreground">
+            Profile settings.
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-studio-dim">
             Manage your personal information and account details
           </p>
         </div>
       )}
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Personal Information</CardTitle>
-            <CardDescription>
+        <Panel className="space-y-4 lg:col-span-2">
+          <div className="space-y-1">
+            <Eyebrow tone="dim">Personal information</Eyebrow>
+            <p className="text-sm text-studio-dim">
               Update your personal details. This information will be visible to other members of your
               organisation.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </p>
+          </div>
+          <div>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
@@ -209,15 +209,13 @@ export function ProfileSettings({ showHeader = true }: ProfileSettingsProps) {
                 )}
               </div>
             </form>
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
 
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Account Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <Panel className="space-y-4">
+            <Eyebrow tone="dim">Account information</Eyebrow>
+            <div className="space-y-4">
               <div className="space-y-1">
                 <p className="text-sm font-medium">User ID</p>
                 <p className="text-xs text-muted-foreground font-mono break-all">
@@ -234,20 +232,16 @@ export function ProfileSettings({ showHeader = true }: ProfileSettingsProps) {
                   })}
                 </p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Need Help?</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <p className="text-sm text-muted-foreground">
-                If you need to change your email address or have account-related questions, please
-                contact your organisation administrator.
-              </p>
-            </CardContent>
-          </Card>
+          <Panel className="space-y-2">
+            <Eyebrow tone="dim">Need help?</Eyebrow>
+            <p className="text-sm text-studio-dim">
+              If you need to change your email address or have account-related questions, please
+              contact your organisation administrator.
+            </p>
+          </Panel>
         </div>
       </div>
     </div>

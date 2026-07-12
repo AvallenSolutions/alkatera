@@ -1,7 +1,7 @@
 'use client'
 
-import { Badge } from '@/components/ui/badge'
 import { Handshake } from 'lucide-react'
+import { StateChip } from '@/components/studio/state-chip'
 
 interface PartnerAuthorBadgeProps {
   authorName: string
@@ -9,13 +9,25 @@ interface PartnerAuthorBadgeProps {
   /** Compact mode for card footer, full mode for detail pages */
   variant?: 'compact' | 'full'
   bio?: string | null
+  /** The partner_attribution key; resolves to a data-driven credit label. */
+  partnerKey?: string | null
 }
 
 const PARTNER_LABELS: Record<string, string> = {
   impact_focus: 'Impact Focus',
 }
 
-export function PartnerAuthorBadge({ authorName, photoUrl, variant = 'compact', bio }: PartnerAuthorBadgeProps) {
+function creditLabel(partnerKey?: string | null): string {
+  return (partnerKey && PARTNER_LABELS[partnerKey]) || 'Partner'
+}
+
+export function PartnerAuthorBadge({
+  authorName,
+  photoUrl,
+  variant = 'compact',
+  bio,
+  partnerKey,
+}: PartnerAuthorBadgeProps) {
   if (variant === 'compact') {
     return (
       <div className="flex items-center gap-1.5">
@@ -26,19 +38,17 @@ export function PartnerAuthorBadge({ authorName, photoUrl, variant = 'compact', 
             className="h-5 w-5 rounded-full object-cover"
           />
         ) : (
-          <Handshake className="h-4 w-4 text-emerald-600" />
+          <Handshake className="h-4 w-4 text-room-accent" />
         )}
         <span className="truncate max-w-[120px]">{authorName}</span>
-        <Badge variant="outline" className="text-[10px] px-1 py-0 border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-400">
-          Partner
-        </Badge>
+        <StateChip>PARTNER</StateChip>
       </div>
     )
   }
 
   // Full variant for detail pages
   return (
-    <div className="flex items-start gap-3 p-3 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/50 dark:border-emerald-800/30">
+    <div className="flex items-start gap-3 rounded-[6px] border border-studio-hairline bg-studio-cream p-3">
       <div className="shrink-0">
         {photoUrl ? (
           <img
@@ -47,19 +57,20 @@ export function PartnerAuthorBadge({ authorName, photoUrl, variant = 'compact', 
             className="h-10 w-10 rounded-full object-cover"
           />
         ) : (
-          <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-            <Handshake className="h-5 w-5 text-emerald-600" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-room/10">
+            <Handshake className="h-5 w-5 text-room-accent" />
           </div>
         )}
       </div>
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-sm">{authorName}</span>
-          <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-400">
-            Impact Focus
-          </Badge>
+      <div className="min-w-0 space-y-1">
+        <div className="font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-room-accent">
+          {creditLabel(partnerKey)}
         </div>
-        {bio && <p className="text-xs text-muted-foreground">{bio}</p>}
+        <div className="flex items-center gap-2">
+          <span className="font-display text-sm font-semibold text-foreground">{authorName}</span>
+          <StateChip>PARTNER</StateChip>
+        </div>
+        {bio && <p className="text-xs text-studio-dim">{bio}</p>}
       </div>
     </div>
   )

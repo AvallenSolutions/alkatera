@@ -2,14 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { StateChip } from "@/components/studio/state-chip";
+import { PillButton } from "@/components/studio/pill-button";
 import {
   Wine,
   Layers,
   Workflow,
-  Pencil,
-  Check,
 } from "lucide-react";
 import { RecipeScaleToggle } from "@/components/products/RecipeScaleToggle";
 import { ProductionChainEditor } from "@/components/products/ProductionChainEditor";
@@ -132,15 +131,14 @@ export function RecipeModePicker(props: RecipeModePickerProps) {
           : "Per unit";
     return (
       <>
-        <div className="flex items-center justify-between rounded-md border bg-muted/30 px-4 py-2 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">Recipe mode:</span>
-            <span className="font-medium">{summary}</span>
+        <div className="flex items-center justify-between rounded-[6px] border border-border bg-card px-4 py-2.5 text-sm">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">Recipe mode</span>
+            <span className="font-medium text-foreground">{summary}</span>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
-            <Pencil className="h-3.5 w-3.5 mr-1" />
+          <PillButton variant="ghost" size="sm" onClick={() => setEditing(true)}>
             Change
-          </Button>
+          </PillButton>
         </div>
 
         {/* Render the relevant editor for the active mode */}
@@ -218,14 +216,13 @@ export function RecipeModePicker(props: RecipeModePickerProps) {
       <Card>
         <CardContent className="p-4 space-y-3">
           <div>
-            <h3 className="text-sm font-semibold">How do you measure your ingredients?</h3>
-            <p className="text-xs text-muted-foreground">
+            <Eyebrow tone="dim">How do you measure your ingredients?</Eyebrow>
+            <p className="text-xs text-muted-foreground mt-1.5">
               Pick the mode that matches how you track production. You can change this any time.
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {cards.map((c) => {
-              const Icon = c.icon;
               const active = currentMode === c.mode;
               return (
                 <button
@@ -233,19 +230,16 @@ export function RecipeModePicker(props: RecipeModePickerProps) {
                   type="button"
                   onClick={() => handleSelect(c.mode)}
                   className={
-                    "text-left rounded-md border p-3 transition-colors focus:outline-none focus:ring-2 focus:ring-ring " +
+                    "text-left rounded-[6px] border p-3 transition-colors focus:outline-none focus:ring-2 focus:ring-ring " +
                     (active
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/40 hover:bg-muted/40")
+                      ? "border-room-accent bg-card"
+                      : "border-border bg-card hover:border-room-accent/40 hover:bg-muted/40")
                   }
                 >
                   <div className="flex items-center gap-2 mb-1">
-                    <Icon className="h-4 w-4" />
                     <span className="font-medium text-sm">{c.title}</span>
                     {active && (
-                      <Badge variant="secondary" className="ml-auto">
-                        <Check className="h-3 w-3 mr-1" /> Selected
-                      </Badge>
+                      <StateChip tone="good" className="ml-auto">Selected</StateChip>
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">{c.description}</p>

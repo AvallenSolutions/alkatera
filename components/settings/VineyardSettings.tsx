@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Eyebrow, Panel } from '@/components/studio';
 import { Button } from '@/components/ui/button';
 import { Leaf, Plus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -50,37 +50,34 @@ export function VineyardSettings() {
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Leaf className="h-5 w-5 text-muted-foreground" />
-                Vineyard Management
-              </CardTitle>
-              <CardDescription className="mt-1">
-                Manage your vineyards and growing operations. Each vineyard can be linked
-                to products to calculate the environmental impact of your grape growing.
-              </CardDescription>
-            </div>
-            <Button
-              onClick={() => {
-                setEditVineyard(null);
-                setDialogOpen(true);
-              }}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Vineyard
-            </Button>
+      <Panel className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-1">
+            <Eyebrow tone="dim">Vineyard management</Eyebrow>
+            <p className="text-sm text-studio-dim">
+              Manage your vineyards and growing operations. Each vineyard can be linked
+              to products to calculate the environmental impact of your grape growing.
+            </p>
           </div>
-        </CardHeader>
-        <CardContent>
+          <Button
+            onClick={() => {
+              setEditVineyard(null);
+              setDialogOpen(true);
+            }}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Vineyard
+          </Button>
+        </div>
+        <div>
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <p className="text-sm text-muted-foreground">Loading vineyards...</p>
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+                Loading
+              </span>
             </div>
           ) : vineyards.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-8 text-studio-dim">
               <Leaf className="h-12 w-12 mx-auto mb-3 opacity-30" />
               <p className="text-sm">No vineyards added yet</p>
               <p className="text-xs mt-1">
@@ -99,8 +96,8 @@ export function VineyardSettings() {
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       <AddVineyardDialog
         open={dialogOpen}

@@ -15,7 +15,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Shield,
   ArrowLeft,
   Play,
   Pause,
@@ -26,8 +25,8 @@ import {
   Clock,
   AlertTriangle,
   Globe,
-  RefreshCw,
 } from "lucide-react";
+import { Statement } from "@/components/studio/statement";
 import { StateChip } from "@/components/studio/state-chip";
 import { BigNumber } from "@/components/studio/big-number";
 import type { WorkingTone } from "@/components/studio/theme";
@@ -211,20 +210,12 @@ export default function BulkJobPage() {
               </Button>
             </Link>
           </div>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Shield className="h-6 w-6 text-studio-brick" />
-              <div>
-                <h1 className="font-display text-2xl font-bold text-foreground">{job.title}</h1>
-                <p className="text-muted-foreground">
-                  Created {format(new Date(job.created_at), "MMM d, yyyy 'at' h:mm a")}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {getStatusBadge(job.status)}
-            </div>
-          </div>
+          <Statement eyebrow="THE EVIDENCE · GUARDIAN" headline={job.title}>
+            {getStatusBadge(job.status)}
+          </Statement>
+          <p className="mt-3 font-mono text-[11px] text-studio-dim">
+            Created {format(new Date(job.created_at), "MMM d, yyyy 'at' h:mm a")}
+          </p>
         </div>
       </div>
 
@@ -284,7 +275,6 @@ export default function BulkJobPage() {
               {(job.status === "completed" || job.status === "cancelled" || job.status === "failed") && (
                 <>
                   <Button onClick={loadJob} variant="outline">
-                    <RefreshCw className="h-4 w-4 mr-2" />
                     Refresh
                   </Button>
                   <Button

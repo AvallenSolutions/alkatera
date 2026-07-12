@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StateChip } from "@/components/studio";
 import { Briefcase, Plus } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -102,13 +103,11 @@ export function ServicesOverheadCard({ reportId, entries, xeroEntries, onUpdate,
   return (
     <>
       <Card className="relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-pink-50 dark:bg-pink-950 rounded-full -mr-16 -mt-16 opacity-50" />
-
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-pink-100 dark:bg-pink-900 flex items-center justify-center">
-                <Briefcase className="h-5 w-5 text-pink-600 dark:text-pink-400" />
+              <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                <Briefcase className="h-5 w-5 text-room-accent" />
               </div>
               <div>
                 <CardTitle className="text-lg">Services & Overhead</CardTitle>
@@ -117,10 +116,10 @@ export function ServicesOverheadCard({ reportId, entries, xeroEntries, onUpdate,
             </div>
             <div className="flex flex-col items-end gap-1.5">
               {(entries.length > 0 || (xeroEntries && xeroEntries.length > 0)) && (
-                <Badge className="bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-100">
+                <StateChip>
                   {entries.length} {entries.length === 1 ? "entry" : "entries"}
                   {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} from Xero`}
-                </Badge>
+                </StateChip>
               )}
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-muted-foreground">Not applicable</span>
@@ -134,7 +133,7 @@ export function ServicesOverheadCard({ reportId, entries, xeroEntries, onUpdate,
           {(entries.length > 0 || xeroTotal > 0) ? (
             <>
               <div className="text-center py-4 border-b">
-                <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">
+                <div className="text-3xl font-bold text-foreground">
                   {formatEmissions(combinedTotal)}
                 </div>
                 <div className="text-sm text-muted-foreground mt-1">
@@ -147,13 +146,13 @@ export function ServicesOverheadCard({ reportId, entries, xeroEntries, onUpdate,
                 {entries.map((entry) => (
                   <div
                     key={entry.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-900"
+                    className="flex items-center justify-between p-3 rounded-lg bg-secondary"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm truncate flex items-center gap-1.5">
                         {entry.description}
                         {entry.data_source === 'xero_upgrade' && (
-                          <Badge variant="outline" className="text-[9px] shrink-0 border-teal-300 text-teal-700 dark:text-teal-400 dark:border-teal-700">Xero</Badge>
+                          <StateChip className="shrink-0">Xero</StateChip>
                         )}
                       </div>
                       <div className="text-xs text-muted-foreground">

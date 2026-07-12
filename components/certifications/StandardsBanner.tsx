@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
+import { PillButton } from '@/components/studio';
 import { BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -65,23 +65,23 @@ export function StandardsBanner({
   };
 
   return (
-    <div className="w-full rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 dark:border-blue-800 dark:bg-blue-950/30">
+    <div className="w-full rounded-[6px] border border-studio-hairline border-l-2 border-l-room-accent bg-studio-cream px-4 py-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
-          <BookOpen className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
+          <BookOpen className="mt-0.5 h-5 w-5 shrink-0 text-room-accent" />
           <div>
-            <p className="font-semibold text-blue-900 dark:text-blue-200">
+            <p className="font-display font-semibold text-foreground">
               Standards updated: {data.latest.version_code}
             </p>
-            <p className="text-sm text-blue-800 dark:text-blue-300">
+            <p className="text-sm text-muted-foreground">
               {data.latest.summary ??
                 'A newer version of the B Corp standards is available.'}
             </p>
           </div>
         </div>
-        <Button size="sm" disabled={busy} onClick={apply} className="shrink-0">
+        <PillButton size="sm" disabled={busy} onClick={apply} className="shrink-0">
           {busy ? 'Applying...' : 'Review changes'}
-        </Button>
+        </PillButton>
       </div>
     </div>
   );

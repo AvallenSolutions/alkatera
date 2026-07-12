@@ -8,11 +8,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Check, X, Loader2, Sparkles } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Statement } from '@/components/studio/statement';
+import { BigNumber } from '@/components/studio/big-number';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { StateChip } from '@/components/studio/state-chip';
+import { PillButton } from '@/components/studio/pill-button';
 
 interface Suggestion {
   id: string;
@@ -63,71 +65,79 @@ export default function SupplierMatchesPage() {
     return Array.from(map.values());
   }, [suggestions]);
 
+  const total = suggestions?.length ?? 0;
+
   return (
-    <div className="space-y-6">
-      <header className="space-y-2">
-        <Link href="/products" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-3 w-3" />
-          Back to products
-        </Link>
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-6 w-6 text-[#2B46C0]" />
-          <h1 className="text-3xl font-semibold tracking-tight">Supplier matches</h1>
-        </div>
-        <p className="max-w-xl text-sm text-muted-foreground">
-          We found supplier products that may match your ingredients. Accepting one links your
-          ingredient to the supplier&apos;s real data. Recalculate the product afterwards to apply it.
-        </p>
-      </header>
+    <div className="mx-auto max-w-3xl space-y-8">
+      <Link
+        href="/products"
+        className="inline-flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <ArrowLeft className="h-3 w-3" />
+        The products
+      </Link>
+
+      <Statement eyebrow="THE CELLAR · SUPPLIER MATCHES" headline="Matches to review.">
+        {total > 0 ? <BigNumber size="display" value={total} label="Suggestions" tone="room" /> : null}
+      </Statement>
+
+      <p className="max-w-xl text-sm text-muted-foreground">
+        Supplier products that may match your ingredients. Accepting one links your ingredient to the
+        supplier&apos;s real data. Recalculate the product afterwards to apply it.
+      </p>
 
       {suggestions === null ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <p className="text-sm text-muted-foreground">Loading the suggestions.</p>
       ) : suggestions.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            No matches to review. Use &quot;Find supplier matches&quot; on the products page to look again,
-            or connect more suppliers.
-          </CardContent>
-        </Card>
+        <p className="text-sm text-muted-foreground">
+          No matches to review. Connect more suppliers, or add supplier products, and they will show up here.
+        </p>
       ) : (
-        grouped.map((rows) => (
-          <Card key={String(rows[0].product_id)}>
-            <CardHeader>
-              <CardTitle className="text-base">
-                <Link href={`/products/${rows[0].product_id}`} className="hover:underline">
-                  Product matches ({rows.length})
-                </Link>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {rows.map((s) => (
-                <div key={s.id} className="flex flex-wrap items-center gap-3 rounded-md border border-border/60 px-3 py-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm">
-                      <span className="font-medium">{s.ingredient_name}</span>
-                      <span className="mx-2 text-muted-foreground">→</span>
-                      <span className="font-medium">{s.supplier_product_name}</span>
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {s.supplier_name ? `${s.supplier_name} · ` : ''}{s.match_reason}
-                    </p>
-                  </div>
-                  <Badge variant="outline" className="text-[10px]">
-                    {Math.round(s.match_confidence * 100)}% match
-                  </Badge>
-                  <Button size="sm" className="h-7 text-xs" disabled={busyId === s.id} onClick={() => act(s.id, 'accept')}>
-                    {busyId === s.id ? <Loader2 className="h-3.5 w-3.5" /> : <Check className="mr-1 h-3.5 w-3.5" />}
-                    Accept
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" disabled={busyId === s.id} onClick={() => act(s.id, 'dismiss')}>
-                    <X className="mr-1 h-3.5 w-3.5" />
-                    Dismiss
-                  </Button>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        ))
+        <div className="space-y-8">
+          {grouped.map((rows) => (
+            <section key={String(rows[0].product_id)} className="space-y-3">
+              <Link href={`/products/${rows[0].product_id}`}>
+                <Eyebrow>{`PRODUCT · ${rows.length} ${rows.length === 1 ? 'MATCH' : 'MATCHES'}`}</Eyebrow>
+              </Link>
+              <ul className="divide-y divide-border">
+                {rows.map((s) => (
+                  <li key={s.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm">
+                        <span className="font-medium">{s.ingredient_name}</span>
+                        <span className="mx-2 text-muted-foreground">→</span>
+                        <span className="font-medium">{s.supplier_product_name}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {s.supplier_name ? `${s.supplier_name} · ` : ''}
+                        {s.match_reason}
+                      </p>
+                    </div>
+                    <StateChip tone={s.match_confidence >= 0.75 ? 'good' : 'attention'}>
+                      {Math.round(s.match_confidence * 100)}% match
+                    </StateChip>
+                    <PillButton
+                      variant="room"
+                      size="sm"
+                      disabled={busyId === s.id}
+                      onClick={() => act(s.id, 'accept')}
+                    >
+                      {busyId === s.id ? 'Linking…' : 'Accept'}
+                    </PillButton>
+                    <PillButton
+                      variant="ghost"
+                      size="sm"
+                      disabled={busyId === s.id}
+                      onClick={() => act(s.id, 'dismiss')}
+                    >
+                      Dismiss
+                    </PillButton>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
       )}
     </div>
   );

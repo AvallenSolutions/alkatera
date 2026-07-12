@@ -1,12 +1,18 @@
 'use client'
 
+/**
+ * Supplier engagement as a quiet section: a mono eyebrow, hairline rows,
+ * typographic status chips and one quiet action per supplier. Same data
+ * as before; the Mail-icon card is gone.
+ */
+
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Loader2, Mail, ExternalLink, CheckCircle2, ArrowRight } from 'lucide-react'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
+import { Eyebrow } from '@/components/studio/eyebrow'
+import { StateChip } from '@/components/studio/state-chip'
+import { PillButton } from '@/components/studio/pill-button'
+import type { WorkingTone } from '@/components/studio/theme'
 
 interface EngageableSupplier {
   xeroContactName: string
@@ -20,6 +26,19 @@ interface EngageableSupplier {
 interface SupplierEngagementPromptsProps {
   /** Optional: limit to top N suppliers */
   limit?: number
+}
+
+function statusChip(status: string | null): { tone: WorkingTone; label: string } {
+  switch (status) {
+    case 'data_provided':
+      return { tone: 'good', label: 'DATA RECEIVED' }
+    case 'active':
+      return { tone: 'good', label: 'ACTIVE' }
+    case 'invited':
+      return { tone: 'quiet', label: 'INVITED' }
+    default:
+      return { tone: 'quiet', label: (status || 'UNKNOWN').toUpperCase() }
+  }
 }
 
 export function SupplierEngagementPrompts({ limit = 10 }: SupplierEngagementPromptsProps) {
@@ -83,13 +102,7 @@ export function SupplierEngagementPrompts({ limit = 10 }: SupplierEngagementProm
     new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0 }).format(amount)
 
   if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
-    )
+    return <div className="h-16 animate-pulse rounded-[6px] bg-studio-cream" aria-hidden="true" />
   }
 
   if (suppliers.length === 0) return null
@@ -98,90 +111,71 @@ export function SupplierEngagementPrompts({ limit = 10 }: SupplierEngagementProm
   const engaged = suppliers.filter(s => s.hasEngagement)
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Mail className="h-5 w-5" />
-          Supplier Engagement
-        </CardTitle>
-        <CardDescription>
-          Request carbon data from your top suppliers to achieve Tier 1 data quality.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Unengaged suppliers */}
-        {unengaged.length > 0 && (
-          <div className="space-y-2">
-            {unengaged.map(s => (
-              <div
-                key={s.supplierId}
-                className="flex items-center justify-between p-3 rounded-lg border bg-slate-50 dark:bg-slate-900/50"
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm truncate">{s.supplierName}</span>
-                    <Badge variant="outline" className="text-[10px] shrink-0">
-                      {formatCurrency(s.totalSpend)}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Request their carbon data for Tier 1 accuracy
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0 ml-3"
-                  asChild
-                >
-                  <a href={`/suppliers?invite=${encodeURIComponent(s.supplierName)}`}>
-                    <Mail className="h-3.5 w-3.5 mr-1.5" />
-                    Request data
-                  </a>
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
+    <section className="space-y-4">
+      <div className="border-b border-studio-hairline pb-2">
+        <Eyebrow>SUPPLIER ENGAGEMENT</Eyebrow>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Ask your biggest suppliers for their own carbon data: the route to Tier 1 accuracy.
+        </p>
+      </div>
 
-        {/* Already engaged suppliers */}
-        {engaged.length > 0 && (
-          <div className="space-y-1">
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-              Already Engaged
-            </h4>
-            {engaged.map(s => (
+      {/* Unengaged suppliers */}
+      {unengaged.length > 0 && (
+        <div>
+          {unengaged.map(s => (
+            <div
+              key={s.supplierId}
+              className="flex items-center justify-between gap-4 border-b border-studio-hairline py-3"
+            >
+              <div className="min-w-0">
+                <div className="flex items-baseline gap-2">
+                  <span className="truncate font-display text-sm font-semibold text-foreground">
+                    {s.supplierName}
+                  </span>
+                  <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.15em] text-studio-dim">
+                    {formatCurrency(s.totalSpend)}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Request their carbon data for Tier 1 accuracy
+                </p>
+              </div>
+              <PillButton
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                href={`/suppliers?invite=${encodeURIComponent(s.supplierName)}`}
+              >
+                Request data
+              </PillButton>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Already engaged suppliers */}
+      {engaged.length > 0 && (
+        <div>
+          <Eyebrow tone="dim" className="mb-1">ALREADY ENGAGED</Eyebrow>
+          {engaged.map(s => {
+            const chip = statusChip(s.engagementStatus)
+            return (
               <div
                 key={s.supplierId}
-                className="flex items-center justify-between text-sm py-1.5 px-2 rounded hover:bg-slate-50 dark:hover:bg-slate-900"
+                className="flex items-center justify-between gap-4 border-b border-studio-hairline py-2 text-sm"
               >
-                <div className="flex items-center gap-2 min-w-0">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                  <span className="truncate">{s.supplierName}</span>
-                  <Badge
-                    variant="outline"
-                    className={`text-[10px] shrink-0 ${
-                      s.engagementStatus === 'data_provided'
-                        ? 'border-emerald-300 text-emerald-700 dark:text-emerald-400'
-                        : s.engagementStatus === 'active'
-                          ? 'border-blue-300 text-blue-700 dark:text-blue-400'
-                          : ''
-                    }`}
-                  >
-                    {s.engagementStatus === 'data_provided' ? 'Data received' :
-                     s.engagementStatus === 'active' ? 'Active' :
-                     s.engagementStatus === 'invited' ? 'Invited' :
-                     s.engagementStatus || 'Unknown'}
-                  </Badge>
+                <div className="flex min-w-0 items-baseline gap-2">
+                  <span className="truncate font-display font-semibold text-foreground">{s.supplierName}</span>
+                  <StateChip tone={chip.tone}>{chip.label}</StateChip>
                 </div>
-                <span className="text-xs text-muted-foreground shrink-0 ml-2">
+                <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.15em] text-studio-dim">
                   {formatCurrency(s.totalSpend)}
                 </span>
               </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+            )
+          })}
+        </div>
+      )}
+    </section>
   )
 }

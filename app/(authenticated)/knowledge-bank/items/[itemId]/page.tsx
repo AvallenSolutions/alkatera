@@ -1,28 +1,26 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { formatDistanceToNow } from 'date-fns'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import { Skeleton } from '@/components/ui/skeleton'
 import {
   ChevronLeft,
   Download,
-  Eye,
   Star,
-  User,
-  Calendar,
   FileText,
   Video,
   Link as LinkIcon,
+  Code2,
   ExternalLink,
 } from 'lucide-react'
-import { useKnowledgeBankItem, KnowledgeBankItem } from '@/hooks/data/useKnowledgeBank'
+import { useKnowledgeBankItem } from '@/hooks/data/useKnowledgeBank'
 import { PartnerAuthorBadge } from '@/components/knowledge-bank/PartnerAuthorBadge'
+import { Statement } from '@/components/studio/statement'
+import { Panel } from '@/components/studio/panel'
+import { StateChip } from '@/components/studio/state-chip'
+import { Eyebrow } from '@/components/studio/eyebrow'
+import { PillButton } from '@/components/studio/pill-button'
+import { PageLoader } from '@/components/ui/page-loader'
 import { supabase } from '@/lib/supabaseClient'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -31,7 +29,7 @@ const contentTypeIcons = {
   document: FileText,
   video: Video,
   link: LinkIcon,
-  embedded: FileText,
+  embedded: Code2,
 }
 
 export default function ItemDetailPage() {
@@ -51,12 +49,13 @@ export default function ItemDetailPage() {
   }, [item])
 
   // Generate a signed URL for private storage files
-  // External links (content_type === 'link') use file_url directly as it's a URL, not a storage path
+  // External links and embeds (content_type 'link' / 'embedded') use file_url
+  // directly as it's a URL, not a storage path.
   // Global items (organization_id === null) use a server-side API route because
   // the files may be stored under another org's path in the storage bucket.
   useEffect(() => {
     async function generateSignedUrl() {
-      if (!item?.file_url || item.content_type === 'link') return
+      if (!item?.file_url || item.content_type === 'link' || item.content_type === 'embedded') return
 
       // Global items: use the API route (service role) to bypass storage path restrictions
       if (item.organization_id === null) {
@@ -214,36 +213,19 @@ export default function ItemDetailPage() {
   }
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-64" />
-        <Card>
-          <CardContent className="p-8 space-y-6">
-            <Skeleton className="h-12 w-12 rounded-lg" />
-            <Skeleton className="h-8 w-3/4" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-2/3" />
-          </CardContent>
-        </Card>
-      </div>
-    )
+    return <PageLoader />
   }
 
   if (!item) {
     return (
       <div className="space-y-6">
-        <Button variant="ghost" asChild>
-          <Link href="/knowledge-bank">
-            <ChevronLeft className="mr-2 h-4 w-4" />
-            Back to Knowledge Bank
-          </Link>
-        </Button>
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">Resource not found</p>
-          </CardContent>
-        </Card>
+        <PillButton variant="ghost" href="/knowledge-bank">
+          <ChevronLeft className="h-4 w-4" />
+          Back to the library
+        </PillButton>
+        <Panel>
+          <p className="py-8 text-center text-sm text-studio-dim">Resource not found.</p>
+        </Panel>
       </div>
     )
   }
@@ -259,185 +241,163 @@ export default function ItemDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <Button variant="ghost" asChild>
-        <Link href="/knowledge-bank">
-          <ChevronLeft className="mr-2 h-4 w-4" />
-          Back to Knowledge Bank
-        </Link>
-      </Button>
+    <div className="space-y-8">
+      <PillButton variant="ghost" href="/knowledge-bank">
+        <ChevronLeft className="h-4 w-4" />
+        Back to the library
+      </PillButton>
+
+      <Statement eyebrow="THE LIBRARY · KNOWLEDGE" headline={item.title}>
+        <button
+          type="button"
+          onClick={handleFavoriteToggle}
+          disabled={isTogglingFavorite}
+          aria-label={isFavorited ? 'Remove from favourites' : 'Add to favourites'}
+          className={cn(
+            'inline-flex h-9 w-9 items-center justify-center rounded-full transition-colors duration-150 ease-studio disabled:opacity-50',
+            isFavorited
+              ? 'text-room-accent hover:bg-room/10'
+              : 'text-studio-dim hover:text-room-accent'
+          )}
+        >
+          <Star className={cn('h-5 w-5', isFavorited && 'fill-current')} />
+        </button>
+      </Statement>
+
+      {item.description && (
+        <p className="max-w-2xl text-sm leading-relaxed text-studio-dim">{item.description}</p>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4 flex-1 min-w-0">
-                  <div className="flex-shrink-0">
-                    <Icon className="h-8 w-8 text-neon-lime" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-2xl mb-2">{item.title}</CardTitle>
-                    {item.description && (
-                      <p className="text-muted-foreground">{item.description}</p>
-                    )}
-                  </div>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    'flex-shrink-0',
-                    isFavorited ? 'text-yellow-500 hover:text-yellow-600' : 'hover:text-yellow-500'
-                  )}
-                  onClick={handleFavoriteToggle}
-                  disabled={isTogglingFavorite}
-                >
-                  <Star className={cn('h-5 w-5', isFavorited && 'fill-current')} />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex flex-wrap gap-2">
-                {item.category && (
-                  <Badge variant="secondary">{item.category.name}</Badge>
-                )}
-                <Badge variant="outline" className="capitalize">
-                  {item.content_type}
-                </Badge>
+          <Panel>
+            <div className="mb-5 flex items-center gap-3">
+              <Icon className="h-6 w-6 text-room-accent" />
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                {item.category && <StateChip>{item.category.name}</StateChip>}
+                <StateChip>{item.content_type}</StateChip>
                 {item.tags?.map((tag) => (
-                  <Badge key={tag} variant="outline">
-                    {tag}
-                  </Badge>
+                  <StateChip key={tag}>{tag}</StateChip>
                 ))}
               </div>
+            </div>
 
-              <Separator />
+            {item.content_type === 'video' && item.file_url && signedUrl && (
+              <div className="aspect-video overflow-hidden rounded-[6px] border border-studio-hairline bg-studio-paper">
+                <video controls className="h-full w-full">
+                  <source src={signedUrl} />
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+            )}
 
-              {item.content_type === 'video' && item.file_url && signedUrl && (
-                <div className="aspect-video bg-muted rounded-lg overflow-hidden">
-                  <video controls className="w-full h-full">
-                    <source src={signedUrl} />
-                    Your browser does not support the video tag.
-                  </video>
-                </div>
-              )}
+            {item.content_type === 'embedded' && item.file_url && (
+              <iframe
+                src={item.file_url}
+                title={item.title}
+                className="aspect-video w-full rounded-[6px] border border-studio-hairline bg-studio-paper"
+                sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                referrerPolicy="no-referrer"
+                loading="lazy"
+              />
+            )}
 
-              {item.content_type === 'link' && item.file_url && (
-                <div className="p-6 bg-muted rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <ExternalLink className="h-5 w-5 text-muted-foreground" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium">External Resource</p>
-                      <a
-                        href={item.file_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-neon-lime hover:underline truncate block"
-                      >
-                        {item.file_url}
-                      </a>
-                    </div>
+            {item.content_type === 'link' && item.file_url && (
+              <div className="rounded-[6px] border border-studio-hairline bg-studio-paper p-6">
+                <div className="flex items-center gap-3">
+                  <ExternalLink className="h-5 w-5 text-studio-dim" />
+                  <div className="min-w-0 flex-1">
+                    <Eyebrow tone="dim" className="mb-1">EXTERNAL RESOURCE</Eyebrow>
+                    <a
+                      href={item.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block truncate text-sm text-room-accent hover:underline"
+                    >
+                      {item.file_url}
+                    </a>
                   </div>
                 </div>
-              )}
+              </div>
+            )}
 
-              {item.content_type === 'document' && item.file_url && (
-                <div className="flex gap-3">
-                  <Button onClick={handleDownload} className="flex-1" disabled={!signedUrl}>
-                    <Download className="mr-2 h-4 w-4" />
-                    {signedUrl ? 'Download Document' : 'Preparing download...'}
-                  </Button>
-                  {signedUrl && (
-                    <Button variant="outline" asChild>
-                      <a href={signedUrl} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="mr-2 h-4 w-4" />
-                        Open
-                      </a>
-                    </Button>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+            {item.content_type === 'document' && item.file_url && (
+              <div className="flex gap-3">
+                <PillButton
+                  variant="room"
+                  onClick={handleDownload}
+                  disabled={!signedUrl}
+                  className="flex-1"
+                >
+                  <Download className="h-4 w-4" />
+                  {signedUrl ? 'Download document' : 'Preparing download...'}
+                </PillButton>
+                {signedUrl && (
+                  <PillButton variant="outline" href={signedUrl}>
+                    <ExternalLink className="h-4 w-4" />
+                    Open
+                  </PillButton>
+                )}
+              </div>
+            )}
+          </Panel>
         </div>
 
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <Eye className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Views:</span>
-                  <span className="font-medium ml-auto">{item.view_count}</span>
-                </div>
+          <Panel>
+            <Eyebrow tone="dim" className="mb-4">DETAILS</Eyebrow>
+            <dl className="space-y-3 text-sm">
+              <DetailRow label="Views" value={String(item.view_count)} />
+              {item.content_type === 'document' && (
+                <DetailRow label="Downloads" value={String(item.download_count)} />
+              )}
+              {item.file_size > 0 && (
+                <DetailRow label="Size" value={formatFileSize(item.file_size)} />
+              )}
 
-                {item.content_type === 'document' && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Download className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Downloads:</span>
-                    <span className="font-medium ml-auto">{item.download_count}</span>
-                  </div>
-                )}
-
-                {item.file_size > 0 && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Size:</span>
-                    <span className="font-medium ml-auto">{formatFileSize(item.file_size)}</span>
-                  </div>
-                )}
-
-                <Separator />
-
+              <div className="border-t border-studio-hairline pt-3">
                 {item.partner_attribution && item.external_author_name ? (
                   <PartnerAuthorBadge
                     authorName={item.external_author_name}
                     photoUrl={item.external_author_photo_url}
                     bio={item.external_author_bio}
+                    partnerKey={item.partner_attribution}
                     variant="full"
                   />
                 ) : (
-                  <div className="flex items-center gap-2 text-sm">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Author:</span>
-                    <span className="font-medium ml-auto truncate">
-                      {item.author?.full_name || (item.organization_id === null ? 'alkatera' : 'Unknown')}
-                    </span>
-                  </div>
+                  <DetailRow
+                    label="Author"
+                    value={item.author?.full_name || (item.organization_id === null ? 'alkatera' : 'Unknown')}
+                  />
                 )}
-
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Created:</span>
-                  <span className="font-medium ml-auto">
-                    {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
-                  </span>
-                </div>
-
-                {item.published_at && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Published:</span>
-                    <span className="font-medium ml-auto">
-                      {formatDistanceToNow(new Date(item.published_at), { addSuffix: true })}
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex items-center gap-2 text-sm">
-                  <Badge variant="outline" className="ml-auto">
-                    v{item.version}
-                  </Badge>
-                </div>
               </div>
-            </CardContent>
-          </Card>
+
+              <DetailRow
+                label="Created"
+                value={formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+              />
+              {item.published_at && (
+                <DetailRow
+                  label="Published"
+                  value={formatDistanceToNow(new Date(item.published_at), { addSuffix: true })}
+                />
+              )}
+              <DetailRow label="Version" value={`v${item.version}`} />
+            </dl>
+          </Panel>
         </div>
       </div>
+    </div>
+  )
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4">
+      <dt className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+        {label}
+      </dt>
+      <dd className="truncate font-display text-sm font-semibold text-foreground">{value}</dd>
     </div>
   )
 }

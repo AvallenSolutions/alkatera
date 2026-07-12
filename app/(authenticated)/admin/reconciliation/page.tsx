@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useIsAlkateraAdmin } from '@/hooks/usePermissions'
 import { supabase } from '@/lib/supabaseClient'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Panel } from '@/components/studio/panel'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -129,15 +129,15 @@ export default function ReconciliationPage() {
   if (adminLoading) {
     return (
       <div className="flex justify-center py-12">
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">Loading…</p>
       </div>
     )
   }
 
   if (!isAlkateraAdmin) {
     return (
-      <Card className="max-w-xl mx-auto mt-12">
-        <CardContent className="py-6 flex items-start gap-3">
+      <Panel className="max-w-xl mx-auto mt-12">
+        <div className="py-6 flex items-start gap-3">
           <ShieldAlert className="h-5 w-5 text-muted-foreground mt-0.5" />
           <div>
             <h2 className="font-semibold">Admin access required</h2>
@@ -145,8 +145,8 @@ export default function ReconciliationPage() {
               This tool is only available to platform administrators.
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     )
   }
 
@@ -164,15 +164,15 @@ export default function ReconciliationPage() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Capture new snapshot</CardTitle>
-          <CardDescription>
+      <Panel>
+        <div className="mb-4 space-y-1">
+          <h2 className="font-display text-base font-semibold text-foreground">Capture new snapshot</h2>
+          <p className="text-sm text-studio-dim">
             Recomputes the org&apos;s footprint via the current resolver and logs it alongside the
             prior snapshot for diffing.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-[1fr_120px_1fr_auto] items-end">
+          </p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-[1fr_120px_1fr_auto] items-end">
           <div className="space-y-1.5">
             <Label>Organisation</Label>
             <Select value={orgId} onValueChange={setOrgId}>
@@ -204,17 +204,17 @@ export default function ReconciliationPage() {
             {!capturing && <Camera className="h-4 w-4 mr-2" />}
             {capturing ? 'Capturing…' : 'Capture'}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Recent snapshots</CardTitle>
-          <CardDescription>
+      <Panel>
+        <div className="mb-4 space-y-1">
+          <h2 className="font-display text-base font-semibold text-foreground">Recent snapshots</h2>
+          <p className="text-sm text-studio-dim">
             Snapshots flagged for attention moved the total by more than 5&#37;: notify the customer.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div>
           {snapshots.length === 0 ? (
             <div className="text-sm text-muted-foreground py-4 text-center">
               No snapshots yet.
@@ -244,7 +244,7 @@ export default function ReconciliationPage() {
                       <TableCell className="text-sm">{s.organization_name || s.organization_id.slice(0, 8)}</TableCell>
                       <TableCell className="font-mono text-xs">{s.year}</TableCell>
                       <TableCell className="text-right font-mono text-xs">
-                        {s.previous_total_kg !== null ? (s.previous_total_kg / 1000).toFixed(2) : '—'}
+                        {s.previous_total_kg !== null ? (s.previous_total_kg / 1000).toFixed(2) : '·'}
                       </TableCell>
                       <TableCell className="text-right font-mono text-xs">
                         {(s.new_total_kg / 1000).toFixed(2)}
@@ -254,10 +254,10 @@ export default function ReconciliationPage() {
                           <StateChip tone={material ? 'attention' : 'quiet'}>
                             {s.delta_pct > 0 ? '+' : ''}{s.delta_pct.toFixed(1)}&#37;
                           </StateChip>
-                        ) : '—'}
+                        ) : '·'}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground max-w-[160px] truncate">
-                        {s.reason || '—'}
+                        {s.reason || '·'}
                       </TableCell>
                       <TableCell>
                         {s.notified_at ? (
@@ -282,8 +282,8 @@ export default function ReconciliationPage() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     </div>
   )
 }

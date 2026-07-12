@@ -129,10 +129,10 @@ const commands: CommandItem[] = [
   },
   {
     id: 'new-supplier',
-    label: 'Add New Supplier',
+    label: 'Find or invite a supplier',
     icon: <Plus className="h-4 w-4" />,
-    href: '/suppliers/new',
-    keywords: ['add', 'vendor'],
+    href: '/suppliers/?invite=1',
+    keywords: ['add', 'vendor', 'supplier', 'invite'],
     group: 'Quick Actions',
   },
   {

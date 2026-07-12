@@ -1,14 +1,20 @@
-import { Loader2 } from 'lucide-react';
-
 interface PageLoaderProps {
+  /** Kept for call-site compatibility; the quiet skeleton does not shout. */
   message?: string;
 }
 
-export function PageLoader({ message = 'Loading...' }: PageLoaderProps) {
+/**
+ * The studio loading state: a quiet pulse skeleton in the page's shape
+ * (statement line + two row blocks). No spinners in the house.
+ */
+export function PageLoader(_props: PageLoaderProps) {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-      <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      <p className="text-muted-foreground text-sm">{message}</p>
+    <div className="mx-auto max-w-4xl space-y-10 py-2" aria-busy="true" aria-live="polite">
+      <div className="h-10 w-64 animate-pulse rounded-[6px] bg-studio-hairline/60" />
+      <div className="space-y-3">
+        <div className="h-14 animate-pulse rounded-[6px] bg-studio-hairline/40" />
+        <div className="h-14 animate-pulse rounded-[6px] bg-studio-hairline/40" />
+      </div>
     </div>
   );
 }

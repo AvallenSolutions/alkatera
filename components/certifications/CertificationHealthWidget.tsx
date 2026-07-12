@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ShieldCheck, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 interface HealthScoreResponse {
   hasCertification: boolean;
@@ -11,6 +10,17 @@ interface HealthScoreResponse {
   previousScore?: number | null;
 }
 
+const TREND_WORD: Record<NonNullable<HealthScoreResponse['trend']>, string> = {
+  up: 'RISING',
+  down: 'FALLING',
+  stable: 'STEADY',
+};
+
+/**
+ * One quiet fact row for the brief: the B Corp certification health score
+ * standing right in a working tone, the trend as a mono word beside it.
+ * Renders nothing when the org has no certification.
+ */
 export function CertificationHealthWidget() {
   const [data, setData] = useState<HealthScoreResponse | null>(null);
 
@@ -29,15 +39,6 @@ export function CertificationHealthWidget() {
 
   if (!data || !data.hasCertification || data.score == null) return null;
 
-  const trendIcon =
-    data.trend === 'up' ? (
-      <TrendingUp className="h-4 w-4 text-studio-good" />
-    ) : data.trend === 'down' ? (
-      <TrendingDown className="h-4 w-4 text-studio-stale" />
-    ) : (
-      <Minus className="h-4 w-4 text-muted-foreground" />
-    );
-
   const tone =
     data.score >= 80
       ? 'text-studio-good'
@@ -46,29 +47,31 @@ export function CertificationHealthWidget() {
         : 'text-studio-stale';
 
   return (
-    <Link href="/certifications" className="block">
-      <div className="rounded-[6px] border border-border bg-card transition-colors duration-200 ease-studio hover:border-foreground/30">
-        <div className="flex items-center justify-between p-4">
-          <div className="flex items-center gap-3">
-            <ShieldCheck className="h-5 w-5 text-studio-dim" />
-            <div>
-              <p className="text-sm font-medium">B Corp certification health</p>
-              <p className="text-xs text-muted-foreground">
-                Evidence, data recency and platform quality
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {trendIcon}
-            <span className="flex items-baseline gap-1.5">
-              <span className={`font-display text-2xl font-bold leading-none tabular-nums ${tone}`}>
-                {data.score}
-              </span>
-              <span className="font-mono text-[9.5px] uppercase tracking-[0.2em] text-foreground opacity-70">
-                / 100
-              </span>
+    <Link
+      href="/certifications"
+      className="block transition-colors duration-150 ease-studio hover:bg-studio-ink/[0.03]"
+    >
+      <div className="flex items-baseline justify-between gap-4 border-b border-border py-3">
+        <div className="min-w-0 truncate text-sm">
+          <span className="font-display font-semibold text-foreground">
+            B Corp certification health
+          </span>
+          <span className="text-studio-dim"> · Evidence, data recency and platform quality</span>
+        </div>
+        <div className="flex shrink-0 items-baseline gap-3">
+          {data.trend ? (
+            <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-studio-dim">
+              {TREND_WORD[data.trend]}
             </span>
-          </div>
+          ) : null}
+          <span className="flex items-baseline gap-1.5">
+            <span className={`font-display text-lg font-bold leading-none tabular-nums ${tone}`}>
+              {data.score}
+            </span>
+            <span className="font-mono text-[9.5px] uppercase tracking-[0.2em] text-foreground opacity-70">
+              / 100
+            </span>
+          </span>
         </div>
       </div>
     </Link>

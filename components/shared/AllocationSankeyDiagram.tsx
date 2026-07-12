@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Factory, Loader2, Package, TrendingDown } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { BigNumber } from "@/components/studio/big-number";
+import { Panel } from "@/components/studio/panel";
+import { PillButton } from "@/components/studio/pill-button";
 
 interface AllocationSankeyDiagramProps {
   organizationId: string;
@@ -76,7 +76,7 @@ export function AllocationSankeyDiagram({ organizationId }: AllocationSankeyDiag
       // Process facilities
       const facilities = facilityEmissions.map((fe: any) => ({
         id: fe.facility_id,
-        name: fe.facility?.name || "Unknown Facility",
+        name: fe.facility?.name || "Unknown facility",
         totalEmissions: fe.total_co2e || 0,
       }));
 
@@ -85,8 +85,8 @@ export function AllocationSankeyDiagram({ organizationId }: AllocationSankeyDiag
       const flows: { from: string; to: string; value: number }[] = [];
 
       productAllocations.forEach((pa: any) => {
-        const productId = pa.product_lca?.product?.id;
-        const productName = pa.product_lca?.product?.name || "Unknown Product";
+        const productId = pa.product_carbon_footprint?.product?.id;
+        const productName = pa.product_carbon_footprint?.product?.name || "Unknown product";
         const emissions = pa.allocated_emissions_kg_co2e || 0;
 
         // Aggregate by product
@@ -121,34 +121,32 @@ export function AllocationSankeyDiagram({ organizationId }: AllocationSankeyDiag
 
   if (loading) {
     return (
-      <Card className="bg-slate-900/50 border-slate-800">
-        <CardContent className="p-6 flex items-center justify-center min-h-[400px]">
-          <Loader2 className="h-8 w-8 animate-spin text-lime-400" />
-        </CardContent>
-      </Card>
+      <Panel className="flex min-h-[300px] items-center justify-center">
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+          Loading
+        </span>
+      </Panel>
     );
   }
 
   if (!flowData || flowData.flows.length === 0) {
     return (
-      <Card className="bg-slate-900/50 border-slate-800">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <TrendingDown className="h-5 w-5 text-lime-400" />
-            Allocation Flow
-          </CardTitle>
-          <CardDescription>
-            Visualize emission allocations from facilities to products
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Alert className="bg-blue-500/10 border-blue-500/20">
-            <AlertDescription className="text-blue-200">
-              No allocation data available yet. Create facility-product allocations to see the flow diagram.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
+      <section className="space-y-4">
+        <div>
+          <Eyebrow>THE FLOW</Eyebrow>
+          <p className="mt-1.5 text-sm text-studio-dim">
+            How facility emissions flow into products.
+          </p>
+        </div>
+        <div className="py-16 text-center">
+          <p className="mb-4 text-sm text-studio-dim">
+            No allocations yet. Allocate facility emissions to products to see the flow.
+          </p>
+          <PillButton variant="outline" href="/company/facilities">
+            Open the facilities
+          </PillButton>
+        </div>
+      </section>
     );
   }
 
@@ -170,32 +168,29 @@ export function AllocationSankeyDiagram({ organizationId }: AllocationSankeyDiag
   const maxProductEmissions = Math.max(...flowData.products.map((p) => p.allocatedEmissions));
 
   return (
-    <Card className="bg-slate-900/50 border-slate-800">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-white flex items-center gap-2">
-              <TrendingDown className="h-5 w-5 text-lime-400" />
-              Allocation Flow Diagram
-            </CardTitle>
-            <CardDescription>
-              Emission allocations from facilities (left) to products (right)
-            </CardDescription>
-          </div>
-          <Badge className="bg-lime-500/20 text-lime-300 border-lime-500/50">
-            {allocationPercentage.toFixed(1)}% Allocated
-          </Badge>
+    <section className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <Eyebrow>THE FLOW</Eyebrow>
+          <p className="mt-1.5 text-sm text-studio-dim">
+            Facility emissions on the left, the products that carry them on the right.
+          </p>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="relative min-h-[600px]">
-          <div className="grid grid-cols-[1fr_2fr_1fr] gap-4 h-full">
-            {/* Facilities Column */}
+        <BigNumber
+          value={`${allocationPercentage.toFixed(1)}%`}
+          label="ALLOCATED"
+          tone={allocationPercentage >= 100 ? "good" : "attention"}
+        />
+      </div>
+
+      <Panel>
+        <div className="relative">
+          <div className="grid h-full grid-cols-[1fr_2fr_1fr] gap-4">
+            {/* Facilities column */}
             <div className="space-y-2">
-              <div className="flex items-center gap-2 mb-4">
-                <Factory className="h-4 w-4 text-blue-400" />
-                <span className="text-sm font-medium text-slate-300">Facilities</span>
-              </div>
+              <Eyebrow tone="dim" className="mb-4">
+                FACILITIES
+              </Eyebrow>
               {flowData.facilities.map((facility) => {
                 const height = Math.max(40, (facility.totalEmissions / maxFacilityEmissions) * 200);
                 return (
@@ -205,12 +200,14 @@ export function AllocationSankeyDiagram({ organizationId }: AllocationSankeyDiag
                     style={{ minHeight: `${height}px` }}
                   >
                     <div
-                      className="p-3 bg-blue-500/20 border-l-4 border-blue-500 rounded hover:bg-blue-500/30 transition-all"
+                      className="rounded-[4px] border-l-4 border-room bg-room/10 p-3 transition-colors duration-150 ease-studio hover:bg-room/20"
                       style={{ height: `${height}px` }}
                     >
-                      <p className="text-xs font-medium text-white truncate">{facility.name}</p>
-                      <p className="text-xs text-blue-300 mt-1">
-                        {facility.totalEmissions.toLocaleString(undefined, {
+                      <p className="truncate font-display text-xs font-semibold text-foreground">
+                        {facility.name}
+                      </p>
+                      <p className="mt-1 font-mono text-[10px] tabular-nums text-studio-dim">
+                        {facility.totalEmissions.toLocaleString("en-GB", {
                           maximumFractionDigits: 0,
                         })}{" "}
                         kg
@@ -221,10 +218,10 @@ export function AllocationSankeyDiagram({ organizationId }: AllocationSankeyDiag
               })}
             </div>
 
-            {/* Flow Visualization */}
+            {/* Flow visualisation */}
             <div className="relative">
               <svg
-                className="absolute inset-0 w-full h-full"
+                className="absolute inset-0 h-full w-full"
                 style={{ overflow: "visible" }}
               >
                 {flowData.flows.map((flow, index) => {
@@ -252,13 +249,12 @@ export function AllocationSankeyDiagram({ organizationId }: AllocationSankeyDiag
                     <path
                       key={`flow-${index}`}
                       d={`M 0 ${facilityY} C 150 ${facilityY}, 150 ${productY}, 300 ${productY}`}
-                      stroke="rgba(163, 230, 53, 0.3)"
+                      className="stroke-room/25 transition-colors duration-150 ease-studio hover:stroke-room/60"
                       strokeWidth={pathWidth}
                       fill="none"
-                      className="hover:stroke-lime-400 transition-all"
                     >
                       <title>
-                        {flow.value.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg
+                        {flow.value.toLocaleString("en-GB", { maximumFractionDigits: 0 })} kg
                         CO₂e
                       </title>
                     </path>
@@ -267,12 +263,11 @@ export function AllocationSankeyDiagram({ organizationId }: AllocationSankeyDiag
               </svg>
             </div>
 
-            {/* Products Column */}
+            {/* Products column */}
             <div className="space-y-2">
-              <div className="flex items-center gap-2 mb-4">
-                <Package className="h-4 w-4 text-lime-400" />
-                <span className="text-sm font-medium text-slate-300">Products</span>
-              </div>
+              <Eyebrow tone="dim" className="mb-4">
+                PRODUCTS
+              </Eyebrow>
               {flowData.products.map((product) => {
                 const height = Math.max(
                   40,
@@ -285,12 +280,14 @@ export function AllocationSankeyDiagram({ organizationId }: AllocationSankeyDiag
                     style={{ minHeight: `${height}px` }}
                   >
                     <div
-                      className="p-3 bg-lime-500/20 border-r-4 border-lime-500 rounded hover:bg-lime-500/30 transition-all"
+                      className="rounded-[4px] border-r-4 border-studio-ink/60 bg-studio-ink/5 p-3 transition-colors duration-150 ease-studio hover:bg-studio-ink/10"
                       style={{ height: `${height}px` }}
                     >
-                      <p className="text-xs font-medium text-white truncate">{product.name}</p>
-                      <p className="text-xs text-lime-300 mt-1">
-                        {product.allocatedEmissions.toLocaleString(undefined, {
+                      <p className="truncate font-display text-xs font-semibold text-foreground">
+                        {product.name}
+                      </p>
+                      <p className="mt-1 font-mono text-[10px] tabular-nums text-studio-dim">
+                        {product.allocatedEmissions.toLocaleString("en-GB", {
                           maximumFractionDigits: 0,
                         })}{" "}
                         kg
@@ -302,34 +299,28 @@ export function AllocationSankeyDiagram({ organizationId }: AllocationSankeyDiag
             </div>
           </div>
 
-          {/* Summary Stats */}
-          <div className="mt-6 grid grid-cols-3 gap-4 pt-6 border-t border-slate-700">
-            <div className="text-center">
-              <p className="text-xs text-slate-400 uppercase mb-1">Total Facility Emissions</p>
-              <p className="text-xl font-bold text-blue-400">
-                {totalFacilityEmissions.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-              </p>
-              <p className="text-xs text-slate-500">kg CO₂e</p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs text-slate-400 uppercase mb-1">Allocated to Products</p>
-              <p className="text-xl font-bold text-lime-400">
-                {totalAllocatedEmissions.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-              </p>
-              <p className="text-xs text-slate-500">kg CO₂e</p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs text-slate-400 uppercase mb-1">Unallocated</p>
-              <p className="text-xl font-bold text-amber-400">
-                {(totalFacilityEmissions - totalAllocatedEmissions).toLocaleString(undefined, {
-                  maximumFractionDigits: 0,
-                })}
-              </p>
-              <p className="text-xs text-slate-500">kg CO₂e</p>
-            </div>
+          {/* Summary figures */}
+          <div className="mt-6 grid grid-cols-3 divide-x divide-studio-hairline border-t border-studio-hairline pt-5">
+            <BigNumber
+              value={totalFacilityEmissions.toLocaleString("en-GB", { maximumFractionDigits: 0 })}
+              label="KG CO2E FROM FACILITIES"
+            />
+            <BigNumber
+              className="pl-6"
+              value={totalAllocatedEmissions.toLocaleString("en-GB", { maximumFractionDigits: 0 })}
+              label="KG CO2E ALLOCATED"
+            />
+            <BigNumber
+              className="pl-6"
+              tone={totalFacilityEmissions - totalAllocatedEmissions > 0 ? "attention" : "ink"}
+              value={(totalFacilityEmissions - totalAllocatedEmissions).toLocaleString("en-GB", {
+                maximumFractionDigits: 0,
+              })}
+              label="KG CO2E UNALLOCATED"
+            />
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </Panel>
+    </section>
   );
 }

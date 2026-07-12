@@ -14,8 +14,8 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Loader2, RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { StateChip } from '@/components/studio/state-chip';
+import { PillButton } from '@/components/studio/pill-button';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { recalculateProductLca } from '@/lib/utils/recalculate-product-lca';
 
@@ -109,9 +109,11 @@ export function RecipeStalenessBanner({ productId, organizationId }: RecipeStale
 
   if (justRecalculated && !stale) {
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300">
-        <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
-        LCA recalculated with your latest recipe. Your reports are up to date.
+      <div className="flex items-center gap-3 rounded-[6px] border border-border bg-card px-4 py-3 text-sm">
+        <StateChip tone="good">Up to date</StateChip>
+        <span className="text-foreground">
+          LCA recalculated with your latest recipe. Your reports are up to date.
+        </span>
       </div>
     );
   }
@@ -119,21 +121,20 @@ export function RecipeStalenessBanner({ productId, organizationId }: RecipeStale
   if (!stale && !note) return null;
 
   return (
-    <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/20">
+    <div className="rounded-[6px] border border-studio-attention/40 bg-card px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-start gap-2 text-sm text-amber-900 dark:text-amber-300">
-          <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-          <span>
+        <div className="flex items-center gap-3 text-sm">
+          <StateChip tone="attention">Recipe changed</StateChip>
+          <span className="text-foreground">
             Your recipe has changed since the last LCA calculation. Recalculate so your reports
             reflect these edits.
           </span>
         </div>
-        <Button size="sm" onClick={recalculate} disabled={busy} className="gap-2">
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+        <PillButton size="sm" onClick={recalculate} disabled={busy}>
           {busy ? 'Recalculating…' : 'Recalculate LCA'}
-        </Button>
+        </PillButton>
       </div>
-      {note && <p className="mt-2 pl-6 text-xs text-amber-800 dark:text-amber-400">{note}</p>}
+      {note && <p className="mt-2 text-xs text-studio-dim">{note}</p>}
     </div>
   );
 }

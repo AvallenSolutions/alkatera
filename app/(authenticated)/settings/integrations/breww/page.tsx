@@ -5,7 +5,9 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useOrganization } from '@/lib/organizationContext'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
+import { Statement } from '@/components/studio'
 import { StateChip } from '@/components/studio/state-chip'
+import { cn } from '@/lib/utils'
 import {
   Dialog,
   DialogContent,
@@ -164,6 +166,12 @@ export default function BrewwDataPage() {
   const initialTab = searchParams?.get('tab') || 'products'
   const [activeTab, setActiveTab] = useState(initialTab)
 
+  // Two-way tab sync: keep the URL current so back/forward and shared links work.
+  const handleTabChange = useCallback((value: string) => {
+    setActiveTab(value)
+    router.replace(`/settings/integrations/breww?tab=${value}`, { scroll: false })
+  }, [router])
+
   const fetchData = useCallback(async () => {
     if (!orgId) return
     setLoading(true)
@@ -261,7 +269,7 @@ export default function BrewwDataPage() {
       const month = run.packaged_at.slice(0, 7)
       const today = new Date().toISOString().slice(0, 10)
       if (run.packaged_at > today) continue
-      const name = run.product_name ?? run.product_external_id ?? '—'
+      const name = run.product_name ?? run.product_external_id ?? '·'
       const key = `${name}||${month}`
       const prev = byKey.get(key) ?? { productName: name, month, units: 0, litres: 0 }
       prev.units += qty
@@ -489,16 +497,18 @@ export default function BrewwDataPage() {
         </Button>
       </div>
 
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Breww synced data</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+      <div className="space-y-3">
+        <Statement eyebrow="THE WIRING · INTEGRATIONS" headline="Breww." />
+        <p className="text-sm text-studio-dim">
           Data pulled from your Breww account. Link each Breww SKU to an alka<strong>tera</strong> product so production, ingredients and packaging flow through automatically.
         </p>
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-muted-foreground py-12 justify-center">
-          <span className="text-sm">Loading synced data...</span>
+        <div className="flex items-center justify-center py-12">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+            Loading synced data
+          </span>
         </div>
       ) : (
         <>
@@ -518,25 +528,25 @@ export default function BrewwDataPage() {
                   label: 'SKUs linked',
                   current: linkedSkuCount,
                   total: visibleSkus.length,
-                  onClick: visibleSkus.length > 0 ? () => setActiveTab('products') : undefined,
+                  onClick: visibleSkus.length > 0 ? () => handleTabChange('products') : undefined,
                 },
                 {
                   label: 'sites linked',
                   current: linkedSiteCount,
                   total: sites.length,
-                  onClick: sites.length > 0 ? () => setActiveTab('sites') : undefined,
+                  onClick: sites.length > 0 ? () => handleTabChange('sites') : undefined,
                 },
                 {
                   label: 'ingredients',
                   current: ingredients.length,
                   total: ingredients.length,
-                  onClick: ingredients.length > 0 ? () => setActiveTab('reference') : undefined,
+                  onClick: ingredients.length > 0 ? () => handleTabChange('reference') : undefined,
                 },
               ]}
             />
           )}
 
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList>
               <TabsTrigger value="products" className="gap-1.5">
                 <Beer className="h-3.5 w-3.5" />
@@ -585,23 +595,22 @@ export default function BrewwDataPage() {
                 />
               ) : (
                 <>
-                  <div className="rounded-lg border overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted/50">
-                        <tr>
-                          <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Breww SKU</th>
-                          <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Container</th>
-                          <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Size</th>
-                          <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Status</th>
-                          <th className="px-4 py-2.5" />
+                  <StudioTable>
+                      <thead>
+                        <tr className="border-b border-studio-hairline">
+                          <Th>Breww SKU</Th>
+                          <Th>Container</Th>
+                          <Th right>Size</Th>
+                          <Th>Status</Th>
+                          <Th />
                         </tr>
                       </thead>
-                      <tbody className="divide-y">
+                      <tbody className="divide-y divide-studio-hairline">
                         {visibleSkus.map((sku) => {
                           const link = linksBySku.get(sku.external_id)
                           const linkedProduct = link ? productsById.get(Number(link.alkatera_product_id)) : null
                           return (
-                            <tr key={sku.id} className="hover:bg-muted/30 transition-colors">
+                            <tr key={sku.id} className="hover:bg-studio-ink/[0.03] transition-colors">
                               <td className="px-4 py-3">
                                 <div className="font-medium">{sku.name}</div>
                                 {sku.primary_drink_name && sku.primary_drink_name !== sku.name && (
@@ -611,10 +620,10 @@ export default function BrewwDataPage() {
                                 )}
                               </td>
                               <td className="px-4 py-3 text-muted-foreground text-xs">
-                                {sku.container_name ?? '—'}
+                                {sku.container_name ?? '·'}
                               </td>
                               <td className="px-4 py-3 text-right tabular-nums text-xs">
-                                {sku.liquid_volume_ml ? `${Number(sku.liquid_volume_ml).toFixed(0)} ml` : '—'}
+                                {sku.liquid_volume_ml ? `${Number(sku.liquid_volume_ml).toFixed(0)} ml` : '·'}
                               </td>
                               <td className="px-4 py-3">
                                 {link ? (
@@ -671,8 +680,7 @@ export default function BrewwDataPage() {
                           )
                         })}
                       </tbody>
-                    </table>
-                  </div>
+                  </StudioTable>
                   <p className="text-[11px] text-muted-foreground">
                     Linking a SKU routes its production volumes, recipe ingredients and packaging specs to the selected alka<strong>tera</strong> product. You can still create a product from scratch and link it afterwards.
                   </p>
@@ -689,23 +697,22 @@ export default function BrewwDataPage() {
                 />
               ) : (
                 <>
-                  <div className="rounded-lg border overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted/50">
-                        <tr>
-                          <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Breww site</th>
-                          <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">
+                  <StudioTable>
+                      <thead>
+                        <tr className="border-b border-studio-hairline">
+                          <Th>Breww site</Th>
+                          <Th>
                             alka<strong>tera</strong> facility
-                          </th>
-                          <th className="px-4 py-2.5" />
+                          </Th>
+                          <Th />
                         </tr>
                       </thead>
-                      <tbody className="divide-y">
+                      <tbody className="divide-y divide-studio-hairline">
                         {sites.map((site) => {
                           const link = facilityLinks.find((l) => l.breww_site_external_id === site.external_id)
                           const linkedFacility = link ? facilities.find((f) => f.id === link.alkatera_facility_id) : null
                           return (
-                            <tr key={site.id} className="hover:bg-muted/30 transition-colors">
+                            <tr key={site.id} className="hover:bg-studio-ink/[0.03] transition-colors">
                               <td className="px-4 py-3 font-medium">{site.name}</td>
                               <td className="px-4 py-3">
                                 {link && linkedFacility ? (
@@ -745,8 +752,7 @@ export default function BrewwDataPage() {
                           )
                         })}
                       </tbody>
-                    </table>
-                  </div>
+                  </StudioTable>
                   <p className="text-[11px] text-muted-foreground">
                     Each Breww site is a physical location where brewing or packaging happens. Link to an alka<strong>tera</strong> facility so brewing hL and packaged litres flow into the right facility&rsquo;s production history.
                   </p>
@@ -764,7 +770,7 @@ export default function BrewwDataPage() {
               ) : (
                 <>
                   <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-1.5 rounded-lg border p-1 text-xs">
+                    <div className="flex items-center gap-1.5 rounded-[6px] border border-studio-hairline p-1 text-xs">
                       <button
                         type="button"
                         onClick={() => setProductionView('totals')}
@@ -796,67 +802,62 @@ export default function BrewwDataPage() {
                   </div>
 
                   {productionView === 'totals' && (
-                    <div className="rounded-lg border overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted/50">
-                          <tr>
-                            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Product</th>
-                            <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Total hL (12 months)</th>
-                            <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Months of data</th>
+                    <StudioTable>
+                        <thead>
+                          <tr className="border-b border-studio-hairline">
+                            <Th>Product</Th>
+                            <Th right>Total hL (12 months)</Th>
+                            <Th right>Months of data</Th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y">
+                        <tbody className="divide-y divide-studio-hairline">
                           {Object.entries(productionByProduct).map(([id, row]) => (
-                            <tr key={id} className="hover:bg-muted/30 transition-colors">
+                            <tr key={id} className="hover:bg-studio-ink/[0.03] transition-colors">
                               <td className="px-4 py-3 font-medium">{row.name}</td>
                               <td className="px-4 py-3 text-right tabular-nums">{row.totalHl.toFixed(1)}</td>
                               <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">{row.months}</td>
                             </tr>
                           ))}
                         </tbody>
-                      </table>
-                    </div>
+                    </StudioTable>
                   )}
 
                   {productionView === 'byMonth' && (
-                    <div className="rounded-lg border overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted/50">
-                          <tr>
-                            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Month</th>
-                            <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Volume (hL)</th>
+                    <StudioTable>
+                        <thead>
+                          <tr className="border-b border-studio-hairline">
+                            <Th>Month</Th>
+                            <Th right>Volume (hL)</Th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y">
+                        <tbody className="divide-y divide-studio-hairline">
                           {monthlyBrewery.length === 0 ? (
                             <tr><td colSpan={2} className="px-4 py-6 text-center text-muted-foreground text-xs">No monthly data yet</td></tr>
                           ) : monthlyBrewery.map((row) => (
-                            <tr key={row.month} className="hover:bg-muted/30 transition-colors">
+                            <tr key={row.month} className="hover:bg-studio-ink/[0.03] transition-colors">
                               <td className="px-4 py-2.5 tabular-nums">{row.month}</td>
                               <td className="px-4 py-2.5 text-right tabular-nums">{row.hl.toFixed(1)}</td>
                             </tr>
                           ))}
                         </tbody>
-                      </table>
-                    </div>
+                    </StudioTable>
                   )}
 
                   {productionView === 'bySku' && (
-                    <div className="rounded-lg border overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted/50">
-                          <tr>
-                            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">SKU</th>
-                            <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Units packaged</th>
-                            <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Litres</th>
-                            <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Months</th>
+                    <StudioTable>
+                        <thead>
+                          <tr className="border-b border-studio-hairline">
+                            <Th>SKU</Th>
+                            <Th right>Units packaged</Th>
+                            <Th right>Litres</Th>
+                            <Th right>Months</Th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y">
+                        <tbody className="divide-y divide-studio-hairline">
                           {skuTotals.length === 0 ? (
                             <tr><td colSpan={4} className="px-4 py-6 text-center text-muted-foreground text-xs">No packaged units yet. Planned-but-not-yet-packaged runs are excluded.</td></tr>
                           ) : skuTotals.map((row) => (
-                            <tr key={row.productName} className="hover:bg-muted/30 transition-colors">
+                            <tr key={row.productName} className="hover:bg-studio-ink/[0.03] transition-colors">
                               <td className="px-4 py-2.5 font-medium">{row.productName}</td>
                               <td className="px-4 py-2.5 text-right tabular-nums">{Math.round(row.units).toLocaleString()}</td>
                               <td className="px-4 py-2.5 text-right tabular-nums">{row.litres.toFixed(0)}</td>
@@ -864,8 +865,7 @@ export default function BrewwDataPage() {
                             </tr>
                           ))}
                         </tbody>
-                      </table>
-                    </div>
+                    </StudioTable>
                   )}
                 </>
               )}
@@ -891,18 +891,17 @@ export default function BrewwDataPage() {
                         <h2 className="text-sm font-medium">Ingredients</h2>
                         <span className="font-mono text-[10px] font-bold tabular-nums text-muted-foreground">{ingredients.length}</span>
                       </div>
-                      <div className="rounded-lg border overflow-hidden">
-                        <table className="w-full text-sm">
-                          <thead className="bg-muted/50">
-                            <tr>
-                              <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Product</th>
-                              <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Ingredient</th>
-                              <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Qty (12 months)</th>
+                      <StudioTable>
+                          <thead>
+                            <tr className="border-b border-studio-hairline">
+                              <Th>Product</Th>
+                              <Th>Ingredient</Th>
+                              <Th right>Qty (12 months)</Th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y">
+                          <tbody className="divide-y divide-studio-hairline">
                             {ingredients.map((row) => (
-                              <tr key={row.id} className="hover:bg-muted/30 transition-colors">
+                              <tr key={row.id} className="hover:bg-studio-ink/[0.03] transition-colors">
                                 <td className="px-4 py-3 text-muted-foreground text-xs">{row.product_name}</td>
                                 <td className="px-4 py-3 font-medium">{row.ingredient_name}</td>
                                 <td className="px-4 py-3 text-right tabular-nums text-xs">
@@ -911,8 +910,7 @@ export default function BrewwDataPage() {
                               </tr>
                             ))}
                           </tbody>
-                        </table>
-                      </div>
+                      </StudioTable>
                     </div>
                   )}
 
@@ -923,34 +921,32 @@ export default function BrewwDataPage() {
                         <h2 className="text-sm font-medium">Container types</h2>
                         <span className="font-mono text-[10px] font-bold tabular-nums text-muted-foreground">{containers.length}</span>
                       </div>
-                      <div className="rounded-lg border overflow-hidden">
-                        <table className="w-full text-sm">
-                          <thead className="bg-muted/50">
-                            <tr>
-                              <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Container</th>
-                              <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Volume (mL)</th>
-                              <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Weight (g)</th>
-                              <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Material</th>
+                      <StudioTable>
+                          <thead>
+                            <tr className="border-b border-studio-hairline">
+                              <Th>Container</Th>
+                              <Th right>Volume (mL)</Th>
+                              <Th right>Weight (g)</Th>
+                              <Th>Material</Th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y">
+                          <tbody className="divide-y divide-studio-hairline">
                             {containers.map((row) => (
-                              <tr key={row.id} className="hover:bg-muted/30 transition-colors">
+                              <tr key={row.id} className="hover:bg-studio-ink/[0.03] transition-colors">
                                 <td className="px-4 py-3 font-medium">{row.name}</td>
                                 <td className="px-4 py-3 text-right tabular-nums text-xs">
-                                  {row.volume_ml != null ? row.volume_ml.toFixed(0) : '—'}
+                                  {row.volume_ml != null ? row.volume_ml.toFixed(0) : '·'}
                                 </td>
                                 <td className="px-4 py-3 text-right tabular-nums text-xs">
-                                  {row.weight_g != null ? row.weight_g.toFixed(1) : '—'}
+                                  {row.weight_g != null ? row.weight_g.toFixed(1) : '·'}
                                 </td>
                                 <td className="px-4 py-3 text-xs text-muted-foreground capitalize">
-                                  {row.material_type ?? '—'}
+                                  {row.material_type ?? '·'}
                                 </td>
                               </tr>
                             ))}
                           </tbody>
-                        </table>
-                      </div>
+                      </StudioTable>
                     </div>
                   )}
                 </>
@@ -1037,24 +1033,24 @@ export default function BrewwDataPage() {
                 Create a new product prefilled from this Breww SKU. You can edit the details afterwards on the product page.
               </DialogDescription>
             </DialogHeader>
-            <div className="rounded-lg border bg-muted/30 p-3 space-y-1.5 text-sm">
+            <div className="rounded-[6px] border border-studio-hairline bg-studio-cream p-3 space-y-1.5 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Name</span>
-                <span className="font-medium">{createSkuTarget.name ?? '—'}</span>
+                <span className="font-medium">{createSkuTarget.name ?? '·'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Container</span>
-                <span className="font-medium">{createSkuTarget.container_name ?? '—'}</span>
+                <span className="font-medium">{createSkuTarget.container_name ?? '·'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Unit size</span>
                 <span className="font-medium tabular-nums">
-                  {createSkuTarget.liquid_volume_ml ? `${Number(createSkuTarget.liquid_volume_ml).toFixed(0)} ml` : '—'}
+                  {createSkuTarget.liquid_volume_ml ? `${Number(createSkuTarget.liquid_volume_ml).toFixed(0)} ml` : '·'}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Parent drink</span>
-                <span className="font-medium">{createSkuTarget.primary_drink_name ?? '—'}</span>
+                <span className="font-medium">{createSkuTarget.primary_drink_name ?? '·'}</span>
               </div>
             </div>
             <DialogFooter>
@@ -1115,9 +1111,31 @@ export default function BrewwDataPage() {
 
 function EmptyState({ message, action }: { message: string; action?: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-dashed py-12 flex flex-col items-center gap-3">
-      <p className="text-sm text-muted-foreground">{message}</p>
+    <div className="rounded-[6px] border border-studio-hairline py-12 flex flex-col items-center gap-3">
+      <p className="text-sm text-studio-dim">{message}</p>
       {action}
     </div>
+  )
+}
+
+/** The page's one quiet table treatment: hairline shell, mono uppercase headers. */
+function StudioTable({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="overflow-x-auto rounded-[6px] border border-studio-hairline">
+      <table className="w-full text-sm">{children}</table>
+    </div>
+  )
+}
+
+function Th({ children, right = false }: { children?: React.ReactNode; right?: boolean }) {
+  return (
+    <th
+      className={cn(
+        'px-4 py-2.5 text-left font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim',
+        right && 'text-right'
+      )}
+    >
+      {children}
+    </th>
   )
 }

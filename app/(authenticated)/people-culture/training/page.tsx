@@ -3,22 +3,15 @@
 import { useState } from 'react';
 import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  GraduationCap,
-  PlusCircle,
-  RefreshCw,
-  ArrowLeft,
-} from 'lucide-react';
-import Link from 'next/link';
 
+import { PillButton } from '@/components/studio/pill-button';
+import { TopicHeader, HubSkeleton, ComplianceNote } from '@/components/social';
 import { TrainingDashboard } from '@/components/people-culture/TrainingDashboard';
 import { useTrainingMetrics } from '@/hooks/data/useTrainingMetrics';
 
@@ -99,13 +92,11 @@ function AddTrainingDialog({ onSuccess }: { onSuccess: () => void }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <PlusCircle className="h-4 w-4 mr-2" />
-          Log Training
-        </Button>
-      </DialogTrigger>
+    <>
+      <PillButton size="sm" onClick={() => setOpen(true)}>
+        Log training
+      </PillButton>
+      <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Log Training Activity</DialogTitle>
@@ -284,12 +275,13 @@ function AddTrainingDialog({ onSuccess }: { onSuccess: () => void }) {
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : 'Log Training'}
+              {isSubmitting ? 'Saving…' : 'Log Training'}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+    </>
   );
 }
 
@@ -305,63 +297,31 @@ function TrainingPageContent() {
   const { metrics, loading, refetch } = useTrainingMetrics();
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-8 w-8" />
-          <Skeleton className="h-8 w-48" />
-        </div>
-        <div className="grid grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-28" />
-          ))}
-        </div>
-        <Skeleton className="h-96" />
-      </div>
-    );
+    return <HubSkeleton />;
   }
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/people-culture">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-              <GraduationCap className="h-6 w-6 text-amber-600" />
-              Training & Development
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Learning hours, skills development, and certifications
-            </p>
-          </div>
-        </div>
+    <div className="space-y-8 animate-fade-in-up">
+      <TopicHeader
+        eyebrow={<>THE WIRING &middot; PEOPLE &amp; CULTURE</>}
+        headline={<>Training &amp; development.</>}
+        description="Learning hours, skills development, and certifications."
+        backHref="/people-culture"
+        backLabel="People & culture"
+      >
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <PillButton variant="outline" size="sm" onClick={() => refetch()}>
             Refresh
-          </Button>
+          </PillButton>
           <AddTrainingDialog onSuccess={refetch} />
         </div>
-      </div>
+      </TopicHeader>
 
-      {/* Info Card */}
-      <Card className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
-        <CardContent className="p-4">
-          <p className="text-sm text-amber-800 dark:text-amber-200">
-            <strong>About Training:</strong> Track learning and development activities to demonstrate
-            investment in employee growth. B Corp recommends 20+ hours per employee annually for
-            professional development.
-          </p>
-        </CardContent>
-      </Card>
+      <ComplianceNote label="ABOUT TRAINING">
+        Track learning and development activities to demonstrate investment in employee growth.
+        B Corp recommends 20+ hours per employee annually for professional development.
+      </ComplianceNote>
 
-      {/* Dashboard */}
       <TrainingDashboard metrics={metrics} isLoading={loading} />
     </div>
   );

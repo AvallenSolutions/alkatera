@@ -1,25 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  ArrowLeft,
-  Bug,
-  Lightbulb,
-  TrendingUp,
-  MessageSquare,
-  Clock,
-  Send,
-  CheckCircle,
-  Paperclip,
-  ExternalLink,
-} from "lucide-react";
-import { StateChip } from "@/components/studio";
+import { ArrowLeft, Paperclip, ExternalLink } from "lucide-react";
+import { Statement, Eyebrow, StateChip } from "@/components/studio";
+import { Thread, useRealtimeThread } from "@/components/network";
 import {
   fetchTicket,
   fetchMessages,
@@ -38,13 +24,6 @@ import { FEEDBACK_STATUSES } from "@/lib/types/feedback";
 import { format } from "date-fns";
 import { supabase } from "@/lib/supabaseClient";
 
-const categoryIcons: Record<FeedbackCategory, React.ElementType> = {
-  bug: Bug,
-  feature: Lightbulb,
-  improvement: TrendingUp,
-  other: MessageSquare,
-};
-
 const categoryLabels: Record<FeedbackCategory, string> = {
   bug: "Bug Report",
   feature: "Feature Request",
@@ -59,22 +38,13 @@ const statusTones: Record<FeedbackStatus, "attention" | "hold" | "good" | "quiet
   closed: "quiet",
 };
 
-function StatusBadge({ status }: { status: FeedbackStatus }) {
-  const config = FEEDBACK_STATUSES[status];
-
-  return <StateChip tone={statusTones[status]}>{config.label}</StateChip>;
-}
-
 export default function TicketDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const { toast } = useToast();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [ticket, setTicket] = useState<FeedbackTicket | null>(null);
   const [messages, setMessages] = useState<FeedbackMessageWithSender[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [newMessage, setNewMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
@@ -92,33 +62,13 @@ export default function TicketDetailPage() {
     }
   }, [messages]);
 
-  useEffect(() => {
-    // Scroll to bottom when new messages arrive
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  useEffect(() => {
-    // Set up realtime subscription for new messages
-    const channel = supabase
-      .channel(`ticket-${ticketId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "feedback_messages",
-          filter: `ticket_id=eq.${ticketId}`,
-        },
-        () => {
-          loadMessages();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [ticketId]);
+  useRealtimeThread({
+    channelName: `ticket-${ticketId}`,
+    table: "feedback_messages",
+    filterColumn: "ticket_id",
+    filterValue: ticketId,
+    onInsert: loadMessages,
+  });
 
   async function getCurrentUser() {
     const { data } = await supabase.auth.getUser();
@@ -155,19 +105,14 @@ export default function TicketDetailPage() {
     }
   }
 
-  async function handleSendMessage(e: React.FormEvent) {
-    e.preventDefault();
-
-    if (!newMessage.trim()) return;
-
+  async function sendMessage(text: string) {
     setIsSending(true);
     try {
       await createMessage({
         ticket_id: ticketId,
-        message: newMessage.trim(),
+        message: text,
         is_admin_reply: false,
       });
-      setNewMessage("");
       await loadMessages();
     } catch (error) {
       console.error("Error sending message:", error);
@@ -176,6 +121,7 @@ export default function TicketDetailPage() {
         description: "Failed to send message",
         variant: "destructive",
       });
+      throw error;
     } finally {
       setIsSending(false);
     }
@@ -183,9 +129,11 @@ export default function TicketDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-8 px-4 max-w-4xl">
+      <div className="container mx-auto max-w-4xl px-4 py-8">
         <div className="flex items-center justify-center py-12">
-          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">Loading</span>
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+            Loading
+          </span>
         </div>
       </div>
     );
@@ -193,192 +141,105 @@ export default function TicketDetailPage() {
 
   if (!ticket) {
     return (
-      <div className="container mx-auto py-8 px-4 max-w-4xl">
-        <Card>
-          <CardContent className="py-12 text-center">
-            <h3 className="text-lg font-medium mb-2">Ticket not found</h3>
-            <Link href="/settings/feedback">
-              <Button variant="outline">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Feedback
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+      <div className="container mx-auto max-w-4xl px-4 py-8">
+        <p className="text-sm text-studio-dim">Ticket not found.</p>
+        <Link
+          href="/settings/feedback"
+          className="mt-2 inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent hover:underline"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Back to support
+        </Link>
       </div>
     );
   }
 
-  const Icon = categoryIcons[ticket.category];
   const isResolved = ticket.status === "resolved" || ticket.status === "closed";
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-4xl">
-      {/* Header */}
-      <div className="mb-6">
-        <Link href="/settings/feedback">
-          <Button variant="ghost" size="sm" className="mb-4">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Feedback
-          </Button>
-        </Link>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-start gap-4">
-              <div className="h-12 w-12 rounded-[6px] bg-secondary flex items-center justify-center flex-shrink-0">
-                <Icon className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <CardTitle className="text-xl">{ticket.title}</CardTitle>
-                </div>
-                <div className="flex items-center gap-3 text-sm">
-                  <StateChip tone="quiet">{categoryLabels[ticket.category]}</StateChip>
-                  <StatusBadge status={ticket.status} />
-                  <span className="text-muted-foreground flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {format(new Date(ticket.created_at), "MMM d, yyyy 'at' h:mm a")}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground whitespace-pre-wrap">{ticket.description}</p>
-
-            {/* Attachments */}
-            {ticket.attachments && ticket.attachments.length > 0 && (
-              <div className="mt-4 pt-4 border-t">
-                <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
-                  <Paperclip className="h-4 w-4" />
-                  Attachments
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                  {ticket.attachments.map((attachment, index) => (
-                    <AttachmentPreview key={index} attachment={attachment} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Resolution Notes */}
-            {ticket.resolution_notes && (
-              <div className="mt-4 pt-4 border-t">
-                <h4 className="text-sm font-medium mb-2 flex items-center gap-2 text-studio-good">
-                  <CheckCircle className="h-4 w-4" />
-                  Resolution
-                </h4>
-                <p className="text-sm text-muted-foreground">{ticket.resolution_notes}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Messages */}
-      <div className="space-y-4 mb-6">
-        <h3 className="text-lg font-semibold">Conversation</h3>
-
-        {messages.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
-              <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>No messages yet. Start a conversation below.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {messages.map((message) => (
-              <MessageBubble
-                key={message.id}
-                message={message}
-                isOwnMessage={message.sender_id === currentUserId}
-              />
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
-        )}
-      </div>
-
-      {/* Reply Form */}
-      {!isResolved && (
-        <Card>
-          <CardContent className="p-4">
-            <form onSubmit={handleSendMessage} className="space-y-3">
-              <Textarea
-                placeholder="Type your message..."
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                rows={3}
-              />
-              <div className="flex justify-end">
-                <Button type="submit" disabled={isSending || !newMessage.trim()}>
-                  <Send className="h-4 w-4 mr-2" />
-                  {isSending ? "Sending..." : "Send Message"}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      {isResolved && (
-        <Card>
-          <CardContent className="py-6 text-center text-muted-foreground">
-            <CheckCircle className="h-8 w-8 mx-auto mb-2 text-studio-good" />
-            <p>This ticket has been resolved.</p>
-            <p className="text-sm mt-1">
-              Need more help?{" "}
-              <Link href="/settings/feedback" className="text-studio-ochre-ink hover:underline">
-                Submit a new ticket
-              </Link>
-            </p>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-function MessageBubble({
-  message,
-  isOwnMessage,
-}: {
-  message: FeedbackMessageWithSender;
-  isOwnMessage: boolean;
-}) {
-  const isAdmin = message.is_admin_reply;
-
-  return (
-    <div className={`flex ${isOwnMessage ? "justify-end" : "justify-start"}`}>
-      <div
-        className={`flex gap-3 max-w-[80%] ${isOwnMessage ? "flex-row-reverse" : "flex-row"}`}
+    <div className="container mx-auto max-w-4xl px-4 py-8">
+      <Link
+        href="/settings/feedback"
+        className="mb-6 inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim transition-colors hover:text-foreground"
       >
-        <Avatar className="h-8 w-8 flex-shrink-0">
-          <AvatarImage src={message.sender_avatar_url} />
-          <AvatarFallback>
-            {isAdmin ? "A" : message.sender_name?.charAt(0) || "U"}
-          </AvatarFallback>
-        </Avatar>
-        <div>
-          <div
-            className={`px-4 py-2 rounded-[6px] border border-border ${
-              isAdmin ? "bg-card" : "bg-secondary"
-            }`}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm font-medium">
-                {isAdmin ? "alkatera Support" : message.sender_name || "You"}
-              </span>
-              {isAdmin && <StateChip tone="quiet">Staff</StateChip>}
-            </div>
-            <p className="text-sm whitespace-pre-wrap">{message.message}</p>
+        <ArrowLeft className="h-3.5 w-3.5" />
+        Back to support
+      </Link>
+
+      <Statement eyebrow="THE NETWORK · SUPPORT" headline={ticket.title} />
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <StateChip tone="quiet">{categoryLabels[ticket.category]}</StateChip>
+        <StateChip tone={statusTones[ticket.status]}>
+          {FEEDBACK_STATUSES[ticket.status].label}
+        </StateChip>
+        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+          {format(new Date(ticket.created_at), "MMM d 'at' h:mm a")}
+        </span>
+      </div>
+
+      <p className="mt-6 whitespace-pre-wrap text-sm text-foreground">
+        {ticket.description}
+      </p>
+
+      {ticket.attachments && ticket.attachments.length > 0 && (
+        <div className="mt-8">
+          <Eyebrow tone="dim" className="mb-3">
+            Attachments
+          </Eyebrow>
+          <div className="flex flex-wrap gap-2">
+            {ticket.attachments.map((attachment, index) => (
+              <AttachmentPreview key={index} attachment={attachment} />
+            ))}
           </div>
-          <p className="text-xs text-muted-foreground mt-1 px-1">
-            {format(new Date(message.created_at), "MMM d 'at' h:mm a")}
-          </p>
         </div>
+      )}
+
+      {ticket.resolution_notes && (
+        <div className="mt-8">
+          <Eyebrow tone="dim" className="mb-3">
+            Resolution
+          </Eyebrow>
+          <p className="text-sm text-studio-good">{ticket.resolution_notes}</p>
+        </div>
+      )}
+
+      <div className="mt-10">
+        <Eyebrow tone="dim" className="mb-4">
+          Conversation
+        </Eyebrow>
+        <Thread
+          messages={messages}
+          currentUserId={currentUserId}
+          isOwn={(m) => m.sender_id === currentUserId}
+          keyFor={(m) => m.id}
+          bubblePropsFor={(m) => ({
+            senderName: m.is_admin_reply
+              ? "alkatera Support"
+              : m.sender_name || "You",
+            senderAvatarUrl: m.sender_avatar_url,
+            body: m.message,
+            createdAt: m.created_at,
+            badge: m.is_admin_reply ? (
+              <StateChip tone="quiet">Staff</StateChip>
+            ) : undefined,
+          })}
+          onSend={sendMessage}
+          isSending={isSending}
+          resolved={isResolved}
+        />
+
+        {isResolved && (
+          <p className="mt-4 text-sm text-studio-good">
+            This ticket has been resolved. Need more help?{" "}
+            <Link
+              href="/settings/feedback"
+              className="text-room-accent hover:underline"
+            >
+              Submit a new ticket
+            </Link>
+            .
+          </p>
+        )}
       </div>
     </div>
   );
@@ -403,8 +264,10 @@ function AttachmentPreview({ attachment }: { attachment: any }) {
 
   if (!url) {
     return (
-      <div className="w-20 h-20 rounded-[6px] bg-secondary flex items-center justify-center">
-        <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-studio-dim">...</span>
+      <div className="flex h-20 w-20 items-center justify-center rounded-[6px] border border-studio-hairline bg-studio-cream">
+        <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-studio-dim">
+          ...
+        </span>
       </div>
     );
   }
@@ -415,7 +278,7 @@ function AttachmentPreview({ attachment }: { attachment: any }) {
         <img
           src={url}
           alt={attachment.name}
-          className="w-20 h-20 object-cover rounded-[6px] border hover:opacity-80 transition-opacity"
+          className="h-20 w-20 rounded-[6px] border border-studio-hairline object-cover transition-opacity hover:opacity-80"
         />
       </a>
     );
@@ -426,11 +289,13 @@ function AttachmentPreview({ attachment }: { attachment: any }) {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-2 px-3 py-2 rounded-[6px] border hover:bg-secondary transition-colors"
+      className="flex items-center gap-2 rounded-[6px] border border-studio-hairline px-3 py-2 transition-colors hover:bg-studio-cream"
     >
-      <Paperclip className="h-4 w-4" />
-      <span className="text-sm truncate max-w-[150px]">{attachment.name}</span>
-      <ExternalLink className="h-3 w-3" />
+      <Paperclip className="h-4 w-4 text-studio-dim" />
+      <span className="max-w-[150px] truncate text-sm text-foreground">
+        {attachment.name}
+      </span>
+      <ExternalLink className="h-3 w-3 text-studio-dim" />
     </a>
   );
 }

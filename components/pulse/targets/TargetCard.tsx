@@ -4,11 +4,11 @@ import { useMemo } from 'react';
 import { Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { METRIC_DEFINITIONS } from '@/lib/pulse/metric-keys';
 import { forecastTrajectory } from '@/lib/pulse/forecast';
 import { INITIATIVE_STATUSES } from '@/lib/pulse/initiative-status';
+import type { WorkingTone } from '@/components/studio/theme';
 import type { Initiative, Target } from './types';
 
 // Typographic state chips: working tones from components/studio/theme.ts.
@@ -17,6 +17,15 @@ const PILL_STYLES: Record<string, string> = {
   at_risk: 'text-studio-attention',
   off_track: 'text-studio-stale',
   unknown: 'text-studio-dim',
+};
+
+// Working tone → status dot fill.
+const TONE_DOT: Record<WorkingTone, string> = {
+  good: 'bg-studio-good',
+  attention: 'bg-studio-attention',
+  stale: 'bg-studio-stale',
+  hold: 'bg-studio-hold',
+  quiet: 'bg-studio-dim',
 };
 
 const PILL_LABELS: Record<string, string> = {
@@ -89,19 +98,10 @@ export function TargetCard({ target, history, initiatives, onDelete, onAddInitia
             initiatives.map((i) => {
               const meta = INITIATIVE_STATUSES[i.status];
               return (
-                <Badge key={i.id} variant="outline" className="gap-1 text-[10px] font-normal">
-                  <span
-                    className={cn(
-                      'h-1.5 w-1.5 rounded-full',
-                      meta?.colour === 'lime' && 'bg-studio-forest',
-                      meta?.colour === 'green' && 'bg-studio-good',
-                      meta?.colour === 'amber' && 'bg-studio-attention',
-                      meta?.colour === 'red' && 'bg-studio-stale',
-                      meta?.colour === 'slate' && 'bg-studio-dim',
-                    )}
-                  />
+                <span key={i.id} className="inline-flex items-center gap-1.5 text-xs text-foreground">
+                  <span className={cn('h-1.5 w-1.5 rounded-full', TONE_DOT[meta.tone])} />
                   {i.title}
-                </Badge>
+                </span>
               );
             })
           )}

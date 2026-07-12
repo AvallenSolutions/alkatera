@@ -1,7 +1,13 @@
 'use client';
 
+/**
+ * The orchard harvest history, re-cut for the studio: a quiet mono
+ * count, a room pill for the add action, the table on a cream hairline
+ * panel with mono heads, typographic deltas and expand marks instead
+ * of icons. Sorting, deltas and the expanded detail are unchanged.
+ */
+
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -10,14 +16,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { Plus, Edit2, ArrowUp, ArrowDown, ChevronRight, ChevronDown } from 'lucide-react';
 import type { HarvestImpactSummary } from '@/lib/types/orchard';
+import { Panel } from '@/components/studio/panel';
+import { PillButton } from '@/components/studio/pill-button';
 import { StateChip } from '@/components/studio/state-chip';
 
 interface HarvestHistoryTableProps {
@@ -26,6 +27,8 @@ interface HarvestHistoryTableProps {
   onEditHarvest: (year: number) => void;
   onAddHarvest: () => void;
 }
+
+const HEAD_CLASS = 'font-mono text-[10px] font-bold uppercase tracking-[0.14em]';
 
 function fmt(n: number, decimals = 0): string {
   return n.toLocaleString('en-GB', { maximumFractionDigits: decimals });
@@ -47,12 +50,11 @@ function DeltaIndicator({ current, previous, invert }: { current: number; previo
   const isGood = invert ? isUp : !isUp;
   return (
     <span
-      className={`inline-flex items-center gap-0.5 text-xs ml-1 ${
+      className={`ml-1 font-mono text-[10px] tabular-nums ${
         isGood ? 'text-studio-good' : 'text-studio-stale'
       }`}
     >
-      {isUp ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
-      {Math.abs(pctChange).toFixed(0)}%
+      {isUp ? '↑' : '↓'}{Math.abs(pctChange).toFixed(0)}%
     </span>
   );
 }
@@ -82,34 +84,31 @@ export function HarvestHistoryTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-muted-foreground">
+      <div className="flex items-center justify-between gap-4">
+        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
           {sorted.length} harvest{sorted.length !== 1 ? 's' : ''} recorded
-        </h3>
-        <Button onClick={onAddHarvest} size="sm" className="gap-1.5">
-          <Plus className="h-4 w-4" />
-          Add New Harvest
+        </p>
+        <PillButton variant="room" size="sm" onClick={onAddHarvest}>
+          Add harvest
           {suggestedYear && (
-            <span className="text-xs opacity-70 ml-1">
-              (copied from {mostRecentYear})
-            </span>
+            <span className="text-xs opacity-70">(copied from {mostRecentYear})</span>
           )}
-        </Button>
+        </PillButton>
       </div>
 
-      <div className="rounded-md border">
+      <Panel flush className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-[30px]"></TableHead>
-              <TableHead>Year</TableHead>
-              <TableHead className="text-right">Yield (t/ha)</TableHead>
-              <TableHead className="text-right">Emissions (kg CO{'₂'}e/ha)</TableHead>
-              <TableHead className="text-right">Water (m{'³'}/ha)</TableHead>
-              <TableHead className="text-right">Removals (kg CO{'₂'}e/ha)</TableHead>
-              <TableHead className="text-right">Ecotox (CTUe/ha)</TableHead>
-              <TableHead>Quality</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className={HEAD_CLASS}>Year</TableHead>
+              <TableHead className={`${HEAD_CLASS} text-right`}>Yield (t/ha)</TableHead>
+              <TableHead className={`${HEAD_CLASS} text-right`}>Emissions (kg CO{'₂'}e/ha)</TableHead>
+              <TableHead className={`${HEAD_CLASS} text-right`}>Water (m{'³'}/ha)</TableHead>
+              <TableHead className={`${HEAD_CLASS} text-right`}>Removals (kg CO{'₂'}e/ha)</TableHead>
+              <TableHead className={`${HEAD_CLASS} text-right`}>Ecotox (CTUe/ha)</TableHead>
+              <TableHead className={HEAD_CLASS}>Quality</TableHead>
+              <TableHead className={`${HEAD_CLASS} text-right`}>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -135,10 +134,9 @@ export function HarvestHistoryTable({
                       onClick={() => setExpandedYear(isExpanded ? null : v.harvest_year)}
                     >
                       <TableCell className="w-[30px] pr-0">
-                        {isExpanded
-                          ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          : <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        }
+                        <span className="font-mono text-xs text-muted-foreground">
+                          {isExpanded ? '−' : '+'}
+                        </span>
                       </TableCell>
                       <TableCell className="font-medium">
                         {v.harvest_year}
@@ -146,22 +144,22 @@ export function HarvestHistoryTable({
                           <StateChip tone="attention" className="ml-2">Draft</StateChip>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right tabular-nums">
                         {v.yield_tonnes_per_ha.toFixed(1)}
                         {prev && <DeltaIndicator current={v.yield_tonnes_per_ha} previous={prev.yield_tonnes_per_ha} invert />}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right tabular-nums">
                         {fmt(v.emissions_per_ha)}
                         {prev && <DeltaIndicator current={v.emissions_per_ha} previous={prev.emissions_per_ha} />}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right tabular-nums">
                         {fmt(v.water_per_ha)}
                         {prev && <DeltaIndicator current={v.water_per_ha} previous={prev.water_per_ha} />}
                       </TableCell>
-                      <TableCell className="text-right text-studio-forest">
+                      <TableCell className="text-right tabular-nums text-studio-forest">
                         {fmt(v.removals_per_ha)}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right tabular-nums">
                         {fmt(ecotoxPerHa)}
                         {prev && (
                           <DeltaIndicator
@@ -184,18 +182,16 @@ export function HarvestHistoryTable({
                         </StateChip>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 text-xs gap-1"
+                        <button
+                          type="button"
+                          className="rounded px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground transition-colors duration-150 hover:text-foreground"
                           onClick={(e) => {
                             e.stopPropagation();
                             onEditHarvest(v.harvest_year);
                           }}
                         >
-                          <Edit2 className="h-3.5 w-3.5" />
                           Edit
-                        </Button>
+                        </button>
                       </TableCell>
                     </TableRow>
 
@@ -206,7 +202,7 @@ export function HarvestHistoryTable({
                           <div className="px-6 py-4 grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-3 text-xs">
                             {/* Column 1: FLAG N2O */}
                             <div className="space-y-1.5">
-                              <p className="font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">FLAG N{'₂'}O Emissions</p>
+                              <p className="font-mono font-bold text-muted-foreground uppercase tracking-[0.18em] text-[10px]">FLAG N{'₂'}O Emissions</p>
                               <DetailItem label="Direct (fertiliser)" value={`${fmt(imp.flag_emissions.n2o_direct_co2e)} kg`} />
                               <DetailItem label="Indirect (vol.+leach.)" value={`${fmt(imp.flag_emissions.n2o_indirect_co2e)} kg`} />
                               <DetailItem label="Crop residue" value={`${fmt(imp.flag_emissions.n2o_crop_residue_co2e)} kg`} />
@@ -215,7 +211,7 @@ export function HarvestHistoryTable({
 
                             {/* Column 2: Non-FLAG */}
                             <div className="space-y-1.5">
-                              <p className="font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Energy & Industrial</p>
+                              <p className="font-mono font-bold text-muted-foreground uppercase tracking-[0.18em] text-[10px]">Energy & Industrial</p>
                               <DetailItem label="Fertiliser production" value={`${fmt(imp.non_flag_emissions.fertiliser_production_co2e)} kg`} />
                               <DetailItem label="Machinery fuel" value={`${fmt(imp.non_flag_emissions.machinery_fuel_co2e)} kg`} />
                               <DetailItem label="Irrigation energy" value={`${fmt(imp.non_flag_emissions.irrigation_energy_co2e)} kg`} />
@@ -225,7 +221,7 @@ export function HarvestHistoryTable({
 
                             {/* Column 3: Water & ecotox */}
                             <div className="space-y-1.5">
-                              <p className="font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Water & Ecotoxicity</p>
+                              <p className="font-mono font-bold text-muted-foreground uppercase tracking-[0.18em] text-[10px]">Water & Ecotoxicity</p>
                               <DetailItem label="Water volume" value={`${fmt(imp.water_m3)} m³`} />
                               <DetailItem label="Scarcity-weighted" value={`${fmt(imp.water_scarcity_m3_eq)} m³ eq`} />
                               <DetailItem label="Freshwater ecotox" value={`${fmt(imp.freshwater_ecotoxicity)} CTUe`} />
@@ -236,11 +232,11 @@ export function HarvestHistoryTable({
 
                             {/* Column 4: Normalised */}
                             <div className="space-y-1.5">
-                              <p className="font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Per kg Fruit</p>
+                              <p className="font-mono font-bold text-muted-foreground uppercase tracking-[0.18em] text-[10px]">Per kg Fruit</p>
                               <DetailItem label="Emissions" value={`${imp.total_emissions_per_kg.toFixed(3)} kg CO₂e`} />
                               <DetailItem label="Removals" value={`${imp.removals_per_kg.toFixed(3)} kg CO₂e`} />
                               <DetailItem label="Soil carbon method" value={imp.flag_removals.methodology === 'measured' ? 'Verified' : 'Practice default'} />
-                              <DetailItem label="Soil management" value={imp.flag_removals.is_verified ? '✅ Verified' : 'Unverified'} muted />
+                              <DetailItem label="Soil management" value={imp.flag_removals.is_verified ? 'Verified' : 'Unverified'} muted />
                             </div>
                           </div>
                         </TableCell>
@@ -252,7 +248,7 @@ export function HarvestHistoryTable({
             )}
           </TableBody>
         </Table>
-      </div>
+      </Panel>
 
       <p className="text-xs text-muted-foreground">
         Click a row to expand full impact detail. Green/red arrows show year-on-year change

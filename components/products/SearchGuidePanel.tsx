@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Dog, ChevronDown, ChevronRight, X, HelpCircle } from "lucide-react";
+import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PillButton } from "@/components/studio/pill-button";
+import { Eyebrow } from "@/components/studio/eyebrow";
 import { useOnboarding } from "@/lib/onboarding/OnboardingContext";
 import { SEARCH_GUIDE_SECTIONS } from "@/lib/search-guide";
 
@@ -28,15 +30,9 @@ export function SearchGuidePanel() {
   if (!isGuideVisible) {
     return (
       <div className="flex justify-end pb-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={resetSearchGuide}
-          className="text-xs text-muted-foreground hover:text-foreground gap-1 h-7 px-2"
-        >
-          <HelpCircle className="h-3 w-3" />
-          Search Tips
-        </Button>
+        <PillButton variant="ghost" size="sm" onClick={resetSearchGuide}>
+          Search tips
+        </PillButton>
       </div>
     );
   }
@@ -50,21 +46,16 @@ export function SearchGuidePanel() {
         transition={{ duration: 0.3, ease: "easeOut" }}
         className="mb-3"
       >
-        <div className="bg-black/60 backdrop-blur-xl border border-emerald-400/20 rounded-xl overflow-hidden">
+        <div className="rounded-[6px] border border-studio-hairline bg-studio-cream overflow-hidden">
           {/* Header bar — always visible */}
           <div className="flex items-center gap-3 px-4 py-3">
-            {/* Rosa avatar */}
-            <div className="w-8 h-8 shrink-0 rounded-lg bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 border border-emerald-400/30 flex items-center justify-center">
-              <Dog className="h-4 w-4 text-emerald-400" />
-            </div>
-
             {/* Teaser or title */}
             <div className="flex-1 min-w-0">
               {isExpanded ? (
-                <p className="text-sm font-medium text-white/90">Rosa&apos;s Search Guide</p>
+                <Eyebrow>Rosa&apos;s search guide</Eyebrow>
               ) : (
-                <p className="text-sm text-white/70">
-                  Need help navigating the databases? I&apos;ve got tips!
+                <p className="text-sm text-muted-foreground">
+                  Need help navigating the databases? I&apos;ve got tips.
                 </p>
               )}
             </div>
@@ -75,7 +66,7 @@ export function SearchGuidePanel() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="h-7 w-7 p-0 text-white/40 hover:text-white/70 hover:bg-white/10"
+                className="h-7 w-7 p-0 text-studio-dim hover:text-foreground hover:bg-studio-ink/5"
               >
                 <ChevronDown
                   className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
@@ -85,7 +76,7 @@ export function SearchGuidePanel() {
                 variant="ghost"
                 size="sm"
                 onClick={markSearchGuideCompleted}
-                className="h-7 w-7 p-0 text-white/30 hover:text-white/50 hover:bg-white/10"
+                className="h-7 w-7 p-0 text-studio-dim hover:text-foreground hover:bg-studio-ink/5"
                 title="Hide search tips"
               >
                 <X className="h-3.5 w-3.5" />
@@ -108,21 +99,21 @@ export function SearchGuidePanel() {
                     const isSectionOpen = expandedSectionId === section.id;
 
                     return (
-                      <div key={section.id} className="rounded-lg overflow-hidden">
+                      <div key={section.id} className="rounded-[6px] overflow-hidden">
                         {/* Section header */}
                         <button
                           type="button"
                           onClick={() => toggleSection(section.id)}
-                          className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-white/5 rounded-lg transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-studio-ink/5 rounded-[6px] transition-colors"
                         >
                           <ChevronRight
-                            className={`h-3.5 w-3.5 text-emerald-400/60 shrink-0 transition-transform duration-200 ${
+                            className={`h-3.5 w-3.5 text-room-accent shrink-0 transition-transform duration-200 ${
                               isSectionOpen ? "rotate-90" : ""
                             }`}
                           />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-emerald-400">{section.title}</p>
-                            <p className="text-xs text-white/40">{section.description}</p>
+                            <p className="text-sm font-medium text-room-accent">{section.title}</p>
+                            <p className="text-xs text-muted-foreground">{section.description}</p>
                           </div>
                         </button>
 
@@ -145,14 +136,14 @@ export function SearchGuidePanel() {
                                       <button
                                         type="button"
                                         onClick={() => toggleTip(tip.id)}
-                                        className="w-full flex items-center gap-2 px-2 py-2 text-left hover:bg-white/5 rounded-md transition-colors"
+                                        className="w-full flex items-center gap-2 px-2 py-2 text-left hover:bg-studio-ink/5 rounded-[6px] transition-colors"
                                       >
                                         <ChevronRight
-                                          className={`h-3 w-3 text-white/30 shrink-0 transition-transform duration-200 ${
+                                          className={`h-3 w-3 text-studio-dim shrink-0 transition-transform duration-200 ${
                                             isTipOpen ? "rotate-90" : ""
                                           }`}
                                         />
-                                        <p className="text-xs font-medium text-white/60">{tip.title}</p>
+                                        <p className="text-xs font-medium text-foreground">{tip.title}</p>
                                       </button>
 
                                       <AnimatePresence>
@@ -164,7 +155,7 @@ export function SearchGuidePanel() {
                                             transition={{ duration: 0.2, ease: "easeOut" }}
                                             className="overflow-hidden"
                                           >
-                                            <p className="px-7 pb-3 text-xs text-white/70 leading-relaxed">
+                                            <p className="px-7 pb-3 text-xs text-muted-foreground leading-relaxed">
                                               {tip.rosa}
                                             </p>
                                           </motion.div>

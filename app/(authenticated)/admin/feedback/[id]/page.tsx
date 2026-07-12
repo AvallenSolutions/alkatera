@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Panel } from "@/components/studio/panel";
+import { Eyebrow } from "@/components/studio/eyebrow";
 import { Button } from "@/components/ui/button";
 import { StateChip } from "@/components/studio/state-chip";
 import { Textarea } from "@/components/ui/textarea";
@@ -251,14 +252,14 @@ export default function AdminTicketDetailPage() {
   if (!isAlkateraAdmin) {
     return (
       <div className="container mx-auto py-8 px-4">
-        <Card className="rounded-[6px]">
-          <CardContent className="py-12 text-center">
+        <Panel>
+          <div className="py-12 text-center">
             <h3 className="text-lg font-medium mb-2">Access Denied</h3>
             <p className="text-muted-foreground">
               You do not have permission to access this page.
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
       </div>
     );
   }
@@ -266,8 +267,8 @@ export default function AdminTicketDetailPage() {
   if (!ticket) {
     return (
       <div className="container mx-auto py-8 px-4">
-        <Card className="rounded-[6px]">
-          <CardContent className="py-12 text-center">
+        <Panel>
+          <div className="py-12 text-center">
             <h3 className="text-lg font-medium mb-2">Ticket not found</h3>
             <Link href="/admin/feedback">
               <Button variant="outline">
@@ -275,8 +276,8 @@ export default function AdminTicketDetailPage() {
                 Back to Dashboard
               </Button>
             </Link>
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
       </div>
     );
   }
@@ -295,17 +296,22 @@ export default function AdminTicketDetailPage() {
           </Button>
         </Link>
 
+        <Eyebrow className="mb-3">THE WIRING · ADMIN</Eyebrow>
+        <h1 className="font-display text-3xl font-bold tracking-[-0.035em] text-foreground mb-6">
+          Feedback ticket.
+        </h1>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Ticket Info */}
-          <Card className="lg:col-span-2 rounded-[6px]">
-            <CardHeader>
+          <Panel className="lg:col-span-2">
+            <div className="mb-4 space-y-1">
               <div className="flex items-start gap-4">
                 <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                   <Icon className="h-6 w-6 text-muted-foreground" />
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <CardTitle className="text-xl">{ticket.title}</CardTitle>
+                    <h2 className="font-display text-xl font-semibold text-foreground">{ticket.title}</h2>
                     <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                       {categoryLabels[ticket.category]}
                     </span>
@@ -316,8 +322,8 @@ export default function AdminTicketDetailPage() {
                   </p>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
+            </div>
+            <div className="space-y-4">
               <div>
                 <h4 className="text-sm font-medium mb-2">Description</h4>
                 <p className="text-muted-foreground whitespace-pre-wrap">
@@ -362,17 +368,17 @@ export default function AdminTicketDetailPage() {
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
 
           {/* Sidebar */}
           <div className="space-y-4">
             {/* User Info */}
-            <Card className="rounded-[6px]">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Submitted By</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            <Panel>
+              <div className="mb-4 space-y-1">
+                <h2 className="font-display text-sm font-semibold text-foreground">Submitted By</h2>
+              </div>
+              <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <Avatar>
                     <AvatarFallback>
@@ -391,15 +397,15 @@ export default function AdminTicketDetailPage() {
                   <Building2 className="h-4 w-4" />
                   {ticket.organization_name || "No organization"}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </Panel>
 
             {/* Status & Priority */}
-            <Card className="rounded-[6px]">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Ticket Management</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <Panel>
+              <div className="mb-4 space-y-1">
+                <h2 className="font-display text-sm font-semibold text-foreground">Ticket Management</h2>
+              </div>
+              <div className="space-y-4">
                 <div>
                   <label className="text-sm text-muted-foreground mb-2 block">Status</label>
                   <Select
@@ -456,8 +462,8 @@ export default function AdminTicketDetailPage() {
                     </SelectContent>
                   </Select>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </Panel>
           </div>
         </div>
       </div>
@@ -467,12 +473,12 @@ export default function AdminTicketDetailPage() {
         <h3 className="text-lg font-semibold">Conversation</h3>
 
         {messages.length === 0 ? (
-          <Card className="rounded-[6px]">
-            <CardContent className="py-8 text-center text-muted-foreground">
+          <Panel>
+            <div className="py-8 text-center text-muted-foreground">
               <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p>No messages yet. Send a reply below.</p>
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
         ) : (
           <div className="space-y-4">
             {messages.map((message) => (
@@ -487,8 +493,8 @@ export default function AdminTicketDetailPage() {
         )}
 
         {/* Reply Form */}
-        <Card className="rounded-[6px]">
-          <CardContent className="p-4">
+        <Panel>
+          <div>
             <form onSubmit={handleSendMessage} className="space-y-3">
               <Textarea
                 placeholder="Type your reply to the user..."
@@ -503,8 +509,8 @@ export default function AdminTicketDetailPage() {
                 </Button>
               </div>
             </form>
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
       </div>
     </div>
   );

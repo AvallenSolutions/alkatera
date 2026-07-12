@@ -8,7 +8,6 @@
  */
 
 import { useState } from 'react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Collapsible,
@@ -17,6 +16,7 @@ import {
 } from '@/components/ui/collapsible'
 import { ChevronDown, ChevronRight, ArrowUpCircle } from 'lucide-react'
 import Link from 'next/link'
+import { StateChip } from '@/components/studio'
 import type { XeroEntry } from '@/lib/xero/scope-card-mapping'
 import { TIER_CONFIG } from '@/lib/xero/category-labels'
 
@@ -53,19 +53,19 @@ export function XeroSpendEntries({ entries, upgradeHref = '/data/spend-data/' }:
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="border-l-2 border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/20 rounded-r-md mt-3">
+      <div className="border-l-2 border-studio-hairline bg-studio-cream rounded-r-md mt-3">
         <CollapsibleTrigger asChild>
-          <button className="flex items-center justify-between w-full px-3 py-2 text-left hover:bg-amber-100/50 dark:hover:bg-amber-900/20 rounded-r-md transition-colors">
+          <button className="flex items-center justify-between w-full px-3 py-2 text-left hover:bg-secondary rounded-r-md transition-colors">
             <div className="flex items-center gap-2">
-              {isOpen ? <ChevronDown className="h-3.5 w-3.5 text-amber-600" /> : <ChevronRight className="h-3.5 w-3.5 text-amber-600" />}
-              <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
+              {isOpen ? <ChevronDown className="h-3.5 w-3.5 text-studio-dim" /> : <ChevronRight className="h-3.5 w-3.5 text-studio-dim" />}
+              <span className="text-xs font-medium text-foreground">
                 {entries.length} Xero transaction{entries.length !== 1 ? 's' : ''}
               </span>
-              <Badge variant="outline" className={`text-[9px] ${TIER_CONFIG[4].colour}`}>
+              <StateChip tone="attention">
                 {TIER_CONFIG[4].label}
-              </Badge>
+              </StateChip>
             </div>
-            <span className="text-xs font-medium text-amber-600 dark:text-amber-400">
+            <span className="text-xs font-medium text-foreground">
               {formatEmissions(totalEmissions)}
             </span>
           </button>
@@ -80,7 +80,7 @@ export function XeroSpendEntries({ entries, upgradeHref = '/data/spend-data/' }:
             {entries.map(entry => (
               <div
                 key={entry.id}
-                className="flex items-center justify-between text-xs py-1 px-1.5 rounded hover:bg-amber-100/50 dark:hover:bg-amber-900/20"
+                className="flex items-center justify-between text-xs py-1 px-1.5 rounded hover:bg-secondary"
               >
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <span className="truncate max-w-[140px] text-muted-foreground" title={entry.supplierName}>
@@ -93,14 +93,14 @@ export function XeroSpendEntries({ entries, upgradeHref = '/data/spend-data/' }:
                     {formatCurrency(entry.amount, entry.currency)}
                   </span>
                 </div>
-                <span className="text-xs font-medium text-amber-600 dark:text-amber-400 shrink-0 ml-2">
+                <span className="text-xs font-medium text-foreground shrink-0 ml-2">
                   {formatEmissions(entry.emissionsKg)}
                 </span>
               </div>
             ))}
 
             <div className="pt-1.5">
-              <Button variant="outline" size="sm" className="w-full h-7 text-xs border-amber-200 dark:border-amber-800" asChild>
+              <Button variant="outline" size="sm" className="w-full h-7 text-xs" asChild>
                 <Link href={upgradeHref}>
                   <ArrowUpCircle className="h-3 w-3 mr-1.5" />
                   Upgrade to activity-based data

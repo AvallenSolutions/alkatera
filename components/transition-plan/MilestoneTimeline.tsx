@@ -3,12 +3,10 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
 import { Trash2, Plus, CheckCircle2, Circle, Clock } from 'lucide-react'
 import {
   type TransitionMilestone,
   MILESTONE_STATUS_LABELS,
-  MILESTONE_STATUS_COLOURS,
 } from '@/lib/transition-plan/types'
 
 interface OperationalEvent {
@@ -27,6 +25,18 @@ const STATUS_ICONS = {
   not_started: Circle,
   in_progress: Clock,
   complete: CheckCircle2,
+}
+
+// Status as a studio working tone (typographic), never a raw colour scale.
+const STATUS_TONE: Record<TransitionMilestone['status'], string> = {
+  not_started: 'text-studio-dim',
+  in_progress: 'text-studio-attention',
+  complete: 'text-studio-good',
+}
+const STATUS_BORDER: Record<TransitionMilestone['status'], string> = {
+  not_started: 'border-studio-dim',
+  in_progress: 'border-studio-attention',
+  complete: 'border-studio-good',
 }
 
 function newMilestone(): TransitionMilestone {
@@ -57,7 +67,7 @@ export function MilestoneTimeline({ milestones, operationalEvents = [], onChange
   return (
     <div className="space-y-4">
       {sorted.length === 0 && (
-        <p className="text-sm text-muted-foreground text-center py-6 border border-dashed border-border rounded-lg">
+        <p className="text-sm text-muted-foreground text-center py-6 border-t border-studio-hairline">
           No milestones added. Define the key actions that will drive your decarbonisation.
         </p>
       )}
@@ -71,19 +81,17 @@ export function MilestoneTimeline({ milestones, operationalEvents = [], onChange
           <div className="space-y-3">
             {sorted.map((milestone, _index) => {
               const StatusIcon = STATUS_ICONS[milestone.status]
-              const statusColour = MILESTONE_STATUS_COLOURS[milestone.status]
 
               return (
                 <div key={milestone.id} className="relative pl-11">
                   {/* Status dot */}
                   <div
-                    className="absolute left-2 top-3 w-5 h-5 rounded-full flex items-center justify-center bg-card border-2 z-10"
-                    style={{ borderColor: statusColour }}
+                    className={`absolute left-2 top-3 w-5 h-5 rounded-full flex items-center justify-center bg-card border-2 z-10 ${STATUS_BORDER[milestone.status]}`}
                   >
-                    <StatusIcon className="w-3 h-3" style={{ color: statusColour }} />
+                    <StatusIcon className={`w-3 h-3 ${STATUS_TONE[milestone.status]}`} />
                   </div>
 
-                  <div className="border border-border rounded-xl p-4 bg-card space-y-3">
+                  <div className="border border-studio-hairline rounded-xl p-4 bg-card space-y-3">
                     <div className="flex items-start gap-3">
                       <div className="flex-1 grid grid-cols-1 gap-3 sm:grid-cols-3">
                         {/* Title */}
@@ -112,7 +120,7 @@ export function MilestoneTimeline({ milestones, operationalEvents = [], onChange
                       <button
                         type="button"
                         onClick={() => remove(milestone.id)}
-                        className="text-muted-foreground hover:text-red-400 transition-colors mt-1 flex-shrink-0"
+                        className="text-muted-foreground hover:text-studio-stale transition-colors mt-1 flex-shrink-0"
                         aria-label="Remove milestone"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -196,7 +204,7 @@ export function MilestoneTimeline({ milestones, operationalEvents = [], onChange
         </div>
       )}
 
-      <Button type="button" variant="outline" size="sm" onClick={add} className="w-full border-dashed">
+      <Button type="button" variant="outline" size="sm" onClick={add} className="w-full">
         <Plus className="w-4 h-4 mr-2" />
         Add Milestone
       </Button>
@@ -208,13 +216,9 @@ export function MilestoneTimeline({ milestones, operationalEvents = [], onChange
             const count = sorted.filter(m => m.status === s).length
             if (count === 0) return null
             return (
-              <div key={s} className="flex items-center gap-1.5">
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ background: MILESTONE_STATUS_COLOURS[s] }}
-                />
-                <span>{count} {MILESTONE_STATUS_LABELS[s]}</span>
-              </div>
+              <span key={s} className={`font-mono text-[10px] font-bold uppercase tracking-[0.18em] ${STATUS_TONE[s]}`}>
+                {count} {MILESTONE_STATUS_LABELS[s]}
+              </span>
             )
           })}
         </div>

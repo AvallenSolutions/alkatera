@@ -1,23 +1,25 @@
 'use client';
 
+/**
+ * One arable field, in the studio grammar: a statement header with the
+ * hectares standing right, pill actions (edit, copy from previous year,
+ * add harvest), a quiet mono back-link, and the surface cut into
+ * mono-eyebrow sections (map, latest harvest, history, trends). Data
+ * loading, the impact calculator and the questionnaire launches are
+ * unchanged.
+ */
+
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import {
-  Wheat,
-  ChevronRight,
-  Plus,
-  Copy,
-  Edit2,
-  ArrowLeft,
-} from 'lucide-react';
 import { toast } from 'sonner';
 import { useOrganization } from '@/lib/organizationContext';
 import { PageLoader } from '@/components/ui/page-loader';
 import { FeatureGate } from '@/components/subscription/FeatureGate';
+import { Statement } from '@/components/studio/statement';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { BigNumber } from '@/components/studio/big-number';
+import { PillButton } from '@/components/studio/pill-button';
 import { ArableGrowingQuestionnaire } from '@/components/arable-fields/ArableGrowingQuestionnaire';
 import { ArableImpactOverview } from '@/components/arable-fields/ArableImpactOverview';
 import { ArableTrendCharts } from '@/components/arable-fields/ArableTrendCharts';
@@ -33,9 +35,32 @@ import type {
   ArableCalculatorInput,
 } from '@/lib/types/arable';
 
+/** Quiet mono back-link to the list page. */
+function BackLink() {
+  return (
+    <Link
+      href="/arable-fields"
+      className="inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground transition-colors duration-150 hover:text-foreground"
+    >
+      &larr; The arable fields
+    </Link>
+  );
+}
+
+/** A quiet section: mono eyebrow over a hairline rule, then the work. */
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-4">
+      <div className="border-b border-studio-hairline pb-2">
+        <Eyebrow>{label}</Eyebrow>
+      </div>
+      {children}
+    </section>
+  );
+}
+
 export default function ArableFieldDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const { currentOrganization } = useOrganization();
   const fieldId = params.id as string;
 
@@ -219,14 +244,9 @@ export default function ArableFieldDetailPage() {
 
   if (!field) {
     return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <p className="text-muted-foreground mb-4">Arable field not found.</p>
-        <Button variant="outline" asChild>
-          <Link href="/arable-fields">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Arable Fields
-          </Link>
-        </Button>
+      <div className="space-y-4">
+        <BackLink />
+        <p className="text-sm text-muted-foreground">Arable field not found.</p>
       </div>
     );
   }
@@ -234,14 +254,13 @@ export default function ArableFieldDetailPage() {
   if (showQuestionnaire) {
     return (
       <FeatureGate feature="arable_beta">
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              {questionnaireProfile
-                ? `Edit Growing Profile: ${field.name} (${questionnaireYear})`
-                : `Add Growing Profile: ${field.name} (${questionnaireYear})`}
-            </h1>
-            <p className="text-muted-foreground mt-2">
+        <div className="space-y-8">
+          <div className="min-w-0">
+            <Statement
+              eyebrow={`THE WORKBENCH · HARVEST ${questionnaireYear}`}
+              headline={field.name.endsWith('.') ? field.name : `${field.name}.`}
+            />
+            <p className="mt-3 max-w-xl text-sm text-muted-foreground">
               Tell us about your growing practices so we can calculate the environmental impact of your grain growing.
             </p>
           </div>
@@ -272,117 +291,78 @@ export default function ArableFieldDetailPage() {
     );
   }
 
+  const factLine = [
+    field.crop_type.charAt(0).toUpperCase() + field.crop_type.slice(1),
+    field.address_city,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
     <FeatureGate feature="arable_beta">
-      <div className="space-y-6">
-        {/* Breadcrumb */}
-        <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          <Link href="/arable-fields" className="hover:text-foreground transition-colors">
-            Arable Fields
-          </Link>
-          <ChevronRight className="h-3.5 w-3.5" />
-          <span className="text-foreground font-medium">{field.name}</span>
-        </nav>
+      <div className="space-y-10">
+        <div className="min-w-0 space-y-4">
+          <BackLink />
 
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-secondary p-2.5">
-              <Wheat className="h-6 w-6 text-studio-forest" />
+          <Statement
+            eyebrow="THE WORKBENCH · ARABLE FIELD"
+            headline={field.name.endsWith('.') ? field.name : `${field.name}.`}
+          >
+            <BigNumber size="display" value={field.hectares} label="Hectares" />
+            <div className="flex flex-wrap items-center gap-2">
+              <PillButton variant="outline" onClick={() => setDialogOpen(true)}>
+                Edit field
+              </PillButton>
+              {profiles.length > 0 && (
+                <PillButton variant="outline" onClick={handleCopyFromPrevious}>
+                  Copy from previous year
+                </PillButton>
+              )}
+              <PillButton variant="room" onClick={handleAddHarvest}>
+                Add harvest year
+              </PillButton>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">{field.name}</h1>
-              <p className="text-muted-foreground mt-1">
-                {field.hectares} ha &middot; {field.crop_type.charAt(0).toUpperCase() + field.crop_type.slice(1)}
-                {field.address_city && ` &middot; ${field.address_city}`}
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => setDialogOpen(true)}
-            >
-              <Edit2 className="h-4 w-4" />
-              Edit Field
-            </Button>
-            {profiles.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                onClick={handleCopyFromPrevious}
-              >
-                <Copy className="h-4 w-4" />
-                Copy from previous year
-              </Button>
-            )}
-            <Button
-              size="sm"
-              className="gap-1.5 bg-primary text-primary-foreground"
-              onClick={handleAddHarvest}
-            >
-              <Plus className="h-4 w-4" />
-              Add harvest year
-            </Button>
-          </div>
+          </Statement>
+
+          <p className="max-w-xl text-sm text-muted-foreground">{factLine}</p>
         </div>
 
-        <Separator />
-
-        {/* Map & location */}
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold">Map &amp; location</h2>
+        <Section label="MAP & LOCATION">
           <LandUnitMap type="arable_field" id={field.id} />
-        </div>
+        </Section>
 
-        <Separator />
-
-        {/* Impact Overview */}
         {latestProfile && latestImpacts ? (
           <>
-            <ArableImpactOverview
-              impacts={latestImpacts}
-              profile={latestProfile}
-            />
+            <Section label={`THE LATEST HARVEST · ${latestProfile.harvest_year}`}>
+              <ArableImpactOverview impacts={latestImpacts} profile={latestProfile} />
+            </Section>
 
-            {/* Harvest History Table */}
             {harvestImpacts.length > 0 && (
-              <HarvestHistoryTable
-                harvestImpacts={harvestImpacts}
-                fieldId={field.id}
-                onEditHarvest={handleEditHarvest}
-                onAddHarvest={handleAddHarvest}
-              />
+              <Section label="HARVEST HISTORY">
+                <HarvestHistoryTable
+                  harvestImpacts={harvestImpacts}
+                  fieldId={field.id}
+                  onEditHarvest={handleEditHarvest}
+                  onAddHarvest={handleAddHarvest}
+                />
+              </Section>
             )}
 
-            {/* Trend Charts (only show with 2+ harvests) */}
             {harvestImpacts.length >= 2 && (
-              <ArableTrendCharts harvestImpacts={harvestImpacts} />
+              <Section label="TRENDS">
+                <ArableTrendCharts harvestImpacts={harvestImpacts} />
+              </Section>
             )}
           </>
         ) : (
-          <Card className="border-2 border-dashed">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <div className="h-14 w-14 rounded-full bg-secondary flex items-center justify-center mb-4">
-                <Wheat className="h-7 w-7 text-studio-forest" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">No Growing Data Yet</h3>
-              <p className="text-muted-foreground text-center max-w-md mb-6">
-                Add a harvest year to start tracking the environmental impact of your grain growing operations.
-              </p>
-              <Button
-                onClick={handleAddHarvest}
-                size="lg"
-                className="gap-2 bg-primary text-primary-foreground"
-              >
-                <Plus className="h-5 w-5" />
-                Add harvest year
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="border-t border-studio-hairline pt-6">
+            <p className="text-sm text-muted-foreground">
+              No growing data yet. Add a harvest year to start tracking the environmental impact of your grain growing.
+            </p>
+            <PillButton variant="room" className="mt-4" onClick={handleAddHarvest}>
+              Add harvest year
+            </PillButton>
+          </div>
         )}
 
         {/* Edit Field Dialog */}

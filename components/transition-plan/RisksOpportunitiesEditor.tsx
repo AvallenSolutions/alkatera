@@ -21,15 +21,15 @@ interface RisksOpportunitiesEditorProps {
 }
 
 const LIKELIHOOD_COLOURS: Record<RiskOpportunity['likelihood'], string> = {
-  low: 'text-[#047857]',
-  medium: 'text-[#B45309]',
-  high: 'text-[#BE123C]',
+  low: 'text-studio-good',
+  medium: 'text-studio-attention',
+  high: 'text-studio-stale',
 }
 
 const IMPACT_COLOURS: Record<RiskOpportunity['impact'], string> = {
-  low: 'text-[#047857]',
-  medium: 'text-[#B45309]',
-  high: 'text-[#BE123C]',
+  low: 'text-studio-good',
+  medium: 'text-studio-attention',
+  high: 'text-studio-stale',
 }
 
 export function RisksOpportunitiesEditor({
@@ -53,10 +53,10 @@ export function RisksOpportunitiesEditor({
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
         <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center">
-          <Sparkles className="w-6 h-6 text-[#2B46C0]" />
+          <Sparkles className="w-6 h-6 text-room-accent" />
         </div>
         <div>
-          <p className="text-sm font-medium">Claude is analysing your plan</p>
+          <p className="text-sm font-medium">Rosa is analysing your plan</p>
           <p className="text-xs text-muted-foreground mt-1">Identifying climate risks and opportunities specific to your organisation</p>
         </div>
       </div>
@@ -65,11 +65,11 @@ export function RisksOpportunitiesEditor({
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-4 text-center border border-dashed border-border rounded-[6px]">
+      <div className="flex flex-col items-center justify-center py-16 gap-4 text-center border-t border-studio-hairline">
         <Sparkles className="w-8 h-8 text-muted-foreground" />
         <div>
           <p className="text-sm font-medium">No risks or opportunities yet</p>
-          <p className="text-xs text-muted-foreground mt-1">Save your plan to generate an AI analysis</p>
+          <p className="text-xs text-muted-foreground mt-1">Save your plan to generate the analysis</p>
         </div>
       </div>
     )
@@ -100,7 +100,7 @@ export function RisksOpportunitiesEditor({
         {/* Risks column */}
         <div className="space-y-3">
           <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="w-4 h-4 text-[#BE123C]" />
+            <AlertTriangle className="w-4 h-4 text-studio-stale" />
             <h3 className="text-sm font-semibold">Risks ({risks.length})</h3>
           </div>
           {risks.map(item => (
@@ -112,14 +112,14 @@ export function RisksOpportunitiesEditor({
             />
           ))}
           {risks.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-4 border border-dashed rounded-lg">No risks identified</p>
+            <p className="text-xs text-muted-foreground text-center py-4 border border-studio-hairline rounded-lg">No risks identified</p>
           )}
         </div>
 
         {/* Opportunities column */}
         <div className="space-y-3">
           <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-4 h-4 text-[#047857]" />
+            <TrendingUp className="w-4 h-4 text-studio-good" />
             <h3 className="text-sm font-semibold">Opportunities ({opportunities.length})</h3>
           </div>
           {opportunities.map(item => (
@@ -131,7 +131,7 @@ export function RisksOpportunitiesEditor({
             />
           ))}
           {opportunities.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-4 border border-dashed rounded-lg">No opportunities identified</p>
+            <p className="text-xs text-muted-foreground text-center py-4 border border-studio-hairline rounded-lg">No opportunities identified</p>
           )}
         </div>
       </div>
@@ -149,7 +149,7 @@ function RoCard({
   onRemove: () => void
 }) {
   const isRisk = item.type === 'risk'
-  const accentColour = isRisk ? 'border-l-[#BE123C]' : 'border-l-[#047857]'
+  const accentColour = isRisk ? 'border-l-studio-stale' : 'border-l-studio-good'
 
   return (
     <div className={`border border-border border-l-4 ${accentColour} rounded-[6px] p-4 bg-card space-y-3`}>
@@ -165,16 +165,16 @@ function RoCard({
             {IMPACT_LABELS[item.impact]} impact
           </span>
           {item.aiGenerated && (
-            <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#2B46C0]">
+            <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent">
               <Sparkles className="w-3 h-3" />
-              AI
+              Rosa
             </span>
           )}
         </div>
         <button
           type="button"
           onClick={onRemove}
-          className="text-muted-foreground hover:text-[#BE123C] transition-colors flex-shrink-0"
+          className="text-muted-foreground hover:text-studio-stale transition-colors flex-shrink-0"
           aria-label="Remove"
         >
           <Trash2 className="w-4 h-4" />

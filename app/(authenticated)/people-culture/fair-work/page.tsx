@@ -3,11 +3,10 @@
 import { useState } from 'react';
 import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,17 +17,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Briefcase,
-  PlusCircle,
-  RefreshCw,
-  Upload,
-  ArrowLeft,
-} from 'lucide-react';
-import Link from 'next/link';
 import { toast } from 'sonner';
 
+import { PillButton } from '@/components/studio/pill-button';
+import { TopicHeader, HubSkeleton, ComplianceNote } from '@/components/social';
 import { FairWorkDashboard } from '@/components/people-culture/FairWorkDashboard';
 import { useFairWorkMetrics, type CompensationRecord } from '@/hooks/data/useFairWorkMetrics';
 
@@ -260,13 +252,11 @@ function AddCompensationDialog({ onSuccess }: { onSuccess: () => void }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <PlusCircle className="h-4 w-4 mr-2" />
-          Add Compensation Record
-        </Button>
-      </DialogTrigger>
+    <>
+      <PillButton size="sm" onClick={() => setOpen(true)}>
+        Add compensation record
+      </PillButton>
+      <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Add Compensation Record</DialogTitle>
@@ -281,12 +271,13 @@ function AddCompensationDialog({ onSuccess }: { onSuccess: () => void }) {
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Adding...' : 'Add Record'}
+              {isSubmitting ? 'Adding…' : 'Add Record'}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+    </>
   );
 }
 
@@ -367,7 +358,7 @@ function EditCompensationDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : 'Save Changes'}
+              {isSubmitting ? 'Saving…' : 'Save Changes'}
             </Button>
           </DialogFooter>
         </form>
@@ -423,67 +414,34 @@ function FairWorkPageContent() {
   };
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-8 w-8" />
-          <Skeleton className="h-8 w-48" />
-        </div>
-        <div className="grid grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-28" />
-          ))}
-        </div>
-        <Skeleton className="h-96" />
-      </div>
-    );
+    return <HubSkeleton />;
   }
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/people-culture">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-              <Briefcase className="h-6 w-6 text-blue-600" />
-              Fair Work
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Living wage compliance, pay equity, and compensation analytics
-            </p>
-          </div>
-        </div>
+    <div className="space-y-8 animate-fade-in-up">
+      <TopicHeader
+        eyebrow={<>THE WIRING &middot; PEOPLE &amp; CULTURE</>}
+        headline={<>Fair work.</>}
+        description="Living wage compliance, pay equity, and compensation analytics."
+        backHref="/people-culture"
+        backLabel="People & culture"
+      >
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <PillButton variant="outline" size="sm" onClick={() => refetch()}>
             Refresh
-          </Button>
-          <Button variant="outline" size="sm">
-            <Upload className="h-4 w-4 mr-2" />
+          </PillButton>
+          <PillButton variant="outline" size="sm">
             Import CSV
-          </Button>
+          </PillButton>
           <AddCompensationDialog onSuccess={refetch} />
         </div>
-      </div>
+      </TopicHeader>
 
-      {/* Info Card */}
-      <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
-        <CardContent className="p-4">
-          <p className="text-sm text-blue-800 dark:text-blue-200">
-            <strong>About Fair Work:</strong> Track compensation data to analyse living wage compliance,
-            gender pay gaps, and pay ratios. Data is anonymised and supports UK Gender Pay Gap Reporting
-            and B Corp Fair Work requirements.
-          </p>
-        </CardContent>
-      </Card>
+      <ComplianceNote label="ABOUT FAIR WORK">
+        Track compensation data to analyse living wage compliance, gender pay gaps, and pay ratios.
+        Data is anonymised and supports UK Gender Pay Gap Reporting and B Corp Fair Work requirements.
+      </ComplianceNote>
 
-      {/* Dashboard */}
       <FairWorkDashboard
         metrics={metrics}
         isLoading={loading}
@@ -518,7 +476,7 @@ function FairWorkPageContent() {
               disabled={isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isDeleting ? 'Removing...' : 'Remove'}
+              {isDeleting ? 'Removing…' : 'Remove'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

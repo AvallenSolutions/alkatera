@@ -800,18 +800,18 @@ export function PackagingFormCard({
   // input's focus). Render conditionally with stable element types instead.
   const renderWrapper = (children: React.ReactNode) =>
     showAll ? (
-      <Card className="border-l-4 border-l-orange-500 bg-amber-50/50 dark:bg-amber-950/20">
+      <Card>
         <div className="p-6 space-y-4">
           <div className="flex items-start justify-between">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded bg-orange-500 flex items-center justify-center text-white font-medium text-sm">
-                {index + 1}
-              </div>
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim pt-1">
+                {String(index + 1).padStart(2, '0')}
+              </span>
               <div>
-                <h3 className="font-semibold text-orange-800 dark:text-orange-300">
+                <h3 className="font-semibold text-foreground">
                   Packaging {index + 1}
                 </h3>
-                <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
+                <p className="text-xs text-muted-foreground mt-0.5">
                   Use smart search to find packaging materials with environmental data
                 </p>
               </div>

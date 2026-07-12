@@ -1,18 +1,18 @@
 'use client';
 
 /**
- * Pulse Financial -- Board-pack export button.
+ * Pulse Financial -- Board-pack export.
  *
- * One-click download of a CFO-ready two-page PDF summarising the entire
- * financial view. Triggers /api/pulse/board-pack which composes every
- * financial endpoint into a single HTML template and PDFShift-converts.
+ * The one act this surface exists for, so it carries the room colour:
+ * a studio pill that downloads the CFO-ready two-page PDF. Triggers
+ * /api/pulse/board-pack which composes every financial endpoint into a
+ * single HTML template and PDFShift-converts.
  */
 
 import { useState } from 'react';
-import { Download } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
+import { PillButton } from '@/components/studio/pill-button';
 
 export function BoardPackButton() {
   const { currentOrganization } = useOrganization();
@@ -51,15 +51,8 @@ export function BoardPackButton() {
   };
 
   return (
-    <Button
-      size="sm"
-      variant="default"
-      onClick={download}
-      disabled={busy}
-      className="bg-primary text-primary-foreground hover:bg-primary/90"
-    >
-      <Download className="mr-1.5 h-3.5 w-3.5" />
+    <PillButton variant="room" onClick={download} disabled={busy}>
       {busy ? 'Generating…' : 'Board pack'}
-    </Button>
+    </PillButton>
   );
 }

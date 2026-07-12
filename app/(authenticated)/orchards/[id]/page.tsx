@@ -1,16 +1,24 @@
 'use client';
 
+/**
+ * One orchard, in the studio grammar: a statement header with the
+ * hectares standing right, pill actions, a quiet mono back-link, and
+ * the surface cut into mono-eyebrow sections (map, latest harvest,
+ * history, trends). Data loading, the impact calculator and the
+ * questionnaire launches are unchanged.
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { TreePine, ChevronRight, Plus, Edit2, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOrganization } from '@/lib/organizationContext';
 import { PageLoader } from '@/components/ui/page-loader';
 import { FeatureGate } from '@/components/subscription/FeatureGate';
+import { Statement } from '@/components/studio/statement';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { BigNumber } from '@/components/studio/big-number';
+import { PillButton } from '@/components/studio/pill-button';
 import { OrchardGrowingQuestionnaire } from '@/components/orchards/OrchardGrowingQuestionnaire';
 import { OrchardImpactOverview } from '@/components/orchards/OrchardImpactOverview';
 import { OrchardTrendCharts } from '@/components/orchards/OrchardTrendCharts';
@@ -64,6 +72,30 @@ function buildInput(orchard: Orchard, profile: OrchardGrowingProfile): OrchardCa
     removal_verification_status:
       (profile.removal_verification_status as OrchardCalculatorInput['removal_verification_status']) ?? 'unverified',
   };
+}
+
+/** Quiet mono back-link to the list page. */
+function BackLink() {
+  return (
+    <Link
+      href="/orchards"
+      className="inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground transition-colors duration-150 hover:text-foreground"
+    >
+      &larr; The orchards
+    </Link>
+  );
+}
+
+/** A quiet section: mono eyebrow over a hairline rule, then the work. */
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-4">
+      <div className="border-b border-studio-hairline pb-2">
+        <Eyebrow>{label}</Eyebrow>
+      </div>
+      {children}
+    </section>
+  );
 }
 
 export default function OrchardDetailPage() {
@@ -158,14 +190,9 @@ export default function OrchardDetailPage() {
 
   if (!orchard) {
     return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <p className="text-muted-foreground mb-4">Orchard not found.</p>
-        <Button variant="outline" asChild>
-          <Link href="/orchards">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Orchards
-          </Link>
-        </Button>
+      <div className="space-y-4">
+        <BackLink />
+        <p className="text-sm text-muted-foreground">Orchard not found.</p>
       </div>
     );
   }
@@ -173,14 +200,13 @@ export default function OrchardDetailPage() {
   if (showQuestionnaire) {
     return (
       <FeatureGate feature="orchard_beta">
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              {questionnaireProfile
-                ? `Edit Growing Profile: ${orchard.name}`
-                : `Add Growing Profile: ${orchard.name}`}
-            </h1>
-            <p className="text-muted-foreground mt-2">
+        <div className="space-y-8">
+          <div className="min-w-0">
+            <Statement
+              eyebrow="THE WORKBENCH · GROWING PROFILE"
+              headline={orchard.name.endsWith('.') ? orchard.name : `${orchard.name}.`}
+            />
+            <p className="mt-3 max-w-xl text-sm text-muted-foreground">
               Tell us about your growing practices so we can calculate the environmental impact of your fruit growing.
             </p>
           </div>
@@ -212,94 +238,73 @@ export default function OrchardDetailPage() {
     );
   }
 
+  const factLine = [
+    orchard.orchard_type,
+    orchard.certification && orchard.certification !== 'conventional' ? orchard.certification : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
     <FeatureGate feature="orchard_beta">
-      <div className="space-y-6">
-        {/* Breadcrumb */}
-        <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          <Link href="/orchards" className="hover:text-foreground transition-colors">
-            Orchards
-          </Link>
-          <ChevronRight className="h-3.5 w-3.5" />
-          <span className="text-foreground font-medium">{orchard.name}</span>
-        </nav>
+      <div className="space-y-10">
+        <div className="min-w-0 space-y-4">
+          <BackLink />
 
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-secondary p-2.5">
-              <TreePine className="h-6 w-6 text-studio-forest" />
+          <Statement
+            eyebrow="THE WORKBENCH · ORCHARD"
+            headline={orchard.name.endsWith('.') ? orchard.name : `${orchard.name}.`}
+          >
+            <BigNumber size="display" value={orchard.hectares} label="Hectares" />
+            <div className="flex items-center gap-2">
+              <PillButton variant="outline" onClick={() => setDialogOpen(true)}>
+                Edit orchard
+              </PillButton>
+              <PillButton variant="room" onClick={handleAddHarvest}>
+                Add harvest year
+              </PillButton>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">{orchard.name}</h1>
-              <p className="text-muted-foreground mt-1 capitalize">
-                {orchard.hectares} ha &middot; {orchard.orchard_type}
-                {orchard.certification && orchard.certification !== 'conventional' && ` · ${orchard.certification}`}
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setDialogOpen(true)}>
-              <Edit2 className="h-4 w-4" />
-              Edit Orchard
-            </Button>
-            <Button
-              size="sm"
-              className="gap-1.5 bg-primary text-primary-foreground"
-              onClick={handleAddHarvest}
-            >
-              <Plus className="h-4 w-4" />
-              Add harvest year
-            </Button>
-          </div>
+          </Statement>
+
+          <p className="max-w-xl text-sm capitalize text-muted-foreground">{factLine}</p>
         </div>
 
-        <Separator />
-
-        {/* Map & location */}
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold">Map &amp; location</h2>
+        <Section label="MAP & LOCATION">
           <LandUnitMap type="orchard" id={orchard.id} />
-        </div>
+        </Section>
 
-        <Separator />
-
-        {/* Impact overview + harvest history */}
         {latestProfile && latestImpacts ? (
           <>
-            <OrchardImpactOverview impacts={latestImpacts} profile={latestProfile} />
+            <Section label={`THE LATEST HARVEST · ${latestProfile.harvest_year}`}>
+              <OrchardImpactOverview impacts={latestImpacts} profile={latestProfile} />
+            </Section>
 
             {harvestImpacts.length > 0 && (
-              <HarvestHistoryTable
-                harvestImpacts={harvestImpacts}
-                orchardId={orchard.id}
-                onEditHarvest={handleEditHarvest}
-                onAddHarvest={handleAddHarvest}
-              />
+              <Section label="HARVEST HISTORY">
+                <HarvestHistoryTable
+                  harvestImpacts={harvestImpacts}
+                  orchardId={orchard.id}
+                  onEditHarvest={handleEditHarvest}
+                  onAddHarvest={handleAddHarvest}
+                />
+              </Section>
             )}
 
-            {harvestImpacts.length >= 2 && <OrchardTrendCharts harvestImpacts={harvestImpacts} />}
+            {harvestImpacts.length >= 2 && (
+              <Section label="TRENDS">
+                <OrchardTrendCharts harvestImpacts={harvestImpacts} />
+              </Section>
+            )}
           </>
         ) : (
-          <Card className="border-2 border-dashed">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <div className="h-14 w-14 rounded-full bg-secondary flex items-center justify-center mb-4">
-                <TreePine className="h-7 w-7 text-studio-forest" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">No Growing Data Yet</h3>
-              <p className="text-muted-foreground text-center max-w-md mb-6">
-                Add a harvest year to start tracking the environmental impact of your fruit growing operations.
-              </p>
-              <Button
-                onClick={handleAddHarvest}
-                size="lg"
-                className="gap-2 bg-primary text-primary-foreground"
-              >
-                <Plus className="h-5 w-5" />
-                Add harvest year
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="border-t border-studio-hairline pt-6">
+            <p className="text-sm text-muted-foreground">
+              No growing data yet. Add a harvest year to start tracking the environmental impact of your fruit growing.
+            </p>
+            <PillButton variant="room" className="mt-4" onClick={handleAddHarvest}>
+              Add harvest year
+            </PillButton>
+          </div>
         )}
 
         {/* Edit Orchard Dialog */}

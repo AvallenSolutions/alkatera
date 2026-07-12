@@ -1,28 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Building2, Truck, Plus, CreditCard, Check, Sparkles, Leaf, Flower2, TreeDeciduous, AlertCircle, FileText, Calendar, History } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Statement, StateChip } from '@/components/studio'
-import { Separator } from '@/components/ui/separator'
-import Link from 'next/link'
-import { useSubscription, TierName } from '@/hooks/useSubscription'
-import { TierBadge } from '@/components/subscription/TierBadge'
-import { UsageMeter } from '@/components/subscription/UsageMeter'
+import { Panel, Statement } from '@/components/studio'
+import { useSubscription } from '@/hooks/useSubscription'
 import { GracePeriodBanner } from '@/components/subscription/GracePeriodBanner'
-import { DowngradeConfirmationModal } from '@/components/subscription/DowngradeConfirmationModal'
-import { CancelSubscriptionModal } from '@/components/subscription/CancelSubscriptionModal'
-import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
 import { FeatureGate } from '@/components/subscription/FeatureGate'
 // Round 5 (auto-research): only one settings tab is visible at a time, so the
-// other panels needn't be in /settings' First Load JS. Lazy-load all 8 panels.
+// other panels needn't be in /settings' First Load JS. Lazy-load all panels.
 const ProfileSettings = dynamic(() => import('@/components/settings/ProfileSettings').then((m) => m.ProfileSettings), { ssr: false })
 const DataPrivacySettings = dynamic(() => import('@/components/settings/DataPrivacySettings').then((m) => m.DataPrivacySettings), { ssr: false })
 const TeamSettings = dynamic(() => import('@/components/settings/TeamSettings').then((m) => m.TeamSettings), { ssr: false })
@@ -31,31 +22,10 @@ const SupportSettings = dynamic(() => import('@/components/settings/SupportSetti
 const IntegrationsSettings = dynamic(() => import('@/components/settings/IntegrationsSettings').then((m) => m.IntegrationsSettings), { ssr: false })
 const VineyardSettings = dynamic(() => import('@/components/settings/VineyardSettings').then((m) => m.VineyardSettings), { ssr: false })
 const LcaTemplatesSettings = dynamic(() => import('@/components/settings/LcaTemplatesSettings').then((m) => m.LcaTemplatesSettings), { ssr: false })
+const SubscriptionSettings = dynamic(() => import('@/components/settings/SubscriptionSettings').then((m) => m.SubscriptionSettings), { ssr: false })
+const BillingSettings = dynamic(() => import('@/components/settings/BillingSettings').then((m) => m.BillingSettings), { ssr: false })
 import { useIsAlkateraAdmin } from '@/hooks/usePermissions'
 import { isViticultureEligible } from '@/lib/viticulture-utils'
-
-type BillingInterval = 'monthly' | 'annual'
-
-interface PaymentMethod {
-  id: string;
-  brand: string;
-  last4: string;
-  expMonth: number;
-  expYear: number;
-  type: string;
-}
-
-interface SubscriptionHistoryEntry {
-  id: string;
-  eventType: string;
-  previousTier: string | null;
-  newTier: string | null;
-  amountCharged: number | null;
-  amountCredited: number | null;
-  currency: string;
-  createdAt: string;
-  eventTypeLabel: string;
-}
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -66,27 +36,18 @@ export default function SettingsPage() {
   const isOrgAdmin = userRole === 'owner' || userRole === 'admin'
   const { isAlkateraAdmin } = useIsAlkateraAdmin()
   const showVineyards = isViticultureEligible(currentOrganization, isAlkateraAdmin)
-  const {
-    usage,
-    tierName,
-    tierDisplayName,
-    subscriptionStatus,
-    allTiers,
-    isLoading,
-  } = useSubscription()
+  const { usage, subscriptionStatus } = useSubscription()
 
-  const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly')
-  const [processingCheckout, setProcessingCheckout] = useState(false)
   const [organizationData, setOrganizationData] = useState<any>(null)
-  const [invoices, setInvoices] = useState<any[]>([])
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null)
-  const [loadingPaymentMethod, setLoadingPaymentMethod] = useState(false)
-  const [updatingPaymentMethod, setUpdatingPaymentMethod] = useState(false)
-  const [subscriptionHistory, setSubscriptionHistory] = useState<SubscriptionHistoryEntry[]>([])
-  const [loadingHistory, setLoadingHistory] = useState(false)
-  const [downgradeModalOpen, setDowngradeModalOpen] = useState(false)
-  const [selectedDowngradeTier, setSelectedDowngradeTier] = useState<string | null>(null)
-  const [cancelModalOpen, setCancelModalOpen] = useState(false)
+
+  // Two-way tab sync: the URL is the single source of truth. Reading ?tab=
+  // keeps the 8 inbound deep-link sources working; writing it back on change
+  // fixes browser back/forward inside settings.
+  const activeTab = searchParams.get('tab') || (isOrgAdmin ? 'subscription' : 'profile')
+
+  function handleTabChange(value: string) {
+    router.replace(`/settings?tab=${value}`, { scroll: false })
+  }
 
   useEffect(() => {
     if (searchParams.get('success') === 'true') {
@@ -116,9 +77,6 @@ export default function SettingsPage() {
   useEffect(() => {
     if (currentOrganization) {
       fetchOrganizationData()
-      fetchPaymentMethod()
-      fetchSubscriptionHistory()
-      fetchInvoices()
     }
   }, [currentOrganization])
 
@@ -139,196 +97,24 @@ export default function SettingsPage() {
     }
   }
 
-  async function fetchPaymentMethod() {
-    if (!currentOrganization) return
-
-    setLoadingPaymentMethod(true)
-    try {
-      const response = await fetch(`/api/stripe/payment-method?organizationId=${currentOrganization.id}`)
-      if (response.ok) {
-        const data = await response.json()
-        setPaymentMethod(data.paymentMethod)
-      }
-    } catch (error) {
-      console.error('Error fetching payment method:', error)
-    } finally {
-      setLoadingPaymentMethod(false)
-    }
-  }
-
-  async function fetchSubscriptionHistory() {
-    if (!currentOrganization) return
-
-    setLoadingHistory(true)
-    try {
-      const response = await fetch(`/api/stripe/subscription-history?organizationId=${currentOrganization.id}&limit=10`)
-      if (response.ok) {
-        const data = await response.json()
-        setSubscriptionHistory(data.history || [])
-      }
-    } catch (error) {
-      console.error('Error fetching subscription history:', error)
-    } finally {
-      setLoadingHistory(false)
-    }
-  }
-
-  async function fetchInvoices() {
-    if (!currentOrganization) return
-
-    try {
-      const response = await fetch(`/api/stripe/invoices?organizationId=${currentOrganization.id}`)
-      if (response.ok) {
-        const data = await response.json()
-        setInvoices(data.invoices || [])
-      }
-    } catch (error) {
-      console.error('Error fetching invoices:', error)
-    }
-  }
-
-  async function handleUpgrade(tierName: string) {
-    if (!currentOrganization) {
-      toast.error('No organization selected')
-      return
-    }
-
-    setProcessingCheckout(true)
-
-    try {
-      const response = await fetch('/api/stripe/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tierName,
-          billingInterval,
-          organizationId: currentOrganization.id,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create checkout session')
-      }
-
-      if (data.url) {
-        window.location.href = data.url
-      }
-    } catch (error: any) {
-      console.error('Error creating checkout session:', error)
-      toast.error(error.message || 'Failed to start checkout')
-    } finally {
-      setProcessingCheckout(false)
-    }
-  }
-
-  async function handleManageSubscription() {
-    if (!organizationData?.stripe_customer_id) {
-      toast.error('No active subscription to manage')
-      return
-    }
-
-    setUpdatingPaymentMethod(true)
-    try {
-      const response = await fetch('/api/stripe/create-portal-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          organizationId: currentOrganization?.id,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to open billing portal')
-      }
-
-      if (data.url) {
-        window.location.href = data.url
-      }
-    } catch (error: any) {
-      console.error('Error opening portal:', error)
-      toast.error(error.message || 'Failed to open billing portal')
-    } finally {
-      setUpdatingPaymentMethod(false)
-    }
-  }
-
-  function handleDowngrade(tierName: string) {
-    setSelectedDowngradeTier(tierName)
-    setDowngradeModalOpen(true)
-  }
-
-  async function handleConfirmDowngrade() {
-    if (!selectedDowngradeTier || !currentOrganization) return
-
-    setProcessingCheckout(true)
-    try {
-      const response = await fetch('/api/stripe/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tierName: selectedDowngradeTier,
-          billingInterval,
-          organizationId: currentOrganization.id,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create checkout session')
-      }
-
-      if (data.url) {
-        window.location.href = data.url
-      }
-    } catch (error: any) {
-      console.error('Error creating checkout session:', error)
-      toast.error(error.message || 'Failed to start checkout')
-    } finally {
-      setProcessingCheckout(false)
-      setDowngradeModalOpen(false)
-    }
-  }
-
-  function getCardBrandIcon(brand: string) {
-    const brandLower = brand.toLowerCase()
-    if (brandLower === 'visa') return '💳 Visa'
-    if (brandLower === 'mastercard') return '💳 Mastercard'
-    if (brandLower === 'amex') return '💳 Amex'
-    return `💳 ${brand.charAt(0).toUpperCase() + brand.slice(1)}`
-  }
-
-  function getPriceIdForTier(tierName: string) {
-    const tier = allTiers.find(t => t.tier_name === tierName)
-    if (!tier) return ''
-    const monthlyPrice = tier.monthly_price_gbp || 0
-    // This is a simplified version - in production, you'd map to actual Stripe price IDs
-    // For now, we'll use the tier name and interval to construct the checkout session
-    return `${tierName}_${billingInterval}`
-  }
-
   return (
     <div className="space-y-6">
       {/* Subscription Required Banner - only shown to admins */}
       {isOrgAdmin && subscriptionStatus !== 'active' && subscriptionStatus !== 'trial' && (
-        <div className="rounded-[6px] border border-border bg-card p-4 mb-2">
+        <Panel className="mb-2 p-4">
           <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-studio-attention mt-0.5 flex-shrink-0" />
+            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-studio-attention" />
             <div>
               <h3 className="font-semibold text-foreground">
                 Subscription Required
               </h3>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="mt-1 text-sm text-studio-dim">
                 Please select a plan below to access the alkatera platform.
                 Choose from Seed or Blossom to get started, or contact us for Canopy.
               </p>
             </div>
           </div>
-        </div>
+        </Panel>
       )}
 
       {/* Grace Period Banner - only shown to admins */}
@@ -341,50 +127,6 @@ export default function SettingsPage() {
         />
       )}
 
-      {/* Downgrade Confirmation Modal */}
-      {selectedDowngradeTier && currentOrganization && (
-        <DowngradeConfirmationModal
-          isOpen={downgradeModalOpen}
-          onClose={() => {
-            setDowngradeModalOpen(false)
-            setSelectedDowngradeTier(null)
-          }}
-          onConfirm={handleConfirmDowngrade}
-          currentTier={tierName}
-          newTier={selectedDowngradeTier}
-          currentTierDisplayName={tierDisplayName}
-          newTierDisplayName={allTiers.find(t => t.tier_name === selectedDowngradeTier)?.display_name || selectedDowngradeTier}
-          organizationId={currentOrganization.id}
-          priceId={getPriceIdForTier(selectedDowngradeTier)}
-          isProcessing={processingCheckout}
-        />
-      )}
-
-      {/* Cancel Subscription Modal */}
-      {currentOrganization && (
-        <CancelSubscriptionModal
-          isOpen={cancelModalOpen}
-          onClose={() => setCancelModalOpen(false)}
-          onCancelled={() => {
-            setCancelModalOpen(false)
-            fetchOrganizationData()
-            fetchSubscriptionHistory()
-          }}
-          onDowngradeInstead={() => {
-            // Find the next lower tier to suggest
-            const tierLevels: Record<string, number> = { seed: 1, blossom: 2, canopy: 3 }
-            const currentLevel = tierLevels[tierName] || 1
-            const lowerTier = currentLevel === 3 ? 'blossom' : currentLevel === 2 ? 'seed' : null
-            if (lowerTier) {
-              handleDowngrade(lowerTier)
-            }
-          }}
-          organizationId={currentOrganization.id}
-          currentTierDisplayName={tierDisplayName}
-          canDowngrade={tierName !== 'seed'}
-        />
-      )}
-
       <div className="space-y-3">
         <Statement eyebrow="THE WIRING · SETTINGS" headline="The wiring." />
         <p className="text-sm text-studio-dim">
@@ -392,7 +134,7 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <Tabs defaultValue={searchParams.get('tab') || (isOrgAdmin ? "subscription" : "profile")} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList>
           {isOrgAdmin && (
             <>
@@ -404,7 +146,6 @@ export default function SettingsPage() {
           {isOrgAdmin && (
             <>
               <TabsTrigger value="team">Team</TabsTrigger>
-              <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
               {showVineyards && <TabsTrigger value="vineyards">Vineyards</TabsTrigger>}
               <TabsTrigger value="integrations">Integrations</TabsTrigger>
               <TabsTrigger value="lca-templates">LCA templates</TabsTrigger>
@@ -415,650 +156,14 @@ export default function SettingsPage() {
         </TabsList>
 
         {isOrgAdmin && <TabsContent value="subscription" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5" />
-                  {subscriptionStatus === 'trial' ? 'Free Trial' : 'Current Plan'}
-                </CardTitle>
-                <CardDescription>
-                  {subscriptionStatus === 'trial'
-                    ? 'Explore the platform, then choose a plan to continue'
-                    : 'Your subscription details and status'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {isLoading ? (
-                  <div className="space-y-3">
-                    <div className="h-8 w-32 bg-muted rounded" />
-                    <div className="h-4 w-48 bg-muted rounded" />
-                  </div>
-                ) : subscriptionStatus === 'trial' ? (
-                  <>
-                    <StateChip tone="hold">Free Trial</StateChip>
-                    <p className="text-sm text-muted-foreground">
-                      You&apos;re on a 30-day free trial with full Seed features.
-                      {organizationData?.subscription_expires_at
-                        ? ` Your trial ends on ${new Date(organizationData.subscription_expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.`
-                        : ''}
-                      {' '}Choose a plan below to keep your access when your trial ends. Your card is
-                      already on file, so it&apos;s a single click.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-3">
-                      <TierBadge tier={tierName} size="lg" />
-                      <StateChip
-                        tone={
-                          subscriptionStatus === 'active' ? 'good'
-                            : subscriptionStatus === 'trial' ? 'hold'
-                            : subscriptionStatus === 'suspended' ? 'attention'
-                            : subscriptionStatus === 'cancelled' ? 'stale'
-                            : 'quiet'
-                        }
-                      >
-                        {subscriptionStatus.charAt(0).toUpperCase() + subscriptionStatus.slice(1)}
-                      </StateChip>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {allTiers.find(t => t.tier_name === tierName)?.description || 'Manage your sustainability tracking'}
-                    </p>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Usage This Month</CardTitle>
-                <CardDescription>
-                  Track your resource consumption against plan limits
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {isLoading || !usage ? (
-                  <div className="space-y-4">
-                    {[1, 2, 3].map(i => (
-                      <div key={i} className="space-y-2">
-                        <div className="h-4 w-24 bg-muted rounded" />
-                        <div className="h-2 w-full bg-muted rounded" />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <>
-                    <UsageMeter
-                      label="Products"
-                      current={usage.usage.products.current}
-                      max={usage.usage.products.max}
-                      isUnlimited={usage.usage.products.is_unlimited}
-                    />
-                    <UsageMeter
-                      label="Facilities"
-                      current={usage.usage.facilities.current}
-                      max={usage.usage.facilities.max}
-                      isUnlimited={usage.usage.facilities.is_unlimited}
-                    />
-                    <UsageMeter
-                      label="Users"
-                      current={usage.usage.team_members.current}
-                      max={usage.usage.team_members.max}
-                      isUnlimited={usage.usage.team_members.is_unlimited}
-                    />
-                    <UsageMeter
-                      label="Reports (Monthly)"
-                      current={usage.usage.reports_monthly.current}
-                      max={usage.usage.reports_monthly.max}
-                      isUnlimited={usage.usage.reports_monthly.is_unlimited}
-                    />
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-3 mb-1">
-                    <CardTitle>Available Plans</CardTitle>
-                    <StateChip tone="quiet">Founding Partner Pricing</StateChip>
-                  </div>
-                  <CardDescription>
-                    Lock in exclusive founding partner rates, honoured for the lifetime of your subscription.
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-2 rounded-[6px] border p-1">
-                  <Button
-                    size="sm"
-                    variant={billingInterval === 'monthly' ? 'default' : 'ghost'}
-                    onClick={() => setBillingInterval('monthly')}
-                  >
-                    Monthly
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={billingInterval === 'annual' ? 'default' : 'ghost'}
-                    onClick={() => setBillingInterval('annual')}
-                    className="gap-1"
-                  >
-                    Annual
-                    <span className="ml-1 font-mono text-[10px] uppercase tracking-[0.18em]">Save 17%</span>
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-6 md:grid-cols-3">
-                {allTiers.map((tier) => {
-                  // On a free trial the org carries tier 'seed' for feature visibility, but
-                  // isn't actually subscribed to any paid plan — so nothing is the "current"
-                  // plan and every tier is selectable as a subscription.
-                  const onTrial = subscriptionStatus === 'trial'
-                  const isCurrent = !onTrial && tier.tier_name === tierName
-                  const currentTierLevel = allTiers.find(t => t.tier_name === tierName)?.tier_level || 1
-                  const isUpgrade = tier.tier_level > currentTierLevel
-                  const isDowngrade = tier.tier_level < currentTierLevel
-
-                  const tierIcons: Record<TierName, React.ComponentType<{ className?: string }>> = {
-                    seed: Leaf,
-                    blossom: Flower2,
-                    canopy: TreeDeciduous,
-                  }
-                  const Icon = tierIcons[tier.tier_name]
-
-                  const monthlyPrice = tier.monthly_price_gbp || 0
-                  const annualPrice = tier.annual_price_gbp || monthlyPrice * 10
-                  const displayPrice = billingInterval === 'monthly' ? monthlyPrice : Math.round(annualPrice / 12)
-                  const annualSavings = monthlyPrice * 12 - annualPrice
-
-                  return (
-                    <div
-                      key={tier.tier_name}
-                      className={cn(
-                        "relative rounded-[6px] border bg-card p-6 transition-colors flex flex-col",
-                        isCurrent ? "border-foreground" : "border-border"
-                      )}
-                    >
-                      {isCurrent && (
-                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                          <span className="rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">
-                            Current Plan
-                          </span>
-                        </div>
-                      )}
-                      {tier.tier_name === 'blossom' && !isCurrent && (
-                        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                          <span className="rounded-full border border-border bg-secondary px-3 py-1 text-xs font-medium text-foreground">
-                            Popular
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="mb-4 flex items-center gap-2 pt-2">
-                        <Icon className="h-5 w-5 text-foreground" />
-                        <span className="font-semibold">{tier.display_name}</span>
-                      </div>
-
-                      {monthlyPrice > 0 ? (
-                        <div className="mb-4">
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-3xl font-bold">£{displayPrice}</span>
-                            <span className="text-sm text-muted-foreground">/month</span>
-                          </div>
-                          {billingInterval === 'annual' && annualSavings > 0 && (
-                            <p className="text-xs text-studio-good mt-1">
-                              £{annualPrice} billed annually (save £{annualSavings})
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="mb-4 h-[52px] flex items-center">
-                          <span className="text-xl font-semibold text-muted-foreground">Contact Us</span>
-                        </div>
-                      )}
-
-                      <p className="text-sm text-muted-foreground mb-4 min-h-[40px]">
-                        {tier.description}
-                      </p>
-
-                      <div className="space-y-4 mb-6 flex-1">
-                        <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                            Plan Limits
-                          </p>
-                          <ul className="space-y-2">
-                            <li className="flex items-center gap-2 text-sm">
-                              <Check className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                              <span>
-                                {tier.max_products ? `${tier.max_products} Products` : 'Unlimited Products'}
-                              </span>
-                            </li>
-                            <li className="flex items-center gap-2 text-sm">
-                              <Check className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                              <span>
-                                {tier.max_lcas ? `${tier.max_lcas} LCAs` : 'Unlimited LCAs'}
-                              </span>
-                            </li>
-                            <li className="flex items-center gap-2 text-sm">
-                              <Check className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                              <span>
-                                {tier.max_team_members ? `${tier.max_team_members} Team Members` : 'Unlimited Team Members'}
-                              </span>
-                            </li>
-                            <li className="flex items-center gap-2 text-sm">
-                              <Check className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                              <span>
-                                {tier.max_facilities ? `${tier.max_facilities} Facilities` : 'Unlimited Facilities'}
-                              </span>
-                            </li>
-                            <li className="flex items-center gap-2 text-sm">
-                              <Check className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                              <span>
-                                {tier.max_suppliers ? `${tier.max_suppliers} Suppliers` : 'Unlimited Suppliers'}
-                              </span>
-                            </li>
-                            <li className="flex items-center gap-2 text-sm">
-                              <Check className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                              <span>
-                                {tier.max_reports_per_month ? `${tier.max_reports_per_month} Reports/month` : 'Unlimited Reports'}
-                              </span>
-                            </li>
-                          </ul>
-                        </div>
-
-                        {tier.features_enabled && tier.features_enabled.length > 0 && (
-                          <div>
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                              Features Included
-                            </p>
-                            <ul className="space-y-1">
-                              {tier.features_enabled.slice(0, 6).map((feature) => (
-                                <li key={feature} className="flex items-center gap-2 text-xs">
-                                  <Check className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                                  <span className="capitalize">{feature.replace(/_/g, ' ')}</span>
-                                </li>
-                              ))}
-                              {tier.features_enabled.length > 6 && (
-                                <li className="text-xs text-muted-foreground ml-5">
-                                  +{tier.features_enabled.length - 6} more features
-                                </li>
-                              )}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-
-                      {isCurrent ? (
-                        <Button variant="outline" className="w-full mt-auto" disabled>
-                          Current Plan
-                        </Button>
-                      ) : onTrial ? (
-                        <Button
-                          variant={tier.tier_name === 'blossom' ? 'default' : 'outline'}
-                          className="w-full mt-auto"
-                          onClick={() => handleUpgrade(tier.tier_name)}
-                          disabled={processingCheckout}
-                        >
-                          {processingCheckout ? 'Processing...' : `Subscribe to ${tier.display_name}`}
-                        </Button>
-                      ) : (
-                        <Button
-                          variant={isUpgrade ? 'default' : 'outline'}
-                          className="w-full mt-auto"
-                          onClick={() => isDowngrade ? handleDowngrade(tier.tier_name) : handleUpgrade(tier.tier_name)}
-                          disabled={processingCheckout}
-                        >
-                          {processingCheckout ? 'Processing...' : isUpgrade ? 'Upgrade' : 'Downgrade'}
-                        </Button>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Cancel Subscription */}
-          {tierName !== 'seed' && subscriptionStatus === 'active' && (
-            <Card>
-              <CardContent className="flex items-center justify-between py-6">
-                <div>
-                  <p className="text-sm font-medium">Cancel Subscription</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Cancel your plan and revert to the free Seed tier at the end of your billing period.
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  className="text-studio-stale hover:text-studio-stale hover:bg-secondary"
-                  onClick={() => setCancelModalOpen(true)}
-                >
-                  Cancel Plan
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+          <SubscriptionSettings
+            organizationData={organizationData}
+            onSubscriptionChanged={fetchOrganizationData}
+          />
         </TabsContent>}
 
         {isOrgAdmin && <TabsContent value="billing" className="space-y-4">
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />
-                  Payment Method
-                </CardTitle>
-                <CardDescription>
-                  Manage your payment details and billing information
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {loadingPaymentMethod ? (
-                  <div className="flex items-center justify-center py-6">
-                    <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">Loading</span>
-                  </div>
-                ) : paymentMethod ? (
-                  <>
-                    <div className="flex items-center gap-3 p-3 rounded-[6px] border border-border bg-card">
-                      <div className="h-10 w-16 rounded-[6px] border border-border bg-secondary flex items-center justify-center">
-                        <CreditCard className="h-6 w-6 text-foreground" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{getCardBrandIcon(paymentMethod.brand)}</p>
-                        <p className="text-sm text-muted-foreground">
-                          •••• •••• •••• {paymentMethod.last4}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Expires {paymentMethod.expMonth?.toString().padStart(2, '0')}/{paymentMethod.expYear}
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleManageSubscription}
-                      disabled={updatingPaymentMethod}
-                    >
-                      {updatingPaymentMethod ? 'Opening Portal...' : 'Update Payment Method'}
-                    </Button>
-                  </>
-                ) : organizationData?.stripe_customer_id ? (
-                  <>
-                    <div className="flex items-center gap-3 p-3 rounded-[6px] border border-border bg-card">
-                      <div className="h-10 w-16 rounded-[6px] border border-border bg-secondary flex items-center justify-center">
-                        <CreditCard className="h-6 w-6 text-foreground" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">Payment method on file</p>
-                        <p className="text-xs text-muted-foreground">Managed via Stripe</p>
-                      </div>
-                    </div>
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleManageSubscription}
-                      disabled={updatingPaymentMethod}
-                    >
-                      {updatingPaymentMethod ? 'Opening Portal...' : 'Update Payment Method'}
-                    </Button>
-                  </>
-                ) : (
-                  <div className="text-center py-6">
-                    <CreditCard className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-sm text-muted-foreground mb-4">
-                      No payment method on file
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Add a payment method by upgrading your plan
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Next Billing Date
-                </CardTitle>
-                <CardDescription>
-                  When your next payment is due
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {subscriptionStatus === 'active' && (organizationData?.current_period_end || organizationData?.subscription_started_at) ? (
-                  <div className="space-y-3">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-bold">
-                        {organizationData.current_period_end
-                          ? new Date(organizationData.current_period_end).toLocaleDateString('en-GB', {
-                              day: 'numeric',
-                              month: 'long',
-                              year: 'numeric'
-                            })
-                          : 'Syncing with Stripe...'}
-                      </span>
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Estimated amount</span>
-                      <span className="font-medium">
-                        £{allTiers.find(t => t.tier_name === tierName)?.monthly_price_gbp || 0}/month
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-6">
-                    <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-sm text-muted-foreground">
-                      No active subscription
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Billing Details
-              </CardTitle>
-              <CardDescription>
-                Organisation information for invoices
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Organisation Name</label>
-                    <p className="text-sm mt-1">{organizationData?.billing_name || currentOrganization?.name || 'Not set'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Billing Email</label>
-                    <p className="text-sm mt-1">{organizationData?.billing_email || 'Not set'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Tax/VAT ID</label>
-                    <p className="text-sm mt-1">{organizationData?.tax_id || 'Not set'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Country</label>
-                    <p className="text-sm mt-1">{organizationData?.billing_address_country || organizationData?.country || 'Not set'}</p>
-                  </div>
-                  {organizationData?.billing_address_line1 && (
-                    <div className="md:col-span-2">
-                      <label className="text-sm font-medium text-muted-foreground">Billing Address</label>
-                      <p className="text-sm mt-1">
-                        {[
-                          organizationData.billing_address_line1,
-                          organizationData.billing_address_city,
-                          organizationData.billing_address_postal_code,
-                        ].filter(Boolean).join(', ')}
-                      </p>
-                    </div>
-                  )}
-                </div>
-                <Separator />
-                <p className="text-xs text-muted-foreground">
-                  Changes made in Organisation settings are automatically synced to your Stripe billing account.
-                </p>
-                <Button variant="outline" asChild>
-                  <Link href="/company/overview">Update Billing Details</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Invoice History
-              </CardTitle>
-              <CardDescription>
-                View and download your past invoices
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {invoices.length > 0 ? (
-                <div className="space-y-2">
-                  {invoices.map((invoice: any) => (
-                    <div
-                      key={invoice.id}
-                      className="flex items-center justify-between p-3 rounded-[6px] border border-border bg-card hover:bg-secondary transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm font-medium">
-                            {new Date(invoice.created).toLocaleDateString('en-GB', {
-                              day: 'numeric',
-                              month: 'long',
-                              year: 'numeric'
-                            })}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Invoice #{invoice.number}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <StateChip tone={invoice.status === 'paid' ? 'good' : 'attention'}>
-                          {invoice.status}
-                        </StateChip>
-                        <span className="text-sm font-medium">
-                          £{(invoice.amount_paid / 100).toFixed(2)}
-                        </span>
-                        <Button size="sm" variant="ghost" asChild>
-                          <a href={invoice.invoice_pdf} target="_blank" rel="noopener noreferrer">
-                            Download
-                          </a>
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                  <p className="text-sm font-medium mb-1">No invoices yet</p>
-                  <p className="text-xs text-muted-foreground">
-                    Invoices will appear here after your first payment
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <History className="h-5 w-5" />
-                Subscription History
-              </CardTitle>
-              <CardDescription>
-                Track all changes to your subscription
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loadingHistory ? (
-                <div className="flex items-center justify-center py-8">
-                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">Loading</span>
-                </div>
-              ) : subscriptionHistory.length > 0 ? (
-                <div className="space-y-2">
-                  {subscriptionHistory.map((entry) => (
-                    <div
-                      key={entry.id}
-                      className="flex items-center justify-between p-3 rounded-[6px] border border-border bg-card hover:bg-secondary transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={cn(
-                          "h-2 w-2 rounded-full",
-                          entry.eventType === 'upgrade' && "bg-studio-good",
-                          entry.eventType === 'downgrade' && "bg-studio-attention",
-                          entry.eventType === 'payment_failed' && "bg-studio-stale",
-                          entry.eventType === 'payment_succeeded' && "bg-studio-good",
-                          entry.eventType === 'grace_period_started' && "bg-studio-attention",
-                          entry.eventType === 'grace_period_auto_deletion' && "bg-studio-stale",
-                          !['upgrade', 'downgrade', 'payment_failed', 'payment_succeeded', 'grace_period_started', 'grace_period_auto_deletion'].includes(entry.eventType) && "bg-studio-dim"
-                        )} />
-                        <div>
-                          <p className="text-sm font-medium">{entry.eventTypeLabel}</p>
-                          {(entry.previousTier || entry.newTier) && (
-                            <p className="text-xs text-muted-foreground">
-                              {entry.previousTier && entry.newTier ? (
-                                <>
-                                  {entry.previousTier.charAt(0).toUpperCase() + entry.previousTier.slice(1)} → {entry.newTier.charAt(0).toUpperCase() + entry.newTier.slice(1)}
-                                </>
-                              ) : entry.newTier ? (
-                                `New plan: ${entry.newTier.charAt(0).toUpperCase() + entry.newTier.slice(1)}`
-                              ) : null}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {entry.amountCharged && entry.amountCharged > 0 && (
-                          <span className="text-sm font-medium">
-                            £{entry.amountCharged.toFixed(2)}
-                          </span>
-                        )}
-                        {entry.amountCredited && entry.amountCredited > 0 && (
-                          <span className="text-sm font-medium text-studio-good">
-                            +£{entry.amountCredited.toFixed(2)}
-                          </span>
-                        )}
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(entry.createdAt).toLocaleDateString('en-GB', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric'
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <History className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                  <p className="text-sm font-medium mb-1">No subscription changes yet</p>
-                  <p className="text-xs text-muted-foreground">
-                    Your subscription activity will appear here
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <BillingSettings organizationData={organizationData} />
         </TabsContent>}
 
         <TabsContent value="profile" className="space-y-4">
@@ -1068,33 +173,6 @@ export default function SettingsPage() {
 
         {isOrgAdmin && <TabsContent value="team" className="space-y-4">
           <TeamSettings showHeader={false} />
-        </TabsContent>}
-
-        {isOrgAdmin && <TabsContent value="suppliers" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Truck className="h-5 w-5" />
-                Supplier Management
-              </CardTitle>
-              <CardDescription>
-                Add and manage your suppliers for supply chain tracking
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Truck className="h-12 w-12 text-slate-300 dark:text-slate-700 mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No Suppliers Added</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Start tracking your supply chain by adding your suppliers
-                </p>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Supplier
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>}
 
         {isOrgAdmin && showVineyards && <TabsContent value="vineyards" className="space-y-4">

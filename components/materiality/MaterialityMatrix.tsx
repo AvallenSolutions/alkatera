@@ -1,8 +1,22 @@
 'use client'
 
 import type { MaterialityTopic } from '@/lib/materiality/topic-library'
-import { CATEGORY_COLOURS } from '@/lib/materiality/topic-library'
 import { cn } from '@/lib/utils'
+
+// Studio palette literals (SVG needs concrete values). These equal the design tokens.
+const CREAM = '#F2F1EA'
+const HAIRLINE = '#D9D6CB'
+const DIM = '#6F6F68'
+const INK = '#1A1B1D'
+// The room's one saturated colour, read from the live CSS variable.
+const ROOM = 'rgb(var(--room-accent-rgb))'
+
+// Short mono tag per ESG category — replaces the old colour-coded legend dots.
+const CATEGORY_TAG: Record<MaterialityTopic['category'], string> = {
+  environmental: 'ENV',
+  social: 'SOC',
+  governance: 'GOV',
+}
 
 interface MaterialityMatrixProps {
   topics: MaterialityTopic[]
@@ -30,7 +44,7 @@ export function MaterialityMatrix({ topics, activeTopicId, onTopicClick, classNa
       {/* Axis labels */}
       <div className="flex items-center gap-2 mb-1">
         <div className="w-8 flex-shrink-0" /> {/* spacer for Y-axis label */}
-        <div className="flex-1 text-center text-xs text-stone-500 font-mono uppercase tracking-widest">
+        <div className="flex-1 text-center text-xs text-studio-dim font-mono uppercase tracking-widest">
           Financial Risk / Opportunity
         </div>
       </div>
@@ -39,7 +53,7 @@ export function MaterialityMatrix({ topics, activeTopicId, onTopicClick, classNa
         {/* Y-axis label (rotated) */}
         <div className="w-8 flex-shrink-0 flex items-center justify-center">
           <span
-            className="text-xs text-stone-500 font-mono uppercase tracking-widest"
+            className="text-xs text-studio-dim font-mono uppercase tracking-widest"
             style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
           >
             Impact on People &amp; Planet
@@ -51,23 +65,23 @@ export function MaterialityMatrix({ topics, activeTopicId, onTopicClick, classNa
           <svg viewBox="0 0 400 360" className="w-full">
             {/* Quadrant backgrounds */}
             {/* Bottom-left: Low-Low */}
-            <rect x={0} y={180} width={200} height={180} fill="#F2F1EA" />
+            <rect x={0} y={180} width={200} height={180} fill={CREAM} />
             {/* Bottom-right: Financial material only */}
-            <rect x={200} y={180} width={200} height={180} fill="#D9D6CB" opacity="0.35" />
+            <rect x={200} y={180} width={200} height={180} fill={HAIRLINE} opacity="0.35" />
             {/* Top-left: Impact material only */}
-            <rect x={0} y={0} width={200} height={180} fill="#D9D6CB" opacity="0.35" />
-            {/* Top-right: Double material, both high */}
-            <rect x={200} y={0} width={200} height={180} fill="#2B46C0" opacity="0.12" />
+            <rect x={0} y={0} width={200} height={180} fill={HAIRLINE} opacity="0.35" />
+            {/* Top-right: Double material, both high — the one saturated block */}
+            <rect x={200} y={0} width={200} height={180} fill={ROOM} opacity="0.12" />
 
             {/* Quadrant labels */}
-            <text x={100} y={350} textAnchor="middle" fontSize={9} fill="#6F6F68" fontFamily="ui-monospace,monospace">LOW PRIORITY</text>
-            <text x={300} y={350} textAnchor="middle" fontSize={9} fill="#6F6F68" fontFamily="ui-monospace,monospace">FINANCIAL RISK</text>
-            <text x={100} y={16} textAnchor="middle" fontSize={9} fill="#6F6F68" fontFamily="ui-monospace,monospace">IMPACT MATERIAL</text>
-            <text x={300} y={16} textAnchor="middle" fontSize={9} fill="#2B46C0" fontFamily="ui-monospace,monospace" fontWeight="700">DOUBLE MATERIAL</text>
+            <text x={100} y={350} textAnchor="middle" fontSize={9} fill={DIM} fontFamily="ui-monospace,monospace">LOW PRIORITY</text>
+            <text x={300} y={350} textAnchor="middle" fontSize={9} fill={DIM} fontFamily="ui-monospace,monospace">FINANCIAL RISK</text>
+            <text x={100} y={16} textAnchor="middle" fontSize={9} fill={DIM} fontFamily="ui-monospace,monospace">IMPACT MATERIAL</text>
+            <text x={300} y={16} textAnchor="middle" fontSize={9} fill={ROOM} fontFamily="ui-monospace,monospace" fontWeight="700">DOUBLE MATERIAL</text>
 
             {/* Axis lines */}
-            <line x1={200} y1={0} x2={200} y2={360} stroke="#D9D6CB" strokeWidth={1} strokeDasharray="4 2" />
-            <line x1={0} y1={180} x2={400} y2={180} stroke="#D9D6CB" strokeWidth={1} strokeDasharray="4 2" />
+            <line x1={200} y1={0} x2={200} y2={360} stroke={HAIRLINE} strokeWidth={1} strokeDasharray="4 2" />
+            <line x1={0} y1={180} x2={400} y2={180} stroke={HAIRLINE} strokeWidth={1} strokeDasharray="4 2" />
 
             {/* Grid ticks */}
             {[1, 2, 3, 4, 5].map(tick => {
@@ -75,18 +89,17 @@ export function MaterialityMatrix({ topics, activeTopicId, onTopicClick, classNa
               const y = 360 - ((tick / 5) * 360 - 36)
               return (
                 <g key={tick}>
-                  <text x={x} y={355} textAnchor="middle" fontSize={8} fill="#D9D6CB" fontFamily="ui-monospace,monospace">{tick}</text>
-                  <text x={4} y={y + 3} textAnchor="start" fontSize={8} fill="#D9D6CB" fontFamily="ui-monospace,monospace">{6 - tick}</text>
+                  <text x={x} y={355} textAnchor="middle" fontSize={8} fill={HAIRLINE} fontFamily="ui-monospace,monospace">{tick}</text>
+                  <text x={4} y={y + 3} textAnchor="start" fontSize={8} fill={HAIRLINE} fontFamily="ui-monospace,monospace">{6 - tick}</text>
                 </g>
               )
             })}
 
-            {/* Plotted topics */}
+            {/* Plotted topics — all in the room's one colour; position carries the meaning */}
             {plottable.map(topic => {
               const cx = ((topic.financialScore! - 0.5) / 5) * 400
               const cy = 360 - ((topic.impactScore! - 0.5) / 5) * 360
               const isActive = topic.id === activeTopicId
-              const colour = CATEGORY_COLOURS[topic.category]
 
               return (
                 <g
@@ -98,9 +111,9 @@ export function MaterialityMatrix({ topics, activeTopicId, onTopicClick, classNa
                     cx={cx}
                     cy={cy}
                     r={isActive ? 12 : 8}
-                    fill={colour}
-                    opacity={isActive ? 0.9 : 0.7}
-                    stroke={isActive ? '#1c1917' : 'white'}
+                    fill={ROOM}
+                    opacity={isActive ? 0.95 : 0.6}
+                    stroke={isActive ? INK : CREAM}
                     strokeWidth={isActive ? 2 : 1.5}
                   />
                   {isActive && (
@@ -109,7 +122,7 @@ export function MaterialityMatrix({ topics, activeTopicId, onTopicClick, classNa
                       y={cy - 16}
                       textAnchor="middle"
                       fontSize={8}
-                      fill="#1c1917"
+                      fill={INK}
                       fontFamily="Inter,system-ui,sans-serif"
                       fontWeight="600"
                     >
@@ -124,7 +137,7 @@ export function MaterialityMatrix({ topics, activeTopicId, onTopicClick, classNa
           {/* No topics placeholder */}
           {plottable.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <p className="text-sm text-stone-400 text-center px-8">
+              <p className="text-sm text-muted-foreground text-center px-8">
                 Mark topics as Material and score them to see them plotted here.
               </p>
             </div>
@@ -132,16 +145,15 @@ export function MaterialityMatrix({ topics, activeTopicId, onTopicClick, classNa
         </div>
       </div>
 
-      {/* Legend */}
-      <div className="flex gap-4 mt-2 pl-10 flex-wrap">
+      {/* Legend — categories as mono tags, not colour dots */}
+      <div className="flex gap-4 mt-2 pl-10 flex-wrap items-center">
         {(['environmental', 'social', 'governance'] as const).map(cat => (
-          <div key={cat} className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full" style={{ background: CATEGORY_COLOURS[cat] }} />
-            <span className="text-xs text-stone-500 capitalize">{cat}</span>
-          </div>
+          <span key={cat} className="font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-studio-dim">
+            {CATEGORY_TAG[cat]} · <span className="capitalize font-normal tracking-normal">{cat}</span>
+          </span>
         ))}
         {plottable.length > 0 && (
-          <span className="text-xs text-stone-400">{plottable.length} topic{plottable.length !== 1 ? 's' : ''} plotted</span>
+          <span className="text-xs text-studio-dim">{plottable.length} topic{plottable.length !== 1 ? 's' : ''} plotted</span>
         )}
       </div>
     </div>

@@ -128,8 +128,8 @@ export function IngredientRow(props: IngredientRowProps) {
         onClick={() => setExpanded((v) => !v)}
         className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-muted/40 rounded-t-md focus:outline-none focus:ring-2 focus:ring-ring"
       >
-        <div className="flex h-7 w-7 items-center justify-center rounded bg-primary text-primary-foreground font-medium text-xs flex-shrink-0">
-          {index + 1}
+        <div className="flex h-7 w-7 items-center justify-center rounded-[4px] bg-studio-ink/5 font-mono text-[10px] text-studio-dim flex-shrink-0">
+          {String(index + 1).padStart(2, '0')}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">

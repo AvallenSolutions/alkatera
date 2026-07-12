@@ -1,9 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -31,6 +29,9 @@ import {
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
+import { StateChip } from '@/components/studio';
+import type { WorkingTone } from '@/components/studio/theme';
+import { evidenceVerificationTone } from '@/lib/certifications/status-tones';
 
 interface GapAnalysis {
   id: string;
@@ -81,36 +82,36 @@ interface GapAnalysisDashboardProps {
 const statusConfig = {
   not_assessed: {
     label: 'Not Assessed',
-    color: 'bg-slate-100 text-slate-700',
+    color: 'text-studio-dim',
     icon: HelpCircle,
   },
   compliant: {
     label: 'Compliant',
-    color: 'bg-emerald-100 text-emerald-700',
+    color: 'text-studio-good',
     icon: CheckCircle2,
   },
   partial: {
     label: 'Partial',
-    color: 'bg-amber-100 text-amber-700',
+    color: 'text-studio-attention',
     icon: MinusCircle,
   },
   non_compliant: {
     label: 'Non-Compliant',
-    color: 'bg-red-100 text-red-700',
+    color: 'text-studio-stale',
     icon: AlertCircle,
   },
   not_applicable: {
     label: 'N/A',
-    color: 'bg-slate-50 text-slate-500',
+    color: 'text-studio-dim',
     icon: MinusCircle,
   },
 };
 
-const priorityColors = {
-  low: 'bg-slate-100 text-slate-700',
-  medium: 'bg-blue-100 text-blue-700',
-  high: 'bg-amber-100 text-amber-700',
-  critical: 'bg-red-100 text-red-700',
+const priorityTones: Record<string, WorkingTone> = {
+  low: 'quiet',
+  medium: 'hold',
+  high: 'attention',
+  critical: 'stale',
 };
 
 export function GapAnalysisDashboard({
@@ -165,32 +166,32 @@ export function GapAnalysisDashboard({
           <StatCard
             label="Compliance Rate"
             value={`${summary.compliance_rate}%`}
-            icon={<Target className="h-4 w-4 text-blue-600" />}
+            icon={<Target className="h-4 w-4 text-room-accent" />}
           />
           <StatCard
             label="Compliant"
             value={summary.compliant}
-            icon={<CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+            icon={<CheckCircle2 className="h-4 w-4 text-studio-good" />}
           />
           <StatCard
             label="Partial"
             value={summary.partial}
-            icon={<MinusCircle className="h-4 w-4 text-amber-600" />}
+            icon={<MinusCircle className="h-4 w-4 text-studio-attention" />}
           />
           <StatCard
             label="Non-Compliant"
             value={summary.non_compliant}
-            icon={<AlertCircle className="h-4 w-4 text-red-600" />}
+            icon={<AlertCircle className="h-4 w-4 text-studio-stale" />}
           />
           <StatCard
             label="Not Assessed"
             value={summary.not_assessed}
-            icon={<HelpCircle className="h-4 w-4 text-slate-500" />}
+            icon={<HelpCircle className="h-4 w-4 text-studio-dim" />}
           />
           <StatCard
             label="Points"
             value={`${summary.total_points_achieved}/${summary.total_points_available}`}
-            icon={<Target className="h-4 w-4 text-purple-600" />}
+            icon={<Target className="h-4 w-4 text-room-accent" />}
           />
         </div>
       )}
@@ -249,17 +250,17 @@ export function GapAnalysisDashboard({
           const categoryPercent = Math.round((categoryCompliance / categoryTotal) * 100);
 
           return (
-            <AccordionItem key={category} value={category} className="border rounded-lg">
+            <AccordionItem key={category} value={category} className="rounded-[6px] border border-studio-hairline">
               <AccordionTrigger className="px-4 hover:no-underline">
                 <div className="flex items-center justify-between w-full pr-4">
-                  <span className="font-medium">{category}</span>
+                  <span className="font-display text-sm font-semibold">{category}</span>
                   <div className="flex items-center gap-4">
                     <div className="w-32">
                       <Progress value={categoryPercent} className="h-2" />
                     </div>
-                    <Badge variant="secondary">
+                    <span className="font-mono text-[10px] font-bold tabular-nums text-muted-foreground">
                       {categoryCompliance}/{categoryTotal}
-                    </Badge>
+                    </span>
                   </div>
                 </div>
               </AccordionTrigger>
@@ -272,14 +273,14 @@ export function GapAnalysisDashboard({
                     return (
                       <div
                         key={item.id}
-                        className="flex items-start justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg"
+                        className="flex items-start justify-between p-3 rounded-[6px] border border-studio-hairline bg-studio-cream"
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <code className="text-xs bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded">
+                            <code className="text-xs bg-secondary px-1.5 py-0.5 rounded">
                               {item.requirement?.requirement_code}
                             </code>
-                            <span className="font-medium text-sm">
+                            <span className="font-display text-sm font-semibold">
                               {item.requirement?.requirement_name}
                             </span>
                           </div>
@@ -289,24 +290,24 @@ export function GapAnalysisDashboard({
                             </p>
                           )}
                           {item.action_required && (
-                            <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
+                            <p className="text-sm text-studio-attention mt-1">
                               Action: {item.action_required}
                             </p>
                           )}
-                          <div className="flex items-center gap-2 mt-2">
+                          <div className="flex items-center gap-3 mt-2">
                             {item.requirement?.points_available && (
-                              <Badge variant="outline" className="text-xs">
+                              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
                                 {item.compliance_status === 'compliant'
                                   ? item.requirement.points_available
                                   : item.compliance_status === 'partial'
                                     ? Math.round(item.requirement.points_available * 0.5)
                                     : 0}/{item.requirement.points_available} pts
-                              </Badge>
+                              </span>
                             )}
                             {item.priority && (
-                              <Badge className={`text-xs ${priorityColors[item.priority]}`}>
+                              <StateChip tone={priorityTones[item.priority]}>
                                 {item.priority}
-                              </Badge>
+                              </StateChip>
                             )}
                             {evidenceByRequirement && (
                               <button
@@ -327,24 +328,15 @@ export function GapAnalysisDashboard({
                           </div>
                           {/* Inline evidence list */}
                           {evidenceByRequirement && expandedEvidence.has(item.requirement_id) && (
-                            <div className="mt-2 pl-2 border-l-2 border-blue-200 dark:border-blue-800 space-y-1">
+                            <div className="mt-2 pl-2 border-l-2 border-studio-hairline space-y-1">
                               {(evidenceByRequirement[item.requirement_id] || []).length === 0 ? (
                                 <p className="text-xs text-muted-foreground italic">No evidence linked</p>
                               ) : (
                                 (evidenceByRequirement[item.requirement_id] || []).map(ev => (
                                   <div key={ev.id} className="flex items-center gap-2 text-xs">
-                                    <Badge
-                                      variant="outline"
-                                      className={`text-xs ${
-                                        ev.verification_status === 'verified'
-                                          ? 'border-emerald-500 text-emerald-600'
-                                          : ev.verification_status === 'rejected'
-                                            ? 'border-red-500 text-red-600'
-                                            : 'border-amber-500 text-amber-600'
-                                      }`}
-                                    >
+                                    <StateChip tone={evidenceVerificationTone(ev.verification_status)}>
                                       {ev.verification_status}
-                                    </Badge>
+                                    </StateChip>
                                     <span className="truncate">{ev.evidence_description}</span>
                                   </div>
                                 ))
@@ -402,12 +394,14 @@ interface StatCardProps {
 
 function StatCard({ label, value, icon }: StatCardProps) {
   return (
-    <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+    <div className="rounded-[6px] border border-studio-hairline bg-studio-cream p-4">
       <div className="flex items-center gap-2 mb-1">
         {icon}
-        <span className="text-xs text-muted-foreground">{label}</span>
+        <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-studio-dim">
+          {label}
+        </span>
       </div>
-      <p className="text-xl font-bold">{value}</p>
+      <p className="font-display text-xl font-bold tabular-nums">{value}</p>
     </div>
   );
 }

@@ -1,20 +1,19 @@
 'use client'
 
 /**
- * Management surface for hospitality recipes (meals or made-drinks).
- * Lists recipes with per-portion impact and lets you create one (which then
- * opens the recipe editor to add ingredients and calculate). Generic over the
- * recipe kind so Meals and Drinks share one component.
+ * Management surface for hospitality recipes (meals or made-drinks): studio
+ * grammar. Lists recipes as quiet fact rows with per-portion impact and lets
+ * you create one (which then opens the recipe editor to add ingredients and
+ * calculate). Generic over the recipe kind so Meals and Drinks share one
+ * component.
  */
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, UtensilsCrossed, Wine, Trash2, Leaf, Upload } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -40,6 +39,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Statement } from '@/components/studio/statement'
+import { BigNumber } from '@/components/studio/big-number'
+import { PillButton } from '@/components/studio/pill-button'
+import { FactList, type FactRowItem } from '@/components/studio/fact-list'
 import { useToast } from '@/hooks/use-toast'
 import { useHospitalityRecipes } from '@/hooks/data/useHospitalityRecipes'
 import { useHospitalityVenues } from '@/hooks/data/useHospitalityVenues'
@@ -59,7 +62,6 @@ export function RecipeManager({ cfg }: { cfg: RecipeKindConfig }) {
   const { venues } = useHospitalityVenues()
   const { toast } = useToast()
 
-  const Icon = cfg.kind === 'drink' ? Wine : UtensilsCrossed
   const portion = cfg.portionWord
   const lc = cfg.label.toLowerCase()
   // Import only applies to meals and drinks (rooms reuse this component).
@@ -125,100 +127,83 @@ export function RecipeManager({ cfg }: { cfg: RecipeKindConfig }) {
     }
   }
 
+  const rows: FactRowItem[] = recipes.map((recipe) => {
+    const portionCount = `${recipe.covers} ${recipe.covers === 1 ? portion : `${portion}s`}`
+    return {
+      id: String(recipe.id),
+      title: recipe.name,
+      hint: recipe.venue_name ? `${recipe.venue_name} · ${portionCount}` : portionCount,
+      chip: recipe.impact
+        ? undefined
+        : { tone: 'attention' as const, label: 'Not calculated' },
+      value: recipe.impact ? fmt(recipe.impact.per_cover_co2e) : undefined,
+      unit: recipe.impact ? `KG CO₂E / ${portion.toUpperCase()}` : undefined,
+      href: `${cfg.basePath}/${recipe.id}`,
+      trailing: (
+        <button
+          type="button"
+          aria-label={`Remove ${recipe.name}`}
+          className="rounded px-2 py-1 text-base leading-none text-muted-foreground transition-colors duration-150 hover:text-studio-stale"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setPendingDelete(recipe)
+          }}
+        >
+          &times;
+        </button>
+      ),
+    }
+  })
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">{cfg.labelPlural}</h2>
-          <p className="text-sm text-muted-foreground">
-            Build a recipe from ingredients and see its carbon, water and land impact per {portion}.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {canImport && (
-            <Button variant="outline" onClick={() => setImportOpen(true)}>
-              <Upload className="mr-2 h-4 w-4" />
-              Import
-            </Button>
-          )}
-          <Button onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" />
-            New {lc}
-          </Button>
-        </div>
+    <div className="space-y-8">
+      <div className="min-w-0">
+        <Statement
+          eyebrow={`THE WORKBENCH · ${cfg.labelPlural.toUpperCase()}`}
+          headline={`The ${cfg.labelPlural.toLowerCase()}.`}
+        >
+          <BigNumber
+            size="display"
+            value={recipes.length}
+            label={recipes.length === 1 ? cfg.label : cfg.labelPlural}
+          />
+          <div className="flex items-center gap-2">
+            {canImport && (
+              <PillButton variant="outline" onClick={() => setImportOpen(true)}>
+                Import
+              </PillButton>
+            )}
+            <PillButton variant="room" onClick={openCreate}>
+              New {lc}
+            </PillButton>
+          </div>
+        </Statement>
+        <p className="mt-3 max-w-xl text-sm text-muted-foreground">
+          Build a recipe from ingredients and see its carbon, water and land impact per {portion}.
+        </p>
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p className="text-sm text-studio-stale">{error}</p>}
 
       {isLoading ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-3 border-t border-border pt-6">
           {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-28 w-full rounded-lg" />
+            <Skeleton key={i} className="h-12 w-full rounded-[6px]" />
           ))}
         </div>
       ) : recipes.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
-          <Icon className="mb-3 h-8 w-8 text-muted-foreground" />
-          <p className="font-medium">No {cfg.labelPlural.toLowerCase()} yet</p>
-          <p className="mb-4 text-sm text-muted-foreground">
-            Create your first {lc}, then add ingredients to calculate its impact.
+        <div className="border-t border-border pt-6">
+          <p className="text-sm text-muted-foreground">
+            No {cfg.labelPlural.toLowerCase()} yet. Create your first {lc}, then add ingredients to
+            calculate its impact.
           </p>
-          <Button onClick={openCreate} variant="outline">
-            <Plus className="mr-2 h-4 w-4" />
+          <PillButton variant="room" className="mt-4" onClick={openCreate}>
             New {lc}
-          </Button>
+          </PillButton>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {recipes.map((recipe) => (
-            <div
-              key={recipe.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => router.push(`${cfg.basePath}/${recipe.id}`)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') router.push(`${cfg.basePath}/${recipe.id}`)
-              }}
-              className="group flex cursor-pointer flex-col rounded-lg border bg-card p-4 shadow-sm transition-colors hover:border-primary"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  <Icon className="h-5 w-5 text-muted-foreground" />
-                  <span className="font-medium">{recipe.name}</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-destructive opacity-0 transition-opacity group-hover:opacity-100"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setPendingDelete(recipe)
-                  }}
-                  aria-label={`Delete ${lc}`}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {recipe.venue_name && <Badge variant="secondary">{recipe.venue_name}</Badge>}
-                <Badge variant="outline">
-                  {recipe.covers} {recipe.covers === 1 ? portion : `${portion}s`}
-                </Badge>
-              </div>
-              <div className="mt-3">
-                {recipe.impact ? (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Leaf className="h-4 w-4 text-primary" />
-                    <span className="font-semibold">{fmt(recipe.impact.per_cover_co2e)} kg CO₂e</span>
-                    <span className="text-muted-foreground">per {portion}</span>
-                  </div>
-                ) : (
-                  <span className="text-sm text-muted-foreground">Not yet calculated</span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+        <FactList items={rows} className="border-t border-border" />
       )}
 
       {canImport && (

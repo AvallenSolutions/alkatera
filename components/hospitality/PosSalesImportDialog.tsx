@@ -14,7 +14,6 @@ import { UploadCloud, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Dialog,
@@ -249,10 +248,10 @@ export function PosSalesImportDialog({
                     {preview.matched.map((m) => (
                       <div key={m.product_id} className="grid grid-cols-[1fr,6rem] items-center gap-2">
                         <span className="truncate text-sm">
-                          {m.product_name}{' '}
-                          <Badge variant="outline" className="ml-1 text-[10px]">
+                          {m.product_name}
+                          <span className="ml-2 font-mono text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
                             {KIND_LABEL[m.product_kind] ?? m.product_kind}
-                          </Badge>
+                          </span>
                           {m.matched_from.length > 1 && (
                             <span className="ml-1 text-xs text-muted-foreground">({m.matched_from.length} lines)</span>
                           )}

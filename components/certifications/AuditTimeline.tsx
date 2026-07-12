@@ -96,7 +96,7 @@ export function AuditTimeline({
             return (
               <li key={s.key} className="flex items-center gap-2 text-sm">
                 {done ? (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  <CheckCircle2 className="h-4 w-4 text-studio-good" />
                 ) : (
                   <Circle className="h-4 w-4 text-muted-foreground" />
                 )}
@@ -179,10 +179,8 @@ export function AuditTimeline({
 
         {ecgtMessage && (
           <div
-            className={`rounded-md border p-3 text-sm ${
-              ecgtMessage.before
-                ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300'
-                : 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300'
+            className={`rounded-[6px] border border-studio-hairline border-l-2 bg-studio-cream p-3 text-sm text-muted-foreground ${
+              ecgtMessage.before ? 'border-l-studio-good' : 'border-l-studio-attention'
             }`}
           >
             {ecgtMessage.before ? (

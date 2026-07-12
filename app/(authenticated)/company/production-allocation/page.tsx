@@ -1,12 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -15,23 +10,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  AlertCircle,
-  Building2,
-  Calendar,
-  CheckCircle2,
-  Circle,
-  Factory,
-  Link as LinkIcon,
-  Loader2,
-  Plus,
-  Search,
-  TrendingUp,
-  XCircle,
-} from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { Statement } from "@/components/studio/statement";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { BigNumber } from "@/components/studio/big-number";
+import { Panel } from "@/components/studio/panel";
+import { PillButton } from "@/components/studio/pill-button";
 import { ReportingPeriodTimeline } from "@/components/shared/ReportingPeriodTimeline";
 import { AllocationSankeyDiagram } from "@/components/shared/AllocationSankeyDiagram";
 import { AllocationOnboardingGuide } from "@/components/shared/AllocationOnboardingGuide";
@@ -73,6 +60,14 @@ interface AllocationHealth {
   unallocatedCapacity: number;
 }
 
+type ViewMode = "matrix" | "timeline" | "flow";
+
+const VIEWS: { key: ViewMode; label: string }[] = [
+  { key: "matrix", label: "The matrix" },
+  { key: "timeline", label: "The timeline" },
+  { key: "flow", label: "The flow" },
+];
+
 export default function ProductionAllocationPage() {
   const router = useRouter();
   const supabase = getSupabaseBrowserClient();
@@ -84,7 +79,7 @@ export default function ProductionAllocationPage() {
   const [matrixData, setMatrixData] = useState<Map<string, MatrixCell>>(new Map());
   const [allocationHealth, setAllocationHealth] = useState<AllocationHealth | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState("matrix");
+  const [activeView, setActiveView] = useState<ViewMode>("matrix");
 
   useEffect(() => {
     loadOrganizationAndData();
@@ -106,7 +101,7 @@ export default function ProductionAllocationPage() {
 
       const profile = profileData as any;
       if (!profile?.default_organization_id) {
-        toast.error("No organization found");
+        toast.error("No organisation found");
         return;
       }
 
@@ -282,22 +277,23 @@ export default function ProductionAllocationPage() {
     });
   };
 
-  const getCellStatus = (facilityId: string, productId: number) => {
+  /** Cell states, drawn in working tones: hairlines and tints, no icons. */
+  const getCellClasses = (facilityId: string, productId: number) => {
     const key = `${facilityId}-${productId}`;
     const cell = matrixData.get(key);
 
     if (!cell || !cell.assignmentId) {
-      return { status: "unassigned", color: "bg-slate-700", icon: Circle };
+      return "border border-dashed border-studio-hairline bg-transparent";
     }
 
     if (cell.hasAllocations && cell.latestAllocation) {
       if (cell.latestAllocation.status === "verified") {
-        return { status: "allocated", color: "bg-green-500/20 border-green-500/50", icon: CheckCircle2 };
+        return "border border-studio-good/40 bg-studio-good/10";
       }
-      return { status: "partial", color: "bg-amber-500/20 border-amber-500/50", icon: AlertCircle };
+      return "border border-studio-attention/40 bg-studio-attention/10";
     }
 
-    return { status: "assigned", color: "bg-blue-500/20 border-blue-500/50", icon: LinkIcon };
+    return "border border-studio-hairline bg-studio-cream";
   };
 
   const handleCellClick = (facilityId: string, productId: number) => {
@@ -351,175 +347,132 @@ export default function ProductionAllocationPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-lime-400" />
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+          Loading
+        </span>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white">Production Allocation Hub</h1>
-          <p className="text-slate-400 mt-1">
-            Visual overview of facility-product relationships and allocation status
-          </p>
-        </div>
-        <Button
-          onClick={() => router.push("/company/facilities")}
-          variant="outline"
-        >
-          <Building2 className="mr-2 h-4 w-4" />
-          Manage Facilities
-        </Button>
-      </div>
-
-      {organizationId && <AllocationOnboardingGuide organizationId={organizationId} />}
+    <div className="mx-auto max-w-6xl space-y-10">
+      <Statement
+        eyebrow="THE WORKBENCH · PRODUCTION ALLOCATION"
+        headline="Who makes what, and where the carbon lands."
+      >
+        {allocationHealth && (
+          <BigNumber
+            size="display"
+            tone={allocationHealth.unallocatedCapacity > 0 ? "attention" : "ink"}
+            value={allocationHealth.unallocatedCapacity.toLocaleString("en-GB", { maximumFractionDigits: 0 })}
+            label="KG CO2E UNALLOCATED"
+          />
+        )}
+      </Statement>
 
       {allocationHealth && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="bg-slate-900/50 border-slate-800">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-400 uppercase">Facilities</p>
-                  <p className="text-2xl font-bold text-white mt-1">
-                    {allocationHealth.facilitiesWithAllocations}/{allocationHealth.totalFacilities}
-                  </p>
-                  <p className="text-xs text-slate-500">with allocations</p>
-                </div>
-                <Factory className="h-8 w-8 text-blue-400" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-900/50 border-slate-800">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-400 uppercase">Products</p>
-                  <p className="text-2xl font-bold text-white mt-1">
-                    {allocationHealth.productsWithAllocations}/{allocationHealth.totalProducts}
-                  </p>
-                  <p className="text-xs text-slate-500">with production sites</p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-lime-400" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-900/50 border-slate-800">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-400 uppercase">Completion</p>
-                  <p className="text-2xl font-bold text-white mt-1">
-                    {allocationHealth.totalFacilities > 0
-                      ? Math.round((allocationHealth.facilitiesWithAllocations / allocationHealth.totalFacilities) * 100)
-                      : 0}%
-                  </p>
-                  <p className="text-xs text-slate-500">facility coverage</p>
-                </div>
-                <CheckCircle2 className="h-8 w-8 text-green-400" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-900/50 border-slate-800">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-400 uppercase">Unallocated</p>
-                  <p className="text-2xl font-bold text-amber-400 mt-1">
-                    {allocationHealth.unallocatedCapacity.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                  </p>
-                  <p className="text-xs text-slate-500">kg CO₂e</p>
-                </div>
-                <AlertCircle className="h-8 w-8 text-amber-400" />
-              </div>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-3 divide-x divide-studio-hairline border-y border-studio-hairline py-5">
+          <BigNumber
+            value={`${allocationHealth.facilitiesWithAllocations}/${allocationHealth.totalFacilities}`}
+            label="FACILITIES WITH ALLOCATIONS"
+          />
+          <BigNumber
+            className="pl-6"
+            value={`${allocationHealth.productsWithAllocations}/${allocationHealth.totalProducts}`}
+            label="PRODUCTS WITH PRODUCTION SITES"
+          />
+          <BigNumber
+            className="pl-6"
+            value={`${allocationHealth.totalFacilities > 0
+              ? Math.round((allocationHealth.facilitiesWithAllocations / allocationHealth.totalFacilities) * 100)
+              : 0}%`}
+            label="FACILITY COVERAGE"
+          />
         </div>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="matrix">
-            <Building2 className="mr-2 h-4 w-4" />
-            Allocation Matrix
-          </TabsTrigger>
-          <TabsTrigger value="timeline">
-            <Calendar className="mr-2 h-4 w-4" />
-            Timeline View
-          </TabsTrigger>
-          <TabsTrigger value="flow">
-            <TrendingUp className="mr-2 h-4 w-4" />
-            Flow Diagram
-          </TabsTrigger>
-        </TabsList>
+      {organizationId && <AllocationOnboardingGuide organizationId={organizationId} />}
 
-        <TabsContent value="matrix" className="space-y-6 mt-6">
-          <Card className="bg-slate-900/50 border-slate-800">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-white">Allocation Matrix</CardTitle>
-                  <CardDescription>
-                    Click cells to view/edit allocations. Right-click to toggle assignments.
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <Input
-                      placeholder="Search facilities or products..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 w-[300px]"
-                    />
-                  </div>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Alert className="mb-4 bg-blue-500/10 border-blue-500/20">
-                <AlertCircle className="h-4 w-4 text-blue-400" />
-                <AlertDescription className="text-blue-200">
-                  <div className="flex items-center gap-4 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-slate-700"></div>
-                      <span className="text-xs">Unassigned</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-blue-500/20 border border-blue-500/50"></div>
-                      <span className="text-xs">Assigned (no data)</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-amber-500/20 border border-amber-500/50"></div>
-                      <span className="text-xs">Partial/Pending</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-green-500/20 border border-green-500/50"></div>
-                      <span className="text-xs">Verified</span>
-                    </div>
-                  </div>
-                </AlertDescription>
-              </Alert>
+      {/* View switch: a genuine mode switch, so quiet mono text tabs. */}
+      <nav className="flex items-center gap-5 border-b border-studio-hairline">
+        {VIEWS.map((view) => (
+          <button
+            key={view.key}
+            type="button"
+            onClick={() => setActiveView(view.key)}
+            className={cn(
+              "relative whitespace-nowrap py-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] transition-opacity duration-150 ease-studio",
+              activeView === view.key ? "opacity-100" : "opacity-60 hover:opacity-100"
+            )}
+          >
+            {view.label}
+            {activeView === view.key && (
+              <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] bg-room-accent" />
+            )}
+          </button>
+        ))}
+      </nav>
 
+      {activeView === "matrix" && (
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <Eyebrow>THE MATRIX</Eyebrow>
+              <p className="mt-1.5 text-sm text-studio-dim">
+                Click a cell to open its allocations. Right-click to toggle the assignment.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Input
+                placeholder="Search facilities or products"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-[260px]"
+              />
+              <PillButton variant="outline" size="sm" href="/company/facilities">
+                Manage facilities
+              </PillButton>
+            </div>
+          </div>
+
+          {facilities.length > 0 && products.length > 0 && (
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+              {[
+                { classes: "border border-dashed border-studio-hairline", label: "UNASSIGNED" },
+                { classes: "border border-studio-hairline bg-studio-cream", label: "ASSIGNED · NO DATA" },
+                { classes: "border border-studio-attention/40 bg-studio-attention/10", label: "PARTIAL · PENDING" },
+                { classes: "border border-studio-good/40 bg-studio-good/10", label: "VERIFIED" },
+              ].map((item) => (
+                <span key={item.label} className="flex items-center gap-2">
+                  <span className={cn("h-3 w-3 rounded-[3px]", item.classes)} />
+                  <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+                    {item.label}
+                  </span>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {facilities.length > 0 && products.length > 0 && filteredFacilities.length > 0 && (
+            <Panel flush>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-slate-700">
-                      <TableHead className="text-slate-400 sticky left-0 bg-slate-900 z-10">
+                    <TableRow className="border-studio-hairline hover:bg-transparent">
+                      <TableHead className="sticky left-0 z-10 bg-studio-cream font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
                         Facility / Product
                       </TableHead>
                       {filteredProducts.map((product) => (
-                        <TableHead key={product.id} className="text-slate-400 text-center min-w-[120px]">
-                          <div className="flex flex-col items-center">
-                            <span className="text-xs font-medium">{product.name}</span>
+                        <TableHead key={product.id} className="min-w-[120px] text-center">
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span className="font-display text-xs font-semibold normal-case tracking-normal text-foreground">
+                              {product.name}
+                            </span>
                             {product.sku && (
-                              <span className="text-xs text-slate-500 font-mono">{product.sku}</span>
+                              <span className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-studio-dim">
+                                {product.sku}
+                              </span>
                             )}
                           </div>
                         </TableHead>
@@ -528,46 +481,43 @@ export default function ProductionAllocationPage() {
                   </TableHeader>
                   <TableBody>
                     {filteredFacilities.map((facility) => (
-                      <TableRow key={facility.id} className="border-slate-700">
-                        <TableCell className="sticky left-0 bg-slate-900 z-10">
+                      <TableRow key={facility.id} className="border-studio-hairline hover:bg-transparent">
+                        <TableCell className="sticky left-0 z-10 bg-studio-cream">
                           <div>
-                            <p className="font-medium text-white">{facility.name}</p>
+                            <p className="font-display text-sm font-semibold text-foreground">{facility.name}</p>
                             {facility.city && (
-                              <p className="text-xs text-slate-400">
+                              <p className="text-xs text-studio-dim">
                                 {facility.city}, {facility.country}
                               </p>
                             )}
                           </div>
                         </TableCell>
                         {filteredProducts.map((product) => {
-                          const cellStatus = getCellStatus(facility.id, product.id);
                           const key = `${facility.id}-${product.id}`;
                           const cell = matrixData.get(key);
 
                           return (
-                            <TableCell
-                              key={`${facility.id}-${product.id}`}
-                              className="text-center p-2"
-                            >
+                            <TableCell key={key} className="p-2 text-center">
                               <div
-                                className={`
-                                  h-16 rounded-md border-2 flex items-center justify-center cursor-pointer
-                                  transition-all hover:scale-105 hover:shadow-lg
-                                  ${cellStatus.color}
-                                `}
+                                className={cn(
+                                  "flex h-14 cursor-pointer items-center justify-center rounded-[6px] transition-colors duration-150 ease-studio hover:border-studio-ink/40",
+                                  getCellClasses(facility.id, product.id)
+                                )}
                                 onClick={() => handleCellClick(facility.id, product.id)}
                                 onContextMenu={(e) => {
                                   e.preventDefault();
                                   handleToggleAssignment(facility.id, product.id);
                                 }}
                               >
-                                <cellStatus.icon className="h-6 w-6 text-slate-300" />
+                                {cell?.latestAllocation ? (
+                                  <span className="font-display text-sm font-bold tabular-nums text-foreground">
+                                    {cell.latestAllocation.allocated_emissions.toLocaleString("en-GB", { maximumFractionDigits: 0 })}
+                                    <span className="ml-1 font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-studio-dim">
+                                      kg
+                                    </span>
+                                  </span>
+                                ) : null}
                               </div>
-                              {cell?.latestAllocation && (
-                                <div className="text-xs text-slate-400 mt-1">
-                                  {cell.latestAllocation.allocated_emissions.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg
-                                </div>
-                              )}
                             </TableCell>
                           );
                         })}
@@ -576,96 +526,56 @@ export default function ProductionAllocationPage() {
                   </TableBody>
                 </Table>
               </div>
-
-              {facilities.length === 0 && products.length === 0 && (
-                <div className="text-center py-12">
-                  <Factory className="h-12 w-12 mx-auto mb-4 text-slate-600" />
-                  <h4 className="text-lg font-medium text-white mb-2">Get Started</h4>
-                  <p className="text-slate-400 mb-4">
-                    Add facilities and products to start tracking production allocations
-                  </p>
-                  <div className="flex items-center justify-center gap-3">
-                    <Button onClick={() => router.push("/company/facilities")} variant="outline">
-                      <Building2 className="mr-2 h-4 w-4" />
-                      Add Facility
-                    </Button>
-                    <Button onClick={() => router.push("/products")} variant="outline">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Product
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {facilities.length === 0 && products.length > 0 && (
-                <div className="text-center py-12">
-                  <Factory className="h-12 w-12 mx-auto mb-4 text-slate-600" />
-                  <h4 className="text-lg font-medium text-white mb-2">No Facilities Yet</h4>
-                  <p className="text-slate-400 mb-4">
-                    You have {products.length} product{products.length !== 1 ? "s" : ""} but no facilities.
-                    Add facilities to start allocating production.
-                  </p>
-                  <Button onClick={() => router.push("/company/facilities")} variant="outline">
-                    <Building2 className="mr-2 h-4 w-4" />
-                    Add Your First Facility
-                  </Button>
-                </div>
-              )}
-
-              {facilities.length > 0 && products.length === 0 && (
-                <div className="text-center py-12">
-                  <Factory className="h-12 w-12 mx-auto mb-4 text-slate-600" />
-                  <h4 className="text-lg font-medium text-white mb-2">No Products Yet</h4>
-                  <p className="text-slate-400 mb-4">
-                    You have {facilities.length} facilit{facilities.length !== 1 ? "ies" : "y"} but no products.
-                    Add products to start allocating production.
-                  </p>
-                  <Button onClick={() => router.push("/products")} variant="outline">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Your First Product
-                  </Button>
-                </div>
-              )}
-
-              {facilities.length > 0 && products.length > 0 && filteredFacilities.length === 0 && (
-                <div className="text-center py-12">
-                  <Search className="h-12 w-12 mx-auto mb-4 text-slate-600" />
-                  <p className="text-slate-400">No facilities found matching &quot;{searchTerm}&quot;</p>
-                  <Button variant="ghost" className="mt-2" onClick={() => setSearchTerm("")}>
-                    Clear Search
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="timeline" className="space-y-6 mt-6">
-          {organizationId ? (
-            <ReportingPeriodTimeline organizationId={organizationId} viewType="all" />
-          ) : (
-            <Card className="bg-slate-900/50 border-slate-800">
-              <CardContent className="py-12 text-center">
-                <Calendar className="h-12 w-12 mx-auto mb-4 text-slate-600" />
-                <p className="text-slate-400">Loading organization data...</p>
-              </CardContent>
-            </Card>
+            </Panel>
           )}
-        </TabsContent>
 
-        <TabsContent value="flow" className="space-y-6 mt-6">
-          {organizationId ? (
-            <AllocationSankeyDiagram organizationId={organizationId} />
-          ) : (
-            <Card className="bg-slate-900/50 border-slate-800">
-              <CardContent className="py-12 text-center">
-                <TrendingUp className="h-12 w-12 mx-auto mb-4 text-slate-600" />
-                <p className="text-slate-400">Loading organization data...</p>
-              </CardContent>
-            </Card>
+          {facilities.length === 0 && products.length === 0 && (
+            <div className="py-16 text-center">
+              <p className="mb-4 text-sm text-studio-dim">
+                No facilities or products yet. Add a facility to start allocating production.
+              </p>
+              <PillButton href="/company/facilities">Add a facility</PillButton>
+            </div>
           )}
-        </TabsContent>
-      </Tabs>
+
+          {facilities.length === 0 && products.length > 0 && (
+            <div className="py-16 text-center">
+              <p className="mb-4 text-sm text-studio-dim">
+                {products.length} product{products.length !== 1 ? "s" : ""}, no facilities. Add a facility to start allocating production.
+              </p>
+              <PillButton href="/company/facilities">Add a facility</PillButton>
+            </div>
+          )}
+
+          {facilities.length > 0 && products.length === 0 && (
+            <div className="py-16 text-center">
+              <p className="mb-4 text-sm text-studio-dim">
+                {facilities.length} facilit{facilities.length !== 1 ? "ies" : "y"}, no products. Add a product to start allocating production.
+              </p>
+              <PillButton href="/products">Add a product</PillButton>
+            </div>
+          )}
+
+          {facilities.length > 0 && products.length > 0 && filteredFacilities.length === 0 && (
+            <div className="py-16 text-center">
+              <p className="mb-4 text-sm text-studio-dim">
+                No facilities match &quot;{searchTerm}&quot;.
+              </p>
+              <PillButton variant="ghost" size="sm" onClick={() => setSearchTerm("")}>
+                Clear search
+              </PillButton>
+            </div>
+          )}
+        </section>
+      )}
+
+      {activeView === "timeline" && organizationId && (
+        <ReportingPeriodTimeline organizationId={organizationId} viewType="all" />
+      )}
+
+      {activeView === "flow" && organizationId && (
+        <AllocationSankeyDiagram organizationId={organizationId} />
+      )}
     </div>
   );
 }

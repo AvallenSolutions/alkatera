@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -291,7 +290,7 @@ export function InitiativeDialog({
           </p>
 
           {error && (
-            <p className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-300">
+            <p className="rounded-[6px] border border-studio-hairline px-3 py-2 text-xs text-studio-attention">
               {error}
             </p>
           )}
@@ -302,8 +301,7 @@ export function InitiativeDialog({
             Cancel
           </Button>
           <Button onClick={save} disabled={saving}>
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {editing ? 'Save changes' : 'Create draft'}
+            {saving ? 'Saving…' : editing ? 'Save changes' : 'Create draft'}
           </Button>
         </DialogFooter>
       </DialogContent>

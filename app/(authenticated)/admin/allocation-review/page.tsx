@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Panel } from "@/components/studio/panel";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -262,43 +261,43 @@ export default function AllocationReviewPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardContent className="pt-6">
+          <Panel>
+            <div>
               <BigNumber value={provisionalCount} label="Pending review" tone="attention" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
+            </div>
+          </Panel>
+          <Panel>
+            <div>
               <BigNumber
                 value={allocations.filter((a) => a.status === "verified").length}
                 label="Verified"
                 tone="good"
               />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
+            </div>
+          </Panel>
+          <Panel>
+            <div>
               <BigNumber
                 value={allocations.filter((a) => a.status === "approved").length}
                 label="Approved"
               />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
+            </div>
+          </Panel>
+          <Panel>
+            <div>
               <BigNumber value={allocations.length} label="Total allocations" />
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
         </div>
 
-        <Card>
-          <CardHeader>
+        <Panel>
+          <div className="mb-4 space-y-1">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Allocations</CardTitle>
-                <CardDescription>
+                <h2 className="font-display text-base font-semibold text-foreground">Allocations</h2>
+                <p className="text-sm text-studio-dim">
                   Contract manufacturer emissions allocations requiring review
-                </CardDescription>
+                </p>
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-40">
@@ -313,8 +312,8 @@ export default function AllocationReviewPage() {
                 </SelectContent>
               </Select>
             </div>
-          </CardHeader>
-          <CardContent>
+          </div>
+          <div>
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <p className="text-sm text-muted-foreground">Loading…</p>
@@ -400,8 +399,8 @@ export default function AllocationReviewPage() {
                 </TableBody>
               </Table>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
       </div>
 
       <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
@@ -416,14 +415,14 @@ export default function AllocationReviewPage() {
           {selectedAllocation && (
             <div className="space-y-6 py-4">
               <div className="grid grid-cols-2 gap-4">
-                <Card>
-                  <CardContent className="pt-4">
+                <Panel>
+                  <div>
                     <p className="text-xs text-muted-foreground">Product</p>
                     <p className="text-lg font-semibold text-foreground">{selectedAllocation.product_name}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-4">
+                  </div>
+                </Panel>
+                <Panel>
+                  <div>
                     <p className="text-xs text-muted-foreground">Facility</p>
                     <p className="text-lg font-semibold text-foreground">{selectedAllocation.facility_name}</p>
                     {selectedAllocation.facility_city && (
@@ -431,15 +430,15 @@ export default function AllocationReviewPage() {
                         {selectedAllocation.facility_city}, {selectedAllocation.facility_country}
                       </p>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+                </Panel>
               </div>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm text-muted-foreground">Calculation Summary</CardTitle>
-                </CardHeader>
-                <CardContent>
+              <Panel>
+                <div className="mb-4 space-y-1">
+                  <h2 className="font-display text-sm font-semibold text-muted-foreground">Calculation Summary</h2>
+                </div>
+                <div>
                   <div className="grid grid-cols-4 gap-4">
                     <BigNumber
                       value={`${selectedAllocation.total_facility_co2e_kg?.toLocaleString()} kg`}
@@ -458,8 +457,8 @@ export default function AllocationReviewPage() {
                       label="Intensity"
                     />
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </Panel>
 
               {selectedAllocation.is_energy_intensive_process && (
                 <Alert>
@@ -472,11 +471,11 @@ export default function AllocationReviewPage() {
               )}
 
               {energyInputs.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-muted-foreground">Energy Inputs (Raw Data)</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                <Panel>
+                  <div className="mb-4 space-y-1">
+                    <h2 className="font-display text-sm font-semibold text-muted-foreground">Energy Inputs (Raw Data)</h2>
+                  </div>
+                  <div>
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -503,8 +502,8 @@ export default function AllocationReviewPage() {
                         ))}
                       </TableBody>
                     </Table>
-                  </CardContent>
-                </Card>
+                  </div>
+                </Panel>
               )}
 
               {selectedAllocation.status === "provisional" && (

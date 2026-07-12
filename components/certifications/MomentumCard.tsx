@@ -55,7 +55,7 @@ export function MomentumCard() {
   return (
     <Card className="border-border/60">
       <CardContent className="flex items-center gap-4 p-5">
-        <TrendingUp className={up ? 'h-5 w-5 text-emerald-500' : 'h-5 w-5 text-red-500'} />
+        <TrendingUp className={up ? 'h-5 w-5 text-studio-good' : 'h-5 w-5 text-studio-stale'} />
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold text-foreground">Your momentum</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -64,7 +64,7 @@ export function MomentumCard() {
           </p>
         </div>
         <div className="w-32 shrink-0">
-          <Sparkline values={values} stroke={up ? '#10b981' : '#ef4444'} height={28} />
+          <Sparkline values={values} stroke={up ? '#047857' : '#BE123C'} height={28} />
         </div>
       </CardContent>
     </Card>

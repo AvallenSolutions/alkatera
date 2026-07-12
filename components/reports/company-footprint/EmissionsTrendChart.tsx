@@ -18,7 +18,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Panel, Eyebrow } from '@/components/studio';
 import type { ScopeBreakdown } from '@/lib/calculations/corporate-emissions';
 import { SCOPE_COLOURS, SCOPE_LABELS, formatCo2e } from '@/lib/reports/scope-display';
 
@@ -41,11 +41,9 @@ export function EmissionsTrendChart({ liveEmissions }: { liveEmissions: LiveEmis
   if (data.length === 0) return null;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Emissions over time</CardTitle>
-      </CardHeader>
-      <CardContent>
+    <Panel>
+      <Eyebrow tone="dim" className="mb-4">EMISSIONS OVER TIME</Eyebrow>
+      <div>
         <div style={{ width: '100%', height: 280 }}>
           <ResponsiveContainer>
             <BarChart data={data} margin={{ top: 24, right: 12, left: 4, bottom: 4 }}>
@@ -89,7 +87,7 @@ export function EmissionsTrendChart({ liveEmissions }: { liveEmissions: LiveEmis
             Add reports for earlier years to see how your emissions are changing.
           </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

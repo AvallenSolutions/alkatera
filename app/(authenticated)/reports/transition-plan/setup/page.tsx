@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Statement } from '@/components/studio'
 import { ChevronLeft, ChevronRight, Save, CheckCircle2, Sparkles } from 'lucide-react'
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client'
 import { useOrganization } from '@/lib/organizationContext'
@@ -208,7 +209,7 @@ function TransitionPlanSetupInner() {
 
   async function handleFinish() {
     await savePlan()
-    router.push('/reports/transition-plan')
+    router.push('/reports/sustainability?tab=transition-plan')
   }
 
   if (isLoading) return <PageLoader />
@@ -218,19 +219,14 @@ function TransitionPlanSetupInner() {
       {/* Header */}
       <div className="flex items-start gap-3">
         <button
-          onClick={() => router.push('/reports/transition-plan')}
+          onClick={() => router.push('/reports/sustainability?tab=transition-plan')}
           className="mt-1 text-muted-foreground hover:text-foreground transition-colors"
           aria-label="Back"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
         <div>
-          <div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-brick mb-2">
-            THE EVIDENCE · TRANSITION PLAN
-          </div>
-          <h1 className="font-display text-3xl md:text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
-            The {planYear} transition plan.
-          </h1>
+          <Statement eyebrow="THE EVIDENCE · TRANSITION PLAN" headline={`The ${planYear} transition plan.`} />
           <p className="mt-2 font-mono text-[11px] text-studio-dim">
             {planId ? 'EDITING' : 'NEW PLAN'} · {planYear} PLAN YEAR
           </p>
@@ -243,24 +239,24 @@ function TransitionPlanSetupInner() {
           <div key={s.id} className="flex items-center gap-2">
             <button
               onClick={() => i < step && setStep(i)}
-              className={`flex items-center gap-2 text-sm ${i === step ? 'text-stone-900 font-medium' : i < step ? 'text-stone-500 cursor-pointer hover:text-stone-700' : 'text-stone-300 cursor-default'}`}
+              className={`flex items-center gap-2 text-sm ${i === step ? 'text-foreground font-medium' : i < step ? 'text-studio-dim cursor-pointer hover:text-foreground' : 'text-muted-foreground/50 cursor-default'}`}
             >
               <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-mono border ${
-                i < step ? 'bg-studio-brick border-studio-brick text-studio-cream' :
-                i === step ? 'bg-stone-900 border-stone-900 text-white' :
-                'border-stone-200 text-stone-400'
+                i < step ? 'bg-room border-room text-room-on' :
+                i === step ? 'bg-studio-ink border-studio-ink text-studio-cream' :
+                'border-studio-hairline text-muted-foreground'
               }`}>
                 {i < step ? <CheckCircle2 className="w-3 h-3" /> : i + 1}
               </span>
               <span className="hidden sm:inline">{s.label}</span>
             </button>
-            {i < STEPS.length - 1 && <div className="w-8 h-px bg-stone-200" />}
+            {i < STEPS.length - 1 && <div className="w-8 h-px bg-studio-hairline" />}
           </div>
         ))}
       </div>
 
       {/* Step content */}
-      <Card className="border-stone-200">
+      <Card className="border-studio-hairline">
         <CardHeader>
           <CardTitle className="text-base">{STEPS[step].label}</CardTitle>
           <CardDescription>{STEPS[step].description}</CardDescription>
@@ -269,9 +265,9 @@ function TransitionPlanSetupInner() {
           {step === 0 && (
             <>
               {/* Baseline configuration */}
-              <div className="grid grid-cols-2 gap-4 pb-4 border-b border-stone-100">
+              <div className="grid grid-cols-2 gap-4 pb-4 border-b border-studio-hairline">
                 <div>
-                  <label className="text-xs font-mono uppercase tracking-wider text-stone-400 mb-1.5 block">
+                  <label className="text-xs font-mono uppercase tracking-wider text-studio-dim mb-1.5 block">
                     Baseline Year
                   </label>
                   <Input
@@ -284,7 +280,7 @@ function TransitionPlanSetupInner() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-mono uppercase tracking-wider text-stone-400 mb-1.5 block">
+                  <label className="text-xs font-mono uppercase tracking-wider text-studio-dim mb-1.5 block">
                     Baseline Emissions (tCO2e)
                   </label>
                   <Input
@@ -299,22 +295,23 @@ function TransitionPlanSetupInner() {
               </div>
 
               {/* SBTi alignment toggle */}
-              <div className="flex items-start gap-3 pb-4 border-b border-stone-100">
+              <div className="flex items-start gap-3 pb-4 border-b border-studio-hairline">
                 <input
                   type="checkbox"
                   id="sbti"
                   checked={sbtiAligned}
                   onChange={e => setSbtiAligned(e.target.checked)}
-                  className="mt-0.5 accent-[#BF4B2A]"
+                  className="mt-0.5"
+                  style={{ accentColor: 'rgb(var(--room-accent-rgb))' }}
                 />
                 <label htmlFor="sbti" className="cursor-pointer">
-                  <span className="text-sm font-medium text-stone-700 flex items-center gap-2">
+                  <span className="text-sm font-medium text-foreground flex items-center gap-2">
                     SBTi aligned
-                    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-brick">
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent">
                       Science Based Targets
                     </span>
                   </span>
-                  <span className="text-xs text-stone-500 block mt-0.5">
+                  <span className="text-xs text-muted-foreground block mt-0.5">
                     Targets meet the SBTi Corporate Standard (minimum 50% absolute reduction per scope by 2030 for 1.5C alignment)
                   </span>
                 </label>
@@ -339,12 +336,12 @@ function TransitionPlanSetupInner() {
           {step === 2 && (
             <>
               {risks.length === 0 && !isGeneratingRisks && (
-                <div className="rounded-[6px] border border-border bg-card p-4 flex items-start gap-3 mb-4">
-                  <Sparkles className="w-4 h-4 text-stone-600 flex-shrink-0 mt-0.5" />
+                <div className="rounded-[6px] border border-studio-hairline bg-studio-cream p-4 flex items-start gap-3 mb-4">
+                  <Sparkles className="w-4 h-4 text-room-accent flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-stone-700">Generate your risk assessment</p>
-                    <p className="text-xs text-stone-500 mt-0.5">
-                      Claude will analyse your emissions profile, targets, and milestones to identify 5-7 climate risks and opportunities. You can edit all suggestions before saving.
+                    <p className="text-sm font-medium text-foreground">Generate your risk assessment</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Rosa will analyse your emissions profile, targets and milestones to identify five to seven climate risks and opportunities. You can edit all suggestions before saving.
                     </p>
                     <Button
                       size="sm"

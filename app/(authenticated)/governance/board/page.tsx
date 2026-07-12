@@ -2,23 +2,17 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Scale,
-  PlusCircle,
-  RefreshCw,
-  ArrowLeft,
-} from 'lucide-react';
-import Link from 'next/link';
 
+import { FeatureGate } from '@/components/subscription/FeatureGate';
+import { PillButton } from '@/components/studio/pill-button';
+import { TopicHeader, HubSkeleton, ComplianceNote } from '@/components/social';
 import { BoardCompositionChart } from '@/components/governance/BoardCompositionChart';
 import { useBoardComposition, type BoardMember } from '@/hooks/data/useBoardComposition';
 
@@ -313,33 +307,32 @@ function AddBoardMemberDialog({ onSuccess }: { onSuccess: () => void }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <PlusCircle className="h-4 w-4 mr-2" />
-          Add Board Member
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Add Board Member</DialogTitle>
-          <DialogDescription>
-            Add a new board member with diversity information
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <BoardMemberFormFields formData={formData} setFormData={setFormData} />
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Adding...' : 'Add Member'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <>
+      <PillButton size="sm" onClick={() => setOpen(true)}>
+        Add board member
+      </PillButton>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Board Member</DialogTitle>
+            <DialogDescription>
+              Add a new board member with diversity information
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit}>
+            <BoardMemberFormFields formData={formData} setFormData={setFormData} />
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Adding…' : 'Add Member'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -414,7 +407,7 @@ function EditBoardMemberDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : 'Save Changes'}
+              {isSubmitting ? 'Saving…' : 'Save Changes'}
             </Button>
           </DialogFooter>
         </form>
@@ -447,7 +440,7 @@ function DeleteBoardMemberDialog({
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
-            className="bg-red-600 hover:bg-red-700 text-white"
+            className="bg-studio-stale text-studio-cream hover:bg-studio-stale/90"
           >
             Remove
           </AlertDialogAction>
@@ -458,6 +451,14 @@ function DeleteBoardMemberDialog({
 }
 
 export default function BoardPage() {
+  return (
+    <FeatureGate feature="governance_ethics">
+      <BoardPageContent />
+    </FeatureGate>
+  );
+}
+
+function BoardPageContent() {
   const { members, metrics, loading, refetch, deleteMember } = useBoardComposition();
   const [editingMember, setEditingMember] = useState<BoardMember | null>(null);
   const [deletingMember, setDeletingMember] = useState<BoardMember | null>(null);
@@ -474,63 +475,31 @@ export default function BoardPage() {
   };
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-8 w-8" />
-          <Skeleton className="h-8 w-48" />
-        </div>
-        <div className="grid grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-28" />
-          ))}
-        </div>
-        <Skeleton className="h-96" />
-      </div>
-    );
+    return <HubSkeleton />;
   }
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/governance">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-              <Scale className="h-6 w-6 text-emerald-600" />
-              Board Composition
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Track board diversity, independence, and governance
-            </p>
-          </div>
-        </div>
+    <div className="space-y-8 animate-fade-in-up">
+      <TopicHeader
+        eyebrow={<>THE WIRING &middot; GOVERNANCE</>}
+        headline={<>The board.</>}
+        description="Track board diversity, independence, and governance."
+        backHref="/governance"
+        backLabel="Governance"
+      >
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <PillButton variant="outline" size="sm" onClick={() => refetch()}>
             Refresh
-          </Button>
+          </PillButton>
           <AddBoardMemberDialog onSuccess={refetch} />
         </div>
-      </div>
+      </TopicHeader>
 
-      {/* Info Card */}
-      <Card className="bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800">
-        <CardContent className="p-4">
-          <p className="text-sm text-emerald-800 dark:text-emerald-200">
-            <strong>About Board Composition:</strong> Track board member diversity, independence,
-            and expertise. Best practice targets include &gt;50% independent directors and balanced
-            gender representation (40-60% any gender).
-          </p>
-        </CardContent>
-      </Card>
+      <ComplianceNote label="ABOUT BOARD COMPOSITION">
+        Track board member diversity, independence, and expertise. Best practice targets include
+        &gt;50% independent directors and balanced gender representation (40-60% any gender).
+      </ComplianceNote>
 
-      {/* Dashboard */}
       <BoardCompositionChart
         members={members}
         metrics={metrics}
@@ -539,7 +508,6 @@ export default function BoardPage() {
         onDeleteMember={(member) => setDeletingMember(member)}
       />
 
-      {/* Edit Dialog */}
       {editingMember && (
         <EditBoardMemberDialog
           member={editingMember}
@@ -549,7 +517,6 @@ export default function BoardPage() {
         />
       )}
 
-      {/* Delete Confirmation */}
       {deletingMember && (
         <DeleteBoardMemberDialog
           member={deletingMember}

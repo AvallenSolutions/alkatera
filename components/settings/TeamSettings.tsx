@@ -31,9 +31,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { UserPlus, Loader2, Users, Trash2, AlertCircle, Lock, Mail, Clock, XCircle, ShieldCheck } from 'lucide-react'
+import { Eyebrow, Panel, StateChip } from '@/components/studio'
+import type { WorkingTone } from '@/components/studio'
+import { UserPlus, Trash2, Lock, ShieldCheck } from 'lucide-react'
 import { useTeamMemberLimit } from '@/hooks/useSubscription'
 import {
   AlertDialog,
@@ -67,6 +67,12 @@ interface TeamInvitation {
 interface TeamSettingsProps {
   showHeader?: boolean
 }
+
+const BUSY_TEXT = (
+  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+    Loading
+  </span>
+)
 
 export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
   const { currentOrganization, userRole } = useOrganization()
@@ -293,16 +299,16 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
     }
   }
 
-  const getRoleBadgeVariant = (roleName: string) => {
+  const getRoleTone = (roleName: string): WorkingTone => {
     switch (roleName) {
       case 'owner':
-        return 'default'
+        return 'good'
       case 'admin':
-        return 'secondary'
+        return 'quiet'
       case 'advisor':
-        return 'secondary'
+        return 'hold'
       default:
-        return 'outline'
+        return 'quiet'
     }
   }
 
@@ -325,24 +331,21 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
 
   if (!currentOrganization) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
+      <div className="flex h-96 items-center justify-center">
+        {BUSY_TEXT}
       </div>
     )
   }
 
   return (
     <div className={showHeader ? "container mx-auto py-8 px-4 max-w-6xl" : ""}>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
+      <Panel className="space-y-6">
+        <div className="flex flex-row items-center justify-between gap-4">
           <div className="space-y-1">
-            <CardTitle className="text-2xl font-semibold flex items-center gap-2">
-              <Users className="h-6 w-6" />
-              Team Members
-            </CardTitle>
-            <CardDescription>
+            <Eyebrow tone="dim">Team members</Eyebrow>
+            <p className="text-sm text-studio-dim">
               Manage your organisation&apos;s team members and their roles
-            </CardDescription>
+            </p>
           </div>
           {isAdmin && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -402,45 +405,37 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
                       Cancel
                     </Button>
                     <Button type="submit" disabled={isInviting}>
-                      {isInviting ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Inviting...
-                        </>
-                      ) : (
-                        'Invite Member'
-                      )}
+                      {isInviting ? 'Inviting...' : 'Invite Member'}
                     </Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
             </Dialog>
           )}
-        </CardHeader>
-        <CardContent>
+        </div>
+        <div>
           {atLimit && (
-            <div className="flex items-center gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4 mb-4">
-              <Lock className="h-5 w-5 text-destructive shrink-0" />
+            <div className="mb-4 flex items-center gap-3 rounded-[6px] border border-studio-stale/30 bg-studio-stale/5 p-4">
+              <Lock className="h-5 w-5 shrink-0 text-studio-stale" />
               <div className="flex-1">
-                <p className="text-sm font-medium text-destructive">Team member limit reached</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm font-medium text-studio-stale">Team member limit reached</p>
+                <p className="text-xs text-studio-dim">
                   You&apos;ve used {currentCount} of {maxCount} team members on your current plan.{' '}
-                  <a href="/dashboard/settings" className="underline text-primary">Upgrade</a> to add more.
+                  <a href="/dashboard/settings" className="underline text-foreground">Upgrade</a> to add more.
                 </p>
               </div>
             </div>
           )}
           {isLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
+            <div className="flex h-64 items-center justify-center">
+              {BUSY_TEXT}
             </div>
           ) : members.length === 0 ? (
-            <div className="text-center py-12">
-              <AlertCircle className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-500 text-lg">No team members found</p>
+            <div className="py-12 text-center">
+              <p className="text-lg text-studio-dim">No team members found</p>
             </div>
           ) : (
-            <div className="rounded-lg border">
+            <div className="rounded-[6px] border border-studio-hairline">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -487,9 +482,9 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
                             </SelectContent>
                           </Select>
                         ) : (
-                          <Badge variant={getRoleBadgeVariant(member.role)}>
+                          <StateChip tone={getRoleTone(member.role)}>
                             {getRoleDisplayName(member.role)}
-                          </Badge>
+                          </StateChip>
                         )}
                       </TableCell>
                       {isOwner && (
@@ -500,7 +495,7 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
                               size="sm"
                               onClick={() => setMemberToDelete(member)}
                             >
-                              <Trash2 className="h-4 w-4 text-red-500" />
+                              <Trash2 className="h-4 w-4 text-studio-stale" />
                             </Button>
                           )}
                         </TableCell>
@@ -511,65 +506,54 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* Pending Invitations */}
       {isAdmin && invitations.length > 0 && (
-        <Card className="mt-6">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <Mail className="h-5 w-5" />
-              Pending Invitations
-            </CardTitle>
-            <CardDescription>
+        <Panel className="mt-6 space-y-4">
+          <div className="space-y-1">
+            <Eyebrow tone="dim">Pending invitations</Eyebrow>
+            <p className="text-sm text-studio-dim">
               Invitations that have been sent but not yet accepted
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Sent</TableHead>
-                    <TableHead>Expires</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invitations.map((invite) => {
-                    const isExpired = invite.status === 'expired' || new Date(invite.expires_at) < new Date()
-                    return (
-                      <TableRow key={invite.id}>
-                        <TableCell className="font-medium">{invite.email}</TableCell>
-                        <TableCell>
-                          {isExpired ? (
-                            <Badge variant="destructive" className="gap-1">
-                              <XCircle className="h-3 w-3" />
-                              Expired
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="gap-1 text-amber-500 border-amber-500/30">
-                              <Clock className="h-3 w-3" />
-                              Pending
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {new Date(invite.invited_at).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {new Date(invite.expires_at).toLocaleDateString()}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+            </p>
+          </div>
+          <div className="rounded-[6px] border border-studio-hairline">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Sent</TableHead>
+                  <TableHead>Expires</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {invitations.map((invite) => {
+                  const isExpired = invite.status === 'expired' || new Date(invite.expires_at) < new Date()
+                  return (
+                    <TableRow key={invite.id}>
+                      <TableCell className="font-medium">{invite.email}</TableCell>
+                      <TableCell>
+                        {isExpired ? (
+                          <StateChip tone="stale">Expired</StateChip>
+                        ) : (
+                          <StateChip tone="attention">Pending</StateChip>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-studio-dim">
+                        {new Date(invite.invited_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="text-sm text-studio-dim">
+                        {new Date(invite.expires_at).toLocaleDateString()}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </Panel>
       )}
 
       <AlertDialog open={!!memberToDelete} onOpenChange={() => setMemberToDelete(null)}>
@@ -586,16 +570,9 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
             <AlertDialogAction
               onClick={handleDeleteMember}
               disabled={isDeleting}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-studio-stale text-studio-cream hover:bg-studio-stale/90"
             >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Removing...
-                </>
-              ) : (
-                'Remove Member'
-              )}
+              {isDeleting ? 'Removing...' : 'Remove Member'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

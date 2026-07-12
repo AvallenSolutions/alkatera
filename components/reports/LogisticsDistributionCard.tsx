@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Truck, Settings, CheckCircle2, Info } from "lucide-react";
+import { Truck, Settings, Info } from "lucide-react";
+import { StateChip } from "@/components/studio";
 import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
@@ -205,14 +206,12 @@ export function LogisticsDistributionCard({
 
   return (
     <>
-      <Card className="relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-50 dark:bg-cyan-950 rounded-full -mr-16 -mt-16 opacity-50" />
-
+      <Card>
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-cyan-100 dark:bg-cyan-900 flex items-center justify-center">
-                <Truck className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+              <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                <Truck className="h-5 w-5 text-room-accent" />
               </div>
               <div>
                 <CardTitle className="text-lg">Logistics & Distribution</CardTitle>
@@ -221,11 +220,10 @@ export function LogisticsDistributionCard({
             </div>
             <div className="flex flex-col items-end gap-1.5">
               {(isConfigured || (xeroEntries && xeroEntries.length > 0)) ? (
-                <Badge className="bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-100">
-                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                <StateChip tone="good">
                   Configured
                   {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} from Xero`}
-                </Badge>
+                </StateChip>
               ) : (
                 <Badge variant="secondary">Not configured</Badge>
               )}
@@ -241,7 +239,7 @@ export function LogisticsDistributionCard({
           {(isConfigured || xeroTotal > 0) ? (
             <>
               <div className="text-center py-4 border-b">
-                <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">
+                <div className="text-3xl font-bold text-foreground">
                   {formatEmissions(combinedTotal)}
                 </div>
                 <div className="text-sm text-muted-foreground mt-1">
@@ -254,13 +252,13 @@ export function LogisticsDistributionCard({
                 {entries.map((entry) => (
                   <div
                     key={entry.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-900"
+                    className="flex items-center justify-between p-3 rounded-lg bg-secondary"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm flex items-center gap-1.5">
                         {entry.description}
                         {entry.data_source === 'xero_upgrade' && (
-                          <Badge variant="outline" className="text-[9px] shrink-0 border-teal-300 text-teal-700 dark:text-teal-400 dark:border-teal-700">Xero</Badge>
+                          <StateChip tone="quiet" className="text-[9px] shrink-0">Xero</StateChip>
                         )}
                       </div>
                       <div className="text-xs text-muted-foreground">
@@ -350,9 +348,9 @@ export function LogisticsDistributionCard({
             </div>
 
             {estimatedEmissions > 0 && (
-              <div className="p-4 rounded-lg bg-cyan-50 dark:bg-cyan-950 border border-cyan-200 dark:border-cyan-800">
+              <div className="p-4 rounded-lg bg-secondary border border-studio-hairline">
                 <div className="text-xs text-muted-foreground mb-1">Estimated Emissions</div>
-                <div className="text-2xl font-bold text-cyan-900 dark:text-cyan-100">
+                <div className="text-2xl font-bold text-foreground">
                   {formatEmissions(estimatedEmissions)}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">

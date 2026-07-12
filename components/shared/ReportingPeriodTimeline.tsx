@@ -1,9 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -11,17 +8,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  AlertCircle,
-  Calendar,
-  CheckCircle2,
-  Factory,
-  Loader2,
-  Package,
-} from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { format, parseISO, differenceInDays, addMonths, startOfMonth } from "date-fns";
 import { useReportingPeriod } from "@/hooks/useReportingPeriod";
+import { cn } from "@/lib/utils";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { BigNumber } from "@/components/studio/big-number";
+import { Panel } from "@/components/studio/panel";
+import { StateChip } from "@/components/studio/state-chip";
 
 interface ReportingPeriodTimelineProps {
   organizationId: string;
@@ -109,7 +103,7 @@ export function ReportingPeriodTimeline({
           timelineData.push({
             id: session.id,
             type: "facility",
-            name: session.facility?.name || "Unknown Facility",
+            name: session.facility?.name || "Unknown facility",
             startDate: parseISO(session.reporting_period_start),
             endDate: parseISO(session.reporting_period_end),
             status: "completed",
@@ -125,7 +119,7 @@ export function ReportingPeriodTimeline({
             timelineData.push({
               id: lca.id,
               type: "product",
-              name: lca.product?.name || "Unknown Product",
+              name: lca.product?.name || "Unknown product",
               startDate: parseISO(lca.temporal_anchor_start),
               endDate: parseISO(lca.temporal_anchor_end),
               status: lca.status,
@@ -210,198 +204,180 @@ export function ReportingPeriodTimeline({
   };
 
   const overlaps = getOverlaps();
-  const hasAlignment = overlaps.length > 0;
 
   if (loading) {
     return (
-      <Card className="bg-slate-900/50 border-slate-800">
-        <CardContent className="p-6 flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-lime-400" />
-        </CardContent>
-      </Card>
+      <Panel className="flex min-h-[200px] items-center justify-center">
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+          Loading
+        </span>
+      </Panel>
     );
   }
 
   return (
-    <Card className="bg-slate-900/50 border-slate-800">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-white flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-lime-400" />
-              Reporting Period Timeline
-            </CardTitle>
-            <CardDescription>
-              Visual overview of data collection periods and temporal alignment
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            <Select value={filterType} onValueChange={(v: any) => setFilterType(v)}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="facilities">Facilities Only</SelectItem>
-                <SelectItem value="products">Products Only</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {selectableYears.map((sy) => (
-                  <SelectItem key={sy.year} value={sy.year.toString()}>
-                    {sy.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+    <section className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <Eyebrow>REPORTING PERIODS</Eyebrow>
+          <p className="mt-1.5 text-sm text-studio-dim">
+            Data collection periods, and where facility and product periods line up.
+          </p>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Alignment Status */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 bg-slate-800/50 rounded-md border border-slate-700">
-            <div className="flex items-center gap-2 mb-1">
-              <Factory className="h-4 w-4 text-blue-400" />
-              <span className="text-xs text-slate-400">Facility Periods</span>
-            </div>
-            <p className="text-2xl font-bold text-white">
-              {filteredEntries.filter((e) => e.type === "facility").length}
-            </p>
-          </div>
-
-          <div className="p-4 bg-slate-800/50 rounded-md border border-slate-700">
-            <div className="flex items-center gap-2 mb-1">
-              <Package className="h-4 w-4 text-lime-400" />
-              <span className="text-xs text-slate-400">Product Periods</span>
-            </div>
-            <p className="text-2xl font-bold text-white">
-              {filteredEntries.filter((e) => e.type === "product").length}
-            </p>
-          </div>
-
-          <div className="p-4 bg-slate-800/50 rounded-md border border-slate-700">
-            <div className="flex items-center gap-2 mb-1">
-              {hasAlignment ? (
-                <CheckCircle2 className="h-4 w-4 text-green-400" />
-              ) : (
-                <AlertCircle className="h-4 w-4 text-amber-400" />
-              )}
-              <span className="text-xs text-slate-400">Overlaps</span>
-            </div>
-            <p className="text-2xl font-bold text-white">{overlaps.length}</p>
-          </div>
-        </div>
-
-        {/* Timeline Visualization */}
-        <div className="space-y-4">
-          {/* Month Headers */}
-          <div className="relative h-8 border-b border-slate-700">
-            <div className="absolute inset-0 flex">
-              {monthsInRange.map((month, index) => (
-                <div
-                  key={index}
-                  className="flex-1 text-center text-xs text-slate-400 border-r border-slate-800"
-                >
-                  {format(month, "MMM")}
-                </div>
+        <div className="flex items-center gap-2">
+          <Select value={filterType} onValueChange={(v: any) => setFilterType(v)}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="facilities">Facilities only</SelectItem>
+              <SelectItem value="products">Products only</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={selectedYear} onValueChange={setSelectedYear}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {selectableYears.map((sy) => (
+                <SelectItem key={sy.year} value={sy.year.toString()}>
+                  {sy.label}
+                </SelectItem>
               ))}
-            </div>
-          </div>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
-          {/* Timeline Entries */}
-          <div className="space-y-2">
-            {filteredEntries.length === 0 ? (
-              <div className="text-center py-8">
-                <Calendar className="h-12 w-12 mx-auto mb-4 text-slate-600" />
-                <p className="text-slate-400">No reporting periods found for {selectedYear}</p>
+      <div className="grid grid-cols-3 divide-x divide-studio-hairline border-y border-studio-hairline py-5">
+        <BigNumber
+          value={filteredEntries.filter((e) => e.type === "facility").length}
+          label="FACILITY PERIODS"
+        />
+        <BigNumber
+          className="pl-6"
+          value={filteredEntries.filter((e) => e.type === "product").length}
+          label="PRODUCT PERIODS"
+        />
+        <BigNumber
+          className="pl-6"
+          tone={overlaps.length > 0 ? "good" : "attention"}
+          value={overlaps.length}
+          label="ALIGNED PERIODS"
+        />
+      </div>
+
+      <Panel>
+        {/* Legend */}
+        <div className="mb-4 flex items-center gap-5">
+          <span className="flex items-center gap-2">
+            <span className="h-3 w-3 rounded-[3px] border border-room/40 bg-room/20" />
+            <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+              Facility
+            </span>
+          </span>
+          <span className="flex items-center gap-2">
+            <span className="h-3 w-3 rounded-[3px] border border-studio-ink/30 bg-studio-ink/10" />
+            <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+              Product
+            </span>
+          </span>
+        </div>
+
+        {/* Month headers */}
+        <div className="relative h-8 border-b border-studio-hairline">
+          <div className="absolute inset-0 flex">
+            {monthsInRange.map((month, index) => (
+              <div
+                key={index}
+                className="flex-1 border-r border-studio-hairline/60 text-center font-mono text-[9.5px] uppercase tracking-[0.14em] text-studio-dim"
+              >
+                {format(month, "MMM")}
               </div>
-            ) : (
-              filteredEntries.map((entry, index) => {
-                const startPos = calculatePosition(entry.startDate);
-                const endPos = calculatePosition(entry.endDate);
-                const width = endPos - startPos;
+            ))}
+          </div>
+        </div>
 
-                return (
-                  <div key={entry.id} className="relative h-12">
-                    <div className="absolute inset-y-0 left-0 flex items-center w-48">
-                      <div className="flex items-center gap-2 truncate">
-                        {entry.type === "facility" ? (
-                          <Factory className="h-4 w-4 text-blue-400 flex-shrink-0" />
-                        ) : (
-                          <Package className="h-4 w-4 text-lime-400 flex-shrink-0" />
+        {/* Timeline entries */}
+        <div className="mt-4 space-y-2">
+          {filteredEntries.length === 0 ? (
+            <p className="py-8 text-center text-sm text-studio-dim">
+              No reporting periods for {selectedYear}.
+            </p>
+          ) : (
+            filteredEntries.map((entry) => {
+              const startPos = calculatePosition(entry.startDate);
+              const endPos = calculatePosition(entry.endDate);
+              const width = endPos - startPos;
+
+              return (
+                <div key={entry.id} className="relative h-12">
+                  <div className="absolute inset-y-0 left-0 flex w-48 items-center">
+                    <span className="truncate font-display text-sm font-semibold text-foreground">
+                      {entry.name}
+                    </span>
+                  </div>
+                  <div className="absolute inset-y-0 left-48 right-0 flex items-center px-2">
+                    <div className="relative h-6 w-full">
+                      <div
+                        className={cn(
+                          "absolute h-full rounded-[4px] border",
+                          entry.type === "facility"
+                            ? "border-room/40 bg-room/20"
+                            : "border-studio-ink/30 bg-studio-ink/10"
                         )}
-                        <span className="text-sm text-white truncate">{entry.name}</span>
-                      </div>
-                    </div>
-                    <div className="absolute inset-y-0 left-48 right-0 flex items-center px-2">
-                      <div className="relative w-full h-6">
-                        <div
-                          className={`absolute h-full rounded transition-all ${
-                            entry.type === "facility"
-                              ? "bg-blue-500/30 border border-blue-500/50"
-                              : "bg-lime-500/30 border border-lime-500/50"
-                          }`}
-                          style={{
-                            left: `${startPos}%`,
-                            width: `${width}%`,
-                          }}
-                        >
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="text-xs font-medium text-white">
-                              {format(entry.startDate, "MMM d")} -{" "}
-                              {format(entry.endDate, "MMM d")}
-                            </span>
-                          </div>
+                        style={{
+                          left: `${startPos}%`,
+                          width: `${width}%`,
+                        }}
+                      >
+                        <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
+                          <span className="whitespace-nowrap font-mono text-[9.5px] uppercase tracking-[0.1em] text-foreground">
+                            {format(entry.startDate, "d MMM")} · {format(entry.endDate, "d MMM")}
+                          </span>
                         </div>
                       </div>
                     </div>
                   </div>
-                );
-              })
-            )}
-          </div>
+                </div>
+              );
+            })
+          )}
         </div>
 
-        {/* Overlaps Summary */}
+        {/* Alignments */}
         {overlaps.length > 0 && (
-          <div className="pt-4 border-t border-slate-700">
-            <h4 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-400" />
-              Period Alignments ({overlaps.length})
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div className="mt-6 border-t border-studio-hairline pt-4">
+            <Eyebrow tone="dim" className="mb-2">
+              PERIOD ALIGNMENTS · {overlaps.length}
+            </Eyebrow>
+            <ul className="divide-y divide-studio-hairline">
               {overlaps.slice(0, 4).map((overlap, index) => (
-                <div
-                  key={index}
-                  className="p-3 bg-green-500/10 border border-green-500/20 rounded-md"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">
+                <li key={index} className="flex items-center gap-4 py-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline gap-3">
+                      <span className="truncate font-display text-sm font-semibold text-foreground">
                         {overlap.facility}
-                      </p>
-                      <p className="text-xs text-slate-400 truncate">× {overlap.product}</p>
+                      </span>
+                      <StateChip tone="good">Aligned</StateChip>
                     </div>
-                    <Badge className="bg-green-500/20 text-green-300 ml-2">
-                      {overlap.days} days
-                    </Badge>
+                    <p className="mt-0.5 truncate text-xs text-studio-dim">{overlap.product}</p>
                   </div>
-                </div>
+                  <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+                    {overlap.days} days
+                  </span>
+                </li>
               ))}
-            </div>
+            </ul>
             {overlaps.length > 4 && (
-              <p className="text-xs text-slate-400 mt-2">
-                + {overlaps.length - 4} more alignments
+              <p className="mt-2 text-xs text-studio-dim">
+                And {overlaps.length - 4} more.
               </p>
             )}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </Panel>
+    </section>
   );
 }

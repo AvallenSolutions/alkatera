@@ -4,8 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Check, Mail, FileText, X, Clock3 } from 'lucide-react'
+import { Eyebrow } from '@/components/studio/eyebrow'
 import { useRosaContext } from '@/lib/rosa/RosaContextProvider'
 import { useRealtimeRefresh } from '@/lib/rosa/useRealtimeRefresh'
 
@@ -93,27 +92,14 @@ export function RecentlyFromRosa() {
   // should appear here without a refresh.
   useRealtimeRefresh(['agent_exceptions', 'ingest_jobs'], load)
 
-  if (items === null) {
-    return (
-      <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
-        <h2 className="text-sm font-medium text-muted-foreground mb-4">
-          Recently from Rosa
-        </h2>
-        <Skeleton className="h-4 w-3/4 mb-2" />
-        <Skeleton className="h-4 w-2/3 mb-2" />
-        <Skeleton className="h-4 w-1/2" />
-      </div>
-    )
-  }
+  if (items === null) return null
 
   if (items.length === 0) return null
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
-      <h2 className="text-sm font-medium text-muted-foreground mb-4">
-        Recently from Rosa
-      </h2>
-      <ul className="space-y-1">
+    <div>
+      <Eyebrow className="mb-3 text-room-accent">Recently from Rosa</Eyebrow>
+      <ul className="divide-y divide-border">
         {items.map(item => (
           <li key={item.id}>
             <RecentRow item={item} />
@@ -132,15 +118,12 @@ function RecentRow({ item }: { item: RecentItem }) {
   // queue — clicking opens the drawer's queue tab rather than navigating
   // away. Reviewed items deep-link to the relevant target page.
   const inner = (
-    <div className="group flex items-start gap-3 py-1.5 -mx-1 px-1 rounded-md hover:bg-muted/40 transition-colors">
-      <span className="flex-shrink-0 mt-0.5">
-        <StatusIcon status={item.status} source={item.source} />
-      </span>
-      <span className="text-muted-foreground tabular-nums text-xs flex-shrink-0 mt-0.5">
-        {fmtRelative(item.reviewed_at || item.created_at)}
-      </span>
+    <div className="group flex items-baseline gap-4 py-2.5">
       <span className="flex-1 min-w-0 leading-snug text-sm">
         {phraseFor(item)}
+      </span>
+      <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.15em] text-studio-dim">
+        {fmtRelative(item.reviewed_at || item.created_at)}
       </span>
     </div>
   )
@@ -195,18 +178,6 @@ function hrefForRecent(item: RecentItem): string | null {
   // Ingest-job result types we now emit:
   if (item.kind === 'website_import') return '/products/'
   return null
-}
-
-function StatusIcon({ status, source }: { status: string; source: string }) {
-  if (status === 'approved')
-    return <Check className="h-4 w-4 text-emerald-400" />
-  if (status === 'rejected')
-    return <X className="h-4 w-4 text-red-400" />
-  if (status === 'deferred')
-    return <Clock3 className="h-4 w-4 text-amber-400" />
-  if (source === 'email')
-    return <Mail className="h-4 w-4 text-muted-foreground" />
-  return <FileText className="h-4 w-4 text-muted-foreground" />
 }
 
 function phraseFor(item: RecentItem): string {

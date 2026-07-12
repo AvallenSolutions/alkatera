@@ -10,6 +10,8 @@
 // Only active/completed initiatives count as B Corp evidence
 // (lib/certifications/initiative-evidence.ts).
 
+import type { WorkingTone } from '@/components/studio/theme';
+
 export type InitiativeStatus =
   | 'draft'
   | 'pending_approval'
@@ -19,34 +21,36 @@ export type InitiativeStatus =
 
 export type InitiativeAction = 'submit' | 'approve' | 'reject' | 'complete' | 'cancel';
 
+// Each status carries a studio working tone directly, so the UI reads its
+// colour from here rather than remapping colour names at render time.
 export const INITIATIVE_STATUSES: Record<
   InitiativeStatus,
-  { label: string; description: string; colour: string }
+  { label: string; description: string; tone: WorkingTone }
 > = {
   draft: {
     label: 'Draft',
     description: 'Being worked on; not yet sent for approval.',
-    colour: 'slate',
+    tone: 'quiet',
   },
   pending_approval: {
     label: 'Waiting for approval',
     description: 'Sent for approval by an organisation owner or admin.',
-    colour: 'amber',
+    tone: 'attention',
   },
   active: {
     label: 'Active',
     description: 'Approved and under way. Counts towards B Corp evidence.',
-    colour: 'lime',
+    tone: 'good',
   },
   completed: {
     label: 'Completed',
     description: 'Finished. Still counts towards B Corp evidence.',
-    colour: 'green',
+    tone: 'good',
   },
   cancelled: {
     label: 'Cancelled',
     description: 'Stopped before completion.',
-    colour: 'red',
+    tone: 'stale',
   },
 };
 

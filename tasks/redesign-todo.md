@@ -74,6 +74,193 @@ Open questions for the M2 review:
   stream to land to avoid conflicts)
 - [ ] Procurement portal (respect tenant whitelabel injection)
 
+## Milestone 4 · room deep-passes (reduce the noise, room by room)
+- [x] TODAY (9 July): plan at `tasks/redesign-today-plan.md`, decisions settled with
+      Tim, built and verified. The Brief is a one-column read (priorities with the
+      one forest block, the day's numbers, the reading digest, the good work, quiet
+      margins); the hub customise system is retired; Pulse lost its internal tabs
+      (verdict is the statement, sections down one paper, Money tab removed in
+      favour of Financial); Financial is statement-led and number-first. tsc clean,
+      consoles clean, mobile clean.
+- [x] THE WORKBENCH (10 July): plan at `tasks/redesign-workbench-plan.md`, four
+      decisions settled with Tim, ALL 30 pages in the room converted (Tim: full
+      consistency, no old-design pages left). Room-landing pilot SHIPPED at
+      /workbench/ (statement, cobalt footprint poster, fact rows with live counts
+      via /api/workbench/counts, beta rows flag-filtered; desk poster + band room
+      name link to it). Emissions is one paper (five tabs gone, monolith split);
+      Spend is the queue; Quality is score-led; Fleet is a logbook; the three
+      agriculture list pages share components/growing/ (CropConfig); hospitality
+      is one header + rows across all twelve pages; facility detail has quiet
+      mono mode tabs. Shared chrome fixed once: FeatureGate lock page, PageLoader
+      skeleton (no spinners), stale THE MEASURES eyebrows fixed in every room.
+      tsc clean, consoles clean, mobile clean.
+- [x] THE CELLAR (10 July): plan at `tasks/redesign-cellar-plan.md`, five decisions
+      settled with Tim, built and verified. Deleted 10 orphaned routes (the dead
+      parallel LCA flow incl. the mock-data report page and the banned-pattern
+      materials editor; EF31 table salvaged). Landing SHIPPED at /cellar/ with the
+      vitality score as the plum poster + /api/cellar/counts; Vitality is now a
+      listed tab. Products list/new/import/supplier-matches, the product hub (orbs
+      gone, one CTA, quiet tabs), the recipe skin, the LCA wizard (second AI folded
+      into Rosa), the library and nature, and the vitality recut (PillarCard studio,
+      hospitality intact) all converted. tsc clean, mobile clean, consoles clean.
+      NB: the wizard's multi-step body is data-gated and verified structurally only;
+      needs a click-through on a real product with a recipe.
+- [x] THE NETWORK (10 July): plan at `tasks/redesign-network-plan.md`, seven
+      decisions settled with Tim, built (foundation by lead + six parallel
+      agents after groundwork) and verified on :8895. Landing SHIPPED at
+      /network/ (statement, THE CHAIN ochre poster ink-on-saturated, five fact
+      rows via /api/network/counts + a single advisor-unread aggregate, no
+      N+1). Registry: five flat tabs (Suppliers/Messages/Support/Experts/
+      Sourcing — the fifth renamed from "Responsibility" at Tim's request so it
+      fits the band; kept a peer, not nested under Suppliers), "More…" retired,
+      /network path-prefix + desk poster wired. Suppliers monolith split into components/suppliers/
+      (fixes the inline focus-loss bug), ONE composition, one door in (Find or
+      invite + Send ESG survey; Smart upload into the sheet; ?invite=1 auto-
+      opens). Legacy ungated /suppliers/new DELETED (public invite journey
+      supersedes it), five inbound links repointed. Supplier detail: tabs →
+      stacked sections (impact figures as tabular numbers, ESG Q&A as tone
+      chips), SendEsgSurveyDialog restyled (contract intact). Shared
+      components/network/ Thread + MessageBubble + useRealtimeThread adopted by
+      messages AND support; both lists + FeedbackDialog de-limed. Experts: one
+      config-driven PartnerProfile template (two thin wrappers), six-colour
+      icon system deleted; Impact Focus mailto fixed to hello@impactfocus.co.uk
+      (all other partner URLs byte-for-byte). Responsibility: six hairline
+      attestations, coverage BigNumber, emoji + /performance back-link gone.
+      Advisor-security: four directory routes wrapped (resolveAccessibleOrg +
+      denyReadOnlyAdvisor), three correctly left (RLS/anon or already
+      compliant). tsc clean, mobile clean, consoles clean.
+- [x] THE EVIDENCE (10 July): plan at `tasks/redesign-evidence-plan.md`, seven
+      decisions settled with Tim, built (foundation by lead + five parallel agents
+      after groundwork) and verified on :8895. Landing SHIPPED at /evidence/
+      (statement, THE PROOF brick poster, seven fact rows via /api/evidence/counts
+      — which also surfaced the footprint, guardian, library and historical
+      surfaces that were orphaned or bandless). Registry: five flat tabs
+      (Reports/Certifications/Guardian/Targets/Library), More… retired, /evidence
+      path-prefix + desk poster wired. Phantom /reports/ front door → redirect to
+      the real hub /reports/sustainability (band points straight there); legacy
+      /operations → redirect to /company/facilities (5 links repointed). Reports
+      hub studio-polished (URL-synced tabs, quiet cards, guardian cross-link);
+      both setup wizards purged of the stone-* scale. CCF hub recut + 18 category
+      cards swept + delineation cross-links to/from the workbench. Certifications:
+      hub scaffold collapsed, the 15-component cluster converted (B Corp + EcoVadis
+      prioritised per Tim), status-tones helper, all three experiences URL-synced
+      (11 B Corp features preserved), library cross-link added. Guardian: statements
+      + emoji/dashed/spinner purge + riskTone helper + a status-string bugfix.
+      Library detail statement + font fix. Targets: stale PULSE eyebrow → evidence,
+      room-hop back-link removed, the room's last Loader2 gone. 6 orphan components
+      deleted, 2 misfiled cards moved to components/emissions/. Full tsc 0 errors,
+      mobile clean, consoles clean, room-wide off-palette grep clean.
+- [x] THE LIBRARY (10 July): plan at `tasks/redesign-library-plan.md`, five decisions
+      settled with Tim, built (foundation by lead + two parallel agents over the KB
+      and wiki trees) and verified on :8896. The room's first landing SHIPPED at
+      /library/ (statement, THE SHELF teal poster, two fact rows via /api/library/counts
+      — published resources + categories as org-or-global head counts, wiki pages
+      counted from disk via getPublishedWikiPages; the counts route added to
+      next.config.js outputFileTracingIncludes); registry gained `landing:'/library/'`
+      + the /library prefix, desk poster flipped, band room-name now links. Knowledge
+      bank: three brick eyebrows → THE LIBRARY, neon-lime → room-accent throughout,
+      CategoryGrid's 15-colour rainbow → a studio token map (data-driven off
+      category.color, muted to the six room inks + dim), Card → Panel, Badge →
+      StateChip, yellow star → room-accent, PartnerAuthorBadge de-emeralded with
+      PARTNER_LABELS wired, item detail + category listing gained Statements,
+      skeletons → PageLoader. 'embedded' is now a creatable content type (Tim's call
+      over the remove default: create Select + file_url + signed-url guard +
+      sandboxed iframe render). Wiki: index eyebrow fixed, WikiMapClient git-mv'd
+      marketing/ → components/wiki/ and re-keyed teal-led (guide takes teal, the
+      other four types keep their studio inks), 12 studio-brick chrome states + the
+      #BF4B2A edge stroke → room-accent (SVG stroke via a style prop, since var()
+      doesn't resolve in SVG attributes), CTA → PillButton, wiki.css teal literals →
+      the room-accent variable so prose follows a partner brand; two stale comments
+      (wiki.css, lib/wiki.ts) fixed. The two library tabs now cross-link (siblings
+      meet). tsc 0 errors, off-palette grep clean, mobile clean, consoles clean.
+      NB: /admin/wiki is a wiring surface, LEFT for the wiring pass; the embedded
+      render + KB card tints need a click-through on an org with real resources
+      (dev org is empty).
+- [x] THE WIRING (10 July, the FINAL room): plan at `tasks/redesign-wiring-plan.md`,
+      four decisions settled with Tim, built (foundation by lead + four parallel cluster
+      agents; a mid-run session limit killed the EPR + three social agents, the lead
+      finished the orphaned slices after the reset and re-delegated the two large
+      remainders) and verified on :8896. First landing SHIPPED at /wiring/ (statement,
+      THE PLAN ink poster = subscription tier + status + renewal, nine fact rows via new
+      /api/wiring/counts: members + integrations + EPR obligation + the three social
+      scores + galleries); registry gained landing + /wiring prefix, desk poster flipped,
+      the band's Billing tab repointed straight to /settings?tab=billing. SETTINGS: the
+      1,124-line monolith cut to 205 (SubscriptionSettings + BillingSettings extracted,
+      Stripe handlers verbatim), two-way ?tab= URL sync (back/forward fixed), the dead
+      Suppliers placeholder tab DELETED, XeroConnectionCard + TeamSettings deep-cleaned,
+      14-file component sweep, breww/unleashed given statements + studio tables. EPR: the
+      whole family re-roomed (six THE EVIDENCE eyebrows → THE WIRING), the 17-step wizard
+      de-limed (neon-lime/glass/spinners/Badge gone), costs #BF4B2A + RAM dots → tones +
+      year-tab URL sync, lib/epr/status-tones.ts dedupes four ladders, redundant hub
+      FeatureGate removed, PRN + Audit orphans given hub doors. SOCIAL: a shared
+      components/social/ scaffold, three hubs (governance finally gets its eyebrow) + all
+      13 detail pages, the four governance detail pages GATED, community ScoreRing +
+      gender charts → studio inks, DependenciesMatrix + BoardCompositionChart + the four
+      people-culture dashboards converted, the four "Back to Company Vitality" room-hops
+      retired. ADMIN: Tier A deep pass (demo-seed, ingest-learning, reference-data,
+      recalculate-lca, admin/wiki) + Tier B sweep (~13 partials, beta-access ccff00 ×4
+      killed) + Tier C (~9k lines of dev docs/factors/platform/supplier tree) ring-fenced.
+      tsc 0, room-wide off-palette grep clean, EPR tests green (4 pre-existing unrelated
+      failures), mobile + consoles clean. DEVIATION: the /admin index was dropped (root
+      /admin is the distributor panel's, a separate stream). THE HOUSE OF SEVEN ROOMS IS
+      COMPLETE.
+- [ ] All seven rooms done. Remaining before go-live: retire the neon-* bridge vars,
+      the app-icon/favicon brand call, the distributor + procurement portals (their own
+      streams), then the go-live pass (merge main, full pnpm build, walk-through, merge
+      redesign → main).
+
+## Review log
+- 9 July 2026 · Today room deep pass: Tim approved the four plan decisions
+  (retire hub customise; kill Pulse Money tab; Customise behind a ghost pill;
+  keep spotlight/partnerships/nature merged into "The good work" rows). Tim asked
+  that features are never deleted unless repeated or redundant; the room-in-room
+  idea resolved to the room-landing pattern (desk grammar inside a room, flat nav).
+- 10 July 2026 · Workbench deep pass: Tim approved folding Emissions' Scope 1/2
+  tabs, parameterising agriculture, footprint-as-poster; revised decision 2 to
+  KEEP the data-sources content as a quiet section ("people rarely use it but
+  should see where their data comes from"). Then extended the pass to ALL pages
+  in the room for platform consistency. Two removal candidates flagged for Tim,
+  nothing deleted: /company/overview (duplicate of /settings?tab=organisation)
+  and /data/ingest (legacy manual form, superseded by smart upload, only Rosa
+  prompt files reference it).
+- 10 July 2026 · Cellar deep pass: Tim approved deleting the dead parallel LCA
+  flow WITH a salvage (keep /report's EF3.1 table components), folding the
+  wizard's second AI into Rosa, one import door, a recut card grid, and the
+  vitality score as the landing poster. Built with 6 parallel agents after
+  groundwork. Flagged for Tim: /company/overview + /data/ingest removals still
+  pending from the workbench pass; the orphaned /api/lca/[id]/ai-suggestions
+  route (dead after the sidebar fold); the wizard step body needs a real-product
+  click-through. Side-finding: bulk import may not enforce product-limit gating
+  client-side (confirm the API does).
+- 10 July 2026 · Evidence deep pass: Tim settled all seven decisions (kill the
+  phantom /reports/ front door → redirect; retire /operations → facilities; five
+  flat tabs; landing poster = THE PROOF; keep CCF + workbench delineated; quiet the
+  certifications monolith in place with "only B Corp and EcoVadis important right
+  now"; delete the 6 orphans). Built with five parallel agents after the lead did
+  the foundation (landing, /api/evidence/counts, both redirects, registry). All
+  verified on :8895. Notes for Tim: (a) the /reports/ and /operations redirects are
+  URL-stable (permanent moves wait for the go-live redirect pass); (b) certification
+  tabs are now deep-linkable via ?tab= (works in dev; confirm the production build's
+  Suspense/dynamic handling at go-live); (c) framework migration of csrd/gri/sbti
+  onto CertificationExperience remains a named follow-up; (d) the transition-plan vs
+  /pulse/targets two-schema target duplication is de-noised but still a follow-up to
+  unify; (e) a stale-cache ENOENT appeared after deleting orphans under the running
+  dev server and cleared on restart (not a code fault).
+- 10 July 2026 · Network deep pass: Tim settled all seven decisions (retire
+  /suppliers/new; one door on the suppliers list; supplier detail → sections;
+  landing poster = THE CHAIN; fold in advisor-security; one PartnerProfile
+  template; Impact Focus email is .co.uk). Built with six parallel agents after
+  the lead did the foundation (registry, /api/network/counts + advisor-unread
+  aggregate, the /network landing). All verified on :8895. Notes for Tim:
+  (a) /suppliers/new was DELETED, not redirected (the public invite journey
+  fully supersedes its token path; also removed the one ungated add path);
+  (b) advisor-security touched FOUR directory routes, not six — the other two
+  supplier routes use the anon/RLS client (DB is the backstop) and one was
+  already compliant; (c) the external supplier-portal components and the now-
+  orphaned old detail-tab components remain off-palette (their own pass);
+  (d) on orgs with a brand palette the room wears the brand colour, not ochre,
+  but the poster/pills still take ink-on-saturated per the room rule.
+
 ## Go-live (later)
 - [ ] Merge latest `main`, full `pnpm build`, full walk-through
 - [ ] Merge `redesign` → `main`, push, Netlify deploys

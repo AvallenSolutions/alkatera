@@ -70,6 +70,7 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
     onColour: 'cream',
     onRgb: ON_COLOUR_RGB.cream,
     mark: 'triangle', // the climb
+    landing: '/workbench/',
     tabs: [
       { label: 'Facilities', href: '/company/facilities/' },
       { label: 'Emissions', href: '/data/scope-1-2/' },
@@ -96,11 +97,13 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
     onColour: 'cream',
     onRgb: ON_COLOUR_RGB.cream,
     mark: 'diamond', // the bottled facet
+    landing: '/cellar/',
     tabs: [
       { label: 'Products', href: '/products/' },
       { label: 'LCAs', href: '/reports/lcas/' },
+      { label: 'Vitality', href: '/performance/' },
+      { label: 'Nature', href: '/nature-assessment/' },
     ],
-    more: [{ label: 'Nature', href: '/nature-assessment/' }],
   },
   network: {
     key: 'network',
@@ -112,14 +115,15 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
     onColour: 'ink', // ochre always takes ink text
     onRgb: ON_COLOUR_RGB.ink,
     mark: 'square', // the envelope, tilted
+    landing: '/network/',
+    // Five flat tabs; the band fits them, so no "More…" overflow (the cellar
+    // precedent). Experts and Responsibility come up from the old overflow.
     tabs: [
       { label: 'Suppliers', href: '/suppliers/' },
       { label: 'Messages', href: '/settings/messages/' },
       { label: 'Support', href: '/settings/feedback/' },
-    ],
-    more: [
       { label: 'Experts', href: '/expert-partners/' },
-      { label: 'Responsibility', href: '/supplier-responsibility/' },
+      { label: 'Sourcing', href: '/supplier-responsibility/' },
     ],
   },
   evidence: {
@@ -132,17 +136,17 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
     onColour: 'cream',
     onRgb: ON_COLOUR_RGB.cream,
     mark: 'quarter', // the atelier window
+    landing: '/evidence/',
+    // Five flat tabs; the band fits them, so no "More…" overflow (the network
+    // precedent). Reports points straight at the real hub (the old /reports/
+    // front door now redirects there). Materiality + Transition plan were tabs
+    // of the hub, not destinations; Footprint + Historical live on the landing.
     tabs: [
-      { label: 'Reports', href: '/reports/' },
-      { label: 'Targets', href: '/pulse/targets/' },
+      { label: 'Reports', href: '/reports/sustainability/' },
       { label: 'Certifications', href: '/certifications/' },
       { label: 'Guardian', href: '/greenwash-guardian/' },
-    ],
-    more: [
+      { label: 'Targets', href: '/pulse/targets/' },
       { label: 'Library', href: '/evidence-library/' },
-      { label: 'Materiality', href: '/reports/materiality/' },
-      { label: 'Transition plan', href: '/reports/transition-plan/' },
-      { label: 'Historical', href: '/reports/historical/' },
     ],
   },
   library: {
@@ -155,6 +159,7 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
     onColour: 'cream',
     onRgb: ON_COLOUR_RGB.cream,
     mark: 'arch', // the doorway
+    landing: '/library/',
     tabs: [
       { label: 'Knowledge', href: '/knowledge-bank/' },
       { label: 'Wiki', href: '/wiki/' },
@@ -170,9 +175,11 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
     onColour: 'cream',
     onRgb: ON_COLOUR_RGB.cream,
     mark: 'ring', // the quiet listener
+    landing: '/wiring/',
     tabs: [
       { label: 'Settings', href: '/settings/' },
-      { label: 'Billing', href: '/settings/billing/' },
+      // Straight to the tab: the /settings/billing stub stays only as an alias.
+      { label: 'Billing', href: '/settings?tab=billing' },
     ],
     more: [
       { label: 'EPR', href: '/epr/' },
@@ -196,6 +203,7 @@ const ROOM_PREFIXES: Array<[prefix: string, room: PlatformRoomKey]> = [
   // the hall
   ['/desk', 'desk'],
   // the network (before /settings and before /suppliers stays here too)
+  ['/network', 'network'],
   ['/settings/messages', 'network'],
   ['/settings/feedback', 'network'],
   ['/expert-partners', 'network'],
@@ -208,6 +216,7 @@ const ROOM_PREFIXES: Array<[prefix: string, room: PlatformRoomKey]> = [
   ['/pulse', 'today'],
   ['/dashboard', 'today'],
   // the workbench (data going in)
+  ['/workbench', 'workbench'],
   ['/company', 'workbench'],
   ['/data', 'workbench'],
   ['/vineyards', 'workbench'],
@@ -215,19 +224,23 @@ const ROOM_PREFIXES: Array<[prefix: string, room: PlatformRoomKey]> = [
   ['/arable-fields', 'workbench'],
   ['/hospitality', 'workbench'],
   // the cellar (footprints being made)
+  ['/cellar', 'cellar'],
   ['/products', 'cellar'],
   ['/reports/lcas', 'cellar'],
   ['/nature-assessment', 'cellar'],
   ['/performance', 'cellar'],
   // the evidence (before /reports catch nothing else; /reports/lcas already routed above)
+  ['/evidence', 'evidence'],
   ['/reports', 'evidence'],
   ['/certifications', 'evidence'],
   ['/greenwash-guardian', 'evidence'],
   ['/evidence-library', 'evidence'],
   // the library
+  ['/library', 'library'],
   ['/knowledge-bank', 'library'],
   ['/wiki', 'library'],
   // the wiring (settings, compliance, the rare)
+  ['/wiring', 'wiring'],
   ['/settings', 'wiring'],
   ['/epr', 'wiring'],
   ['/people-culture', 'wiring'],

@@ -33,7 +33,7 @@ export function SmartGoalsSection({ goals, className }: SmartGoalsSectionProps) 
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-heading font-semibold">Smart Goals</h2>
         <Link
-          href="/reports"
+          href="/reports/sustainability"
           className="text-sm font-medium text-neon-lime hover:underline transition-all"
         >
           VIEW ALL

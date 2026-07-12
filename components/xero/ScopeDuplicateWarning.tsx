@@ -1,19 +1,19 @@
 'use client'
 
 /**
- * Inline duplicate warning shown on the Scope 1/2 page when Xero spend-based
- * energy data overlaps with facility-level utility meter readings.
+ * Inline duplicate warning shown on the emissions page when Xero
+ * spend-based energy data overlaps with facility-level utility meter
+ * readings.
  *
  * Unlike the DuplicateWarningBanner in ActionCentre, this component:
  * - Filters to a specific scope (1 or 2)
  * - Filters to the selected reporting period
- * - Shows a compact alert directly above the scope total
+ * - Sits quietly under the scope's fact row (studio re-cut: a hairline
+ *   panel, a working-tone chip and two typographic actions, no icons)
  */
 
 import { useState, useEffect } from 'react'
-import { AlertTriangle, X, Eye } from 'lucide-react'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
+import { StateChip } from '@/components/studio/state-chip'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
 import {
@@ -94,46 +94,41 @@ export function ScopeDuplicateWarning({
   if (isLoading || visibleOverlaps.length === 0) return null
 
   return (
-    <Alert className="border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30">
-      <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-      <AlertDescription>
-        <div className="space-y-2">
-          {visibleOverlaps.map(overlap => (
-            <div key={overlap.category} className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-amber-900 dark:text-amber-100">
-                  {overlap.message}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Xero spend: {new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0 }).format(overlap.xeroSpend)}
-                </p>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => handleAcknowledge(overlap.category)}
-                  title="Keep both - I have checked and there is no overlap"
-                >
-                  <Eye className="h-3 w-3 mr-1" />
-                  Keep both
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"
-                  onClick={() => handleDismiss(overlap.category)}
-                  title="Keep your utility data and dismiss the Xero spend transactions"
-                >
-                  <X className="h-3 w-3 mr-1" />
-                  Use utility data only
-                </Button>
-              </div>
+    <div className="rounded-[6px] border border-studio-hairline bg-studio-cream px-4 py-3">
+      <div className="divide-y divide-studio-hairline">
+        {visibleOverlaps.map(overlap => (
+          <div
+            key={overlap.category}
+            className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 py-2 first:pt-0 last:pb-0"
+          >
+            <div className="min-w-0 flex-1">
+              <StateChip tone="attention">Possible double count</StateChip>
+              <p className="mt-1 text-sm text-foreground">{overlap.message}</p>
+              <p className="mt-0.5 text-xs text-studio-dim">
+                Xero spend: {new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0 }).format(overlap.xeroSpend)}
+              </p>
             </div>
-          ))}
-        </div>
-      </AlertDescription>
-    </Alert>
+            <div className="flex shrink-0 items-center gap-4">
+              <button
+                type="button"
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim transition-colors hover:text-foreground"
+                onClick={() => handleAcknowledge(overlap.category)}
+                title="Keep both: I have checked and there is no overlap"
+              >
+                Keep both
+              </button>
+              <button
+                type="button"
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-attention transition-colors hover:text-foreground"
+                onClick={() => handleDismiss(overlap.category)}
+                title="Keep your utility data and dismiss the Xero spend transactions"
+              >
+                Use utility data only
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }

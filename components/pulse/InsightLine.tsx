@@ -1,15 +1,14 @@
 'use client';
 
 /**
- * Pulse Overview -- one-line daily insight.
+ * Pulse -- one-line daily insight.
  *
- * The latest AI-written headline, one line, click for the full write-up
- * (the existing insight drill). Replaces the full insight card on first
- * paint.
+ * The latest AI-written headline as one quiet line under the statement,
+ * click for the full write-up (the existing insight drill). No card, no
+ * icon: a mono INSIGHT label, the sentence, a hairline beneath.
  */
 
 import { useEffect, useState } from 'react';
-import { Sparkles, ArrowRight } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 import { useMetricDrill } from '@/lib/pulse/MetricDrillContext';
@@ -43,13 +42,14 @@ export function InsightLine() {
     <button
       type="button"
       onClick={() => openDrill({ kind: 'widget', id: 'insight-card' })}
-      className="group flex w-full items-center gap-2.5 rounded-[6px] border border-border bg-card px-4 py-2.5 text-left transition-colors hover:border-studio-forest/50"
+      className="group flex w-full items-baseline gap-3 border-b border-studio-hairline pb-3 text-left"
     >
-      <Sparkles className="h-4 w-4 shrink-0 text-studio-forest" aria-hidden="true" />
+      <span className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-room-accent">
+        Insight
+      </span>
       <span className="min-w-0 flex-1 truncate text-sm text-foreground">{headline}</span>
-      <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground group-hover:text-foreground">
+      <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim transition-colors duration-150 ease-studio group-hover:text-foreground">
         Read more
-        <ArrowRight className="h-3 w-3" />
       </span>
     </button>
   );

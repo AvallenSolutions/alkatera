@@ -38,7 +38,6 @@ const DISALLOW = [
   '/supplier-onboarding', // token-based supplier flow reached via email link
   '/team-invite/',
   '/advisor-invite/',
-  '/lca-report/',
   '/r/', // private per-prospect footprint reports (capability-token links)
 ];
 

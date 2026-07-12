@@ -42,7 +42,7 @@ const quickActions: QuickAction[] = [
     id: 'add-supplier',
     label: 'Add Supplier',
     description: 'Expand your supply chain',
-    href: '/suppliers/new',
+    href: '/suppliers/?invite=1',
     emoji: '🤝',
   },
   {

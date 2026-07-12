@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Dog, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
+import { Dog, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useOnboarding } from '@/lib/onboarding'
 import { PRODUCT_GUIDE_STEPS, getVisibleProductSteps, type ProductGuideStep } from '@/lib/product-guide'
@@ -42,51 +42,6 @@ function useTypewriter(text: string, speed: number = 25) {
   }, [text])
 
   return { displayed, isComplete, skipToEnd }
-}
-
-// ─── Sparkle Particles (Final Step) ────────────────────────────────────────────
-
-function SparkleParticles() {
-  const particles = useMemo(
-    () =>
-      Array.from({ length: 12 }, (_, i) => ({
-        id: i,
-        x: Math.random() * 100,
-        y: Math.random() * 100,
-        delay: Math.random() * 2,
-        duration: 2 + Math.random() * 2,
-        size: 4 + Math.random() * 6,
-      })),
-    []
-  )
-
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {particles.map((p) => (
-        <motion.div
-          key={p.id}
-          className="absolute rounded-full bg-room/30"
-          style={{
-            width: p.size,
-            height: p.size,
-            left: `${p.x}%`,
-            top: `${p.y}%`,
-          }}
-          animate={{
-            y: [0, -20, 0],
-            opacity: [0, 1, 0],
-            scale: [0.5, 1, 0.5],
-          }}
-          transition={{
-            duration: p.duration,
-            delay: p.delay,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
-        />
-      ))}
-    </div>
-  )
 }
 
 // ─── Step Dots ─────────────────────────────────────────────────────────────────
@@ -143,8 +98,6 @@ function RosaCard({
       transition={{ duration: 0.3, ease: 'easeOut' }}
       className="bg-card border border-border rounded-[6px] p-5 max-w-sm relative"
     >
-      {isLastStep && <SparkleParticles />}
-
       {/* Header */}
       <div className="flex items-center gap-3 mb-3">
         <div className="w-10 h-10 rounded-[6px] bg-secondary border border-border flex items-center justify-center flex-shrink-0">
@@ -179,9 +132,8 @@ function RosaCard({
               <Button
                 key={action.label}
                 onClick={() => onAction(action.action)}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-[6px] w-full"
+                className="bg-studio-ink text-studio-cream hover:bg-studio-ink/85 font-medium rounded-full w-full"
               >
-                <Sparkles className="w-4 h-4 mr-2" />
                 {action.label}
               </Button>
             ) : (
@@ -217,7 +169,7 @@ function RosaCard({
             <Button
               size="sm"
               onClick={onNext}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-[6px] h-8 px-3"
+              className="bg-studio-ink text-studio-cream hover:bg-studio-ink/85 font-medium rounded-full h-8 px-3"
             >
               Next
               <ChevronRight className="w-4 h-4 ml-1" />

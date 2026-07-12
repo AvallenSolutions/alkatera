@@ -240,7 +240,7 @@ export function UtilityRolloverDialog({
         <DialogHeader>
           <DialogTitle>Copy from {fromLabel}</DialogTitle>
           <DialogDescription>
-            Review last year&apos;s utility data below. Quantities are editable — adjust anything that&apos;s changed before copying to {toLabel}.
+            Review last year&apos;s utility data below. Quantities are editable: adjust anything that&apos;s changed before copying to {toLabel}.
           </DialogDescription>
         </DialogHeader>
 
@@ -269,7 +269,7 @@ export function UtilityRolloverDialog({
               <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
                 <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
                 <span>
-                  {entries.length} {entries.length === 1 ? 'entry' : 'entries'} found in {fromLabel}. Copied entries will be marked as <strong>estimated</strong> — update them with actual readings when available.
+                  {entries.length} {entries.length === 1 ? 'entry' : 'entries'} found in {fromLabel}. Copied entries will be marked as <strong>estimated</strong>. Update them with actual readings when available.
                 </span>
               </div>
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StateChip } from "@/components/studio";
 import { Users, Save, CheckCircle2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -85,13 +86,11 @@ export function TeamCommutingCard({ reportId, initialFteCount, onUpdate, isNotAp
 
   return (
     <Card className="relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 dark:bg-green-950 rounded-full -mr-16 -mt-16 opacity-50" />
-
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-green-100 dark:bg-green-900 flex items-center justify-center">
-              <Users className="h-5 w-5 text-green-600 dark:text-green-400" />
+            <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+              <Users className="h-5 w-5 text-room-accent" />
             </div>
             <div>
               <CardTitle className="text-lg">Team & Commuting</CardTitle>
@@ -100,9 +99,9 @@ export function TeamCommutingCard({ reportId, initialFteCount, onUpdate, isNotAp
           </div>
           <div className="flex flex-col items-end gap-1.5">
             {initialFteCount > 0 && (
-              <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+              <StateChip>
                 {initialFteCount} FTEs
-              </Badge>
+              </StateChip>
             )}
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-muted-foreground">Not applicable</span>
@@ -131,9 +130,9 @@ export function TeamCommutingCard({ reportId, initialFteCount, onUpdate, isNotAp
           </div>
 
           {fteCount && parseFloat(fteCount) > 0 && (
-            <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-900 space-y-2">
+            <div className="p-4 rounded-lg bg-secondary space-y-2">
               <div className="text-xs text-muted-foreground">Estimated Annual Emissions</div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              <div className="text-2xl font-bold text-foreground">
                 {formatEmissions(estimatedCO2e)}
               </div>
               <div className="text-xs text-muted-foreground">

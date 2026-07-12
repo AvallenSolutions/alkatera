@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -45,7 +46,10 @@ import {
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Eyebrow, StateChip } from '@/components/studio';
-import type { WorkingTone } from '@/components/studio/theme';
+import {
+  auditPackageStatusTone,
+  evidenceVerificationTone,
+} from '@/lib/certifications/status-tones';
 import { GapAnalysisView } from '@/components/certifications/GapAnalysisView';
 import { ReadinessBanner } from '@/components/certifications/ReadinessBanner';
 import { EcgtBanner } from '@/components/certifications/EcgtBanner';
@@ -98,7 +102,25 @@ export function BcorpExperience() {
     refetch: refetchReadiness,
   } = useCertificationReadiness();
 
-  const [activeTab, setActiveTab] = useState('overview');
+  // URL-synced tabs (?tab=) so surfaces are deep-linkable. The setter wraps the
+  // local state so every existing call site (including the blocking-signal and
+  // focus-requirement jumps) keeps working unchanged, it just also writes the
+  // tab to the URL.
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTabState] = useState(
+    () => searchParams.get('tab') || 'overview',
+  );
+  const setActiveTab = useCallback(
+    (tab: string) => {
+      setActiveTabState(tab);
+      const params = new URLSearchParams(Array.from(searchParams.entries()));
+      params.set('tab', tab);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [router, pathname, searchParams],
+  );
   const [blockingSignal, setBlockingSignal] = useState(0);
   const [focusRequirementId, setFocusRequirementId] = useState<string | null>(null);
   const [focusSignal, setFocusSignal] = useState(0);
@@ -480,12 +502,9 @@ export function BcorpExperience() {
               ) : (
                 <div className="space-y-3">
                   {evidence.map((item) => {
-                    const statusTone: WorkingTone =
-                      item.verification_status === 'verified'
-                        ? 'good'
-                        : item.verification_status === 'rejected'
-                          ? 'stale'
-                          : 'attention';
+                    const statusTone = evidenceVerificationTone(
+                      item.verification_status,
+                    );
                     return (
                       <div
                         key={item.id}
@@ -791,16 +810,7 @@ export function BcorpExperience() {
               ) : (
                 <div className="space-y-3">
                   {auditPackages.map((pkg) => {
-                    const statusTone: WorkingTone =
-                      pkg.status === 'approved'
-                        ? 'good'
-                        : pkg.status === 'submitted'
-                          ? 'hold'
-                          : pkg.status === 'in_review'
-                            ? 'attention'
-                            : pkg.status === 'rejected'
-                              ? 'stale'
-                              : 'quiet';
+                    const statusTone = auditPackageStatusTone(pkg.status);
                     return (
                       <div
                         key={pkg.id}

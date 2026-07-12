@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -32,9 +32,9 @@ import {
   Plus,
   Trash2,
   CheckCircle2,
-  Clock,
-  XCircle,
 } from 'lucide-react';
+import { StateChip } from '@/components/studio';
+import { evidenceVerificationTone } from '@/lib/certifications/status-tones';
 
 interface EvidenceLink {
   id: string;
@@ -85,18 +85,18 @@ interface CreateEvidenceInput {
 }
 
 const evidenceTypeConfig = {
-  document: { label: 'Document', icon: FileText, color: 'bg-blue-100 text-blue-700' },
-  data_link: { label: 'Data Link', icon: Database, color: 'bg-purple-100 text-purple-700' },
-  policy: { label: 'Policy', icon: FileCheck, color: 'bg-emerald-100 text-emerald-700' },
-  metric: { label: 'Metric', icon: Database, color: 'bg-amber-100 text-amber-700' },
-  external_url: { label: 'External URL', icon: ExternalLink, color: 'bg-slate-100 text-slate-700' },
-  confirmation: { label: 'Confirmation', icon: CheckCircle2, color: 'bg-teal-100 text-teal-700' },
+  document: { label: 'Document', icon: FileText },
+  data_link: { label: 'Data Link', icon: Database },
+  policy: { label: 'Policy', icon: FileCheck },
+  metric: { label: 'Metric', icon: Database },
+  external_url: { label: 'External URL', icon: ExternalLink },
+  confirmation: { label: 'Confirmation', icon: CheckCircle2 },
 };
 
-const verificationStatusConfig = {
-  pending: { label: 'Pending', icon: Clock, color: 'bg-amber-100 text-amber-700' },
-  verified: { label: 'Verified', icon: CheckCircle2, color: 'bg-emerald-100 text-emerald-700' },
-  rejected: { label: 'Rejected', icon: XCircle, color: 'bg-red-100 text-red-700' },
+const verificationStatusLabels: Record<EvidenceLink['verification_status'], string> = {
+  pending: 'Pending',
+  verified: 'Verified',
+  rejected: 'Rejected',
 };
 
 const sourceModuleOptions = [
@@ -161,11 +161,17 @@ export function EvidenceLinker({
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="text-base flex items-center gap-2">
-              <LinkIcon className="h-5 w-5 text-blue-600" />
+              <LinkIcon className="h-5 w-5 text-room-accent" />
               Evidence Links
             </CardTitle>
             <CardDescription>
-              Link evidence to support certification requirements
+              Link evidence to support certification requirements.{' '}
+              <Link
+                href="/evidence-library/"
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent underline-offset-4 hover:underline"
+              >
+                Open the library
+              </Link>
             </CardDescription>
           </div>
           {canAddEvidence && (
@@ -336,26 +342,23 @@ export function EvidenceLinker({
           <div className="space-y-3">
             {filteredEvidence.map((item) => {
               const typeConfig = evidenceTypeConfig[item.evidence_type] ?? evidenceTypeConfig.document;
-              const statusConfig = verificationStatusConfig[item.verification_status];
               const TypeIcon = typeConfig.icon;
-              const StatusIcon = statusConfig.icon;
 
               return (
                 <div
                   key={item.id}
-                  className="flex items-start justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg"
+                  className="flex items-start justify-between p-3 rounded-[6px] border border-studio-hairline bg-studio-cream"
                 >
                   <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-lg ${typeConfig.color}`}>
+                    <div className="p-2 rounded-[6px] bg-secondary text-studio-dim">
                       <TypeIcon className="h-4 w-4" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm">{item.evidence_description}</span>
-                        <Badge className={`text-xs ${statusConfig.color}`}>
-                          <StatusIcon className="h-3 w-3 mr-1" />
-                          {statusConfig.label}
-                        </Badge>
+                        <span className="font-display text-sm font-semibold">{item.evidence_description}</span>
+                        <StateChip tone={evidenceVerificationTone(item.verification_status)}>
+                          {verificationStatusLabels[item.verification_status]}
+                        </StateChip>
                       </div>
                       {item.source_module && (
                         <p className="text-xs text-muted-foreground mt-1">
@@ -367,7 +370,7 @@ export function EvidenceLinker({
                           href={item.document_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-1"
+                          className="text-xs text-room-accent hover:underline flex items-center gap-1 mt-1"
                         >
                           <ExternalLink className="h-3 w-3" />
                           View document
@@ -388,7 +391,7 @@ export function EvidenceLinker({
                         size="sm"
                         onClick={() => onVerifyEvidence(item.id)}
                       >
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        <CheckCircle2 className="h-4 w-4 text-studio-good" />
                       </Button>
                     )}
                     <Button
@@ -396,7 +399,7 @@ export function EvidenceLinker({
                       size="sm"
                       onClick={() => onDeleteEvidence(item.id)}
                     >
-                      <Trash2 className="h-4 w-4 text-red-500" />
+                      <Trash2 className="h-4 w-4 text-studio-stale" />
                     </Button>
                   </div>
                 </div>

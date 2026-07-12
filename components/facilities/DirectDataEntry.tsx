@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Plus, Trash2, Loader2, Zap, Droplets, Trash, Upload, Copy } from "lucide-react";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { PillButton } from "@/components/studio/pill-button";
+import { Trash2, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { checkSmartMeterConflict, resolveSmartMeterConflict } from "@/lib/energy/check-conflict-client";
@@ -67,6 +67,13 @@ interface DirectDataEntryProps {
   organizationId: string;
   onDataSaved?: () => void;
 }
+
+/** Quiet mono tab trigger: uppercase, tracked, 3px underline when active. */
+const MONO_TAB =
+  "relative -mb-px rounded-none border-b-[3px] border-transparent bg-transparent px-0 pb-2.5 pt-1 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim shadow-none transition-colors data-[state=active]:border-room-accent data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none";
+
+const MONO_TAB_LIST =
+  "h-auto w-full justify-start gap-6 overflow-x-auto rounded-none border-b border-border bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 
 // =============================================================================
 // Component
@@ -389,16 +396,14 @@ export function DirectDataEntry({
   return (
     <>
     <AgentBanner kinds={['utility_bill', 'water_bill', 'waste_bill']} formName="energy, water and waste data" />
-    <Card>
-      <CardHeader>
-        <CardTitle>Enter Facility Data</CardTitle>
-        <CardDescription>
-          Select a period, then add utility, water, or waste readings
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <section>
+      <Eyebrow className="mb-1">Log facility data</Eyebrow>
+      <p className="mb-5 text-xs text-muted-foreground">
+        Select a period, then add utility, water or waste readings.
+      </p>
+      <div className="space-y-6">
         {/* Period Selection */}
-        <div className="flex flex-wrap gap-4 items-end p-4 rounded-lg border bg-muted/30">
+        <div className="flex flex-wrap gap-4 items-end rounded-[6px] border border-border bg-card p-4">
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-muted-foreground">Cadence</Label>
             <Select value={cadence} onValueChange={(v) => setCadence(v as Cadence)}>
@@ -462,17 +467,14 @@ export function DirectDataEntry({
 
         {/* Data Type Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="utilities" className="gap-2">
-              <Zap className="h-4 w-4" />
+          <TabsList className={MONO_TAB_LIST}>
+            <TabsTrigger value="utilities" className={MONO_TAB}>
               Utilities
             </TabsTrigger>
-            <TabsTrigger value="water" className="gap-2">
-              <Droplets className="h-4 w-4" />
+            <TabsTrigger value="water" className={MONO_TAB}>
               Water
             </TabsTrigger>
-            <TabsTrigger value="waste" className="gap-2">
-              <Trash className="h-4 w-4" />
+            <TabsTrigger value="waste" className={MONO_TAB}>
               Waste
             </TabsTrigger>
           </TabsList>
@@ -480,24 +482,24 @@ export function DirectDataEntry({
           {/* ============================================================= */}
           {/* UTILITIES TAB */}
           {/* ============================================================= */}
-          <TabsContent value="utilities" className="space-y-4 mt-4">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-semibold">Utility Entries</Label>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setShowRollover(true)} disabled={isSubmitting}>
-                  <Copy className="h-4 w-4 mr-1" /> Copy from last year
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setShowBillImport(true)} disabled={isSubmitting}>
-                  <Upload className="h-4 w-4 mr-1" /> Upload Bill
-                </Button>
-                <Button variant="outline" size="sm" onClick={addUtilityRow} disabled={isSubmitting}>
-                  <Plus className="h-4 w-4 mr-1" /> Add Row
-                </Button>
+          <TabsContent value="utilities" className="space-y-4 mt-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label className="text-sm font-semibold">Utility entries</Label>
+              <div className="flex flex-wrap items-center gap-2">
+                <PillButton variant="ghost" size="sm" onClick={() => setShowRollover(true)} disabled={isSubmitting}>
+                  Copy from last year
+                </PillButton>
+                <PillButton variant="outline" size="sm" onClick={() => setShowBillImport(true)} disabled={isSubmitting}>
+                  Upload bill
+                </PillButton>
+                <PillButton variant="outline" size="sm" onClick={addUtilityRow} disabled={isSubmitting}>
+                  Add row
+                </PillButton>
               </div>
             </div>
 
             {utilityRows.map((row, i) => (
-              <div key={i} className="grid grid-cols-1 md:grid-cols-5 gap-3 p-3 border rounded-lg">
+              <div key={i} className="grid grid-cols-1 md:grid-cols-5 gap-3 rounded-[6px] border border-border bg-card p-3">
                 <div className="md:col-span-2">
                   <Label className="text-xs">Type</Label>
                   <Select
@@ -585,7 +587,7 @@ export function DirectDataEntry({
                       <SelectContent>
                         {Object.entries(REFRIGERANT_GWP).map(([key, r]) => (
                           <SelectItem key={key} value={key}>
-                            {r.label} — GWP {r.gwp}
+                            {r.label} · GWP {r.gwp}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -601,46 +603,44 @@ export function DirectDataEntry({
             ))}
 
             {smConflict ? (
-              <Alert className="border-amber-300 bg-amber-50">
-                <AlertDescription className="text-amber-800">
-                  <span className="font-medium">Smart-meter data already covers these months.</span> Saving this entry
-                  too would count the same energy twice. Replace the smart-meter data with this entry, or cancel and
-                  keep the (more detailed) smart-meter data.
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Button size="sm" disabled={isSubmitting} onClick={() => handleSaveUtilities("replace")}>
-                      Replace smart-meter data
-                    </Button>
-                    <Button size="sm" variant="ghost" disabled={isSubmitting} onClick={() => setSmConflict(null)}>
-                      Cancel
-                    </Button>
-                  </div>
-                </AlertDescription>
-              </Alert>
+              <div className="rounded-[6px] border border-studio-attention/40 bg-card p-4 text-sm">
+                <span className="font-medium text-studio-attention">Smart-meter data already covers these months.</span>{' '}
+                Saving this entry too would count the same energy twice. Replace the smart-meter data with this entry,
+                or cancel and keep the (more detailed) smart-meter data.
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <PillButton size="sm" disabled={isSubmitting} onClick={() => handleSaveUtilities("replace")}>
+                    Replace smart-meter data
+                  </PillButton>
+                  <PillButton size="sm" variant="ghost" disabled={isSubmitting} onClick={() => setSmConflict(null)}>
+                    Cancel
+                  </PillButton>
+                </div>
+              </div>
             ) : (
-              <Button onClick={() => handleSaveUtilities()} disabled={isSubmitting} className="w-full">
-                {isSubmitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : "Save Utility Data"}
-              </Button>
+              <PillButton variant="room" onClick={() => handleSaveUtilities()} disabled={isSubmitting} className="w-full">
+                {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : "Save utility data"}
+              </PillButton>
             )}
           </TabsContent>
 
           {/* ============================================================= */}
           {/* WATER TAB */}
           {/* ============================================================= */}
-          <TabsContent value="water" className="space-y-4 mt-4">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-semibold">Water Entries</Label>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setShowWaterImport(true)} disabled={isSubmitting}>
-                  <Upload className="h-4 w-4 mr-1" /> Upload Bill
-                </Button>
-                <Button variant="outline" size="sm" onClick={addWaterRow} disabled={isSubmitting}>
-                  <Plus className="h-4 w-4 mr-1" /> Add Row
-                </Button>
+          <TabsContent value="water" className="space-y-4 mt-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label className="text-sm font-semibold">Water entries</Label>
+              <div className="flex flex-wrap items-center gap-2">
+                <PillButton variant="outline" size="sm" onClick={() => setShowWaterImport(true)} disabled={isSubmitting}>
+                  Upload bill
+                </PillButton>
+                <PillButton variant="outline" size="sm" onClick={addWaterRow} disabled={isSubmitting}>
+                  Add row
+                </PillButton>
               </div>
             </div>
 
             {waterRows.map((row, i) => (
-              <div key={i} className="p-3 border rounded-lg space-y-3">
+              <div key={i} className="rounded-[6px] border border-border bg-card p-3 space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   <div>
                     <Label className="text-xs">Category</Label>
@@ -707,29 +707,29 @@ export function DirectDataEntry({
               </div>
             ))}
 
-            <Button onClick={handleSaveWater} disabled={isSubmitting} className="w-full">
-              {isSubmitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : "Save Water Data"}
-            </Button>
+            <PillButton variant="room" onClick={handleSaveWater} disabled={isSubmitting} className="w-full">
+              {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : "Save water data"}
+            </PillButton>
           </TabsContent>
 
           {/* ============================================================= */}
           {/* WASTE TAB */}
           {/* ============================================================= */}
-          <TabsContent value="waste" className="space-y-4 mt-4">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-semibold">Waste Entries</Label>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setShowWasteImport(true)} disabled={isSubmitting}>
-                  <Upload className="h-4 w-4 mr-1" /> Upload Invoice
-                </Button>
-                <Button variant="outline" size="sm" onClick={addWasteRow} disabled={isSubmitting}>
-                  <Plus className="h-4 w-4 mr-1" /> Add Row
-                </Button>
+          <TabsContent value="waste" className="space-y-4 mt-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label className="text-sm font-semibold">Waste entries</Label>
+              <div className="flex flex-wrap items-center gap-2">
+                <PillButton variant="outline" size="sm" onClick={() => setShowWasteImport(true)} disabled={isSubmitting}>
+                  Upload invoice
+                </PillButton>
+                <PillButton variant="outline" size="sm" onClick={addWasteRow} disabled={isSubmitting}>
+                  Add row
+                </PillButton>
               </div>
             </div>
 
             {wasteRows.map((row, i) => (
-              <div key={i} className="p-3 border rounded-lg space-y-3">
+              <div key={i} className="rounded-[6px] border border-border bg-card p-3 space-y-3">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   <div>
                     <Label className="text-xs">Category</Label>
@@ -797,12 +797,12 @@ export function DirectDataEntry({
               </div>
             ))}
 
-            <Button onClick={handleSaveWaste} disabled={isSubmitting} className="w-full">
-              {isSubmitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : "Save Waste Data"}
-            </Button>
+            <PillButton variant="room" onClick={handleSaveWaste} disabled={isSubmitting} className="w-full">
+              {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : "Save waste data"}
+            </PillButton>
           </TabsContent>
         </Tabs>
-      </CardContent>
+      </div>
 
       <UtilityRolloverDialog
         open={showRollover}
@@ -847,7 +847,7 @@ export function DirectDataEntry({
           onDataSaved?.()
         }}
       />
-    </Card>
+    </section>
     </>
   );
 }

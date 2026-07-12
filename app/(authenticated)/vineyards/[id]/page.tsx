@@ -1,11 +1,16 @@
 'use client';
 
+/**
+ * One vineyard, in the studio grammar: a statement header with the
+ * hectares standing right, a quiet mono back-link, and the old tab bar
+ * re-cut as mono-eyebrow sections down one paper (overview, trends,
+ * history, map). The vintage selector stays as the one working control.
+ * Queries, questionnaire launches and handlers are unchanged.
+ */
+
 import { useState, useMemo } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -13,9 +18,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, Leaf, MapPin, Thermometer } from 'lucide-react';
 import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { PageLoader } from '@/components/ui/page-loader';
+import { Statement } from '@/components/studio/statement';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { BigNumber } from '@/components/studio/big-number';
 import { useVineyardDashboard } from '@/hooks/data/useVineyardDashboard';
 import { VineyardImpactOverview } from '@/components/vineyards/VineyardImpactOverview';
 import { VineyardTrendCharts } from '@/components/vineyards/VineyardTrendCharts';
@@ -37,9 +44,32 @@ const CLIMATE_LABELS: Record<string, string> = {
   temperate: 'Temperate',
 };
 
+/** Quiet mono back-link to the list page. */
+function BackLink() {
+  return (
+    <Link
+      href="/vineyards/"
+      className="inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground transition-colors duration-150 hover:text-foreground"
+    >
+      &larr; The vineyards
+    </Link>
+  );
+}
+
+/** A quiet section: mono eyebrow over a hairline rule, then the work. */
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-4">
+      <div className="border-b border-studio-hairline pb-2">
+        <Eyebrow>{label}</Eyebrow>
+      </div>
+      {children}
+    </section>
+  );
+}
+
 export default function VineyardDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const vineyardId = params.id as string;
   const { vineyard, profiles, vintageImpacts, isLoading, error, refetch } = useVineyardDashboard(vineyardId);
 
@@ -74,11 +104,8 @@ export default function VineyardDetailPage() {
     return (
       <FeatureGate feature="viticulture_beta">
         <div className="space-y-4">
-          <Link href="/vineyards/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" />
-            Back to vineyards
-          </Link>
-          <p className="text-muted-foreground">{error || 'Vineyard not found.'}</p>
+          <BackLink />
+          <p className="text-sm text-muted-foreground">{error || 'Vineyard not found.'}</p>
         </div>
       </FeatureGate>
     );
@@ -112,12 +139,13 @@ export default function VineyardDetailPage() {
 
     return (
       <FeatureGate feature="viticulture_beta">
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              {editProfile ? `Edit Vintage ${questionnaireYear}` : `Add Vintage ${questionnaireYear}`}: {vineyard.name}
-            </h1>
-            <p className="text-muted-foreground mt-2">
+        <div className="space-y-8">
+          <div className="min-w-0">
+            <Statement
+              eyebrow={`THE WORKBENCH · VINTAGE ${questionnaireYear}`}
+              headline={vineyard.name.endsWith('.') ? vineyard.name : `${vineyard.name}.`}
+            />
+            <p className="mt-3 max-w-xl text-sm text-muted-foreground">
               Enter growing data for the {questionnaireYear} vintage.
             </p>
           </div>
@@ -145,101 +173,76 @@ export default function VineyardDetailPage() {
     );
   }
 
+  const location = [vineyard.address_city, vineyard.address_country].filter(Boolean).join(', ');
+  const factLine = [
+    CERTIFICATION_LABELS[vineyard.certification] || vineyard.certification,
+    CLIMATE_LABELS[vineyard.climate_zone] || vineyard.climate_zone,
+    location,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
     <FeatureGate feature="viticulture_beta">
-      <div className="space-y-6">
-        {/* Back button */}
-        <Link
-          href="/vineyards/"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to vineyards
-        </Link>
+      <div className="space-y-10">
+        <div className="min-w-0 space-y-4">
+          <BackLink />
 
-        {/* Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="rounded-lg bg-secondary p-3">
-              <Leaf className="h-6 w-6 text-studio-forest" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">{vineyard.name}</h1>
-              {vineyard.address_city && (
-                <p className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-                  <MapPin className="h-3.5 w-3.5" />
-                  {[vineyard.address_city, vineyard.address_country].filter(Boolean).join(', ')}
-                </p>
-              )}
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <Badge variant="outline">
-                  {CERTIFICATION_LABELS[vineyard.certification] || vineyard.certification}
-                </Badge>
-                <Badge variant="secondary">{vineyard.hectares} ha</Badge>
-                <Badge variant="secondary" className="flex items-center gap-1">
-                  <Thermometer className="h-3 w-3" />
-                  {CLIMATE_LABELS[vineyard.climate_zone] || vineyard.climate_zone}
-                </Badge>
+          <Statement
+            eyebrow="THE WORKBENCH · VINEYARD"
+            headline={vineyard.name.endsWith('.') ? vineyard.name : `${vineyard.name}.`}
+          >
+            <BigNumber size="display" value={vineyard.hectares} label="Hectares" />
+            {availableYears.length > 0 && (
+              <div>
+                <Eyebrow tone="dim" className="mb-2">
+                  Vintage
+                </Eyebrow>
+                <Select
+                  value={String(effectiveYear)}
+                  onValueChange={(v) => setSelectedYear(parseInt(v))}
+                >
+                  <SelectTrigger className="w-[110px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableYears.map((year) => (
+                      <SelectItem key={year} value={String(year)}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </div>
-          </div>
+            )}
+          </Statement>
 
-          {/* Year selector */}
-          {availableYears.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Vintage:</span>
-              <Select
-                value={String(effectiveYear)}
-                onValueChange={(v) => setSelectedYear(parseInt(v))}
-              >
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableYears.map((year) => (
-                    <SelectItem key={year} value={String(year)}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          <p className="max-w-xl text-sm text-muted-foreground">{factLine}</p>
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="overview">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="trends">Trends</TabsTrigger>
-            <TabsTrigger value="history">Vintage History</TabsTrigger>
-            <TabsTrigger value="map">Map</TabsTrigger>
-          </TabsList>
+        <Section label={effectiveYear ? `VINTAGE ${effectiveYear} · OVERVIEW` : 'OVERVIEW'}>
+          <VineyardImpactOverview
+            impacts={selectedImpact?.impacts ?? null}
+            profile={selectedProfile ?? null}
+          />
+        </Section>
 
-          <TabsContent value="overview" className="mt-6">
-            <VineyardImpactOverview
-              impacts={selectedImpact?.impacts ?? null}
-              profile={selectedProfile ?? null}
-            />
-          </TabsContent>
+        <Section label="TRENDS">
+          <VineyardTrendCharts vintageImpacts={vintageImpacts} />
+        </Section>
 
-          <TabsContent value="trends" className="mt-6">
-            <VineyardTrendCharts vintageImpacts={vintageImpacts} />
-          </TabsContent>
+        <Section label="VINTAGE HISTORY">
+          <VintageHistoryTable
+            vintageImpacts={vintageImpacts}
+            vineyardId={vineyard.id}
+            onEditVintage={handleEditVintage}
+            onAddVintage={handleAddVintage}
+          />
+        </Section>
 
-          <TabsContent value="history" className="mt-6">
-            <VintageHistoryTable
-              vintageImpacts={vintageImpacts}
-              vineyardId={vineyard.id}
-              onEditVintage={handleEditVintage}
-              onAddVintage={handleAddVintage}
-            />
-          </TabsContent>
-
-          <TabsContent value="map" className="mt-6">
-            <LandUnitMap type="vineyard" id={vineyard.id} />
-          </TabsContent>
-        </Tabs>
+        <Section label="MAP & LOCATION">
+          <LandUnitMap type="vineyard" id={vineyard.id} />
+        </Section>
       </div>
     </FeatureGate>
   );

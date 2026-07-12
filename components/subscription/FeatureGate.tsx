@@ -27,7 +27,6 @@ import {
 import { useFeatureGate, FeatureCode, TierName } from "@/hooks/useSubscription";
 import { isBetaFeature } from "@/lib/subscription/feature-catalog";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
@@ -38,6 +37,7 @@ import { TIER_PRICING } from "@/lib/stripe-config";
 import { useOrganization } from "@/lib/organizationContext";
 import { useToast } from "@/hooks/use-toast";
 import { requestBetaAccess } from "@/lib/feedback";
+import { PillButton } from "@/components/studio/pill-button";
 
 interface FeatureGateProps {
   feature: FeatureCode;
@@ -685,7 +685,6 @@ function LockedFeaturePage({
     info?.description ||
     `This feature is available on the ${tierDisplayNames[requiredTier]} plan and above.`;
   const benefits = info?.benefits || [];
-  const IconComponent = info?.icon || Lock;
   const category = info?.category || "";
   const highlights = tierHighlights[requiredTier] || [];
 
@@ -695,167 +694,100 @@ function LockedFeaturePage({
   const isBeta = isBetaFeature(feature);
 
   return (
-    <div className={cn("flex h-full flex-col items-center justify-center px-6 py-8 max-w-4xl mx-auto", className)}>
-      {/* Header */}
-      <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted/60 border border-border">
-          <Lock className="h-5 w-5 text-muted-foreground" />
+    <div className={cn("mx-auto max-w-4xl space-y-8 px-6 py-10", className)}>
+      {/* The statement: what this is, and that the key is missing. */}
+      <div>
+        <div className="mb-3 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+          {category ? `${category} · ` : ""}
+          {isBeta ? "PRIVATE BETA" : "LOCKED"}
         </div>
-        <div>
-          {category && (
-            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              {category}
-            </span>
+        <h2 className="font-display text-3xl font-semibold tracking-[-0.02em]">{name}.</h2>
+        <p className="mt-3 max-w-lg text-sm leading-relaxed text-muted-foreground">
+          {description}
+        </p>
+      </div>
+
+      {/* What it does: quiet hairline rows, told once. */}
+      {benefits.length > 0 && (
+        <ul className="divide-y divide-studio-hairline border-y border-studio-hairline">
+          {benefits.map((benefit, i) => (
+            <li key={i} className="py-2.5 text-sm text-muted-foreground">
+              {benefit}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* The way in. */}
+      {isBeta ? (
+        <div className="space-y-4">
+          <p className="max-w-lg text-sm leading-relaxed text-muted-foreground">
+            {name} is available to select organisations during the beta period.
+            Request access and the alka<strong>tera</strong> team will get back
+            to you.
+          </p>
+          <PillButton
+            disabled={isRequesting || hasRequested}
+            onClick={async () => {
+              if (!currentOrganization) return;
+              setIsRequesting(true);
+              try {
+                await requestBetaAccess(
+                  currentOrganization.id,
+                  name,
+                  currentOrganization.name
+                );
+                setHasRequested(true);
+                toast({
+                  title: "Request sent",
+                  description: `We've received your request for ${name}. We'll be in touch shortly.`,
+                });
+              } catch {
+                toast({
+                  title: "Something went wrong",
+                  description: "Please try again or contact us at hello@alkatera.com",
+                  variant: "destructive",
+                });
+              } finally {
+                setIsRequesting(false);
+              }
+            }}
+          >
+            {isRequesting
+              ? "Sending request"
+              : hasRequested
+                ? "Request sent"
+                : "Request beta access"}
+          </PillButton>
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+            You are on the {tierDisplayNames[currentTier]} plan
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {highlights.length > 0 && (
+            <div>
+              <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+                Everything you unlock
+              </p>
+              <ul className="space-y-1.5">
+                {highlights.map((highlight, i) => (
+                  <li key={i} className="text-sm text-foreground/80">
+                    {highlight}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
-          <h2 className="text-xl font-semibold leading-tight">{name}</h2>
+          <PillButton href="/settings/">
+            Upgrade to {tierDisplayNames[requiredTier]}
+          </PillButton>
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+            From &pound;{tierPrices[requiredTier]}/month · you are on the{" "}
+            {tierDisplayNames[currentTier]} plan
+          </p>
         </div>
-      </div>
-
-      <p className="mb-6 text-sm text-muted-foreground text-center max-w-lg leading-relaxed">
-        {description}
-      </p>
-
-      {/* Two cards side by side */}
-      <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Benefits card */}
-        {benefits.length > 0 && (
-          <div className="rounded-lg border border-border bg-card p-5 flex flex-col">
-            <h3 className="mb-3 text-sm font-semibold flex items-center gap-2">
-              <IconComponent className="h-4 w-4 text-neon-lime" />
-              What you get with {name}
-            </h3>
-            <ul className="space-y-2.5 flex-1">
-              {benefits.map((benefit, i) => (
-                <li key={i} className="flex items-start gap-2.5 text-sm">
-                  <Check className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-neon-lime" />
-                  <span className="text-muted-foreground">{benefit}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* Upgrade card — or Beta access card if the feature is beta-gated */}
-        {isBeta ? (
-          <div className="rounded-lg border border-neon-lime/30 bg-neon-lime/5 p-5 flex flex-col">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-semibold">Beta Access Required</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  This feature is currently in private beta
-                </p>
-              </div>
-              <FlaskConical className="h-5 w-5 text-neon-lime" />
-            </div>
-
-            <p className="text-sm text-muted-foreground mb-4 flex-1 leading-relaxed">
-              {name} is available to select organisations during the beta period.
-              Request access and the alka<strong>tera</strong> team will get
-              back to you.
-            </p>
-
-            <Button
-              className="w-full gap-2"
-              size="default"
-              disabled={isRequesting || hasRequested}
-              onClick={async () => {
-                if (!currentOrganization) return;
-                setIsRequesting(true);
-                try {
-                  await requestBetaAccess(
-                    currentOrganization.id,
-                    name,
-                    currentOrganization.name
-                  );
-                  setHasRequested(true);
-                  toast({
-                    title: "Request sent",
-                    description: `We've received your request for ${name}. We'll be in touch shortly.`,
-                  });
-                } catch {
-                  toast({
-                    title: "Something went wrong",
-                    description: "Please try again or contact us at hello@alkatera.com",
-                    variant: "destructive",
-                  });
-                } finally {
-                  setIsRequesting(false);
-                }
-              }}
-            >
-              {isRequesting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : hasRequested ? (
-                <>
-                  <Check className="h-4 w-4" />
-                  Request Sent
-                </>
-              ) : (
-                <>
-                  <FlaskConical className="h-4 w-4" />
-                  Request Beta Access
-                  <ArrowRight className="h-4 w-4" />
-                </>
-              )}
-            </Button>
-
-            <p className="mt-2.5 text-center text-xs text-muted-foreground">
-              You&apos;re currently on the{" "}
-              <span className="font-medium text-foreground">
-                {tierDisplayNames[currentTier]}
-              </span>{" "}
-              plan
-            </p>
-          </div>
-        ) : (
-          <div className="rounded-lg border border-neon-lime/30 bg-neon-lime/5 p-5 flex flex-col">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-semibold">
-                  Upgrade to {tierDisplayNames[requiredTier]}
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  From &pound;{tierPrices[requiredTier]}/month
-                </p>
-              </div>
-              <Sparkles className="h-5 w-5 text-neon-lime" />
-            </div>
-
-            {/* What else you unlock */}
-            {highlights.length > 0 && (
-              <div className="mb-4 flex-1">
-                <p className="text-xs font-medium text-muted-foreground mb-2.5 uppercase tracking-wider">
-                  Everything you unlock
-                </p>
-                <ul className="space-y-1.5">
-                  {highlights.map((highlight, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm">
-                      <Check className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-neon-lime" />
-                      <span className="text-foreground/80">{highlight}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <Link href="/settings/">
-              <Button className="w-full gap-2" size="default">
-                <Sparkles className="h-4 w-4" />
-                Upgrade to {tierDisplayNames[requiredTier]}
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-
-            <p className="mt-2.5 text-center text-xs text-muted-foreground">
-              You&apos;re currently on the{" "}
-              <span className="font-medium text-foreground">
-                {tierDisplayNames[currentTier]}
-              </span>{" "}
-              plan
-            </p>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }

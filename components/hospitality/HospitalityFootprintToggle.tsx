@@ -4,11 +4,10 @@
  * Org setting: whether the hospitality element counts toward the company total.
  * Governs carbon, water and waste together. Default ON. Stored on
  * organizations.report_defaults.include_hospitality via /api/hospitality/footprint-settings.
+ * Rendered as a single hairline row, studio-quiet.
  */
 
 import { useEffect, useState } from 'react';
-import { Scale } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
@@ -51,27 +50,22 @@ export function HospitalityFootprintToggle() {
   };
 
   return (
-    <Card>
-      <CardContent className="flex items-center justify-between gap-4 p-4">
-        <div className="flex items-start gap-3">
-          <Scale className="mt-0.5 h-5 w-5 text-muted-foreground" />
-          <div>
-            <Label htmlFor="include-hospitality" className="text-sm font-medium">
-              Count hospitality in the company total
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              When on, hospitality carbon, water and waste roll into your company footprint. When off, it&apos;s
-              tracked and reported here but excluded from the company total.
-            </p>
-          </div>
-        </div>
-        <Switch
-          id="include-hospitality"
-          checked={include}
-          onCheckedChange={onChange}
-          disabled={loading || saving}
-        />
-      </CardContent>
-    </Card>
+    <div className="flex items-center justify-between gap-4 border-y border-border py-4">
+      <div className="min-w-0">
+        <Label htmlFor="include-hospitality" className="font-display text-sm font-semibold text-foreground">
+          Count hospitality in the company total
+        </Label>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          When on, hospitality carbon, water and waste roll into your company footprint. When off, it&apos;s
+          tracked and reported here but excluded from the company total.
+        </p>
+      </div>
+      <Switch
+        id="include-hospitality"
+        checked={include}
+        onCheckedChange={onChange}
+        disabled={loading || saving}
+      />
+    </div>
   );
 }

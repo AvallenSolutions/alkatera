@@ -1,8 +1,12 @@
 "use client";
 
+/**
+ * Fleet emissions, re-cut for the studio: a cream hairline panel with a
+ * mono label, studio inks for the data, no icon titles and no card chrome.
+ * The queries and the maths are unchanged.
+ */
+
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   BarChart,
   Bar,
@@ -17,19 +21,36 @@ import {
   Legend,
 } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
+import { Panel } from "@/components/studio/panel";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { STUDIO } from "@/components/studio/theme";
 
 interface FleetEmissionsChartProps {
   organizationId?: string;
   type?: "scope" | "vehicle" | "monthly";
 }
 
-const SCOPE_COLORS = {
-  "Scope 1": "#f97316",
-  "Scope 2": "#3b82f6",
-  "Scope 3 Cat 6": "#64748b",
+const SCOPE_COLORS: Record<string, string> = {
+  "Scope 1": STUDIO.cobalt,
+  "Scope 2": STUDIO.teal,
+  "Scope 3 Cat 6": STUDIO.dim,
 };
 
-const VEHICLE_COLORS = ["#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4"];
+const VEHICLE_COLORS = [STUDIO.forest, STUDIO.ochre, STUDIO.plum, STUDIO.brick, STUDIO.teal];
+
+const PANEL_LABELS: Record<NonNullable<FleetEmissionsChartProps["type"]>, string> = {
+  scope: "BY SCOPE",
+  vehicle: "BY VEHICLE TYPE",
+  monthly: "BY MONTH",
+};
+
+const TOOLTIP_STYLE = {
+  backgroundColor: STUDIO.cream,
+  border: `1px solid ${STUDIO.hairline}`,
+  borderRadius: "6px",
+  fontSize: "12px",
+  color: STUDIO.ink,
+};
 
 export function FleetEmissionsChart({
   organizationId,
@@ -68,7 +89,7 @@ export function FleetEmissionsChart({
           Object.entries(scopeData).map(([name, value]) => ({
             name,
             value: parseFloat(value.toFixed(4)),
-            fill: SCOPE_COLORS[name as keyof typeof SCOPE_COLORS] || "#94a3b8",
+            fill: SCOPE_COLORS[name] || STUDIO.dim,
           }))
         );
       } else if (type === "vehicle") {
@@ -139,68 +160,50 @@ export function FleetEmissionsChart({
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Fleet Emissions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-[250px] w-full" />
-        </CardContent>
-      </Card>
+      <Panel>
+        <Eyebrow tone="dim">{PANEL_LABELS[type]}</Eyebrow>
+        <div className="mt-3 h-[250px] animate-pulse rounded-[6px] bg-border/40" />
+      </Panel>
     );
   }
 
   if (data.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Fleet Emissions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[250px] flex items-center justify-center text-muted-foreground">
-            No emissions data available
-          </div>
-        </CardContent>
-      </Card>
+      <Panel>
+        <Eyebrow tone="dim">{PANEL_LABELS[type]}</Eyebrow>
+        <div className="mt-3 flex h-[250px] items-center justify-center text-sm text-muted-foreground">
+          No emissions recorded yet.
+        </div>
+      </Panel>
     );
   }
 
   if (type === "monthly") {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Monthly Fleet Emissions</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Panel>
+        <Eyebrow tone="dim">{PANEL_LABELS[type]}</Eyebrow>
+        <div className="mt-3">
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="name" className="text-xs" />
-              <YAxis className="text-xs" />
+              <CartesianGrid strokeDasharray="3 3" stroke={STUDIO.hairline} vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 10, fill: STUDIO.dim }} stroke={STUDIO.hairline} />
+              <YAxis tick={{ fontSize: 10, fill: STUDIO.dim }} stroke={STUDIO.hairline} />
               <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--popover))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "var(--radius)",
-                }}
+                contentStyle={TOOLTIP_STYLE}
                 formatter={(value: number) => [`${value.toFixed(4)} tCO2e`, "Emissions"]}
               />
-              <Bar dataKey="emissions" fill="#10b981" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="emissions" fill={STUDIO.cobalt} radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg">
-          {type === "scope" ? "Emissions by Scope" : "Emissions by Vehicle Type"}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+    <Panel>
+      <Eyebrow tone="dim">{PANEL_LABELS[type]}</Eyebrow>
+      <div className="mt-3">
         <ResponsiveContainer width="100%" height={250}>
           <PieChart>
             <Pie
@@ -219,17 +222,13 @@ export function FleetEmissionsChart({
               ))}
             </Pie>
             <Tooltip
-              contentStyle={{
-                backgroundColor: "hsl(var(--popover))",
-                border: "1px solid hsl(var(--border))",
-                borderRadius: "var(--radius)",
-              }}
+              contentStyle={TOOLTIP_STYLE}
               formatter={(value: number) => [`${value.toFixed(4)} tCO2e`, "Emissions"]}
             />
-            <Legend />
+            <Legend wrapperStyle={{ fontSize: "11px", color: STUDIO.dim }} />
           </PieChart>
         </ResponsiveContainer>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

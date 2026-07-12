@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -34,6 +35,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // The service-role client bypasses RLS, so resolve the caller's organisation
+    // explicitly, honouring advisor access grants. This both gates the privileged
+    // read and scopes the ESG survey invitation lookup below.
+    const organizationId = await resolveAccessibleOrg(adminClient as any, user);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation' }, { status: 403 });
+    }
+
     const body = await request.json();
     const email: string = body.email;
 
@@ -56,16 +65,6 @@ export async function POST(request: NextRequest) {
     if (!supplierRecord) {
       return NextResponse.json({ supplier: null, products: [], esg_assessment: null, esg_invitation: null });
     }
-
-    // Resolve the caller's organisation so the ESG survey invitation lookup is
-    // scoped to the brand that's viewing the supplier.
-    const { data: membership } = await adminClient
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .limit(1)
-      .maybeSingle();
-    const organizationId = membership?.organization_id;
 
     // Fetch products, ESG assessment, and the latest ESG survey invitation in parallel
     const [productsResult, esgResult, esgInvitationResult] = await Promise.all([

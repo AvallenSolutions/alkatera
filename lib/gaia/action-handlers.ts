@@ -50,8 +50,8 @@ const NAVIGATION_MAP: Record<string, string> = {
   'create facility': '/company/facilities/new',
 
   // Common actions - suppliers
-  'add supplier': '/suppliers/new',
-  'new supplier': '/suppliers/new',
+  'add supplier': '/suppliers/?invite=1',
+  'new supplier': '/suppliers/?invite=1',
 
   // Common actions - fleet
   'add vehicle': '/company/fleet/new',
@@ -81,7 +81,7 @@ const PAGE_NAME_MAP: Record<string, string> = {
   '/company/emissions': 'Company Emissions',
   '/company/vitality': 'Company Vitality',
   '/suppliers': 'Suppliers',
-  '/suppliers/new': 'Add New Supplier',
+  '/suppliers/?invite=1': 'Find or invite a supplier',
   '/people-culture': 'People & Culture',
   '/governance': 'Governance',
   '/community-impact': 'Community Impact',

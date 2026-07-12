@@ -3,31 +3,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { FlagThresholdBanner } from '@/components/flag/FlagThresholdBanner';
-import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  RefreshCw,
-  Calendar,
-  TrendingUp,
-  Leaf,
-  Droplets,
-  Trash2,
-  Mountain,
-  Factory,
-  AlertTriangle,
-  CheckCircle2,
-  ArrowRight,
-  Target,
-  Award,
-  Activity,
-  Truck,
-  ChevronDown,
-  ChevronUp
-} from 'lucide-react';
-import Link from 'next/link';
+import { ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { BigNumber } from '@/components/studio/big-number';
+import { StateChip } from '@/components/studio/state-chip';
+import { PillButton } from '@/components/studio/pill-button';
 
 import { useCompanyMetrics, CompanyMetrics } from '@/hooks/data/useCompanyMetrics';
 import { useCompanyFootprint } from '@/hooks/data/useCompanyFootprint';
@@ -521,17 +501,14 @@ function generateStrengthsAndImprovements(
  */
 function MethodologyRow({ name, summary }: { name: string; summary: string }) {
   return (
-    <div className="flex items-start justify-between gap-3 p-3 rounded-lg bg-muted/40">
+    <div className="flex items-start justify-between gap-3 py-2.5">
       <div className="min-w-0">
-        <div className="text-sm font-medium">{name}</div>
-        <div className="text-xs text-muted-foreground mt-0.5">{summary}</div>
+        <div className="font-display text-sm font-semibold text-foreground">{name}</div>
+        <div className="mt-0.5 text-xs text-muted-foreground">{summary}</div>
       </div>
-      <Badge
-        variant="outline"
-        className="shrink-0 border-muted-foreground/30 text-muted-foreground"
-      >
+      <StateChip tone="quiet" className="shrink-0 pt-0.5">
         Method
-      </Badge>
+      </StateChip>
     </div>
   );
 }
@@ -592,28 +569,12 @@ export default function PerformancePage() {
   const [showHotspots, setShowHotspots] = useState(true);
   const [showCompliance, setShowCompliance] = useState(false);
 
-  // Fetch the Vitality composite so the Strengths/Improvements panel can
-  // be driven by the same sub-pillar scores users see in the hero ring
-  // and Rosa's read. The hero card has its own internal fetch already;
-  // this duplicate hit is cheap (the route is fast and HTTP-cached) and
-  // it keeps this page's strengths/improvements logic self-contained.
+  // The Vitality composite is fetched exactly once for this surface, by the
+  // EsgVitalityScoreHero at the top of the page. It hands the loaded composite
+  // back up via onComposite so the strengths/improvements panel and the four
+  // pillar breakdowns all read from the same object the hero ring shows. No
+  // second /api/vitality/composite hit from this page.
   const [vitalityComposite, setVitalityComposite] = useState<VitalityComposite | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/vitality/composite', { credentials: 'include' });
-        if (!res.ok) return;
-        const json = await res.json();
-        if (!cancelled) setVitalityComposite(json?.composite ?? null);
-      } catch {
-        // Non-fatal — the panel falls back to metrics-only signals.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [currentOrganization?.id]);
 
   // Actual certifications the org holds or is progressing — joined with
   // certification_frameworks so we can show the human-readable name and
@@ -718,32 +679,15 @@ export default function PerformancePage() {
     [currentOrganization?.product_type, productCategories]
   );
 
-  // Climate + water scores now come from the same /api/vitality/composite
-  // endpoint that /rosa/ uses, so the two surfaces always agree. Each
-  // breakdown carries intensity / YoY sub-scores + blend weights and (for
-  // water) the AWARE scarcity context — fed into the score explainer below
-  // for full transparency to the user.
-  const [climateBreakdown, setClimateBreakdown] = useState<ClimateScoreBreakdown | null>(null);
-  const [waterBreakdown, setWaterBreakdown] = useState<WaterScoreBreakdown | null>(null);
-  const [circularityBreakdown, setCircularityBreakdown] = useState<CircularityScoreBreakdown | null>(null);
-  const [natureBreakdown, setNatureBreakdown] = useState<NatureScoreBreakdown | null>(null);
-  useEffect(() => {
-    if (!currentOrganization?.id) return;
-    let cancelled = false;
-    fetch('/api/vitality/composite', { credentials: 'include' })
-      .then(r => (r.ok ? r.json() : null))
-      .then(json => {
-        if (cancelled) return;
-        setClimateBreakdown(json?.composite?.e?.climate_breakdown ?? null);
-        setWaterBreakdown(json?.composite?.e?.water_breakdown ?? null);
-        setCircularityBreakdown(json?.composite?.e?.circularity_breakdown ?? null);
-        setNatureBreakdown(json?.composite?.e?.nature_breakdown ?? null);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [currentOrganization?.id]);
+  // Climate + water + circularity + nature scores all come from the single
+  // composite the hero shared above (same endpoint /rosa/ uses, so the
+  // surfaces always agree). Each breakdown carries intensity / YoY sub-scores
+  // + blend weights and (for water) the AWARE scarcity context — fed into the
+  // score explainer below for full transparency to the user.
+  const climateBreakdown: ClimateScoreBreakdown | null = vitalityComposite?.e.climate_breakdown ?? null;
+  const waterBreakdown: WaterScoreBreakdown | null = vitalityComposite?.e.water_breakdown ?? null;
+  const circularityBreakdown: CircularityScoreBreakdown | null = vitalityComposite?.e.circularity_breakdown ?? null;
+  const natureBreakdown: NatureScoreBreakdown | null = vitalityComposite?.e.nature_breakdown ?? null;
 
   const vitalityScores = useMemo(() => {
     // Check if we have actual product data (not just zeros)
@@ -894,12 +838,12 @@ export default function PerformancePage() {
   if (loading) {
     return (
       <div className="space-y-6 animate-fade-in-up">
-        <Skeleton className="h-64 rounded-2xl" />
+        <Skeleton className="h-64 rounded-[6px]" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Skeleton className="h-48 rounded-xl" />
-          <Skeleton className="h-48 rounded-xl" />
-          <Skeleton className="h-48 rounded-xl" />
-          <Skeleton className="h-48 rounded-xl" />
+          <Skeleton className="h-40 rounded-[6px]" />
+          <Skeleton className="h-40 rounded-[6px]" />
+          <Skeleton className="h-40 rounded-[6px]" />
+          <Skeleton className="h-40 rounded-[6px]" />
         </div>
       </div>
     );
@@ -908,7 +852,7 @@ export default function PerformancePage() {
   return (
     <div className="space-y-6 animate-fade-in-up">
       <header>
-        <Eyebrow className="mb-3">THE MEASURES · VITALITY</Eyebrow>
+        <Eyebrow className="mb-3">THE CELLAR · VITALITY</Eyebrow>
         <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
           The vitality.
         </h1>
@@ -918,49 +862,43 @@ export default function PerformancePage() {
           Replaces the legacy environmental-only VitalityScoreHero. The
           deep environmental pillar deep-dives still live further down the
           page (Carbon / Water / Circularity / Nature DeepDive sections). */}
-      <EsgVitalityScoreHero />
+      <EsgVitalityScoreHero onComposite={setVitalityComposite} />
 
-      {/* Action Bar */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="px-3 py-1.5 text-sm font-medium rounded-md border border-emerald-500 text-emerald-700 dark:text-emerald-400 bg-transparent hover:bg-emerald-50 dark:hover:bg-emerald-950/30 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              {AVAILABLE_YEARS.map((year) => (
-                <option key={year} value={year}>
-                  {year} Data
-                </option>
-              ))}
-            </select>
-          </div>
-          {metrics?.total_products_assessed && metrics.total_products_assessed > 0 && (
-            <span className="text-sm text-muted-foreground">
-              Based on {metrics.total_products_assessed} assessed product{metrics.total_products_assessed !== 1 ? 's' : ''}
-            </span>
-          )}
-        </div>
+      {/* Action bar — a quiet year selector, no emerald border, no icon */}
+      <div className="flex items-center gap-4">
+        <select
+          value={selectedYear}
+          onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+          className="rounded-[6px] border border-border bg-transparent px-3 py-1.5 text-sm font-medium text-foreground hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-room-accent"
+        >
+          {AVAILABLE_YEARS.map((year) => (
+            <option key={year} value={year}>
+              {year} Data
+            </option>
+          ))}
+        </select>
+        {metrics?.total_products_assessed && metrics.total_products_assessed > 0 ? (
+          <span className="text-sm text-muted-foreground">
+            Based on {metrics.total_products_assessed} assessed product{metrics.total_products_assessed !== 1 ? 's' : ''}
+          </span>
+        ) : null}
       </div>
 
       {error && (
-        <Alert variant="destructive">
-          <AlertTitle>Error Loading Metrics</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+        <div className="rounded-[6px] border border-border bg-card p-5">
+          <Eyebrow tone="inherit" className="mb-2 text-studio-stale">Could not load metrics</Eyebrow>
+          <p className="text-sm text-muted-foreground">{error}</p>
+        </div>
       )}
 
       {!loading && metrics && metrics.total_products_assessed === 0 && (
-        <Alert>
-          <TrendingUp className="h-4 w-4" />
-          <AlertTitle>Get Started</AlertTitle>
-          <AlertDescription>
-            Complete product LCAs to see your Company Vitality metrics.
-            The platform will automatically aggregate impacts across all products.
-          </AlertDescription>
-        </Alert>
+        <div className="rounded-[6px] border border-border bg-card p-5">
+          <Eyebrow className="mb-2">Get started</Eyebrow>
+          <p className="text-sm text-muted-foreground">
+            Complete product LCAs to see your Company Vitality metrics. The platform
+            will automatically aggregate impacts across all products.
+          </p>
+        </div>
       )}
 
       <FlagThresholdBanner />
@@ -993,15 +931,15 @@ export default function PerformancePage() {
             year={selectedYear}
             isLoadingScope3={footprintLoading}
           />
-          <Button
+          <PillButton
             variant="ghost"
             size="sm"
             onClick={() => setCarbonSheetOpen(true)}
             className="mt-4 w-full"
           >
-            View Full Analysis
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
+            View full analysis
+            <ArrowRight className="h-4 w-4" />
+          </PillButton>
         </PillarCard>
 
         <PillarCard
@@ -1023,15 +961,15 @@ export default function PerformancePage() {
             productLcaWaterConsumption={waterConsumption}
             productLcaWaterScarcity={waterScarcityImpact}
           />
-          <Button
+          <PillButton
             variant="ghost"
             size="sm"
             onClick={() => setWaterSheetOpen(true)}
             className="mt-4 w-full"
           >
-            View Full Analysis
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
+            View full analysis
+            <ArrowRight className="h-4 w-4" />
+          </PillButton>
         </PillarCard>
 
         <PillarCard
@@ -1047,15 +985,15 @@ export default function PerformancePage() {
             wasteMetrics={wasteMetrics}
             loading={wasteLoading}
           />
-          <Button
+          <PillButton
             variant="ghost"
             size="sm"
             onClick={() => setCircularitySheetOpen(true)}
             className="mt-4 w-full"
           >
-            View Full Analysis
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
+            View full analysis
+            <ArrowRight className="h-4 w-4" />
+          </PillButton>
         </PillarCard>
 
         <PillarCard
@@ -1068,15 +1006,15 @@ export default function PerformancePage() {
           onToggle={() => togglePillar('nature')}
         >
           <NatureDeepDive natureMetrics={natureMetrics} />
-          <Button
+          <PillButton
             variant="ghost"
             size="sm"
             onClick={() => setNatureSheetOpen(true)}
             className="mt-4 w-full"
           >
-            View Full Analysis
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
+            View full analysis
+            <ArrowRight className="h-4 w-4" />
+          </PillButton>
         </PillarCard>
       </PillarGrid>
 
@@ -1088,129 +1026,116 @@ export default function PerformancePage() {
 
       {/* Collapsible: Material Hotspots */}
       <Collapsible open={showHotspots} onOpenChange={setShowHotspots}>
-        <Card>
+        <div className="rounded-[6px] border border-border bg-card">
           <CollapsibleTrigger asChild>
-            <button className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors rounded-t-lg">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
-                  <AlertTriangle className="h-5 w-5 text-amber-600" />
-                </div>
-                <div className="text-left">
-                  <h3 className="font-semibold">Impact Hotspots</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Top {topMaterialHotspots.length} materials driving {
-                      topMaterialHotspots.reduce((sum, m) => sum + m.percentage, 0).toFixed(0)
-                    }% of your material emissions
-                  </p>
-                </div>
+            <button className="flex w-full items-center justify-between gap-3 p-5 text-left transition-colors hover:bg-secondary/40">
+              <div className="min-w-0">
+                <Eyebrow>Impact hotspots</Eyebrow>
+                <p className="mt-1.5 text-sm text-muted-foreground">
+                  Top {topMaterialHotspots.length} materials driving {
+                    topMaterialHotspots.reduce((sum, m) => sum + m.percentage, 0).toFixed(0)
+                  }% of your material emissions
+                </p>
               </div>
               {showHotspots ? (
-                <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                <ChevronUp className="h-5 w-5 shrink-0 text-muted-foreground" />
               ) : (
-                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground" />
               )}
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <CardContent className="pt-0">
+            <div className="border-t border-border p-5">
               {topMaterialHotspots.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-sm font-medium">No material hotspots identified yet</p>
-                  <p className="text-xs mt-2">Complete product LCAs to see top contributing materials</p>
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  No material hotspots identified yet. Complete product LCAs to see your top
+                  contributing materials.
+                </p>
               ) : (
-                <div className="space-y-3">
-                  {topMaterialHotspots.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg font-bold text-muted-foreground w-6">#{idx + 1}</span>
-                        <div>
-                          <span className="font-medium">{item.label}</span>
+                <ul className="divide-y divide-border">
+                  {topMaterialHotspots.map((item, idx) => {
+                    const tone: 'stale' | 'attention' | 'good' =
+                      item.severity === 'high' ? 'stale' : item.severity === 'medium' ? 'attention' : 'good';
+                    return (
+                      <li key={idx} className="flex items-center gap-4 py-3">
+                        <span className="w-6 shrink-0 font-mono text-xs font-bold tabular-nums text-muted-foreground">
+                          {idx + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-display text-sm font-semibold text-foreground">
+                            {item.label}
+                          </p>
                           <p className="text-xs text-muted-foreground">
                             {(item.value / 1000).toFixed(2)} tCO2eq
                           </p>
                         </div>
-                      </div>
-                      <Badge
-                        variant="outline"
-                        className={
-                          item.severity === 'high' ? 'border-red-500 text-red-700' :
-                          item.severity === 'medium' ? 'border-amber-500 text-amber-700' :
-                          'border-green-500 text-green-700'
-                        }
-                      >
-                        {item.percentage.toFixed(0)}%
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
+                        <span className="shrink-0 font-display text-lg font-bold tabular-nums text-foreground">
+                          {item.percentage.toFixed(0)}
+                          <span className="ml-0.5 font-mono text-[10px] font-bold text-muted-foreground">%</span>
+                        </span>
+                        <StateChip tone={tone} className="shrink-0">{item.severity}</StateChip>
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
-            </CardContent>
+            </div>
           </CollapsibleContent>
-        </Card>
+        </div>
       </Collapsible>
 
       {/* Collapsible: Methodology & Reporting */}
       <Collapsible open={showCompliance} onOpenChange={setShowCompliance}>
-        <Card>
+        <div className="rounded-[6px] border border-border bg-card">
           <CollapsibleTrigger asChild>
-            <button className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors rounded-t-lg">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
-                  <Award className="h-5 w-5 text-green-600" />
-                </div>
-                <div className="text-left">
-                  <h3 className="font-semibold">Methodology & Reporting</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {(() => {
-                      const total = dedupedCertifications.length;
-                      const achieved = dedupedCertifications.filter(c => c.status === 'achieved' || c.status === 'certified').length;
-                      const inProgress = dedupedCertifications.filter(c => c.status === 'in_progress').length;
-                      if (total === 0) {
-                        return `${metrics?.csrd_compliant_percentage || 0}% CSRD-aligned LCAs · No certifications logged`;
-                      }
-                      return `${achieved} of ${total} certifications achieved · ${inProgress} in progress`;
-                    })()}
-                  </p>
-                </div>
+            <button className="flex w-full items-center justify-between gap-3 p-5 text-left transition-colors hover:bg-secondary/40">
+              <div className="min-w-0">
+                <Eyebrow>Methodology &amp; reporting</Eyebrow>
+                <p className="mt-1.5 text-sm text-muted-foreground">
+                  {(() => {
+                    const total = dedupedCertifications.length;
+                    const achieved = dedupedCertifications.filter(c => c.status === 'achieved' || c.status === 'certified').length;
+                    const inProgress = dedupedCertifications.filter(c => c.status === 'in_progress').length;
+                    if (total === 0) {
+                      return `${metrics?.csrd_compliant_percentage || 0}% CSRD-aligned LCAs · No certifications logged`;
+                    }
+                    return `${achieved} of ${total} certifications achieved · ${inProgress} in progress`;
+                  })()}
+                </p>
               </div>
               {showCompliance ? (
-                <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                <ChevronUp className="h-5 w-5 shrink-0 text-muted-foreground" />
               ) : (
-                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground" />
               )}
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <CardContent className="pt-0 space-y-5">
-              {/* Headline stats */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20">
-                  <div className="text-2xl font-bold">{metrics?.total_products_assessed || 0}</div>
-                  <div className="text-xs text-muted-foreground mt-1">Products fully LCA-assessed</div>
-                </div>
-                <div className="text-center p-4 rounded-lg bg-green-50 dark:bg-green-950/20">
-                  <div className="text-2xl font-bold">{metrics?.csrd_compliant_percentage || 0}%</div>
-                  <div
-                    className="text-xs text-muted-foreground mt-1"
-                    title="Reflects LCA-level CSRD alignment only. Full CSRD reporting also requires social disclosures (S1-S4), governance disclosures (G1), value-chain analysis, and a double-materiality assessment."
-                  >
-                    CSRD-aligned LCAs
-                    <span className="ml-1 opacity-60 cursor-help">ⓘ</span>
-                  </div>
-                </div>
+            <div className="space-y-6 border-t border-border p-5">
+              {/* Headline figures */}
+              <div className="flex flex-wrap gap-x-12 gap-y-4">
+                <BigNumber
+                  value={metrics?.total_products_assessed || 0}
+                  label="Products assessed"
+                />
+                <span
+                  className="cursor-help"
+                  title="Reflects LCA-level CSRD alignment only. Full CSRD reporting also requires social disclosures (S1-S4), governance disclosures (G1), value-chain analysis, and a double-materiality assessment."
+                >
+                  <BigNumber
+                    value={`${metrics?.csrd_compliant_percentage || 0}%`}
+                    label="CSRD-aligned LCAs"
+                  />
+                </span>
               </div>
 
               {/* Methodology used by the platform */}
               <div>
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                  Methodology applied
-                </h4>
-                <p className="text-xs text-muted-foreground mb-3">
+                <Eyebrow tone="dim" className="mb-2">Methodology applied</Eyebrow>
+                <p className="mb-1 text-xs text-muted-foreground">
                   Calculations follow these international standards and methods. These are the methodologies alka<strong>tera</strong> uses, not certifications your organisation has achieved.
                 </p>
-                <div className="space-y-2">
+                <div className="divide-y divide-border">
                   <MethodologyRow
                     name="ISO 14044:2006"
                     summary="Life Cycle Assessment principles and requirements"
@@ -1232,15 +1157,13 @@ export default function PerformancePage() {
 
               {/* Org's actual certifications */}
               <div>
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                  Your certifications
-                </h4>
+                <Eyebrow tone="dim" className="mb-2">Your certifications</Eyebrow>
                 {dedupedCertifications.length === 0 ? (
-                  <p className="text-xs text-muted-foreground italic">
+                  <p className="text-xs italic text-muted-foreground">
                     No certifications logged yet. Open Compliance, Certifications to add ones you hold or are progressing.
                   </p>
                 ) : (
-                  <div className="space-y-2">
+                  <ul className="divide-y divide-border">
                     {dedupedCertifications
                       .slice()
                       .sort((a, b) => {
@@ -1266,71 +1189,66 @@ export default function PerformancePage() {
                                 : status === 'expired'
                                   ? 'Expired'
                                   : (status ?? 'Unknown');
-                        const statusTone =
+                        const statusTone: 'good' | 'hold' | 'stale' | 'quiet' =
                           status === 'achieved' || status === 'certified'
-                            ? 'border-green-500 text-green-700'
+                            ? 'good'
                             : status === 'in_progress'
-                              ? 'border-blue-500 text-blue-700'
+                              ? 'hold'
                               : status === 'expired'
-                                ? 'border-red-500 text-red-700'
-                                : 'border-muted-foreground/40 text-muted-foreground';
+                                ? 'stale'
+                                : 'quiet';
                         const targetSuffix = cert.target_date
-                          ? ` — target ${new Date(cert.target_date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`
+                          ? `target ${new Date(cert.target_date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`
                           : cert.certified_date
-                            ? ` — since ${new Date(cert.certified_date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`
+                            ? `since ${new Date(cert.certified_date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`
                             : '';
                         return (
-                          <div
+                          <li
                             key={cert.id}
-                            className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                            className="flex items-center justify-between gap-3 py-2.5"
                           >
                             <div className="min-w-0">
-                              <div className="text-sm font-medium truncate">{name}</div>
+                              <div className="truncate font-display text-sm font-semibold text-foreground">{name}</div>
                               {cert.certification_frameworks?.category ? (
-                                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">
+                                <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                                   {cert.certification_frameworks.category}
                                 </div>
                               ) : null}
                             </div>
-                            <div className="text-right shrink-0 ml-3">
-                              <Badge variant="outline" className={statusTone}>
-                                {statusLabel}
-                              </Badge>
+                            <div className="ml-3 shrink-0 text-right">
+                              <StateChip tone={statusTone}>{statusLabel}</StateChip>
                               {targetSuffix ? (
-                                <div className="text-[10px] text-muted-foreground mt-1">
-                                  {targetSuffix.replace(/^ — /, '')}
+                                <div className="mt-1 font-mono text-[10px] text-muted-foreground">
+                                  {targetSuffix}
                                 </div>
                               ) : null}
                             </div>
-                          </div>
+                          </li>
                         );
                       })}
-                  </div>
+                  </ul>
                 )}
               </div>
 
-              <Button asChild className="w-full">
-                <Link href="/reports/sustainability">
-                  Generate Sustainability Report
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </CardContent>
+              <PillButton href="/reports/sustainability" variant="ink" className="w-full">
+                Generate sustainability report
+                <ArrowRight className="h-4 w-4" />
+              </PillButton>
+            </div>
           </CollapsibleContent>
-        </Card>
+        </div>
       </Collapsible>
 
       {/* Methodology Note */}
       {!loading && metrics && metrics.total_products_assessed > 0 && (
-        <Alert className="border-slate-200 bg-slate-50 dark:bg-slate-900/20 dark:border-slate-800">
-          <Activity className="h-4 w-4" />
-          <AlertTitle>Calculation Methodology</AlertTitle>
-          <AlertDescription className="text-sm">
+        <div className="rounded-[6px] border border-border bg-card p-5">
+          <Eyebrow tone="dim" className="mb-2">Calculation methodology</Eyebrow>
+          <p className="text-sm text-muted-foreground">
             Company Vitality aggregates impacts following GHG Protocol Corporate Standard and ISO 14064-1.
-            Scope 1 & 2 from facilities, Scope 3 from product LCAs and corporate emissions data.
+            Scope 1 &amp; 2 from facilities, Scope 3 from product LCAs and corporate emissions data.
             No double-counting between facility and product data.
-          </AlertDescription>
-        </Alert>
+          </p>
+        </div>
       )}
 
       {/* Modals and Sheets */}

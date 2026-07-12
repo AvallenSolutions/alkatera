@@ -119,7 +119,7 @@ export function NatureActionsGallery() {
       )}
 
       {empty && (
-        <div className="rounded-[6px] border border-dashed border-border bg-card p-10 text-center">
+        <div className="border-t border-studio-hairline px-4 pt-10 pb-6 text-center">
           <p className="text-sm text-muted-foreground">
             No nature-positive actions logged yet. Register a regenerative-ag, restoration, or
             habitat-creation partnership and the platform will start tracking it as part of your

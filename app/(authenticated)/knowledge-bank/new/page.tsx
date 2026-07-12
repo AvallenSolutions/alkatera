@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -17,6 +16,8 @@ import {
 } from '@/components/ui/select'
 import { ChevronLeft, Upload } from 'lucide-react'
 import { Eyebrow } from '@/components/studio/eyebrow'
+import { Panel } from '@/components/studio/panel'
+import { PillButton } from '@/components/studio/pill-button'
 import { useKnowledgeBankCategories } from '@/hooks/data/useKnowledgeBank'
 import { useOrganization } from '@/lib/organizationContext'
 import { useIsAlkateraAdmin } from '@/hooks/usePermissions'
@@ -54,6 +55,11 @@ export default function NewResourcePage() {
 
     if (contentType === 'link' && !externalUrl) {
       toast.error('Please provide a URL for the external link')
+      return
+    }
+
+    if (contentType === 'embedded' && !externalUrl) {
+      toast.error('Please provide a URL to embed')
       return
     }
 
@@ -186,7 +192,7 @@ export default function NewResourcePage() {
       </Button>
 
       <div>
-        <Eyebrow className="mb-3">THE EVIDENCE · KNOWLEDGE</Eyebrow>
+        <Eyebrow className="mb-3">THE LIBRARY · KNOWLEDGE</Eyebrow>
         <h1 className="font-display text-3xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
           Add a resource.
         </h1>
@@ -196,11 +202,9 @@ export default function NewResourcePage() {
       </div>
 
       <form onSubmit={(e) => handleSubmit(e, 'published')}>
-        <Card className="rounded-[6px]">
-          <CardHeader>
-            <CardTitle>Resource Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
+        <Panel>
+          <Eyebrow tone="dim" className="mb-5">RESOURCE DETAILS</Eyebrow>
+          <div className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="title">
                 Title <span className="text-destructive">*</span>
@@ -260,15 +264,17 @@ export default function NewResourcePage() {
                     <SelectItem value="document">Document</SelectItem>
                     <SelectItem value="video">Video</SelectItem>
                     <SelectItem value="link">External Link</SelectItem>
+                    <SelectItem value="embedded">Embedded</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
-            {contentType === 'link' ? (
+            {contentType === 'link' || contentType === 'embedded' ? (
               <div className="space-y-2">
                 <Label htmlFor="url">
-                  URL <span className="text-destructive">*</span>
+                  {contentType === 'embedded' ? 'Embed URL' : 'URL'}{' '}
+                  <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="url"
@@ -278,6 +284,11 @@ export default function NewResourcePage() {
                   placeholder="https://example.com/resource"
                   required
                 />
+                {contentType === 'embedded' && (
+                  <p className="text-xs text-muted-foreground">
+                    The page at this URL is shown inline on the resource, in a frame
+                  </p>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
@@ -325,20 +336,20 @@ export default function NewResourcePage() {
             </div>
 
             <div className="flex gap-3 pt-4">
-              <Button
+              <PillButton
                 type="button"
                 variant="outline"
                 onClick={(e) => handleSubmit(e as any, 'draft')}
                 disabled={isUploading}
               >
                 {isUploading ? 'Saving...' : 'Save as Draft'}
-              </Button>
-              <Button type="submit" disabled={isUploading}>
+              </PillButton>
+              <PillButton type="submit" variant="room" disabled={isUploading}>
                 {isUploading ? 'Publishing...' : 'Publish Resource'}
-              </Button>
+              </PillButton>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
       </form>
     </div>
   )

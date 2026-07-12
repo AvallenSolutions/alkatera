@@ -490,7 +490,7 @@ const MAPPINGS: Record<string, ModuleMapping> = {
   'IT6-Y0-001': {
     module: 'operations',
     moduleLabel: 'Operations',
-    moduleLink: '/operations',
+    moduleLink: '/company/facilities',
     async query(supabase, orgId) {
       const { data } = await supabase
         .from('facility_activity_entries')
@@ -513,7 +513,7 @@ const MAPPINGS: Record<string, ModuleMapping> = {
   'IT6-Y0-002': {
     module: 'operations',
     moduleLabel: 'Operations',
-    moduleLink: '/operations',
+    moduleLink: '/company/facilities',
     async query(supabase, orgId) {
       const { data } = await supabase
         .from('facility_activity_entries')

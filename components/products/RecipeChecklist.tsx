@@ -8,7 +8,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Check, ChevronDown, ChevronUp, Plus, Lightbulb } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Plus } from "lucide-react";
 import { getRecipeTemplate, type RecipeTemplateItem } from "@/lib/recipe-templates";
 import type { PackagingCategory } from "@/lib/types/lca";
 
@@ -109,9 +109,8 @@ export function RecipeChecklist({
         <CollapsibleTrigger asChild>
           <button className="flex items-center justify-between w-full px-4 py-3 text-left hover:bg-muted/50 transition-colors rounded-lg">
             <div className="flex items-center gap-2">
-              <Lightbulb className="h-4 w-4 text-room-accent" />
               <span className="text-sm font-medium">
-                Typical {categoryLabel} Recipe
+                Typical {categoryLabel} recipe
               </span>
               <StateChip tone={allFilled ? "good" : "quiet"}>
                 {filledCount} / {totalCount}

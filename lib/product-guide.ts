@@ -24,7 +24,7 @@ export interface ProductGuideStep {
 export const PRODUCT_GUIDE_STEPS: ProductGuideStep[] = [
   {
     targetSelector: 'product-header',
-    rosa: "This is your product dashboard — the command centre for everything about this product. You can see its name, category, and status at a glance. Hit 'Edit' to update any details.",
+    rosa: "This is your product dashboard, the command centre for everything about this product. You can see its name, category, and status at a glance. Hit 'Edit' to update any details.",
     popoverPosition: 'below',
   },
   {
@@ -40,12 +40,12 @@ export const PRODUCT_GUIDE_STEPS: ProductGuideStep[] = [
   },
   {
     targetSelector: 'product-overview',
-    rosa: "The Overview tab is where your environmental impact comes to life. Once you've run a calculation, you'll see your carbon footprint, water usage, circularity score, and more — all visualised beautifully.",
+    rosa: "The Overview tab is where your environmental impact comes to life. Once you've run a calculation, you'll see your carbon footprint, water usage, circularity score, and more, all visualised beautifully.",
     popoverPosition: 'below',
   },
   {
     targetSelector: 'product-specification',
-    rosa: "The Specification tab is where you build your product's recipe. Add ingredients with their origins and quantities, then add your packaging — bottles, labels, closures, everything. This data feeds directly into your LCA.",
+    rosa: "The Specification tab is where you build your product's recipe. Add ingredients with their origins and quantities, then add your packaging: bottles, labels, closures, everything. This data feeds directly into your LCA.",
     popoverPosition: 'below',
     skipOnMobile: true,
   },

@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { StateChip } from "@/components/studio";
 import { toast } from "sonner";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 
@@ -92,9 +93,9 @@ const DIRECTION_ICONS = {
 };
 
 const DIRECTION_COLOURS = {
-  decrease: "text-emerald-600 dark:text-emerald-400",
-  increase: "text-red-600 dark:text-red-400",
-  neutral: "text-slate-500",
+  decrease: "text-studio-good",
+  increase: "text-studio-stale",
+  neutral: "text-muted-foreground",
 };
 
 // ============================================================================
@@ -251,13 +252,11 @@ export function OperationalChangesCard({
   return (
     <>
       <Card className="relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-50 dark:bg-amber-950 rounded-full -mr-16 -mt-16 opacity-50" />
-
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-amber-100 dark:bg-amber-900 flex items-center justify-center">
-                <Zap className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                <Zap className="h-5 w-5 text-studio-dim" />
               </div>
               <div>
                 <CardTitle className="text-lg">Operational Changes</CardTitle>
@@ -267,9 +266,9 @@ export function OperationalChangesCard({
               </div>
             </div>
             {entries.length > 0 && (
-              <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100">
+              <StateChip>
                 {entries.length} {entries.length === 1 ? "change" : "changes"}
-              </Badge>
+              </StateChip>
             )}
           </div>
         </CardHeader>
@@ -289,12 +288,12 @@ export function OperationalChangesCard({
                 const dirColour =
                   DIRECTION_COLOURS[
                     entry.impact_direction as keyof typeof DIRECTION_COLOURS
-                  ] || "text-slate-500";
+                  ] || "text-muted-foreground";
 
                 return (
                   <div
                     key={entry.id}
-                    className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-900 group"
+                    className="flex items-start gap-3 p-3 rounded-lg bg-secondary group"
                   >
                     <DirIcon className={`h-4 w-4 mt-0.5 shrink-0 ${dirColour}`} />
                     <div className="flex-1 min-w-0">
@@ -404,7 +403,7 @@ export function OperationalChangesCard({
                     <RadioGroupItem value="decrease" id="dir-decrease" />
                     <Label
                       htmlFor="dir-decrease"
-                      className="text-sm text-emerald-600 dark:text-emerald-400 cursor-pointer"
+                      className="text-sm text-studio-good cursor-pointer"
                     >
                       Decrease
                     </Label>
@@ -413,7 +412,7 @@ export function OperationalChangesCard({
                     <RadioGroupItem value="increase" id="dir-increase" />
                     <Label
                       htmlFor="dir-increase"
-                      className="text-sm text-red-600 dark:text-red-400 cursor-pointer"
+                      className="text-sm text-studio-stale cursor-pointer"
                     >
                       Increase
                     </Label>

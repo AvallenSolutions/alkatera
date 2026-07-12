@@ -2,22 +2,16 @@
 
 import { useState, useEffect } from "react";
 import {
-  Building2,
   Globe,
-  MapPin,
   Calendar,
-  Briefcase,
   Save,
   ArrowLeft,
-  Clock,
   Upload,
   X,
   Image as ImageIcon,
   Trash2,
-  AlertTriangle,
-  Factory,
 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Eyebrow, Panel } from "@/components/studio";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -375,8 +369,9 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Organisation Overview</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <Eyebrow>THE WIRING · ORGANISATION</Eyebrow>
+            <h1 className="mt-1 font-display text-3xl font-bold tracking-[-0.02em]">Organisation overview.</h1>
+            <p className="text-sm text-studio-dim mt-1">
               View and update your organisation details
             </p>
           </div>
@@ -385,17 +380,14 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Basic Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
-              Basic Information
-            </CardTitle>
-            <CardDescription>
+        <Panel className="space-y-4">
+          <div className="space-y-1">
+            <Eyebrow tone="dim">Basic information</Eyebrow>
+            <p className="text-sm text-studio-dim">
               Your organisation&apos;s core details
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+            </p>
+          </div>
+          <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">
                 Organisation Name <span className="text-destructive">*</span>
@@ -442,7 +434,7 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
                   />
                 </div>
               ) : (
-                <div className="border-2 border-dashed border-muted-foreground/25 rounded-[6px] p-4">
+                <div className="rounded-[6px] border border-studio-hairline bg-studio-paper p-4">
                   <input
                     type="file"
                     id="logo-upload-org"
@@ -452,10 +444,10 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
                     disabled={uploadingLogo || isSaving}
                   />
                   <label htmlFor="logo-upload-org" className="cursor-pointer flex items-center gap-3">
-                    <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                    <ImageIcon className="h-5 w-5 text-studio-dim" />
                     <div>
                       <p className="text-sm font-medium">{uploadingLogo ? 'Uploading logo' : 'Upload logo'}</p>
-                      <p className="text-xs text-muted-foreground">PNG, JPG or SVG, max 10MB</p>
+                      <p className="text-xs text-studio-dim">PNG, JPG or SVG, max 10MB</p>
                     </div>
                   </label>
                 </div>
@@ -559,22 +551,19 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
                 />
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
 
         {/* Location & Billing */}
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
-                Location
-              </CardTitle>
-              <CardDescription>
+          <Panel className="space-y-4">
+            <div className="space-y-1">
+              <Eyebrow tone="dim">Location</Eyebrow>
+              <p className="text-sm text-studio-dim">
                 Your organisation&apos;s address
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              </p>
+            </div>
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="address">Street Address</Label>
                 <Input
@@ -609,20 +598,17 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
                   />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Briefcase className="h-5 w-5" />
-                Billing Information
-              </CardTitle>
-              <CardDescription>
+          <Panel className="space-y-4">
+            <div className="space-y-1">
+              <Eyebrow tone="dim">Billing information</Eyebrow>
+              <p className="text-sm text-studio-dim">
                 Details used for invoices
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              </p>
+            </div>
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="billing-email">Billing Email</Label>
                 <Input
@@ -645,20 +631,17 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
                   disabled={isSaving}
                 />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Reporting Period
-              </CardTitle>
-              <CardDescription>
+          <Panel className="space-y-4">
+            <div className="space-y-1">
+              <Eyebrow tone="dim">Reporting period</Eyebrow>
+              <p className="text-sm text-studio-dim">
                 Configure your financial year and default reporting cadence
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              </p>
+            </div>
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="fy-start">Financial Year</Label>
                 <Select value={fyStartMonth} onValueChange={setFyStartMonth} disabled={isSaving}>
@@ -701,27 +684,24 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
                     <SelectItem value="annual">Annual</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-studio-dim">
                   Suggested period when entering facility data. Can be changed per entry.
                 </p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
         </div>
       </div>
 
       {/* Production Profile */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Factory className="h-5 w-5" />
-            Production Profile
-          </CardTitle>
-          <CardDescription>
+      <Panel className="space-y-4">
+        <div className="space-y-1">
+          <Eyebrow tone="dim">Production profile</Eyebrow>
+          <p className="text-sm text-studio-dim">
             Your production setup: used to calibrate emissions estimates and benchmark comparisons
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="annual-production">Annual Production Volume</Label>
             <Select value={annualProductionBucket} onValueChange={setAnnualProductionBucket} disabled={isSaving}>
@@ -793,8 +773,8 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
               </SelectContent>
             </Select>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       <Separator />
 
@@ -820,17 +800,14 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
       {userRole === "owner" && (
         <>
           <Separator />
-          <Card className="border-destructive/50">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-destructive">
-                <AlertTriangle className="h-5 w-5" />
-                Danger Zone
-              </CardTitle>
-              <CardDescription>
+          <Panel className="space-y-4 border-studio-stale/40">
+            <div className="space-y-1">
+              <Eyebrow tone="inherit" className="text-studio-stale">Danger zone</Eyebrow>
+              <p className="text-sm text-studio-dim">
                 Irreversible actions that permanently affect your organisation
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+              </p>
+            </div>
+            <div>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium">Delete this organisation</p>
@@ -892,8 +869,8 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
                   </AlertDialogContent>
                 </AlertDialog>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
         </>
       )}
     </div>

@@ -1,10 +1,8 @@
 "use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { StateChip } from "@/components/studio/state-chip";
-import { Button } from "@/components/ui/button";
-import { Package, Droplets, Zap, Wind, MapPin, AlertTriangle, FileText, CheckCircle2, ArrowRight, Map, Factory, Layers } from "lucide-react";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { BigNumber } from "@/components/studio/big-number";
 import type { Product, ProductIngredient, ProductPackaging, ProductLCA } from "@/hooks/data/useProductData";
 import { useProductFacility } from "@/hooks/data/useProductFacility";
 import dynamic from "next/dynamic";
@@ -12,13 +10,13 @@ import dynamic from "next/dynamic";
 const SupplyChainMap = dynamic(() => import("./SupplyChainMap").then(mod => ({ default: mod.SupplyChainMap })), {
   ssr: false,
   loading: () => (
-    <div className="w-full h-[450px] bg-muted/20 rounded-lg flex items-center justify-center">
-      <p className="text-sm text-muted-foreground">Loading map...</p>
+    <div className="flex h-[450px] w-full items-center justify-center rounded-[6px] bg-studio-hairline/20">
+      <p className="text-sm text-studio-dim">Loading map...</p>
     </div>
   ),
 });
-import { ProductHeroImpact, ContainerType } from "./ProductHeroImpact";
-import { QuickImpactBar, ImpactCategory, ImpactSummaryCard } from "./QuickImpactBar";
+import { ProductHeroImpact } from "./ProductHeroImpact";
+import { QuickImpactBar, ImpactCategory } from "./QuickImpactBar";
 import { ImpactAccordion, ImpactAccordionGroup, SimpleBreakdownTable } from "./ImpactAccordion";
 import { MultipackContentsCard } from "./MultipackContentsCard";
 import { ProductProductionSparkline } from "./ProductProductionSparkline";
@@ -38,6 +36,27 @@ interface OverviewTabProps {
   lcaReports: ProductLCA[];
   isHealthy: boolean;
   onEditMultipack?: () => void;
+}
+
+/** A quiet row: subject, a working-tone chip, a figure standing right. */
+function CompletenessRow({
+  label,
+  detail,
+  done,
+}: {
+  label: string;
+  detail: string;
+  done: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-2.5">
+      <div className="flex items-center gap-3">
+        <span className="text-sm text-foreground">{label}</span>
+        <StateChip tone={done ? "good" : "quiet"}>{done ? "Done" : "To do"}</StateChip>
+      </div>
+      <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">{detail}</span>
+    </div>
+  );
 }
 
 export function OverviewTab({ product, ingredients, packaging, lcaReports, isHealthy, onEditMultipack }: OverviewTabProps) {
@@ -142,7 +161,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
 
   if (!hasLCAData || !breakdown) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* Multipack Contents Card - shown at the top for multipacks */}
         {product.is_multipack && (
           <MultipackContentsCard
@@ -151,74 +170,36 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           />
         )}
 
-        <Card className="border overflow-hidden">
-          <CardContent className="p-8">
-            <div className="flex flex-col items-center justify-center py-12 space-y-6">
-              <div className="relative w-48 h-72 opacity-30">
-                <svg viewBox="0 0 200 400" className="w-full h-full">
-                  <path
-                    d="M 85 10 L 115 10 L 115 60 Q 120 63, 130 68 Q 145 72, 160 75 L 160 370 L 40 370 L 40 75 Q 55 72, 70 68 Q 80 63, 85 60 Z"
-                    className="fill-muted-foreground/10 stroke-muted-foreground/20"
-                    strokeWidth="2"
-                  />
-                </svg>
-              </div>
-              <div className="text-center space-y-4 max-w-md">
-                <AlertTriangle className="h-12 w-12 text-studio-attention mx-auto" />
-                <div>
-                  <h3 className="text-lg font-semibold text-foreground mb-2">No LCA Data Available</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Complete a Life Cycle Assessment to visualise the environmental impact of this product
-                  </p>
-                </div>
-                <Link href={`/products/${product.id}/compliance-wizard`}>
-                  <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
-                    Run LCA
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <section className="border-t border-border pt-5">
+          <Eyebrow className="mb-1">Impact</Eyebrow>
+          <p className="max-w-xl text-sm text-muted-foreground">
+            No life cycle assessment yet. Once you create one, this product&apos;s footprint,
+            water, circularity and nature figures appear here.
+          </p>
+        </section>
 
-        <Card className="border">
-          <CardHeader>
-            <CardTitle className="text-foreground flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-studio-good" />
-              Data Completeness
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-              <div className="flex items-center gap-2">
-                <div className={`h-2 w-2 rounded-full ${ingredients.length > 0 ? 'bg-studio-good' : 'bg-muted-foreground/40'}`} />
-                <span className="text-sm text-muted-foreground">Ingredients</span>
-              </div>
-              <span className="text-sm font-medium text-foreground">{ingredients.length} added ({ingredientWeight.toFixed(2)} kg)</span>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-              <div className="flex items-center gap-2">
-                <div className={`h-2 w-2 rounded-full ${packaging.length > 0 ? 'bg-studio-good' : 'bg-muted-foreground/40'}`} />
-                <span className="text-sm text-muted-foreground">Packaging</span>
-              </div>
-              <span className="text-sm font-medium text-foreground">{packaging.length} added ({packagingWeight.toFixed(1)} g)</span>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-              <div className="flex items-center gap-2">
-                <div className={`h-2 w-2 rounded-full bg-muted-foreground/40`} />
-                <span className="text-sm text-muted-foreground">LCA Calculations</span>
-              </div>
-              <span className="text-sm font-medium text-foreground">Not started</span>
-            </div>
-          </CardContent>
-        </Card>
+        <section className="border-t border-border pt-5">
+          <Eyebrow className="mb-4">Data completeness</Eyebrow>
+          <div className="divide-y divide-border">
+            <CompletenessRow
+              label="Ingredients"
+              detail={`${ingredients.length} · ${ingredientWeight.toFixed(2)} kg`}
+              done={ingredients.length > 0}
+            />
+            <CompletenessRow
+              label="Packaging"
+              detail={`${packaging.length} · ${packagingWeight.toFixed(1)} g`}
+              done={packaging.length > 0}
+            />
+            <CompletenessRow label="LCA" detail="Not started" done={false} />
+          </div>
+        </section>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       {/* Hero Impact Section with Container Switcher */}
       <ProductHeroImpact
         productName={product.name}
@@ -248,19 +229,17 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
       />
 
       {/* Quick Impact Summary Bar */}
-      <div className="rounded-[6px] border border-border bg-card p-4">
-        <QuickImpactBar
-          impacts={quickImpacts}
-          compact={false}
-        />
-      </div>
+      <section className="border-t border-border pt-5">
+        <Eyebrow className="mb-4">Impact at a glance</Eyebrow>
+        <QuickImpactBar impacts={quickImpacts} compact={false} />
+      </section>
 
       {/* Detailed Impact Accordions */}
       <ImpactAccordionGroup allowMultiple defaultExpanded={['climate']}>
         <ImpactAccordion
           id="climate"
           category="climate"
-          title="Climate Impact"
+          title="Climate impact"
           summary="Total GHG emissions by lifecycle stage"
           value={totalCarbon}
           unit="kg CO₂e"
@@ -269,33 +248,30 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
             data={[
               ...(breakdown.hasViticulture
                 ? [
-                    { name: 'Viticulture (Primary)', value: breakdown.viticulture, unit: 'kg CO₂e' },
-                    { name: 'Purchased Ingredients', value: breakdown.purchasedIngredients, unit: 'kg CO₂e' },
+                    { name: 'Viticulture (primary)', value: breakdown.viticulture, unit: 'kg CO₂e' },
+                    { name: 'Purchased ingredients', value: breakdown.purchasedIngredients, unit: 'kg CO₂e' },
                   ]
                 : [
-                    { name: 'Raw Materials', value: breakdown.rawMaterials, unit: 'kg CO₂e' },
+                    { name: 'Raw materials', value: breakdown.rawMaterials, unit: 'kg CO₂e' },
                   ]
               ),
               { name: 'Processing', value: breakdown.processing, unit: 'kg CO₂e' },
               { name: 'Packaging', value: breakdown.packaging, unit: 'kg CO₂e' },
               { name: 'Transport', value: breakdown.transport, unit: 'kg CO₂e' },
-              ...(breakdown.endOfLife ? [{ name: 'End of Life', value: breakdown.endOfLife, unit: 'kg CO₂e' }] : []),
-              ...(breakdown.usePhase ? [{ name: 'Use Phase', value: breakdown.usePhase, unit: 'kg CO₂e' }] : []),
+              ...(breakdown.endOfLife ? [{ name: 'End of life', value: breakdown.endOfLife, unit: 'kg CO₂e' }] : []),
+              ...(breakdown.usePhase ? [{ name: 'Use phase', value: breakdown.usePhase, unit: 'kg CO₂e' }] : []),
             ]}
             showPercentages
           />
           {breakdown.soilCarbonRemovals > 0 && (
-            <div className="mt-3 p-3 rounded-[6px] border border-border bg-card">
+            <div className="mt-4 border-t border-border pt-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="h-2.5 w-2.5 rounded-full bg-studio-good" />
-                  <span className="text-sm text-muted-foreground">Soil Carbon Removals (FLAG)</span>
-                </div>
-                <span className="text-sm font-medium text-studio-good">
+                <span className="text-sm text-muted-foreground">Soil carbon removals (FLAG)</span>
+                <span className="text-sm font-medium tabular-nums text-studio-good">
                   -{breakdown.soilCarbonRemovals.toFixed(4)} kg CO₂e
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground mt-1.5">
+              <p className="mt-1.5 text-xs text-muted-foreground">
                 Reported separately per SBTi FLAG Guidance v1.2. Not netted against emissions.
               </p>
             </div>
@@ -305,22 +281,14 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
         <ImpactAccordion
           id="water"
           category="water"
-          title="Water Impact"
+          title="Water impact"
           summary="Water consumption and scarcity footprint"
           value={waterScarcity}
           unit="m³ world eq"
         >
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 rounded-[6px] bg-secondary border border-border">
-              <p className="text-xs text-muted-foreground uppercase mb-1">Consumption</p>
-              <p className="text-2xl font-bold text-foreground">{waterConsumption.toFixed(3)}</p>
-              <p className="text-sm text-muted-foreground">m³</p>
-            </div>
-            <div className="p-4 rounded-[6px] bg-secondary border border-border">
-              <p className="text-xs text-muted-foreground uppercase mb-1">Scarcity Impact</p>
-              <p className="text-2xl font-bold text-foreground">{waterScarcity.toFixed(3)}</p>
-              <p className="text-sm text-muted-foreground">m³ world eq</p>
-            </div>
+          <div className="grid grid-cols-2 gap-8">
+            <BigNumber value={waterConsumption.toFixed(3)} label="M³ CONSUMPTION" />
+            <BigNumber value={waterScarcity.toFixed(3)} label="M³ WORLD EQ SCARCITY" />
           </div>
           {latestLCA.aggregated_impacts?.water_risk_level && (
             <div className="mt-4">
@@ -329,8 +297,8 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                 latestLCA.aggregated_impacts.water_risk_level === 'medium' ? 'attention' :
                 'stale'
               }>
-                {latestLCA.aggregated_impacts.water_risk_level === 'low' ? 'Low Risk' :
-                 latestLCA.aggregated_impacts.water_risk_level === 'medium' ? 'Medium Risk' : 'High Risk'}
+                {latestLCA.aggregated_impacts.water_risk_level === 'low' ? 'Low risk' :
+                 latestLCA.aggregated_impacts.water_risk_level === 'medium' ? 'Medium risk' : 'High risk'}
               </StateChip>
             </div>
           )}
@@ -347,33 +315,30 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           <div className="space-y-4">
             <div className="flex items-center gap-4">
               <div className="flex-1">
-                <div className="h-4 bg-muted rounded-full overflow-hidden">
+                <div className="h-2 overflow-hidden rounded-full bg-muted">
                   <div
                     className="h-full bg-room transition-all"
                     style={{ width: `${circularityRate}%` }}
                   />
                 </div>
               </div>
-              <span className="text-2xl font-bold text-foreground">{circularityRate}%</span>
+              <span className="font-display text-2xl font-bold tabular-nums text-foreground">{circularityRate}%</span>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-3 rounded-[6px] bg-secondary border border-border">
-                <p className="text-xs text-muted-foreground uppercase mb-1">Fossil Resources</p>
-                <p className="text-xl font-bold text-foreground">
-                  {latestLCA.aggregated_impacts?.fossil_resource_scarcity?.toFixed(3) || '0'}
-                </p>
-                <p className="text-sm text-muted-foreground">kg oil eq</p>
-              </div>
-              <div className="p-3 rounded-[6px] bg-secondary border border-border">
-                <p className="text-xs text-muted-foreground uppercase mb-1">Rating</p>
-                <div className="mt-1">
+            <div className="grid grid-cols-2 gap-8">
+              <BigNumber
+                value={latestLCA.aggregated_impacts?.fossil_resource_scarcity?.toFixed(3) || '0'}
+                label="KG OIL EQ FOSSIL"
+              />
+              <div>
+                <div className="font-mono text-[9.5px] uppercase tracking-[0.2em] text-studio-dim">Rating</div>
+                <div className="mt-1.5">
                   <StateChip tone={
                     circularityRate >= 50 ? 'good' :
                     circularityRate >= 25 ? 'attention' : 'stale'
                   }>
-                    {circularityRate >= 75 ? 'EXCELLENT' :
-                     circularityRate >= 50 ? 'GOOD' :
-                     circularityRate >= 25 ? 'FAIR' : 'POOR'}
+                    {circularityRate >= 75 ? 'Excellent' :
+                     circularityRate >= 50 ? 'Good' :
+                     circularityRate >= 25 ? 'Fair' : 'Poor'}
                   </StateChip>
                 </div>
               </div>
@@ -384,55 +349,43 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
         <ImpactAccordion
           id="nature"
           category="nature"
-          title="Nature Impact"
+          title="Nature impact"
           summary="Land use and biodiversity impact"
           value={landUse}
           unit="m²a"
         >
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 rounded-[6px] bg-secondary border border-border">
-              <p className="text-xs text-muted-foreground uppercase mb-1">Land Use</p>
-              <p className="text-2xl font-bold text-foreground">{landUse.toFixed(3)}</p>
-              <p className="text-sm text-muted-foreground">m²a crop eq</p>
-            </div>
-            <div className="p-4 rounded-[6px] bg-secondary border border-border">
-              <p className="text-xs text-muted-foreground uppercase mb-1">Ecotoxicity</p>
-              <p className="text-2xl font-bold text-foreground">
-                {latestLCA.aggregated_impacts?.terrestrial_ecotoxicity?.toFixed(3) || '0.000'}
-              </p>
-              <p className="text-sm text-muted-foreground">kg DCB eq</p>
-            </div>
+          <div className="grid grid-cols-2 gap-8">
+            <BigNumber value={landUse.toFixed(3)} label="M²A CROP EQ LAND USE" />
+            <BigNumber
+              value={latestLCA.aggregated_impacts?.terrestrial_ecotoxicity?.toFixed(3) || '0.000'}
+              label="KG DCB EQ ECOTOXICITY"
+            />
           </div>
-          <div className="flex gap-3 mt-4">
-            <StateChip>ReCiPe 2016</StateChip>
-            <StateChip>Multi-capital</StateChip>
+          <div className="mt-4 flex gap-4">
+            <StateChip tone="quiet">ReCiPe 2016</StateChip>
+            <StateChip tone="quiet">Multi-capital</StateChip>
           </div>
         </ImpactAccordion>
       </ImpactAccordionGroup>
 
       {/* Collapsible Supply Chain Map */}
       <Collapsible open={showSupplyChain} onOpenChange={setShowSupplyChain}>
-        <Card className="border">
+        <section className="border-t border-border pt-5">
           <CollapsibleTrigger asChild>
-            <button className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-[6px] bg-secondary flex items-center justify-center">
-                  <Map className="h-5 w-5 text-room-accent" />
-                </div>
-                <div className="text-left">
-                  <h3 className="font-semibold text-foreground">Supply Chain Network</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {1 + ingredients.filter(i => i.origin_lat && i.origin_lng).length + packaging.filter(p => p.origin_lat && p.origin_lng).length} supply chain origins
-                  </p>
-                </div>
+            <button className="flex w-full items-center justify-between gap-4 text-left">
+              <div>
+                <Eyebrow className="mb-1">Supply chain network</Eyebrow>
+                <p className="text-sm text-muted-foreground">
+                  {1 + ingredients.filter(i => i.origin_lat && i.origin_lng).length + packaging.filter(p => p.origin_lat && p.origin_lng).length} supply chain origins
+                </p>
               </div>
               <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent">
-                {showSupplyChain ? 'Hide' : 'Show'} Map
+                {showSupplyChain ? 'Hide map' : 'Show map'}
               </span>
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <CardContent className="pt-0">
+            <div className="pt-4">
               <SupplyChainMap
                 facility={facility}
                 ingredients={ingredients}
@@ -440,117 +393,91 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                 productId={product.id}
                 productName={product.name}
               />
-            </CardContent>
+            </div>
           </CollapsibleContent>
-        </Card>
+        </section>
       </Collapsible>
 
-      {/* Carbon Footprint Reports */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Carbon Footprint Reports */}
-        <Card className="border">
-          <CardHeader>
-            <div className="flex items-center justify-between">
+      {/* LCA reports */}
+      <section className="border-t border-border pt-5">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <Eyebrow className="mb-1">LCA reports</Eyebrow>
+            <p className="text-sm text-muted-foreground">Calculation history</p>
+          </div>
+          {lcaReports.length > 0 && (
+            <Link
+              href="/reports/lcas"
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent transition-colors hover:text-foreground"
+            >
+              View all
+            </Link>
+          )}
+        </div>
+        <div className="divide-y divide-border">
+          {lcaReports.slice(0, 3).map((lca) => (
+            <Link
+              key={lca.id}
+              href={`/products/${product.id}/compliance-wizard`}
+              className="group flex items-center justify-between gap-4 py-3"
+            >
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-[6px] bg-secondary flex items-center justify-center">
-                  <FileText className="h-5 w-5 text-room-accent" />
-                </div>
-                <div>
-                  <CardTitle className="text-foreground">LCA Reports</CardTitle>
-                  <CardDescription className="text-muted-foreground">Calculation history</CardDescription>
-                </div>
+                <StateChip tone={lca.status === 'completed' ? 'good' : 'attention'}>
+                  {lca.status}
+                </StateChip>
+                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+                  {formatDistanceToNow(new Date(lca.created_at), { addSuffix: true })}
+                </span>
               </div>
-              {lcaReports.length > 0 && (
-                <Link href="/reports/lcas">
-                  <Button variant="ghost" size="sm" className="text-room-accent hover:text-room-accent/80">
-                    View All
-                  </Button>
-                </Link>
+              {lca.aggregated_impacts?.climate_change_gwp100 != null && (
+                <span className="font-display text-sm font-bold tabular-nums text-foreground">
+                  {lca.aggregated_impacts.climate_change_gwp100.toFixed(3)}
+                  <span className="ml-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                    kg CO₂e
+                  </span>
+                </span>
               )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {lcaReports.slice(0, 3).map((lca) => (
-              <Link key={lca.id} href={`/products/${product.id}/compliance-wizard`}>
-                <div className="p-3 rounded-lg bg-muted/50 border hover:bg-accent transition-all cursor-pointer">
-                  <div className="flex items-center justify-between mb-2">
-                    <StateChip tone={lca.status === 'completed' ? 'good' : 'attention'}>
-                      {lca.status}
-                    </StateChip>
-                    <span className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(lca.created_at), { addSuffix: true })}
-                    </span>
-                  </div>
-                  {lca.aggregated_impacts?.climate_change_gwp100 && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Total Impact</span>
-                      <span className="text-sm font-bold text-foreground">
-                        {lca.aggregated_impacts.climate_change_gwp100.toFixed(3)} kg CO₂e
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+            </Link>
+          ))}
+        </div>
+      </section>
 
       {/* Collapsible Data Completeness */}
       <Collapsible open={showDataCompleteness} onOpenChange={setShowDataCompleteness}>
-        <Card className="border">
+        <section className="border-t border-border pt-5">
           <CollapsibleTrigger asChild>
-            <button className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-[6px] bg-secondary flex items-center justify-center">
-                  <CheckCircle2 className="h-5 w-5 text-studio-good" />
-                </div>
-                <div className="text-left">
-                  <h3 className="font-semibold text-foreground">Data Completeness</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {isHealthy ? '100%' : ingredients.length > 0 || packaging.length > 0 ? '66%' : '33%'} complete
-                  </p>
-                </div>
+            <button className="flex w-full items-center justify-between gap-4 text-left">
+              <div>
+                <Eyebrow className="mb-1">Data completeness</Eyebrow>
+                <p className="text-sm text-muted-foreground">
+                  {isHealthy ? '100%' : ingredients.length > 0 || packaging.length > 0 ? '66%' : '33%'} complete
+                </p>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-studio-good transition-all duration-500"
-                    style={{ width: `${isHealthy ? 100 : ingredients.length > 0 || packaging.length > 0 ? 66 : 33}%` }}
-                  />
-                </div>
-                <Badge variant="secondary">
-                  {showDataCompleteness ? 'Hide' : 'Details'}
-                </Badge>
-              </div>
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent">
+                {showDataCompleteness ? 'Hide' : 'Details'}
+              </span>
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <CardContent className="pt-0 space-y-3">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                <div className="flex items-center gap-2">
-                  <div className={`h-2 w-2 rounded-full ${ingredients.length > 0 ? 'bg-studio-good' : 'bg-muted-foreground/40'}`} />
-                  <span className="text-sm text-muted-foreground">Ingredients</span>
-                </div>
-                <span className="text-sm font-medium text-foreground">{ingredients.length} ({ingredientWeight.toFixed(2)} kg)</span>
-              </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                <div className="flex items-center gap-2">
-                  <div className={`h-2 w-2 rounded-full ${packaging.length > 0 ? 'bg-studio-good' : 'bg-muted-foreground/40'}`} />
-                  <span className="text-sm text-muted-foreground">Packaging</span>
-                </div>
-                <span className="text-sm font-medium text-foreground">{packaging.length} ({packagingWeight.toFixed(1)} g)</span>
-              </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                <div className="flex items-center gap-2">
-                  <div className={`h-2 w-2 rounded-full ${lcaReports.length > 0 ? 'bg-studio-good' : 'bg-muted-foreground/40'}`} />
-                  <span className="text-sm text-muted-foreground">Carbon Footprint Reports</span>
-                </div>
-                <span className="text-sm font-medium text-foreground">{lcaReports.length}</span>
-              </div>
-            </CardContent>
+            <div className="mt-4 divide-y divide-border">
+              <CompletenessRow
+                label="Ingredients"
+                detail={`${ingredients.length} · ${ingredientWeight.toFixed(2)} kg`}
+                done={ingredients.length > 0}
+              />
+              <CompletenessRow
+                label="Packaging"
+                detail={`${packaging.length} · ${packagingWeight.toFixed(1)} g`}
+                done={packaging.length > 0}
+              />
+              <CompletenessRow
+                label="Carbon footprint reports"
+                detail={String(lcaReports.length)}
+                done={lcaReports.length > 0}
+              />
+            </div>
           </CollapsibleContent>
-        </Card>
+        </section>
       </Collapsible>
     </div>
   );

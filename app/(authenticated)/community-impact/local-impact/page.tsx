@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
-  DialogHeader, DialogTitle, DialogTrigger,
+  DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -20,11 +19,13 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Skeleton } from '@/components/ui/skeleton';
-import { MapPin, PlusCircle, TrendingUp, Users, Building2, Pencil, Trash2 } from 'lucide-react';
+import { TrendingUp, Users, Building2, Pencil, Trash2 } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
-import Link from 'next/link';
 import { toast } from 'sonner';
+
+import { PillButton } from '@/components/studio/pill-button';
+import { Panel } from '@/components/studio/panel';
+import { TopicHeader, HubSkeleton, Section } from '@/components/social';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -99,12 +100,12 @@ const emptyForm: LocalImpactFormData = {
 };
 
 function formatGBP(value: number | null | undefined): string {
-  if (value === null || value === undefined || value === 0) return '—';
+  if (value === null || value === undefined || value === 0) return '·';
   return `£${value.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
 function formatPercent(value: number | null | undefined): string {
-  if (value === null || value === undefined) return '—';
+  if (value === null || value === undefined) return '·';
   return `${value.toFixed(1)}%`;
 }
 
@@ -407,13 +408,11 @@ function AddLocalImpactDialog({ onSuccess }: { onSuccess: () => void }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <PlusCircle className="h-4 w-4 mr-2" />
-          Add Data
-        </Button>
-      </DialogTrigger>
+    <>
+      <PillButton size="sm" onClick={() => setOpen(true)}>
+        Add data
+      </PillButton>
+      <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Local Impact Data</DialogTitle>
@@ -428,12 +427,13 @@ function AddLocalImpactDialog({ onSuccess }: { onSuccess: () => void }) {
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : 'Add Data'}
+              {isSubmitting ? 'Saving…' : 'Add Data'}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+    </>
   );
 }
 
@@ -589,161 +589,133 @@ function LocalImpactPageContent() {
     r.reporting_quarter ? `${r.reporting_year} Q${r.reporting_quarter}` : String(r.reporting_year);
 
   const formatRatio = (local: number | null, total: number | null) => {
-    if (local === null && total === null) return '—';
+    if (local === null && total === null) return '·';
     return `${local ?? 0} / ${total ?? 0}`;
   };
 
+  if (loading) {
+    return <HubSkeleton />;
+  }
+
   return (
-    <div className="space-y-6 animate-fade-in-up">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <Link href="/community-impact" className="text-muted-foreground hover:text-foreground">
-              Community & Impact
-            </Link>
-            <span className="text-muted-foreground">/</span>
-            <span className="font-medium">Local Impact</span>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2 mt-2">
-            <MapPin className="h-6 w-6 text-emerald-600" />
-            Local Economic Impact
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Track local employment, sourcing, and community investment
-          </p>
-        </div>
+    <div className="space-y-8 animate-fade-in-up">
+      <TopicHeader
+        eyebrow={<>THE WIRING &middot; COMMUNITY IMPACT</>}
+        headline={<>Local impact.</>}
+        description="Track local employment, sourcing, and community investment."
+        backHref="/community-impact"
+        backLabel="Community impact"
+      >
         <AddLocalImpactDialog onSuccess={fetchData} />
+      </TopicHeader>
+
+      {/* Summary */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Panel>
+          <div className="flex items-center gap-3">
+            <Users className="h-5 w-5 text-studio-dim" aria-hidden="true" />
+            <div>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+                Local employment
+              </p>
+              <p className="mt-1 text-2xl font-bold tabular-nums">
+                {formatPercent(metrics?.local_employment_rate)}
+              </p>
+            </div>
+          </div>
+        </Panel>
+
+        <Panel>
+          <div className="flex items-center gap-3">
+            <Building2 className="h-5 w-5 text-studio-dim" aria-hidden="true" />
+            <div>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+                Local sourcing
+              </p>
+              <p className="mt-1 text-2xl font-bold tabular-nums">
+                {formatPercent(metrics?.local_sourcing_rate)}
+              </p>
+            </div>
+          </div>
+        </Panel>
+
+        <Panel>
+          <div className="flex items-center gap-3">
+            <TrendingUp className="h-5 w-5 text-studio-dim" aria-hidden="true" />
+            <div>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+                Community investment
+              </p>
+              <p className="mt-1 text-2xl font-bold tabular-nums">
+                {formatGBP(metrics?.community_investment)}
+              </p>
+            </div>
+          </div>
+        </Panel>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                <Users className="h-5 w-5 text-emerald-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Local Employment</p>
-                <p className="text-2xl font-bold">
-                  {loading ? <Skeleton className="h-8 w-16" /> : formatPercent(metrics?.local_employment_rate)}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                <Building2 className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Local Sourcing</p>
-                <p className="text-2xl font-bold">
-                  {loading ? <Skeleton className="h-8 w-16" /> : formatPercent(metrics?.local_sourcing_rate)}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                <TrendingUp className="h-5 w-5 text-amber-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Community Investment</p>
-                <p className="text-2xl font-bold">
-                  {loading ? <Skeleton className="h-8 w-16" /> : formatGBP(metrics?.community_investment)}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Records Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Local Impact Records</CardTitle>
-          <CardDescription>Historical data by reporting period</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : records.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">
-              No local impact data logged yet. Click &quot;Add Data&quot; to get started.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Period</TableHead>
-                    <TableHead>Employees (local / total)</TableHead>
-                    <TableHead>Procurement (local / total)</TableHead>
-                    <TableHead>Suppliers (local / total)</TableHead>
-                    <TableHead>Tax Contribution</TableHead>
-                    <TableHead>Community Investment</TableHead>
-                    <TableHead className="w-[80px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {records.map((record) => {
-                    const taxTotal = (record.corporate_tax_paid || 0)
-                      + (record.payroll_taxes_paid || 0)
-                      + (record.business_rates_paid || 0);
-                    return (
-                      <TableRow key={record.id}>
-                        <TableCell className="font-medium">{formatPeriod(record)}</TableCell>
-                        <TableCell>{formatRatio(record.local_employees, record.total_employees)}</TableCell>
-                        <TableCell>
-                          {record.local_procurement_spend !== null || record.total_procurement_spend !== null
-                            ? `${formatGBP(record.local_procurement_spend)} / ${formatGBP(record.total_procurement_spend)}`
-                            : '—'}
-                        </TableCell>
-                        <TableCell>{formatRatio(record.local_supplier_count, record.total_supplier_count)}</TableCell>
-                        <TableCell>{taxTotal > 0 ? formatGBP(taxTotal) : '—'}</TableCell>
-                        <TableCell>{formatGBP(record.community_investment_total)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => setEditingRecord(record)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => setDeletingRecord(record)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <Section label="LOCAL IMPACT RECORDS" blurb="Historical data by reporting period.">
+        {records.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No local impact data logged yet. Use &quot;Add data&quot; to get started.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Period</TableHead>
+                  <TableHead>Employees (local / total)</TableHead>
+                  <TableHead>Procurement (local / total)</TableHead>
+                  <TableHead>Suppliers (local / total)</TableHead>
+                  <TableHead>Tax Contribution</TableHead>
+                  <TableHead>Community Investment</TableHead>
+                  <TableHead className="w-[80px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {records.map((record) => {
+                  const taxTotal = (record.corporate_tax_paid || 0)
+                    + (record.payroll_taxes_paid || 0)
+                    + (record.business_rates_paid || 0);
+                  return (
+                    <TableRow key={record.id}>
+                      <TableCell className="font-medium">{formatPeriod(record)}</TableCell>
+                      <TableCell className="tabular-nums">{formatRatio(record.local_employees, record.total_employees)}</TableCell>
+                      <TableCell className="tabular-nums">
+                        {record.local_procurement_spend !== null || record.total_procurement_spend !== null
+                          ? `${formatGBP(record.local_procurement_spend)} / ${formatGBP(record.total_procurement_spend)}`
+                          : '·'}
+                      </TableCell>
+                      <TableCell className="tabular-nums">{formatRatio(record.local_supplier_count, record.total_supplier_count)}</TableCell>
+                      <TableCell className="tabular-nums">{taxTotal > 0 ? formatGBP(taxTotal) : '·'}</TableCell>
+                      <TableCell className="tabular-nums">{formatGBP(record.community_investment_total)}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <PillButton
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditingRecord(record)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </PillButton>
+                          <PillButton
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeletingRecord(record)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </PillButton>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </Section>
 
       {/* Edit Dialog */}
       {editingRecord && (

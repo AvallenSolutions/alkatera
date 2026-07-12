@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Eyebrow } from '@/components/studio/eyebrow';
+import { Statement } from '@/components/studio/statement';
 import { StateChip } from '@/components/studio/state-chip';
+import { auditActionTone } from '@/lib/epr/status-tones';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -30,7 +31,6 @@ import {
   User,
   Clock,
   FileText,
-  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOrganization } from '@/lib/organizationContext';
@@ -132,27 +132,9 @@ function formatRelativeTime(iso: string): string {
   }
 }
 
-function actionBadge(action: string) {
-  switch (action) {
-    case 'create':
-      return <StateChip tone="good">Create</StateChip>;
-    case 'update':
-      return <StateChip tone="quiet">Update</StateChip>;
-    case 'delete':
-      return <StateChip tone="stale">Delete</StateChip>;
-    case 'generate_csv':
-      return <StateChip tone="hold">Generate CSV</StateChip>;
-    case 'submit':
-      return <StateChip tone="good">Submit</StateChip>;
-    case 'approve':
-      return <StateChip tone="good">Approve</StateChip>;
-    case 'amend':
-      return <StateChip tone="attention">Amend</StateChip>;
-    case 'estimate_nations':
-      return <StateChip tone="hold">Estimate Nations</StateChip>;
-    default:
-      return <StateChip tone="quiet">{action}</StateChip>;
-  }
+function actionChip(action: string) {
+  const { label, tone } = auditActionTone(action);
+  return <StateChip tone={tone}>{label}</StateChip>;
 }
 
 function entityTypeLabel(entityType: string): string {
@@ -222,7 +204,7 @@ function AuditEntryCard({ entry }: { entry: AuditEntry }) {
           {/* Left: timestamp + user + action */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1.5">
-              {actionBadge(entry.action)}
+              {actionChip(entry.action)}
               <span className="text-sm font-medium">
                 {entityTypeLabel(entry.entity_type)}
               </span>
@@ -415,12 +397,7 @@ export default function AuditTrailPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div className="min-w-0">
-          <Eyebrow tone="inherit" className="mb-3 text-room-accent">
-            THE EVIDENCE · EPR · AUDIT
-          </Eyebrow>
-          <h1 className="font-display text-[clamp(2rem,4vw,3.25rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
-            The audit trail.
-          </h1>
+          <Statement eyebrow="THE WIRING · EPR · AUDIT" headline="The audit trail." />
           <p className="text-muted-foreground mt-3 text-sm">
             Immutable audit log for all EPR compliance activity: submissions, fee calculations, PRN updates, and configuration changes
           </p>

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Panel } from "@/components/studio/panel";
+import { Statement } from "@/components/studio/statement";
+import { StateChip } from "@/components/studio/state-chip";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -163,19 +164,19 @@ export default function SupplierVerificationPage() {
   if (!isAlkateraAdmin) {
     return (
       <div className="flex items-center justify-center min-h-screen p-4">
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <Panel className="max-w-md">
+          <div className="mb-4 space-y-1">
+            <h2 className="font-display text-base font-semibold text-foreground flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-destructive" />
               Access Denied
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+            </h2>
+          </div>
+          <div>
             <p className="text-muted-foreground">
               This page is only accessible to alkatera administrators. If you believe you should have access, please contact your system administrator.
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
       </div>
     );
   }
@@ -183,10 +184,8 @@ export default function SupplierVerificationPage() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <div className="flex items-center gap-2">
-          <h1 className="text-3xl font-bold tracking-tight">Supplier Verification</h1>
-        </div>
-        <p className="text-muted-foreground mt-2">
+        <Statement eyebrow="THE WIRING · ADMIN" headline="Supplier verification." />
+        <p className="mt-2 max-w-2xl text-sm text-studio-dim">
           Review and verify supplier products and ESG assessments
         </p>
       </div>
@@ -199,29 +198,29 @@ export default function SupplierVerificationPage() {
 
         <TabsContent value="products" className="space-y-6">
           {products.length === 0 ? (
-            <Card>
-              <CardContent className="py-12">
+            <Panel>
+              <div className="py-12">
                 <div className="text-center">
-                  <Shield className="h-12 w-12 mx-auto text-emerald-600 mb-4" />
+                  <Shield className="h-12 w-12 mx-auto text-studio-good mb-4" />
                   <h3 className="text-lg font-semibold mb-2">All Products Verified</h3>
                   <p className="text-muted-foreground">
                     There are no pending supplier products requiring verification
                   </p>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </Panel>
           ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+            <Panel>
+              <div className="mb-4 space-y-1">
+                <h2 className="font-display text-base font-semibold text-foreground flex items-center gap-2">
                   <Clock className="h-5 w-5" />
                   Pending Verification ({products.length})
-                </CardTitle>
-                <CardDescription>
+                </h2>
+                <p className="text-sm text-studio-dim">
                   Products awaiting verification before appearing in material search
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+                </p>
+              </div>
+              <div>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -261,9 +260,9 @@ export default function SupplierVerificationPage() {
                         </TableCell>
                         <TableCell>
                           {product.category ? (
-                            <Badge variant="outline">{product.category}</Badge>
+                            <StateChip tone="quiet">{product.category}</StateChip>
                           ) : (
-                            <span className="text-muted-foreground text-sm">—</span>
+                            <span className="text-muted-foreground text-sm">·</span>
                           )}
                         </TableCell>
                         <TableCell>
@@ -288,7 +287,7 @@ export default function SupplierVerificationPage() {
                           <Button
                             size="sm"
                             onClick={() => handleVerify(product)}
-                            className="bg-emerald-600 hover:bg-emerald-700"
+                            className="bg-studio-ink text-studio-cream"
                           >
                             <Check className="h-4 w-4 mr-1" />
                             Verify
@@ -298,8 +297,8 @@ export default function SupplierVerificationPage() {
                     ))}
                   </TableBody>
                 </Table>
-              </CardContent>
-            </Card>
+              </div>
+            </Panel>
           )}
         </TabsContent>
 
@@ -312,7 +311,7 @@ export default function SupplierVerificationPage() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-emerald-600" />
+              <Shield className="h-5 w-5 text-studio-good" />
               Verify Supplier Product
             </DialogTitle>
             <DialogDescription>
@@ -358,9 +357,9 @@ export default function SupplierVerificationPage() {
                 />
               </div>
 
-              <Alert className="bg-emerald-50 border-emerald-200 dark:bg-emerald-950 dark:border-emerald-800">
-                <Shield className="h-4 w-4 text-emerald-600" />
-                <AlertDescription className="text-emerald-800 dark:text-emerald-100">
+              <Alert className="border-studio-hairline">
+                <Shield className="h-4 w-4 text-studio-good" />
+                <AlertDescription className="text-studio-good">
                   Once verified, this product will immediately appear in material search results for the organisation&apos;s users.
                 </AlertDescription>
               </Alert>
@@ -378,7 +377,7 @@ export default function SupplierVerificationPage() {
             <Button
               onClick={confirmVerification}
               disabled={verifying}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-studio-ink text-studio-cream"
             >
               {verifying ? (
                 <>Verifying...</>
@@ -482,60 +481,60 @@ function EsgVerificationTab() {
     }
   };
 
-  const getRatingBadge = (rating: string | null) => {
+  const getRatingChip = (rating: string | null) => {
     if (!rating) return null;
-    const styles: Record<string, string> = {
-      leader: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-      progressing: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-      needs_improvement: 'bg-red-500/20 text-red-400 border-red-500/30',
-      not_assessed: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
+    const tones: Record<string, 'good' | 'attention' | 'stale' | 'quiet'> = {
+      leader: 'good',
+      progressing: 'attention',
+      needs_improvement: 'stale',
+      not_assessed: 'quiet',
     };
     return (
-      <Badge className={`text-xs ${styles[rating] || ''}`}>
+      <StateChip tone={tones[rating] || 'quiet'}>
         {getRatingLabel(rating as any)}
-      </Badge>
+      </StateChip>
     );
   };
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="py-12">
-          <div className="text-center text-muted-foreground">Loading ESG assessments...</div>
-        </CardContent>
-      </Card>
+      <Panel>
+        <div className="py-12">
+          <p className="text-center font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">Loading…</p>
+        </div>
+      </Panel>
     );
   }
 
   if (assessments.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-12">
+      <Panel>
+        <div className="py-12">
           <div className="text-center">
-            <Shield className="h-12 w-12 mx-auto text-emerald-600 mb-4" />
+            <Shield className="h-12 w-12 mx-auto text-studio-good mb-4" />
             <h3 className="text-lg font-semibold mb-2">All Assessments Reviewed</h3>
             <p className="text-muted-foreground">
               There are no pending ESG assessments requiring verification
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Panel>
+        <div className="mb-4 space-y-1">
+          <h2 className="font-display text-base font-semibold text-foreground flex items-center gap-2">
             <Clock className="h-5 w-5" />
             Pending ESG Verification ({assessments.length})
-          </CardTitle>
-          <CardDescription>
+          </h2>
+          <p className="text-sm text-studio-dim">
             ESG self-assessments submitted by suppliers awaiting review
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -557,10 +556,10 @@ function EsgVerificationTab() {
                   </TableCell>
                   <TableCell>
                     <span className="font-mono text-sm font-semibold">
-                      {a.score_total ?? '—'}
+                      {a.score_total ?? '·'}
                     </span>
                   </TableCell>
-                  <TableCell>{getRatingBadge(a.score_rating)}</TableCell>
+                  <TableCell>{getRatingChip(a.score_rating)}</TableCell>
                   <TableCell>
                     <span className="text-sm text-muted-foreground">
                       {a.submitted_at
@@ -569,7 +568,7 @@ function EsgVerificationTab() {
                             month: 'short',
                             year: 'numeric',
                           })
-                        : '—'}
+                        : '·'}
                     </span>
                   </TableCell>
                   <TableCell>
@@ -585,18 +584,18 @@ function EsgVerificationTab() {
               ))}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       <Dialog open={showReviewDialog} onOpenChange={setShowReviewDialog}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-emerald-600" />
+              <Shield className="h-5 w-5 text-studio-good" />
               Review ESG Assessment
             </DialogTitle>
             <DialogDescription>
-              {selectedAssessment?.supplier?.name} — Score: {selectedAssessment?.score_total ?? 'N/A'}
+              {selectedAssessment?.supplier?.name}. Score: {selectedAssessment?.score_total ?? 'N/A'}
             </DialogDescription>
           </DialogHeader>
 
@@ -637,11 +636,11 @@ function EsgVerificationTab() {
                     <div className="space-y-2">
                       {questions.map((q) => {
                         const answer = answers[q.id];
-                        const answerStyles: Record<string, string> = {
-                          yes: 'bg-emerald-500/20 text-emerald-400',
-                          partial: 'bg-amber-500/20 text-amber-400',
-                          no: 'bg-red-500/20 text-red-400',
-                          na: 'bg-slate-500/20 text-slate-400',
+                        const answerTones: Record<string, 'good' | 'attention' | 'stale' | 'quiet'> = {
+                          yes: 'good',
+                          partial: 'attention',
+                          no: 'stale',
+                          na: 'quiet',
                         };
                         const answerLabels: Record<string, string> = {
                           yes: 'Yes',
@@ -654,11 +653,11 @@ function EsgVerificationTab() {
                           <div key={q.id} className="flex items-start justify-between gap-4 text-sm py-1.5 border-b border-border/50 last:border-0">
                             <span className="text-muted-foreground flex-1">{q.text}</span>
                             {answer ? (
-                              <Badge className={`text-xs ${answerStyles[answer] || ''}`}>
+                              <StateChip tone={answerTones[answer] || 'quiet'}>
                                 {answerLabels[answer] || answer}
-                              </Badge>
+                              </StateChip>
                             ) : (
-                              <span className="text-muted-foreground text-xs">—</span>
+                              <span className="text-muted-foreground text-xs">·</span>
                             )}
                           </div>
                         );
@@ -694,7 +693,7 @@ function EsgVerificationTab() {
               variant="outline"
               onClick={() => handleAction('request_revision')}
               disabled={processing}
-              className="text-amber-600 hover:text-amber-700"
+              className="text-studio-attention"
             >
               <RotateCcw className="h-4 w-4 mr-1" />
               Request Revision
@@ -702,7 +701,7 @@ function EsgVerificationTab() {
             <Button
               onClick={() => handleAction('verify')}
               disabled={processing}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-studio-ink text-studio-cream"
             >
               {processing ? (
                 <>Processing...</>

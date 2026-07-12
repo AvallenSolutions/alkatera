@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { ArrowUpRight, RefreshCw, Settings2, Sparkles, TrendingDown, TrendingUp } from 'lucide-react'
+import { ArrowUpRight, TrendingDown, TrendingUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useOrganization } from '@/lib/organizationContext'
@@ -10,6 +10,7 @@ import { useRealtimeRefresh } from '@/lib/rosa/useRealtimeRefresh'
 import { VitalityRing } from './VitalityRing'
 import { EsgPillarCards } from './EsgPillarCards'
 import { ScoreExplainer, type CalculationInputs } from './ScoreExplainer'
+import { Eyebrow } from '@/components/studio/eyebrow'
 import type { VitalityComposite, ScoreBand } from '@/lib/vitality/composite'
 import type { TrendPoint } from '@/lib/vitality/snapshot'
 
@@ -29,27 +30,44 @@ interface CompositeResponse {
   stale?: boolean
 }
 
-const BAND_TONE: Record<ScoreBand, string> = {
-  EXCELLENT: 'border-border bg-card',
-  HEALTHY: 'border-border bg-card',
-  DEVELOPING: 'border-border bg-card',
-  EMERGING: 'border-border bg-card',
-  'NEEDS ATTENTION': 'border-border bg-card',
-  'AWAITING DATA': 'border-border bg-card',
+/** Each band as a proper sentence: "is healthy" reads, "is needs attention" does not. */
+const BAND_SENTENCE: Record<ScoreBand, string> = {
+  EXCELLENT: 'Your vitality is excellent.',
+  HEALTHY: 'Your vitality is healthy.',
+  DEVELOPING: 'Your vitality is developing.',
+  EMERGING: 'Your vitality is emerging.',
+  'NEEDS ATTENTION': 'Your vitality needs attention.',
+  'AWAITING DATA': 'Awaiting more data to call your score.',
+}
+
+function bandSentence(band: ScoreBand): string {
+  return BAND_SENTENCE[band] ?? `Your vitality is ${band.toLowerCase()}.`
 }
 
 /**
  * Top of /performance/. Same data as VitalityHero on Rosa hub but rendered
  * larger with the pillar cards inline (no modal needed). Uses the same
  * /api/vitality/composite endpoint so HTTP cache is shared across surfaces.
+ *
+ * The hero owns the one composite fetch for the whole surface: `onComposite`
+ * hands the loaded composite back up to /performance so the page never
+ * re-fetches it for its pillar breakdowns or strengths/improvements.
  */
-export function EsgVitalityScoreHero() {
+export function EsgVitalityScoreHero({
+  onComposite,
+}: {
+  onComposite?: (composite: VitalityComposite) => void
+} = {}) {
   const { currentOrganization } = useOrganization()
   const orgId = currentOrganization?.id
   const [data, setData] = useState<CompositeResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [readUpgrading, setReadUpgrading] = useState(false)
+
+  // Held in a ref so /performance's inline handler doesn't churn `load`.
+  const onCompositeRef = useRef(onComposite)
+  onCompositeRef.current = onComposite
 
   const load = useCallback(
     async (opts: { fresh?: boolean; withAiRead?: boolean } = {}): Promise<CompositeResponse | null> => {
@@ -63,6 +81,7 @@ export function EsgVitalityScoreHero() {
         if (!res.ok) return null
         const json = (await res.json()) as CompositeResponse
         setData(json)
+        if (json?.composite) onCompositeRef.current?.(json.composite)
         return json
       } catch {
         // keep last good
@@ -156,9 +175,9 @@ export function EsgVitalityScoreHero() {
 
   if (loading && !data) {
     return (
-      <div className="rounded-[6px] border border-border bg-card p-6 sm:p-8">
-        <Skeleton className="h-8 w-64 mb-3" />
-        <Skeleton className="h-40 w-full mb-3" />
+      <div className="space-y-6">
+        <Skeleton className="h-40 w-40 rounded-full" />
+        <Skeleton className="h-8 w-72" />
         <Skeleton className="h-24 w-full" />
       </div>
     )
@@ -166,9 +185,9 @@ export function EsgVitalityScoreHero() {
 
   if (!data) {
     return (
-      <div className="rounded-[6px] border border-border bg-card p-6 text-sm text-muted-foreground">
-        Couldn&apos;t load your composite vitality. Try refreshing.
-      </div>
+      <p className="text-sm text-muted-foreground">
+        Couldn&apos;t load your composite vitality. Try refreshing the page.
+      </p>
     )
   }
 
@@ -192,13 +211,15 @@ export function EsgVitalityScoreHero() {
   }
 
   return (
-    <div className={cn('rounded-[6px] border p-6 sm:p-8', BAND_TONE[composite.band])}>
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div className="min-w-0">
+    <div className="space-y-8">
+      {/* The score: the ring is the number, the band its plain-language read. */}
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:gap-10">
+        <div className="flex-shrink-0">
+          <VitalityRing score={composite.composite} size="xl" animated showLabel label={composite.band} />
+        </div>
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              Company vitality
-            </p>
+            <Eyebrow>Company vitality</Eyebrow>
             <ScoreExplainer
               scoreType="composite"
               currentScore={composite.composite}
@@ -206,94 +227,74 @@ export function EsgVitalityScoreHero() {
               className="hover:bg-muted text-muted-foreground hover:text-foreground"
             />
           </div>
-          <h1 className="mt-1 text-2xl sm:text-3xl font-semibold leading-tight">
-            {composite.band === 'AWAITING DATA'
-              ? 'Awaiting more data to call your score.'
-              : `Your vitality is ${composite.band.toLowerCase()}.`}
-          </h1>
-        </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <Link
-            href="/governance/vitality-weights/"
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-            aria-label="Adjust ESG weighting"
-            title="Adjust ESG weighting"
-          >
-            <Settings2 className="h-3.5 w-3.5" />
-          </Link>
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={refreshing}
-            aria-label="Refresh score"
-            title="Refresh score"
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-          </button>
+          <p className="mt-2 font-display text-2xl sm:text-3xl font-semibold leading-tight tracking-[-0.02em]">
+            {bandSentence(composite.band)}
+          </p>
+          <div className="mt-3 flex items-center gap-4">
+            {delta !== null && delta !== 0 ? (
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <DeltaIcon className="h-3.5 w-3.5" />
+                {delta > 0 ? '+' : ''}
+                {delta} pts over the snapshot window
+              </span>
+            ) : null}
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim transition-colors hover:text-foreground disabled:opacity-50"
+            >
+              {refreshing ? 'Refreshing' : 'Refresh'}
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-center">
-        <div className="lg:col-span-2 flex flex-col items-center justify-center">
-          <VitalityRing score={composite.composite} size="xl" animated showLabel label={composite.band} />
-          {delta !== null && delta !== 0 ? (
-            <p className="mt-3 text-xs text-muted-foreground inline-flex items-center gap-1.5">
-              <DeltaIcon className="h-3.5 w-3.5" />
-              {delta > 0 ? '+' : ''}
-              {delta} pts over the snapshot window
+      {/* Rosa's read: a quiet section, no nested card. */}
+      {read ? (
+        <div className="border-t border-border pt-6">
+          <Eyebrow className="mb-2">
+            Rosa&apos;s read
+            {readUpgrading ? (
+              <span className="ml-1 text-muted-foreground/60">· deepening</span>
+            ) : read.confidence === 'low' ? (
+              <span className="ml-1 text-muted-foreground/60">· low confidence</span>
+            ) : null}
+          </Eyebrow>
+          <p className="text-sm font-medium leading-snug">{read.headline}</p>
+          <p
+            key={read.detail}
+            className={cn(
+              'mt-1.5 text-sm text-muted-foreground leading-relaxed transition-opacity duration-300',
+              readUpgrading ? 'opacity-60' : 'opacity-100 animate-in fade-in',
+            )}
+          >
+            {read.detail}
+          </p>
+          {read.next_move ? (
+            <p
+              key={read.next_move}
+              className={cn(
+                'mt-2 text-sm italic text-foreground/90 leading-relaxed transition-opacity duration-300',
+                readUpgrading ? 'opacity-60' : 'opacity-100 animate-in fade-in',
+              )}
+            >
+              Next move: {read.next_move}
             </p>
           ) : null}
         </div>
-        <div className="lg:col-span-3 flex flex-col gap-4">
-          {trend.some(p => p.composite !== null) ? (
-            <CompositeChart trend={trend} />
-          ) : (
-            <p className="text-xs text-muted-foreground italic">
-              Trend builds up across visits, one snapshot per day.
-            </p>
-          )}
-          {read ? (
-            <div className="rounded-lg border border-border/50 bg-card/40 p-4">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground inline-flex items-center gap-1.5">
-                <Sparkles className="h-3 w-3 text-studio-forest" />
-                Rosa&apos;s read
-                {readUpgrading ? (
-                  <span className="text-[10px] text-muted-foreground/70">· deepening</span>
-                ) : read.confidence === 'low' ? (
-                  <span className="text-[10px] text-muted-foreground/70">· low confidence</span>
-                ) : null}
-              </p>
-              <p className="mt-1.5 text-sm font-medium leading-snug">{read.headline}</p>
-              <p
-                key={read.detail}
-                className={cn(
-                  'mt-1.5 text-xs text-muted-foreground leading-relaxed transition-opacity duration-300',
-                  readUpgrading ? 'opacity-60' : 'opacity-100 animate-in fade-in',
-                )}
-              >
-                {read.detail}
-              </p>
-              {read.next_move ? (
-                <p
-                  key={read.next_move}
-                  className={cn(
-                    'mt-2 text-xs italic text-foreground/90 leading-relaxed transition-opacity duration-300',
-                    readUpgrading ? 'opacity-60' : 'opacity-100 animate-in fade-in',
-                  )}
-                >
-                  Next move: {read.next_move}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      </div>
+      ) : null}
 
-      <div className="mt-6">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-          Pillar breakdown
-        </h2>
+      {/* The 12-week trend: a quiet section. */}
+      {trend.some(p => p.composite !== null) ? (
+        <div className="border-t border-border pt-6">
+          <CompositeChart trend={trend} />
+        </div>
+      ) : null}
+
+      {/* Pillar breakdown. */}
+      <div className="border-t border-border pt-6">
+        <Eyebrow className="mb-3">Pillar breakdown</Eyebrow>
         <EsgPillarCards
           e={composite.e}
           s={composite.s}
@@ -302,7 +303,8 @@ export function EsgVitalityScoreHero() {
         />
       </div>
 
-      <div className="mt-4 pt-3 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
+      {/* Weights: a quiet footer line. */}
+      <div className="flex items-center justify-between border-t border-border pt-4 text-xs text-muted-foreground">
         <span>
           Weighted: E {Math.round(composite.weights.e * 100)}% · S{' '}
           {Math.round(composite.weights.s * 100)}% · G {Math.round(composite.weights.g * 100)}%

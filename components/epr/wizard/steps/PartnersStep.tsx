@@ -5,10 +5,11 @@ import { useOrganization } from '@/lib/organizationContext'
 import { useEPRHMRCDetails } from '@/hooks/data/useEPRHMRCDetails'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { PillButton } from '@/components/studio/pill-button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
-  ArrowLeft, ArrowRight, SkipForward, Loader2, UserPlus, Plus, Trash2,
+  ArrowLeft, ArrowRight, SkipForward, UserPlus, Plus, Trash2,
 } from 'lucide-react'
 
 interface PartnersStepProps {
@@ -114,7 +115,9 @@ export function PartnersStep({ onComplete, onBack, onSkip }: PartnersStepProps) 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-neon-lime animate-spin" />
+        <span className="font-mono text-xs uppercase tracking-[0.18em] text-studio-dim">
+          Loading...
+        </span>
       </div>
     )
   }
@@ -124,10 +127,10 @@ export function PartnersStep({ onComplete, onBack, onSkip }: PartnersStepProps) 
       <div className="w-full max-w-lg space-y-6">
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-neon-lime/20 backdrop-blur-md border border-neon-lime/30 rounded-2xl flex items-center justify-center">
-            <UserPlus className="w-8 h-8 text-neon-lime" />
+          <div className="mx-auto w-16 h-16 rounded-[6px] border border-studio-hairline bg-studio-paper flex items-center justify-center">
+            <UserPlus className="w-8 h-8 text-room-accent" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-foreground">
+          <h3 className="text-xl font-display font-bold text-foreground">
             Partnership Details
           </h3>
           <p className="text-sm text-muted-foreground">
@@ -136,7 +139,7 @@ export function PartnersStep({ onComplete, onBack, onSkip }: PartnersStepProps) 
         </div>
 
         {/* Form card */}
-        <div className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl p-6 space-y-4">
+        <div className="rounded-[6px] border border-studio-hairline bg-studio-paper p-6 space-y-4">
           {/* Partner rows */}
           {partners.map((partner, index) => (
             <div key={index} className="space-y-3 pb-4 border-b border-border last:border-b-0 last:pb-0">
@@ -149,7 +152,7 @@ export function PartnersStep({ onComplete, onBack, onSkip }: PartnersStepProps) 
                   size="icon"
                   onClick={() => removePartner(index)}
                   disabled={isSaving || partners.length <= 1}
-                  className="text-muted-foreground hover:text-red-400 hover:bg-red-400/10 h-7 w-7"
+                  className="text-muted-foreground hover:text-studio-stale hover:bg-studio-stale/10 h-7 w-7"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </Button>
@@ -166,7 +169,6 @@ export function PartnersStep({ onComplete, onBack, onSkip }: PartnersStepProps) 
                     value={partner.first_name}
                     onChange={(e) => updatePartner(index, 'first_name', e.target.value)}
                     disabled={isSaving}
-                    className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -179,7 +181,6 @@ export function PartnersStep({ onComplete, onBack, onSkip }: PartnersStepProps) 
                     value={partner.last_name}
                     onChange={(e) => updatePartner(index, 'last_name', e.target.value)}
                     disabled={isSaving}
-                    className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -192,7 +193,6 @@ export function PartnersStep({ onComplete, onBack, onSkip }: PartnersStepProps) 
                     value={partner.phone}
                     onChange={(e) => updatePartner(index, 'phone', e.target.value)}
                     disabled={isSaving}
-                    className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -206,7 +206,6 @@ export function PartnersStep({ onComplete, onBack, onSkip }: PartnersStepProps) 
                     value={partner.email}
                     onChange={(e) => updatePartner(index, 'email', e.target.value)}
                     disabled={isSaving}
-                    className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50"
                   />
                 </div>
               </div>
@@ -215,7 +214,7 @@ export function PartnersStep({ onComplete, onBack, onSkip }: PartnersStepProps) 
 
           {/* Validation error */}
           {validationError && (
-            <p className="text-xs text-red-400">{validationError}</p>
+            <p className="text-xs text-studio-stale">{validationError}</p>
           )}
 
           {/* Add partner button */}
@@ -223,7 +222,7 @@ export function PartnersStep({ onComplete, onBack, onSkip }: PartnersStepProps) 
             variant="ghost"
             onClick={addPartner}
             disabled={isSaving}
-            className="w-full border border-dashed border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:border-neon-lime/30"
+            className="w-full border border-studio-hairline text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:border-room-accent/40"
           >
             <Plus className="w-4 h-4 mr-2" />
             Add Partner
@@ -253,23 +252,16 @@ export function PartnersStep({ onComplete, onBack, onSkip }: PartnersStepProps) 
                 Skip
               </Button>
             )}
-            <Button
-              onClick={handleContinue}
-              disabled={isSaving}
-              className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl"
-            >
+            <PillButton variant="ink" onClick={handleContinue} disabled={isSaving}>
               {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
+                'Saving...'
               ) : (
                 <>
                   Continue
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </>
               )}
-            </Button>
+            </PillButton>
           </div>
         </div>
       </div>

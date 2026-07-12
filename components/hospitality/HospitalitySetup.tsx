@@ -2,22 +2,21 @@
 
 /**
  * Hospitality function chooser. Shown on first open (and from "Customise") so a
- * venue picks which functions it needs — the nav then only shows those sections.
+ * venue picks which functions it needs; the nav then only shows those sections.
+ * Studio-quiet: selectable hairline rows with a typographic On/Off state.
  */
 
 import { useState } from 'react';
-import { UtensilsCrossed, Wine, BedDouble, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { HospitalitySettings } from '@/lib/hospitality/settings';
 
 type FnKey = 'meals' | 'drinks' | 'rooms';
 
-const FUNCTIONS: { key: FnKey; label: string; blurb: string; icon: typeof Wine }[] = [
-  { key: 'meals', label: 'Food', blurb: 'Meals & recipes for a restaurant or kitchen.', icon: UtensilsCrossed },
-  { key: 'drinks', label: 'Drinks', blurb: 'Cocktails, coffees and bar drinks.', icon: Wine },
-  { key: 'rooms', label: 'Rooms', blurb: 'Accommodation and per-room-night impact.', icon: BedDouble },
+const FUNCTIONS: { key: FnKey; label: string; blurb: string }[] = [
+  { key: 'meals', label: 'Food', blurb: 'Meals and recipes for a restaurant or kitchen.' },
+  { key: 'drinks', label: 'Drinks', blurb: 'Cocktails, coffees and bar drinks.' },
+  { key: 'rooms', label: 'Rooms', blurb: 'Accommodation and per-room-night impact.' },
 ];
 
 export function HospitalitySetup({
@@ -65,60 +64,65 @@ export function HospitalitySetup({
   };
 
   return (
-    <Card>
-      <CardContent className="space-y-5 p-6">
-        <div>
-          <h2 className="text-lg font-semibold">What does this venue offer?</h2>
-          <p className="text-sm text-muted-foreground">
-            Pick the functions you need. We&apos;ll hide the rest from the menu — you can change
-            this any time.
-          </p>
-        </div>
+    <div className="space-y-5 rounded-[6px] border border-border bg-card p-6">
+      <div>
+        <h2 className="font-display text-lg font-bold tracking-[-0.02em] text-foreground">
+          What does this venue offer?
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Pick the functions you need. We&apos;ll hide the rest from the menu; you can change
+          this any time.
+        </p>
+      </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          {FUNCTIONS.map((f) => {
-            const Icon = f.icon;
-            const on = sel[f.key];
-            return (
+      <ul className="divide-y divide-border border-y border-border">
+        {FUNCTIONS.map((f) => {
+          const on = sel[f.key];
+          return (
+            <li key={f.key}>
               <button
-                key={f.key}
                 type="button"
                 onClick={() => toggle(f.key)}
                 aria-pressed={on}
-                className={cn(
-                  'relative flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-colors',
-                  on ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50',
-                )}
+                className="flex w-full items-center gap-4 py-3 text-left"
               >
+                <div className="min-w-0 flex-1">
+                  <span
+                    className={cn(
+                      'font-display text-sm font-semibold transition-colors',
+                      on ? 'text-foreground' : 'text-muted-foreground',
+                    )}
+                  >
+                    {f.label}
+                  </span>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{f.blurb}</p>
+                </div>
                 <span
                   className={cn(
-                    'absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full border',
-                    on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40',
+                    'shrink-0 font-mono text-[10px] font-bold uppercase tracking-[0.22em] transition-colors',
+                    on ? 'text-room-accent' : 'text-muted-foreground/50',
                   )}
                 >
-                  {on && <Check className="h-3.5 w-3.5" />}
+                  {on ? 'On' : 'Off'}
                 </span>
-                <Icon className="h-6 w-6" />
-                <span className="font-medium">{f.label}</span>
-                <span className="text-xs text-muted-foreground">{f.blurb}</span>
               </button>
-            );
-          })}
-        </div>
+            </li>
+          );
+        })}
+      </ul>
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
-        <div className="flex items-center gap-2">
-          <Button onClick={save} disabled={saving || !anySelected}>
-            {saving ? 'Saving…' : 'Save'}
+      <div className="flex items-center gap-2">
+        <Button className="rounded-full" onClick={save} disabled={saving || !anySelected}>
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+        {onCancel && (
+          <Button className="rounded-full" variant="outline" onClick={onCancel} disabled={saving}>
+            Cancel
           </Button>
-          {onCancel && (
-            <Button variant="outline" onClick={onCancel} disabled={saving}>
-              Cancel
-            </Button>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+        )}
+      </div>
+    </div>
   );
 }

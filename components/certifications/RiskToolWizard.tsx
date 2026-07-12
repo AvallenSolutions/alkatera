@@ -108,10 +108,10 @@ export function RiskToolWizard({
                       onClick={() =>
                         setResponses((r) => ({ ...r, [q.id]: opt.value }))
                       }
-                      className={`w-full rounded-md border px-3 py-2 text-left text-sm transition-colors ${
+                      className={`w-full rounded-[6px] border px-3 py-2 text-left text-sm transition-colors ${
                         selected
-                          ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30'
-                          : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                          ? 'border-studio-good bg-studio-cream'
+                          : 'hover:bg-secondary'
                       }`}
                     >
                       {opt.label}

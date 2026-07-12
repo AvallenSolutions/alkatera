@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Panel } from "@/components/studio/panel";
+import { Statement } from "@/components/studio/statement";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -296,10 +296,8 @@ export default function ApprovalsPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-            Approval Queue
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <Statement eyebrow="THE WIRING · ADMIN" headline="Approval queue." />
+          <p className="mt-2 max-w-2xl text-sm text-studio-dim">
             Review and approve data submissions from team members
           </p>
         </div>
@@ -309,99 +307,107 @@ export default function ApprovalsPage() {
           onClick={handleRefresh}
           disabled={refreshing}
         >
-          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+          <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card
+        <div
           className={`cursor-pointer transition-colors ${
-            activeTab === "activity_data" ? "ring-2 ring-blue-500" : ""
+            activeTab === "activity_data" ? "ring-2 ring-studio-ink" : ""
           }`}
           onClick={() => setActiveTab("activity_data")}
         >
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Activity className="h-4 w-4 text-blue-600" />
-              Activity Data
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{counts.activity_data}</div>
-            <p className="text-xs text-gray-500">pending</p>
-          </CardContent>
-        </Card>
+          <Panel>
+            <div className="mb-4 space-y-1 pb-2">
+              <h2 className="font-display text-sm font-medium text-foreground flex items-center gap-2">
+                <Activity className="h-4 w-4 text-studio-ink" />
+                Activity Data
+              </h2>
+            </div>
+            <div>
+              <div className="text-2xl font-bold">{counts.activity_data}</div>
+              <p className="text-xs text-studio-dim">pending</p>
+            </div>
+          </Panel>
+        </div>
 
-        <Card
+        <div
           className={`cursor-pointer transition-colors ${
-            activeTab === "facilities" ? "ring-2 ring-green-500" : ""
+            activeTab === "facilities" ? "ring-2 ring-studio-ink" : ""
           }`}
           onClick={() => setActiveTab("facilities")}
         >
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Factory className="h-4 w-4 text-green-600" />
-              Facilities
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{counts.facilities}</div>
-            <p className="text-xs text-gray-500">pending</p>
-          </CardContent>
-        </Card>
+          <Panel>
+            <div className="mb-4 space-y-1 pb-2">
+              <h2 className="font-display text-sm font-medium text-foreground flex items-center gap-2">
+                <Factory className="h-4 w-4 text-studio-ink" />
+                Facilities
+              </h2>
+            </div>
+            <div>
+              <div className="text-2xl font-bold">{counts.facilities}</div>
+              <p className="text-xs text-studio-dim">pending</p>
+            </div>
+          </Panel>
+        </div>
 
-        <Card
+        <div
           className={`cursor-pointer transition-colors ${
-            activeTab === "products" ? "ring-2 ring-amber-500" : ""
+            activeTab === "products" ? "ring-2 ring-studio-ink" : ""
           }`}
           onClick={() => setActiveTab("products")}
         >
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Package className="h-4 w-4 text-amber-600" />
-              Products
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{counts.products}</div>
-            <p className="text-xs text-gray-500">pending</p>
-          </CardContent>
-        </Card>
+          <Panel>
+            <div className="mb-4 space-y-1 pb-2">
+              <h2 className="font-display text-sm font-medium text-foreground flex items-center gap-2">
+                <Package className="h-4 w-4 text-studio-ink" />
+                Products
+              </h2>
+            </div>
+            <div>
+              <div className="text-2xl font-bold">{counts.products}</div>
+              <p className="text-xs text-studio-dim">pending</p>
+            </div>
+          </Panel>
+        </div>
 
-        <Card
+        <div
           className={`cursor-pointer transition-colors ${
-            activeTab === "suppliers" ? "ring-2 ring-cyan-500" : ""
+            activeTab === "suppliers" ? "ring-2 ring-studio-ink" : ""
           }`}
           onClick={() => setActiveTab("suppliers")}
         >
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Users className="h-4 w-4 text-cyan-600" />
-              Suppliers
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{counts.suppliers}</div>
-            <p className="text-xs text-gray-500">pending</p>
-          </CardContent>
-        </Card>
+          <Panel>
+            <div className="mb-4 space-y-1 pb-2">
+              <h2 className="font-display text-sm font-medium text-foreground flex items-center gap-2">
+                <Users className="h-4 w-4 text-studio-ink" />
+                Suppliers
+              </h2>
+            </div>
+            <div>
+              <div className="text-2xl font-bold">{counts.suppliers}</div>
+              <p className="text-xs text-studio-dim">pending</p>
+            </div>
+          </Panel>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Panel>
+        <div className="mb-4 space-y-1">
+          <h2 className="font-display text-base font-semibold text-foreground flex items-center gap-2">
             {getIcon(activeTab)}
             {activeTab === "activity_data"
               ? "Activity Data"
               : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}{" "}
             Submissions
-          </CardTitle>
-          <CardDescription>
+          </h2>
+          <p className="text-sm text-studio-dim">
             {items.length} pending submission{items.length !== 1 ? "s" : ""} to review
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div>
           {loading ? (
             <div className="space-y-2">
               {[...Array(3)].map((_, i) => (
@@ -409,8 +415,8 @@ export default function ApprovalsPage() {
               ))}
             </div>
           ) : items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-              <CheckCircle className="h-12 w-12 text-green-500 mb-4" />
+            <div className="flex flex-col items-center justify-center py-12 text-studio-dim">
+              <CheckCircle className="h-12 w-12 text-studio-good mb-4" />
               <p className="text-lg font-medium">All caught up!</p>
               <p className="text-sm">No pending submissions to review</p>
             </div>
@@ -474,7 +480,7 @@ export default function ApprovalsPage() {
                         </TableCell>
                       </>
                     )}
-                    <TableCell className="text-gray-500 text-sm">
+                    <TableCell className="text-studio-dim text-sm">
                       {formatDistanceToNow(new Date(item.submitted_at), { addSuffix: true })}
                     </TableCell>
                     <TableCell className="text-right">
@@ -489,7 +495,7 @@ export default function ApprovalsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                          className="text-studio-good"
                           onClick={() => handleApprove(item)}
                           disabled={processing}
                         >
@@ -498,7 +504,7 @@ export default function ApprovalsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          className="text-studio-stale"
                           onClick={() => openRejectDialog(item)}
                           disabled={processing}
                         >
@@ -511,8 +517,8 @@ export default function ApprovalsPage() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
         <DialogContent>
@@ -566,11 +572,11 @@ export default function ApprovalsPage() {
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-gray-500">Name</Label>
+                  <Label className="text-studio-dim">Name</Label>
                   <p className="font-medium">{selectedItem.name}</p>
                 </div>
                 <div>
-                  <Label className="text-gray-500">Submitted</Label>
+                  <Label className="text-studio-dim">Submitted</Label>
                   <p className="font-medium">
                     {format(new Date(selectedItem.submitted_at), "PPp")}
                   </p>
@@ -579,20 +585,20 @@ export default function ApprovalsPage() {
               {activeTab === "activity_data" && (
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <Label className="text-gray-500">Category</Label>
+                    <Label className="text-studio-dim">Category</Label>
                     <p className="font-medium">
                       {(selectedItem as PendingActivityData).category}
                     </p>
                   </div>
                   <div>
-                    <Label className="text-gray-500">Quantity</Label>
+                    <Label className="text-studio-dim">Quantity</Label>
                     <p className="font-medium">
                       {(selectedItem as PendingActivityData).quantity}{" "}
                       {(selectedItem as PendingActivityData).unit}
                     </p>
                   </div>
                   <div>
-                    <Label className="text-gray-500">Activity Date</Label>
+                    <Label className="text-studio-dim">Activity Date</Label>
                     <p className="font-medium">
                       {format(
                         new Date((selectedItem as PendingActivityData).activity_date),
@@ -605,25 +611,25 @@ export default function ApprovalsPage() {
               {activeTab === "facilities" && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-gray-500">Facility Type</Label>
+                    <Label className="text-studio-dim">Facility Type</Label>
                     <p className="font-medium">
                       {(selectedItem as PendingFacility).facility_type || "-"}
                     </p>
                   </div>
                   <div>
-                    <Label className="text-gray-500">Location</Label>
+                    <Label className="text-studio-dim">Location</Label>
                     <p className="font-medium">
                       {(selectedItem as PendingFacility).location || "-"}
                     </p>
                   </div>
                   <div>
-                    <Label className="text-gray-500">City</Label>
+                    <Label className="text-studio-dim">City</Label>
                     <p className="font-medium">
                       {(selectedItem as PendingFacility).city || "-"}
                     </p>
                   </div>
                   <div>
-                    <Label className="text-gray-500">Country</Label>
+                    <Label className="text-studio-dim">Country</Label>
                     <p className="font-medium">
                       {(selectedItem as PendingFacility).country || "-"}
                     </p>
@@ -633,13 +639,13 @@ export default function ApprovalsPage() {
               {activeTab === "products" && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-gray-500">SKU</Label>
+                    <Label className="text-studio-dim">SKU</Label>
                     <p className="font-medium">
                       {(selectedItem as PendingProduct).sku || "-"}
                     </p>
                   </div>
                   <div className="col-span-2">
-                    <Label className="text-gray-500">Description</Label>
+                    <Label className="text-studio-dim">Description</Label>
                     <p className="font-medium">
                       {(selectedItem as PendingProduct).product_description || "-"}
                     </p>
@@ -649,25 +655,25 @@ export default function ApprovalsPage() {
               {activeTab === "suppliers" && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-gray-500">Contact Name</Label>
+                    <Label className="text-studio-dim">Contact Name</Label>
                     <p className="font-medium">
                       {(selectedItem as PendingSupplier).contact_name || "-"}
                     </p>
                   </div>
                   <div>
-                    <Label className="text-gray-500">Contact Email</Label>
+                    <Label className="text-studio-dim">Contact Email</Label>
                     <p className="font-medium">
                       {(selectedItem as PendingSupplier).contact_email || "-"}
                     </p>
                   </div>
                   <div>
-                    <Label className="text-gray-500">City</Label>
+                    <Label className="text-studio-dim">City</Label>
                     <p className="font-medium">
                       {(selectedItem as PendingSupplier).city || "-"}
                     </p>
                   </div>
                   <div>
-                    <Label className="text-gray-500">Country</Label>
+                    <Label className="text-studio-dim">Country</Label>
                     <p className="font-medium">
                       {(selectedItem as PendingSupplier).country || "-"}
                     </p>

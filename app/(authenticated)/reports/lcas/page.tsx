@@ -1,17 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { EmptyState } from '@/components/ui/empty-state';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Award, Eye, Download, Search, Filter, Package, Calendar, Shield } from 'lucide-react';
 import Link from 'next/link';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/lib/organizationContext';
 import { VerificationCard } from '@/components/partners/VerificationCard';
-import { Eyebrow, StateChip } from '@/components/studio';
+import { Eyebrow, StateChip, Statement, BigNumber, Panel, PillButton } from '@/components/studio';
 import type { WorkingTone } from '@/components/studio';
 
 interface LCAReport {
@@ -19,7 +14,6 @@ interface LCAReport {
   product_id: number | null;
   product_name: string;
   title: string;
-  version: string;
   status: 'completed' | 'draft' | 'in_progress';
   dqi_score: number;
   system_boundary: string;
@@ -83,13 +77,15 @@ export default function LcasPage() {
 
         const productName = lca.product_name || 'Unknown Product';
         const functionalUnit = lca.functional_unit || 'per unit';
+        const year = new Date(lca.created_at).getFullYear();
 
         return {
           id: lca.id,
           product_id: lca.product_id,
           product_name: productName,
-          title: `${new Date(lca.created_at).getFullYear()} LCA Study`,
-          version: '1.0',
+          // No stored title exists on the record; describe it honestly by the
+          // year it was assessed rather than claiming a formal "study".
+          title: `${year} life cycle assessment`,
           status: lca.status as 'completed' | 'draft' | 'in_progress',
           dqi_score: dqiScore,
           system_boundary: lca.system_boundary || 'cradle-to-gate',
@@ -180,270 +176,186 @@ export default function LcasPage() {
     report.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const getStatusBadge = (status: string): { tone: WorkingTone; label: string } => {
+  const completedCount = reports.filter(r => r.status === 'completed').length;
+  const avgDqi = reports.length > 0
+    ? Math.round(reports.reduce((sum, r) => sum + r.dqi_score, 0) / reports.length)
+    : 0;
+
+  const getStatusChip = (status: string): { tone: WorkingTone; label: string } => {
     const config: Record<string, { tone: WorkingTone; label: string }> = {
       completed: { tone: 'good', label: 'Completed' },
       published: { tone: 'good', label: 'Published' },
       verified: { tone: 'good', label: 'Verified' },
       draft: { tone: 'quiet', label: 'Draft' },
-      in_progress: { tone: 'attention', label: 'In Progress' },
+      in_progress: { tone: 'attention', label: 'In progress' },
     };
     return config[status] || config.draft;
   };
 
-  const getDQIBadge = (score: number): { tone: WorkingTone; label: string } => {
-    if (score >= 80) return { tone: 'good', label: 'High Confidence' };
-    if (score >= 50) return { tone: 'attention', label: 'Medium Confidence' };
+  const getDQIChip = (score: number): { tone: WorkingTone; label: string } => {
+    if (score >= 80) return { tone: 'good', label: 'High confidence' };
+    if (score >= 50) return { tone: 'attention', label: 'Medium confidence' };
     return { tone: 'stale', label: 'Modelled' };
   };
 
   return (
-    <div className="container mx-auto py-8 space-y-8">
-      <div className="flex items-start justify-between">
-        <div className="space-y-2">
-          <Eyebrow>THE EVIDENCE · LIFE CYCLE ASSESSMENTS</Eyebrow>
-          <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
-            The life cycle assessments.
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            ISO 14044 compliant Life Cycle Assessment reports for your products
-          </p>
-        </div>
-        <Link href="/products">
-          <Button className="gap-2">
-            <Package className="h-4 w-4" />
-            Create New LCA
-          </Button>
-        </Link>
+    <div className="mx-auto max-w-5xl space-y-10 p-6">
+      {/* The statement */}
+      <div className="flex flex-wrap items-end justify-between gap-6">
+        <Statement eyebrow="THE CELLAR · LCAS" headline="The life cycle assessments." />
+        <PillButton href="/products">Create new LCA</PillButton>
       </div>
 
-      {/* Search and Filter Bar */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by product name or report title..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Button variant="outline" className="gap-2">
-              <Filter className="h-4 w-4" />
-              Filter
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Loading State */}
       {loading ? (
-        <Card>
-          <CardContent className="p-12 flex items-center justify-center">
-            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
-              Loading
-            </span>
-          </CardContent>
-        </Card>
+        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+          Loading
+        </p>
+      ) : reports.length === 0 ? (
+        <section className="border-t border-studio-hairline pt-6">
+          <p className="text-sm text-muted-foreground">
+            No life cycle assessments yet. Complete a product footprint to generate your first
+            report.
+          </p>
+          <PillButton href="/products" variant="outline" size="sm" className="mt-4">
+            Go to products
+          </PillButton>
+        </section>
       ) : (
         <>
-          {/* Summary Cards */}
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Total Reports</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{reports.length}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {reports.filter(r => r.status === 'completed').length} completed
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">Average DQI Score</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {reports.length > 0 ? Math.round(reports.reduce((sum, r) => sum + r.dqi_score, 0) / reports.length) : 0}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Data quality indicator
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium">CSRD Compliant</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {reports.filter(r => r.dqi_score >= 80).length}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Ready for disclosure
-                </p>
-              </CardContent>
-            </Card>
+          {/* The figures, one hairline row */}
+          <div className="flex flex-wrap items-end gap-x-12 gap-y-4 border-t border-studio-hairline pt-5">
+            <BigNumber size="display" value={reports.length} label="Reports" />
+            <BigNumber size="display" value={avgDqi} label="Average DQI" />
+            <BigNumber size="display" value={completedCount} label="ISO 14044 complete" />
           </div>
-        </>
-      )}
 
-      {/* Reports List */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">All Reports</h2>
+          {/* Search over the loaded reports */}
+          <div className="max-w-sm">
+            <Input
+              placeholder="Search by product or report..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
 
-        {reports.length === 0 ? (
-          <EmptyState
-            compact
-            icon={Award}
-            title="No LCA reports yet"
-            description="Complete a product footprint to generate your first life-cycle assessment report."
-            actionLabel="Go to products"
-            actionHref="/products"
-          />
-        ) : filteredReports.length === 0 ? (
-          <Card>
-            <CardContent className="p-12 text-center text-muted-foreground">
-              <Award className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-sm">No reports found matching your search</p>
-              <p className="text-xs mt-1">Try adjusting your search terms</p>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredReports.map((report) => {
-            const statusBadge = getStatusBadge(report.status);
-            const dqiBadge = getDQIBadge(report.dqi_score);
+          {/* Reports */}
+          {filteredReports.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No reports match your search.</p>
+          ) : (
+            <div className="space-y-4">
+              {filteredReports.map((report) => {
+                const statusChip = getStatusChip(report.status);
+                const dqiChip = getDQIChip(report.dqi_score);
 
-            return (
-              <Card key={report.id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2 flex-1">
-                      <div className="flex items-center gap-3">
-                        <CardTitle className="text-lg">{report.product_name}</CardTitle>
-                        <StateChip tone={statusBadge.tone}>{statusBadge.label}</StateChip>
-                        <Badge variant="outline">v{report.version}</Badge>
+                return (
+                  <Panel key={report.id}>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0 space-y-1.5">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <h2 className="font-display text-lg font-semibold text-foreground">
+                            {report.product_name}
+                          </h2>
+                          <StateChip tone={statusChip.tone}>{statusChip.label}</StateChip>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{report.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {report.functional_unit} · {report.assessment_period}
+                          {report.published_at && (
+                            <> · Published {new Date(report.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</>
+                          )}
+                        </p>
                       </div>
-                      <CardDescription>{report.title}</CardDescription>
 
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Package className="h-3.5 w-3.5" />
-                          {report.functional_unit}
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-studio-dim">
+                          DQI
+                        </span>
+                        <span className="font-display text-sm font-semibold text-foreground">
+                          {report.dqi_score}/100
+                        </span>
+                        <StateChip tone={dqiChip.tone}>{dqiChip.label}</StateChip>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-col gap-4 border-t border-studio-hairline pt-4 sm:flex-row sm:items-end sm:justify-between">
+                      <div className="flex flex-wrap items-end gap-x-10 gap-y-4">
+                        <BigNumber
+                          size="panel"
+                          value={report.total_co2e.toFixed(3)}
+                          label="kg CO₂e"
+                        />
+                        <div>
+                          <p className="font-display text-sm font-medium text-foreground">
+                            {report.system_boundary}
+                          </p>
+                          <p className="mt-1.5 font-mono text-[9.5px] uppercase tracking-[0.2em] text-foreground opacity-70">
+                            System boundary
+                          </p>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3.5 w-3.5" />
-                          {report.assessment_period}
+                        <div>
+                          <p className="font-display text-sm font-medium text-foreground">
+                            ISO 14044
+                          </p>
+                          <p className="mt-1.5 font-mono text-[9.5px] uppercase tracking-[0.2em] text-foreground opacity-70">
+                            Standard
+                          </p>
                         </div>
-                        {report.published_at && (
-                          <div className="flex items-center gap-1">
-                            Published: {new Date(report.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {report.status === 'completed' ? (
+                          <>
+                            <PillButton
+                              size="sm"
+                              disabled={loadingPdf === report.id}
+                              onClick={() => handleViewReport(report.id)}
+                            >
+                              {loadingPdf === report.id ? 'Preparing...' : 'View report'}
+                            </PillButton>
+                            <PillButton
+                              variant="outline"
+                              size="sm"
+                              disabled={downloadingPdf === report.id}
+                              onClick={() => handleDownloadReport(report.id, report.product_name)}
+                            >
+                              {downloadingPdf === report.id ? 'Preparing...' : 'Download'}
+                            </PillButton>
+                          </>
+                        ) : (
+                          <PillButton
+                            href={`/products/${report.product_id}/compliance-wizard`}
+                            variant="room"
+                            size="sm"
+                          >
+                            Continue wizard
+                          </PillButton>
                         )}
                       </div>
                     </div>
-
-                    <div className="flex flex-col items-end gap-2">
-                      <div className="flex items-center gap-2">
-                        <Shield className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-semibold">{report.dqi_score}/100</span>
-                        <StateChip tone={dqiBadge.tone}>{dqiBadge.label}</StateChip>
-                      </div>
-                    </div>
-                  </div>
-                </CardHeader>
-
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-6">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Total GHG Emissions</p>
-                        <p className="text-lg font-semibold">{report.total_co2e.toFixed(3)} kg CO₂eq</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">System Boundary</p>
-                        <p className="text-sm font-medium">{report.system_boundary}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Standards</p>
-                        <div className="flex gap-1 mt-1">
-                          <Badge variant="outline" className="text-xs">ISO 14044</Badge>
-                          <Badge variant="outline" className="text-xs">CSRD</Badge>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {report.status === 'completed' ? (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2"
-                            disabled={loadingPdf === report.id}
-                            onClick={() => handleViewReport(report.id)}
-                          >
-                            <Eye className="h-4 w-4" />
-                            {loadingPdf === report.id ? 'Preparing...' : 'View Report'}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2"
-                            disabled={downloadingPdf === report.id}
-                            onClick={() => handleDownloadReport(report.id, report.product_name)}
-                          >
-                            <Download className="h-4 w-4" />
-                            {downloadingPdf === report.id ? 'Preparing...' : 'Download'}
-                          </Button>
-                        </>
-                      ) : (
-                        <Link href={`/products/${report.product_id}/compliance-wizard`}>
-                          <Button variant="outline" size="sm" className="gap-2">
-                            <Eye className="h-4 w-4" />
-                            Continue Wizard
-                          </Button>
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })
-        )}
-      </div>
+                  </Panel>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
 
       {/* Expert Verification */}
       <VerificationCard variant="lca" />
 
-      {/* Info Card */}
-      <Card className="rounded-[6px] border border-border bg-card">
-        <CardContent className="p-6">
-          <div className="flex items-start gap-4">
-            <div className="p-2 rounded-[6px] bg-secondary">
-              <Award className="h-6 w-6 text-studio-dim" />
-            </div>
-            <div className="space-y-2">
-              <h3 className="font-semibold text-foreground">About LCA Reports</h3>
-              <p className="text-sm text-muted-foreground">
-                Life Cycle Assessments (LCAs) provide a comprehensive environmental profile of your products following ISO 14044:2006 standards.
-                Each report includes cradle-to-gate impacts across multiple environmental categories including climate change, water use,
-                land use, and resource depletion.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Reports with a DQI score above 80 are suitable for external disclosure under CSRD and GHG Protocol Product Standard.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* About these reports */}
+      <section className="max-w-3xl border-t border-studio-hairline pt-4">
+        <Eyebrow tone="dim" className="mb-2">About these reports</Eyebrow>
+        <p className="text-sm text-muted-foreground">
+          Life cycle assessments give a full environmental profile of your products, following
+          ISO 14044:2006. Each report covers cradle-to-gate impacts across climate change, water
+          use, land use and resource depletion.
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          A data quality indicator above 80 means a report is strong enough for external disclosure
+          under CSRD and the GHG Protocol Product Standard.
+        </p>
+      </section>
     </div>
   );
 }

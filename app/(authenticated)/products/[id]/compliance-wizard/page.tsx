@@ -4,9 +4,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { EnhancedComplianceWizard } from '@/components/lca/EnhancedComplianceWizard';
-import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { PillButton } from '@/components/studio/pill-button';
+import { PageLoader } from '@/components/ui/page-loader';
+import { ArrowLeft } from 'lucide-react';
 import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
 
 // ============================================================================
@@ -104,11 +104,8 @@ export default function ComplianceWizardPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">Loading wizard...</p>
-        </div>
+      <div className="min-h-screen bg-studio-paper px-6 py-16">
+        <PageLoader />
       </div>
     );
   }
@@ -119,18 +116,22 @@ export default function ComplianceWizardPage() {
 
   if (error) {
     return (
-      <div className="container mx-auto max-w-2xl py-12">
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Error Loading Wizard</AlertTitle>
-          <AlertDescription className="mt-2">{error}</AlertDescription>
-        </Alert>
-        <div className="mt-6 flex gap-3">
-          <Button variant="outline" onClick={handleBack}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Go Back
-          </Button>
-          <Button onClick={() => window.location.reload()}>Try Again</Button>
+      <div className="mx-auto min-h-screen max-w-2xl space-y-5 bg-studio-paper px-6 py-16">
+        <div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-stale">
+          The cellar · LCA wizard
+        </div>
+        <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">
+          The wizard could not load.
+        </h1>
+        <p className="text-sm text-studio-dim">{error}</p>
+        <div className="flex gap-3 pt-1">
+          <PillButton variant="outline" onClick={handleBack}>
+            <ArrowLeft className="h-4 w-4" />
+            Go back
+          </PillButton>
+          <PillButton variant="room" onClick={() => window.location.reload()}>
+            Try again
+          </PillButton>
         </div>
       </div>
     );
@@ -141,26 +142,28 @@ export default function ComplianceWizardPage() {
   // ============================================================================
 
   return (
-    <div className="min-h-screen bg-muted/30">
-      {/* Header */}
-      <header className="border-b bg-background">
-        <div className="container mx-auto flex items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={handleBack}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Product
-            </Button>
-            <div className="h-6 w-px bg-border" />
-            <div>
-              <h1 className="text-lg font-semibold">LCA Wizard</h1>
-              <p className="text-sm text-muted-foreground">{productName}</p>
-            </div>
+    <div className="min-h-screen bg-studio-paper">
+      {/* Statement header */}
+      <header className="border-b border-studio-hairline bg-studio-paper">
+        <div className="container mx-auto flex flex-col gap-3 px-6 py-5">
+          <button
+            onClick={handleBack}
+            className="inline-flex items-center gap-1.5 self-start font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim transition-colors duration-150 ease-studio hover:text-foreground"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to product
+          </button>
+          <div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-room-accent">
+            The cellar · LCA wizard
           </div>
+          <h1 className="font-display text-3xl font-bold leading-none tracking-tight text-foreground">
+            {productName || 'Lifecycle assessment.'}
+          </h1>
         </div>
       </header>
 
       {/* Wizard */}
-      <main className="h-[calc(100vh-73px)]">
+      <main className="h-[calc(100vh-129px)]">
         <EnhancedComplianceWizard
           productId={productId}
           pcfId={pcfId}

@@ -30,13 +30,11 @@ export function ProductsSupplyChainCard({
 
   return (
     <Card className="relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 dark:bg-blue-950 rounded-full -mr-16 -mt-16 opacity-50" />
-
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-              <Package className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+              <Package className="h-5 w-5 text-room-accent" />
             </div>
             <div>
               <CardTitle className="text-lg">Scope 3 Emissions</CardTitle>
@@ -55,7 +53,7 @@ export function ProductsSupplyChainCard({
         ) : totalCO2e > 0 ? (
           <>
             <div className="text-center py-4">
-              <div className="text-4xl font-bold text-slate-900 dark:text-slate-100">
+              <div className="text-4xl font-bold text-foreground">
                 {formatEmissions(totalCO2e)}
               </div>
               <div className="text-sm text-muted-foreground mt-1">

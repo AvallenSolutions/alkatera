@@ -2,9 +2,8 @@
 
 import { useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Download, Share2, Copy, Check } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { PillButton } from '@/components/studio/pill-button';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -109,77 +108,30 @@ export default function QRCodeDisplay({ url, productName, size = 200 }: QRCodeDi
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>QR Code</CardTitle>
-        <CardDescription>
-          Share this QR code on packaging, marketing materials, or displays
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div ref={qrRef} className="flex justify-center p-6 bg-white rounded-lg border-2 border-neutral-200">
-          <QRCodeSVG
-            value={url}
-            size={size}
-            level="H"
-            includeMargin={true}
-          />
+    <div>
+      <Eyebrow className="mb-1">QR code</Eyebrow>
+      <p className="mb-4 text-sm text-muted-foreground">
+        Put this on packaging, marketing or displays. Anyone who scans it opens the passport.
+      </p>
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+        <div ref={qrRef} className="flex justify-center rounded-[6px] border border-border bg-white p-5">
+          <QRCodeSVG value={url} size={size} level="H" includeMargin={true} />
         </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDownloadPNG}
-            className="w-full"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            PNG
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDownloadSVG}
-            className="w-full"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            SVG
-          </Button>
+        <div className="flex flex-wrap gap-2">
+          <PillButton variant="outline" size="sm" onClick={handleDownloadPNG}>
+            Download PNG
+          </PillButton>
+          <PillButton variant="outline" size="sm" onClick={handleDownloadSVG}>
+            Download SVG
+          </PillButton>
+          <PillButton variant="ghost" size="sm" onClick={handleCopyUrl}>
+            {copied ? 'Copied' : 'Copy link'}
+          </PillButton>
+          <PillButton variant="ghost" size="sm" onClick={handleShare}>
+            Share
+          </PillButton>
         </div>
-
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleCopyUrl}
-            className="flex-1"
-          >
-            {copied ? (
-              <>
-                <Check className="h-4 w-4 mr-2" />
-                Copied
-              </>
-            ) : (
-              <>
-                <Copy className="h-4 w-4 mr-2" />
-                Copy URL
-              </>
-            )}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleShare}
-          >
-            <Share2 className="h-4 w-4" />
-          </Button>
-        </div>
-
-        <div className="bg-neutral-50 p-3 rounded-md">
-          <p className="text-xs text-neutral-600 mb-1 font-medium">Passport URL:</p>
-          <p className="text-xs text-neutral-800 break-all font-mono">{url}</p>
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

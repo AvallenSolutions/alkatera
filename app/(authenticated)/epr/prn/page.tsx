@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Eyebrow } from '@/components/studio/eyebrow';
+import { Statement } from '@/components/studio/statement';
 import { StateChip } from '@/components/studio/state-chip';
+import { prnStatusTone } from '@/lib/epr/status-tones';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
@@ -70,19 +71,9 @@ interface PRNResponse {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function statusBadge(status: EPRPRNObligation['status']) {
-  switch (status) {
-    case 'not_started':
-      return <StateChip tone="stale">Not Started</StateChip>;
-    case 'partial':
-      return <StateChip tone="attention">Partial</StateChip>;
-    case 'fulfilled':
-      return <StateChip tone="good">Fulfilled</StateChip>;
-    case 'exceeded':
-      return <StateChip tone="good">Exceeded</StateChip>;
-    default:
-      return <StateChip tone="quiet">{status}</StateChip>;
-  }
+function statusChip(status: EPRPRNObligation['status']) {
+  const { label, tone } = prnStatusTone(status);
+  return <StateChip tone={tone}>{label}</StateChip>;
 }
 
 function fmtGBP(value: number | null | undefined): string {
@@ -377,12 +368,7 @@ export default function PRNTrackerPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div className="min-w-0">
-          <Eyebrow tone="inherit" className="mb-3 text-room-accent">
-            THE EVIDENCE · EPR · PRN
-          </Eyebrow>
-          <h1 className="font-display text-[clamp(2rem,4vw,3.25rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
-            The PRN tracker.
-          </h1>
+          <Statement eyebrow="THE WIRING · EPR · PRN" headline="The PRN tracker." />
           <p className="text-muted-foreground mt-3 text-sm">
             Manage your Packaging Recovery Note obligations and track fulfilment across material types
           </p>
@@ -575,7 +561,7 @@ export default function PRNTrackerPage() {
                           {fmtGBP(ob.total_prn_cost_gbp)}
                         </TableCell>
                         <TableCell className="text-center">
-                          {statusBadge(ob.status)}
+                          {statusChip(ob.status)}
                         </TableCell>
                         <TableCell className="text-right">
                           <UpdatePRNDialog obligation={ob} onSave={handleSave} />

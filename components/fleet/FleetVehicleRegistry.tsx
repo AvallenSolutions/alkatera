@@ -1,14 +1,12 @@
 "use client";
 
+/**
+ * The vehicle registry, re-cut for the studio: a flush cream panel with a
+ * quiet table, typographic state chips instead of badge pills, and no icon
+ * headers. The Add Vehicle dialog and every query are unchanged.
+ */
+
 import { useState, useEffect } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -35,9 +33,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Car, Truck, Bike, Loader2, Pencil, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Trash2 } from "lucide-react";
+import { Panel } from "@/components/studio/panel";
+import { StateChip } from "@/components/studio/state-chip";
+import { PillButton } from "@/components/studio/pill-button";
+import type { WorkingTone } from "@/components/studio/theme";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -62,10 +63,10 @@ interface Vehicle {
 }
 
 const VEHICLE_CLASSES = [
-  { value: "car", label: "Car", icon: Car },
-  { value: "van", label: "Van", icon: Truck },
-  { value: "hgv", label: "HGV / Truck", icon: Truck },
-  { value: "motorcycle", label: "Motorcycle", icon: Bike },
+  { value: "car", label: "Car" },
+  { value: "van", label: "Van" },
+  { value: "hgv", label: "HGV / Truck" },
+  { value: "motorcycle", label: "Motorcycle" },
 ];
 
 const PROPULSION_TYPES = [
@@ -234,27 +235,22 @@ export function FleetVehicleRegistry({
     });
   };
 
-  const getScopeColor = (scope: string) => {
-    if (scope === "Scope 1") return "secondary";
-    if (scope === "Scope 2") return "default";
-    return "outline";
-  };
+  const statusTone = (status: string): WorkingTone =>
+    status === "active" ? "good" : "quiet";
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle>Vehicle Registry</CardTitle>
-          <CardDescription>
-            Manage your fleet vehicles for accurate emissions tracking
-          </CardDescription>
-        </div>
+    <Panel flush>
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-studio-hairline px-5 py-4">
+        <p className="text-sm text-muted-foreground">
+          {loading
+            ? "Loading the registry"
+            : vehicles.length === 0
+            ? "No vehicles registered yet"
+            : `${vehicles.length} vehicle${vehicles.length === 1 ? "" : "s"} on the register`}
+        </p>
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
           <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Vehicle
-            </Button>
+            <PillButton size="sm">Add vehicle</PillButton>
           </DialogTrigger>
           <DialogContent className="max-w-lg">
             <DialogHeader>
@@ -429,35 +425,33 @@ export function FleetVehicleRegistry({
               </div>
 
               <DialogFooter>
-                <Button
+                <PillButton
                   type="button"
                   variant="outline"
                   onClick={() => setShowAddDialog(false)}
                 >
                   Cancel
-                </Button>
-                <Button type="submit" disabled={saving}>
-                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Add Vehicle
-                </Button>
+                </PillButton>
+                <PillButton type="submit" disabled={saving}>
+                  {saving ? "Adding vehicle" : "Add vehicle"}
+                </PillButton>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
-      </CardHeader>
+      </div>
 
-      <CardContent>
+      <div className="px-5 py-4">
         {loading ? (
           <div className="space-y-2">
             {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full" />
+              <div key={i} className="h-12 w-full animate-pulse rounded-[6px] bg-border/40" />
             ))}
           </div>
         ) : vehicles.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Car className="mx-auto h-12 w-12 mb-4 opacity-50" />
-            <p>No vehicles registered yet</p>
-            <p className="text-sm">Add your first vehicle to start tracking fleet emissions</p>
+          <div className="py-8 text-center text-sm text-muted-foreground">
+            <p>No vehicles registered yet.</p>
+            <p className="mt-1">Add your first vehicle to start tracking fleet emissions.</p>
           </div>
         ) : (
           <Table>
@@ -491,21 +485,16 @@ export function FleetVehicleRegistry({
                     {vehicle.ownership_type?.replace("_", " ")}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={getScopeColor(vehicle.calculated_scope)}>
-                      {vehicle.calculated_scope}
-                    </Badge>
+                    <StateChip tone="quiet">{vehicle.calculated_scope}</StateChip>
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant={vehicle.status === "active" ? "default" : "secondary"}
-                    >
-                      {vehicle.status}
-                    </Badge>
+                    <StateChip tone={statusTone(vehicle.status)}>{vehicle.status}</StateChip>
                   </TableCell>
                   <TableCell>
                     <Button
                       variant="ghost"
                       size="icon"
+                      aria-label="Retire vehicle"
                       onClick={() => handleDeleteVehicle(vehicle.id)}
                     >
                       <Trash2 className="h-4 w-4 text-muted-foreground" />
@@ -516,7 +505,7 @@ export function FleetVehicleRegistry({
             </TableBody>
           </Table>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

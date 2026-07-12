@@ -1,11 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { Eyebrow } from './eyebrow';
-import { StateChip } from './state-chip';
+import { FactList } from './fact-list';
 import type { WorkingTone } from './theme';
 
 interface CuratedTile {
@@ -66,52 +64,17 @@ export function DeskPriorities({ limit = 3 }: { limit?: number }) {
   return (
     <section className="rounded-[6px] border border-border bg-card p-5 md:p-6">
       <Eyebrow className="mb-4 text-room-accent">What needs you today</Eyebrow>
-      <ul className="divide-y divide-border">
-        {shown.map((tile) => {
-          const row = (
-            <div className="flex items-center gap-4 py-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline gap-3">
-                  <span className="truncate font-display text-sm font-semibold text-foreground">
-                    {tile.title}
-                  </span>
-                  <StateChip tone={TONE[tile.tone]}>{TONE_WORD[tile.tone]}</StateChip>
-                </div>
-                {tile.hint ? (
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{tile.hint}</p>
-                ) : null}
-              </div>
-              {tile.value ? (
-                <span className="shrink-0 font-display text-lg font-bold tabular-nums text-foreground">
-                  {tile.value}
-                  {tile.unit ? (
-                    <span className="ml-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                      {tile.unit}
-                    </span>
-                  ) : null}
-                </span>
-              ) : null}
-              {tile.href ? (
-                <ArrowRight
-                  className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150 ease-studio group-hover:translate-x-0.5 group-hover:text-room-accent"
-                  aria-hidden="true"
-                />
-              ) : null}
-            </div>
-          );
-          return (
-            <li key={tile.id}>
-              {tile.href ? (
-                <Link href={tile.href} className="group block">
-                  {row}
-                </Link>
-              ) : (
-                row
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      <FactList
+        items={shown.map((tile) => ({
+          id: tile.id,
+          title: tile.title,
+          hint: tile.hint || undefined,
+          chip: { tone: TONE[tile.tone], label: TONE_WORD[tile.tone] },
+          value: tile.value || undefined,
+          unit: tile.unit,
+          href: tile.href ?? undefined,
+        }))}
+      />
     </section>
   );
 }

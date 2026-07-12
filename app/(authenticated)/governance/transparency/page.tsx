@@ -1,27 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
-import {
-  Eye,
-  RefreshCw,
-  ArrowLeft,
-  Target,
-  Building2,
-  Globe,
-  Heart,
-  Save,
-  CheckCircle,
-} from 'lucide-react';
-import Link from 'next/link';
 import { useOrganization } from '@/lib/organizationContext';
+
+import { FeatureGate } from '@/components/subscription/FeatureGate';
+import { PillButton } from '@/components/studio/pill-button';
+import { StateChip } from '@/components/studio/state-chip';
+import { TopicHeader, Section, HubSkeleton, ComplianceNote } from '@/components/social';
 
 interface MissionData {
   id?: string;
@@ -59,6 +48,14 @@ const SDG_LIST = [
 ];
 
 export default function TransparencyPage() {
+  return (
+    <FeatureGate feature="governance_ethics">
+      <TransparencyPageContent />
+    </FeatureGate>
+  );
+}
+
+function TransparencyPageContent() {
   const { currentOrganization } = useOrganization();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -204,80 +201,30 @@ export default function TransparencyPage() {
   };
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-8 w-8" />
-          <Skeleton className="h-8 w-48" />
-        </div>
-        <Skeleton className="h-96" />
-      </div>
-    );
+    return <HubSkeleton />;
   }
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/governance">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-              <Eye className="h-6 w-6 text-amber-600" />
-              Transparency & Mission
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Mission, values, legal structure, and public commitments
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={handleSave} disabled={saving}>
-            {saved ? (
-              <>
-                <CheckCircle className="h-4 w-4 mr-2 text-emerald-500" />
-                Saved
-              </>
-            ) : saving ? (
-              <>
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4 mr-2" />
-                Save Changes
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-8 animate-fade-in-up">
+      <TopicHeader
+        eyebrow={<>THE WIRING &middot; GOVERNANCE</>}
+        headline={<>Transparency.</>}
+        description="Mission, values, legal structure, and public commitments."
+        backHref="/governance"
+        backLabel="Governance"
+      >
+        <PillButton size="sm" onClick={handleSave} disabled={saving}>
+          {saved ? 'Saved' : saving ? 'Saving…' : 'Save changes'}
+        </PillButton>
+      </TopicHeader>
 
-      {/* Info Card */}
-      <Card className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
-        <CardContent className="p-4">
-          <p className="text-sm text-amber-800 dark:text-amber-200">
-            <strong>About Transparency:</strong> Document your organization&apos;s mission, vision,
-            values, and public commitments. This information supports B Corp certification and
-            demonstrates purpose-driven governance.
-          </p>
-        </CardContent>
-      </Card>
+      <ComplianceNote label="ABOUT TRANSPARENCY">
+        Document your organisation&apos;s mission, vision, values, and public commitments. This
+        information supports B Corp certification and demonstrates purpose-driven governance.
+      </ComplianceNote>
 
-      {/* Mission & Vision */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Target className="h-5 w-5 text-blue-600" />
-            <CardTitle className="text-base">Mission & Vision</CardTitle>
-          </div>
-          <CardDescription>Your organization&apos;s purpose and direction</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <Section label="MISSION & VISION" blurb="Your organisation's purpose and direction.">
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="mission_statement">Mission Statement</Label>
             <Textarea
@@ -308,36 +255,24 @@ export default function TransparencyPage() {
               rows={2}
             />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Section>
 
-      {/* Core Values */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Heart className="h-5 w-5 text-pink-600" />
-            <CardTitle className="text-base">Core Values</CardTitle>
-          </div>
-          <CardDescription>The principles that guide your organization</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <Section label="CORE VALUES" blurb="The principles that guide your organisation.">
+        <div className="space-y-4">
           {formData.core_values && formData.core_values.length > 0 && (
-            <div className="space-y-2">
+            <div className="divide-y divide-studio-hairline border-y border-studio-hairline">
               {formData.core_values.map((value, index) => (
-                <div key={index} className="flex items-start gap-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <div key={index} className="flex items-start gap-2 py-3">
                   <div className="flex-1">
                     <p className="font-medium">{value.name}</p>
                     {value.description && (
                       <p className="text-sm text-muted-foreground">{value.description}</p>
                     )}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeCoreValue(index)}
-                  >
+                  <PillButton variant="ghost" size="sm" onClick={() => removeCoreValue(index)}>
                     Remove
-                  </Button>
+                  </PillButton>
                 </div>
               ))}
             </div>
@@ -361,25 +296,17 @@ export default function TransparencyPage() {
                   onChange={(e) => setNewValue({ ...newValue, description: e.target.value })}
                   placeholder="Brief description..."
                 />
-                <Button onClick={addCoreValue} disabled={!newValue.name}>
+                <PillButton variant="outline" onClick={addCoreValue} disabled={!newValue.name}>
                   Add
-                </Button>
+                </PillButton>
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Section>
 
-      {/* Legal Structure */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-emerald-600" />
-            <CardTitle className="text-base">Legal Structure</CardTitle>
-          </div>
-          <CardDescription>Your organization&apos;s legal form and governance</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <Section label="LEGAL STRUCTURE" blurb="Your organisation's legal form and governance.">
+        <div className="space-y-4">
           <div className="flex items-center space-x-2">
             <Checkbox
               id="is_benefit_corporation"
@@ -417,73 +344,62 @@ export default function TransparencyPage() {
               Articles of Association include stakeholder consideration
             </Label>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Section>
 
-      {/* SDG Commitments */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Globe className="h-5 w-5 text-blue-600" />
-            <CardTitle className="text-base">UN Sustainable Development Goals</CardTitle>
+      <Section
+        label="UN SUSTAINABLE DEVELOPMENT GOALS"
+        blurb="Select the SDGs your organisation is committed to."
+      >
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+          {SDG_LIST.map((sdg) => {
+            const isSelected = (formData.sdg_commitments || []).includes(sdg.number);
+            return (
+              <button
+                key={sdg.number}
+                onClick={() => toggleSDG(sdg.number)}
+                className={`p-2 rounded-[6px] border text-left transition-colors ${
+                  isSelected
+                    ? 'border-studio-ink bg-studio-cream'
+                    : 'border-studio-hairline bg-transparent hover:bg-studio-cream'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`font-bold text-sm ${isSelected ? 'text-foreground' : 'text-studio-dim'}`}>
+                    {sdg.number}
+                  </span>
+                  <span className="text-xs line-clamp-1">{sdg.name}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        {(formData.sdg_commitments || []).length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <span className="text-sm text-muted-foreground">Selected:</span>
+            {(formData.sdg_commitments || []).map(num => (
+              <StateChip key={num} tone="quiet">
+                SDG {num}
+              </StateChip>
+            ))}
           </div>
-          <CardDescription>Select the SDGs your organization is committed to</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-            {SDG_LIST.map((sdg) => {
-              const isSelected = (formData.sdg_commitments || []).includes(sdg.number);
-              return (
-                <button
-                  key={sdg.number}
-                  onClick={() => toggleSDG(sdg.number)}
-                  className={`p-2 rounded-lg border text-left transition-colors ${
-                    isSelected
-                      ? 'bg-blue-100 border-blue-300 dark:bg-blue-900/30 dark:border-blue-700'
-                      : 'bg-slate-50 border-slate-200 dark:bg-slate-800 dark:border-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={`font-bold text-sm ${isSelected ? 'text-blue-600' : 'text-slate-500'}`}>
-                      {sdg.number}
-                    </span>
-                    <span className="text-xs line-clamp-1">{sdg.name}</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-          {(formData.sdg_commitments || []).length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="text-sm text-muted-foreground">Selected:</span>
-              {(formData.sdg_commitments || []).map(num => (
-                <Badge key={num} variant="secondary">
-                  SDG {num}
-                </Badge>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        )}
+      </Section>
 
-      {/* Climate Commitments */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Climate Commitments</CardTitle>
-          <CardDescription>Public climate and environmental commitments</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <Section label="CLIMATE COMMITMENTS" blurb="Public climate and environmental commitments.">
+        <div className="space-y-4">
           {formData.climate_commitments && formData.climate_commitments.length > 0 && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
               {formData.climate_commitments.map((commitment, index) => (
-                <Badge
+                <button
                   key={index}
-                  variant="secondary"
-                  className="cursor-pointer hover:bg-red-100"
+                  type="button"
                   onClick={() => removeClimateCommitment(index)}
+                  className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim transition-colors hover:text-studio-stale"
+                  title="Remove commitment"
                 >
                   {commitment} ×
-                </Badge>
+                </button>
               ))}
             </div>
           )}
@@ -493,12 +409,12 @@ export default function TransparencyPage() {
               onChange={(e) => setNewClimateCommitment(e.target.value)}
               placeholder="e.g., Net Zero by 2050, SBTi committed"
             />
-            <Button onClick={addClimateCommitment} disabled={!newClimateCommitment}>
+            <PillButton variant="outline" onClick={addClimateCommitment} disabled={!newClimateCommitment}>
               Add
-            </Button>
+            </PillButton>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Section>
     </div>
   );
 }

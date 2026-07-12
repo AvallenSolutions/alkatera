@@ -198,7 +198,7 @@ export function BrandsStep({ onComplete, onBack, onSkip }: BrandsStepProps) {
             variant="ghost"
             onClick={addBrand}
             disabled={isSaving}
-            className="w-full border border-dashed border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:border-room-accent/40"
+            className="w-full border border-studio-hairline text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:border-room-accent/40"
           >
             <Plus className="w-4 h-4 mr-2" />
             Add Brand

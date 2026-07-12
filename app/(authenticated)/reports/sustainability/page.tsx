@@ -3,16 +3,13 @@
 import { Suspense, useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
-  Zap, FileText, Download, CheckCircle2,
-  Wand2, TrendingUp, Scale, Clock, AlertTriangle, BarChart2, Layers,
-  Target, TrendingDown, MapPin, ShieldAlert, Circle,
+  Download, TrendingUp, Scale,
 } from 'lucide-react'
-import { StateChip } from '@/components/studio'
+import {
+  Statement, Eyebrow, StateChip, BigNumber, PillButton, Panel, FactRow,
+} from '@/components/studio'
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client'
 import { useOrganization } from '@/lib/organizationContext'
 import { PageLoader } from '@/components/ui/page-loader'
@@ -26,10 +23,16 @@ import type { ReportConfig } from '@/types/report-builder'
 import { AUDIENCE_LABELS } from '@/types/report-builder'
 import { toast as sonnerToast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
-import { CATEGORY_COLOURS } from '@/lib/materiality/topic-library'
 import type { MaterialityTopic } from '@/lib/materiality/topic-library'
 import type { TransitionPlan } from '@/lib/transition-plan/types'
-import { SCOPE_LABELS, SCOPE_COLOURS } from '@/lib/transition-plan/types'
+import { SCOPE_LABELS } from '@/lib/transition-plan/types'
+
+// Short mono tag for an ESG category — replaces the old inline CATEGORY_COLOURS dot.
+const CATEGORY_TAG: Record<string, string> = {
+  environmental: 'ENV',
+  social: 'SOC',
+  governance: 'GOV',
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -288,148 +291,126 @@ function SustainabilityReportsHub() {
     <div className="space-y-6">
 
       {/* ── Page header ─────────────────────────────────────────────────────── */}
-      <div>
-        <div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-brick mb-2">
-          THE EVIDENCE · REPORTS
-        </div>
-        <h1 className="font-display text-[clamp(2.25rem,4vw,3.5rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
-          Sustainability reports.
-        </h1>
-        <p className="text-sm text-muted-foreground mt-3">
-          Generate, manage, and track your annual sustainability reports
+      <div className="space-y-3">
+        <Statement eyebrow="THE EVIDENCE · REPORTS" headline="Sustainability reports." />
+        <p className="text-sm text-muted-foreground">
+          Generate, manage and track your annual sustainability reports.
         </p>
       </div>
 
       {/* ── Report Readiness Panel ───────────────────────────────────────────── */}
-      <Card className="border-2">
-        <CardContent className="pt-6">
-          <div className="mb-4">
-            <h2 className="font-semibold text-base">Report Readiness</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Your data status for {currentYear}: click a tile to view details</p>
-          </div>
+      <Panel>
+        <div className="mb-4">
+          <Eyebrow tone="dim">READINESS · {currentYear}</Eyebrow>
+          <p className="text-xs text-muted-foreground mt-1.5">Your data status for the year. Open a tile for detail.</p>
+        </div>
 
-          {/* 4 status tiles */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-            {/* Emissions */}
-            <Link href="/data/scope-1-2" className="group">
-              <div className="p-3 rounded-[6px] border border-border bg-card h-full transition-colors cursor-pointer hover:border-foreground/40">
-                <div className="flex items-center gap-2 mb-1.5">
-                  {hasEmissions
-                    ? <CheckCircle2 className="h-4 w-4 text-studio-good shrink-0" />
-                    : <Circle className="h-4 w-4 text-muted-foreground shrink-0" />}
-                  <span className="text-xs font-medium">Emissions Data</span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {hasEmissions ? `${currentYear} footprint calculated` : 'Not calculated yet'}
-                </p>
+        {/* 4 status tiles */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          {/* Emissions */}
+          <Link href="/data/scope-1-2" className="group">
+            <div className="p-3 rounded-[6px] border border-studio-hairline h-full transition-colors cursor-pointer hover:border-foreground/40">
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <span className="text-xs font-medium">Emissions data</span>
+                <StateChip tone={hasEmissions ? 'good' : 'quiet'}>{hasEmissions ? 'Ready' : 'Todo'}</StateChip>
               </div>
-            </Link>
-
-            {/* Materiality */}
-            <button onClick={() => handleTabChange('materiality')} className="text-left group">
-              <div className="p-3 rounded-[6px] border border-border bg-card h-full transition-colors cursor-pointer hover:border-foreground/40">
-                <div className="flex items-center gap-2 mb-1.5">
-                  {matComplete
-                    ? <CheckCircle2 className="h-4 w-4 text-studio-good shrink-0" />
-                    : matInProgress
-                    ? <Clock className="h-4 w-4 text-studio-attention shrink-0" />
-                    : <Circle className="h-4 w-4 text-muted-foreground shrink-0" />}
-                  <span className="text-xs font-medium">Materiality</span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {matComplete
-                    ? `${matTopics.length} material topics`
-                    : matInProgress ? 'In progress' : 'Not started'}
-                </p>
-              </div>
-            </button>
-
-            {/* Transition Plan */}
-            <button onClick={() => handleTabChange('transition-plan')} className="text-left group">
-              <div className="p-3 rounded-[6px] border border-border bg-card h-full transition-colors cursor-pointer hover:border-foreground/40">
-                <div className="flex items-center gap-2 mb-1.5">
-                  {tpComplete
-                    ? <CheckCircle2 className="h-4 w-4 text-studio-good shrink-0" />
-                    : tpInProgress
-                    ? <Clock className="h-4 w-4 text-studio-attention shrink-0" />
-                    : <Circle className="h-4 w-4 text-muted-foreground shrink-0" />}
-                  <span className="text-xs font-medium">Transition Plan</span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {tpComplete
-                    ? `${transitionPlan!.targets.length} targets set`
-                    : tpInProgress ? 'In progress' : 'Not started'}
-                </p>
-              </div>
-            </button>
-
-            {/* LCAs */}
-            <Link href="/products" className="group">
-              <div className="p-3 rounded-[6px] border border-border bg-card h-full transition-colors cursor-pointer hover:border-foreground/40">
-                <div className="flex items-center gap-2 mb-1.5">
-                  {lcaCount > 0
-                    ? <CheckCircle2 className="h-4 w-4 text-studio-good shrink-0" />
-                    : <Circle className="h-4 w-4 text-muted-foreground shrink-0" />}
-                  <span className="text-xs font-medium">Product LCAs</span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {lcaCount > 0 ? `${lcaCount} completed` : 'None completed'}
-                </p>
-              </div>
-            </Link>
-          </div>
-
-          {/* CTAs */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <Button
-                className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                size="lg"
-                onClick={() => setQuickGenerateOpen(true)}
-              >
-                <Zap className="h-4 w-4 mr-2" />
-                Quick Generate
-              </Button>
-              <p className="text-xs text-muted-foreground text-center mt-1.5">
-                Auto-selects sections from your data. Ready in ~60 seconds.
+              <p className="text-xs text-muted-foreground">
+                {hasEmissions ? `${currentYear} footprint calculated` : 'Not calculated yet'}
               </p>
             </div>
-            <div className="flex-1">
-              <Link href="/reports/builder" className="block">
-                <Button variant="outline" className="w-full" size="lg">
-                  <Wand2 className="h-4 w-4 mr-2" />
-                  Custom Builder
-                </Button>
-              </Link>
-              <p className="text-xs text-muted-foreground text-center mt-1.5">
-                Choose your audience, sections, branding and more.
+          </Link>
+
+          {/* Materiality */}
+          <button onClick={() => handleTabChange('materiality')} className="text-left group">
+            <div className="p-3 rounded-[6px] border border-studio-hairline h-full transition-colors cursor-pointer hover:border-foreground/40">
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <span className="text-xs font-medium">Materiality</span>
+                <StateChip tone={matComplete ? 'good' : matInProgress ? 'attention' : 'quiet'}>
+                  {matComplete ? 'Done' : matInProgress ? 'Going' : 'Todo'}
+                </StateChip>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {matComplete
+                  ? `${matTopics.length} material topics`
+                  : matInProgress ? 'In progress' : 'Not started'}
               </p>
             </div>
+          </button>
+
+          {/* Transition Plan */}
+          <button onClick={() => handleTabChange('transition-plan')} className="text-left group">
+            <div className="p-3 rounded-[6px] border border-studio-hairline h-full transition-colors cursor-pointer hover:border-foreground/40">
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <span className="text-xs font-medium">Transition plan</span>
+                <StateChip tone={tpComplete ? 'good' : tpInProgress ? 'attention' : 'quiet'}>
+                  {tpComplete ? 'Done' : tpInProgress ? 'Going' : 'Todo'}
+                </StateChip>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {tpComplete
+                  ? `${transitionPlan!.targets.length} targets set`
+                  : tpInProgress ? 'In progress' : 'Not started'}
+              </p>
+            </div>
+          </button>
+
+          {/* LCAs */}
+          <Link href="/products" className="group">
+            <div className="p-3 rounded-[6px] border border-studio-hairline h-full transition-colors cursor-pointer hover:border-foreground/40">
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <span className="text-xs font-medium">Product LCAs</span>
+                <StateChip tone={lcaCount > 0 ? 'good' : 'quiet'}>{lcaCount > 0 ? 'Ready' : 'Todo'}</StateChip>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {lcaCount > 0 ? `${lcaCount} completed` : 'None completed'}
+              </p>
+            </div>
+          </Link>
+        </div>
+
+        {/* CTAs */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <PillButton variant="room" className="w-full" onClick={() => setQuickGenerateOpen(true)}>
+              Quick Generate
+            </PillButton>
+            <p className="text-xs text-muted-foreground text-center mt-1.5">
+              Auto-selects sections from your data. Ready in about 60 seconds.
+            </p>
           </div>
-        </CardContent>
-      </Card>
+          <div className="flex-1">
+            <PillButton variant="outline" href="/reports/builder" className="w-full">
+              Custom Builder
+            </PillButton>
+            <p className="text-xs text-muted-foreground text-center mt-1.5">
+              Choose your audience, sections, branding and more.
+            </p>
+          </div>
+        </div>
+      </Panel>
 
       {/* ── Impact Focus report creation ─────────────────────────────────── */}
       <VerificationCard variant="report-creation" />
 
+      {/* ── Guardian cross-link (the guardian's door from reports) ────────── */}
+      <FactRow
+        subject="Check a claim before you publish"
+        detail="run it past the greenwash guardian"
+        meta="OPEN →"
+        href="/greenwash-guardian/"
+      />
+
       {/* ── Tabs ────────────────────────────────────────────────────────────── */}
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full max-w-md grid-cols-3">
-          <TabsTrigger value="reports" className="gap-1.5">
-            <FileText className="h-4 w-4" />
+          <TabsTrigger value="reports" className="gap-2">
             Reports
             {activeReports.length > 0 && (
-              <Badge variant="secondary" className="ml-0.5 text-xs px-1.5 py-0 h-4">{activeReports.length}</Badge>
+              <StateChip>{activeReports.length}</StateChip>
             )}
           </TabsTrigger>
-          <TabsTrigger value="materiality" className="gap-1.5">
-            <Layers className="h-4 w-4" />
-            Materiality
-          </TabsTrigger>
-          <TabsTrigger value="transition-plan" className="gap-1.5">
-            <TrendingDown className="h-4 w-4" />
-            Transition Plan
-          </TabsTrigger>
+          <TabsTrigger value="materiality">Materiality</TabsTrigger>
+          <TabsTrigger value="transition-plan">Transition Plan</TabsTrigger>
         </TabsList>
 
         {/* ── Reports tab ─────────────────────────────────────────────────── */}
@@ -449,142 +430,121 @@ function SustainabilityReportsHub() {
 
           {/* Completed generation banner */}
           {generatingReportId && progress.status === 'completed' && progress.documentUrl && (
-            <Card className="rounded-[6px] border border-border bg-card">
-              <CardContent className="py-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-studio-good shrink-0" />
-                    <div>
-                      <p className="font-medium">Report ready</p>
-                      <p className="text-sm text-muted-foreground">{config.reportName}</p>
-                    </div>
+            <Panel>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-baseline gap-3">
+                    <p className="font-display font-semibold text-foreground">Report ready</p>
+                    <StateChip tone="good">Complete</StateChip>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button onClick={() => handleDownload(progress.documentUrl!)} size="sm">
-                      <Download className="h-4 w-4 mr-1.5" />Download
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setGeneratingReportId(null)}>Dismiss</Button>
-                  </div>
+                  <p className="text-sm text-muted-foreground mt-0.5">{config.reportName}</p>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="flex items-center gap-2 shrink-0">
+                  <PillButton size="sm" onClick={() => handleDownload(progress.documentUrl!)}>
+                    <Download className="h-3.5 w-3.5" />Download
+                  </PillButton>
+                  <PillButton variant="ghost" size="sm" onClick={() => setGeneratingReportId(null)}>Dismiss</PillButton>
+                </div>
+              </div>
+            </Panel>
           )}
 
           {/* Reports card grid — completed/generating only */}
           {activeReports.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {activeReports.map(report => (
-                <Card key={report.id} className="flex flex-col">
-                  <CardContent className="pt-5 flex flex-col flex-1">
-                    {/* Header row */}
-                    <div className="flex items-start gap-3 mb-3">
-                      <div className="h-10 w-10 rounded-[6px] bg-secondary flex items-center justify-center shrink-0">
-                        <FileText className="h-5 w-5 text-muted-foreground" />
+                <Panel key={report.id} className="flex flex-col">
+                  {/* Header row */}
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-display font-semibold leading-tight truncate text-foreground">{report.report_name}</div>
+                      <div className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                        {report.report_year} · {getFormatLabel(report.output_format)} · {AUDIENCE_LABELS?.[report.audience as keyof typeof AUDIENCE_LABELS] || report.audience}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="font-semibold leading-tight truncate">{report.report_name}</div>
-                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                          <Badge variant="secondary" className="text-xs">{report.report_year}</Badge>
-                          <Badge variant="outline" className="text-xs">{getFormatLabel(report.output_format)}</Badge>
-                          <Badge variant="outline" className="text-xs">{AUDIENCE_LABELS?.[report.audience as keyof typeof AUDIENCE_LABELS] || report.audience}</Badge>
-                        </div>
-                      </div>
-                      {getStatusBadge(report.status)}
                     </div>
+                    {getStatusBadge(report.status)}
+                  </div>
 
-                    <p className="text-xs text-muted-foreground mb-auto">
-                      Generated {formatDistanceToNow(new Date(report.created_at), { addSuffix: true })}
-                    </p>
+                  <p className="text-xs text-muted-foreground mb-auto">
+                    Generated {formatDistanceToNow(new Date(report.created_at), { addSuffix: true })}
+                  </p>
 
-                    {/* Actions — only for completed reports */}
-                    {report.status === 'completed' && (
-                      <div className="flex flex-wrap gap-2 pt-3 mt-3 border-t border-border">
-                        {report.document_url && (
-                          <Button size="sm" onClick={() => handleDownload(report.document_url!)}>
-                            <Download className="h-3.5 w-3.5 mr-1.5" />
-                            Download
-                          </Button>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={exportingId === `${report.id}-investor-summary`}
-                          onClick={() => downloadSummary(report.id, 'investor-summary')}
-                        >
-                          <TrendingUp className="h-3.5 w-3.5 mr-1.5" />
-                          {exportingId === `${report.id}-investor-summary` ? 'Exporting...' : 'Investor Summary'}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={exportingId === `${report.id}-regulatory-index`}
-                          onClick={() => downloadSummary(report.id, 'regulatory-index')}
-                        >
-                          <Scale className="h-3.5 w-3.5 mr-1.5" />
-                          {exportingId === `${report.id}-regulatory-index` ? 'Exporting...' : 'Regulatory Index'}
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                  {/* Actions — only for completed reports */}
+                  {report.status === 'completed' && (
+                    <div className="flex flex-wrap gap-2 pt-3 mt-3 border-t border-studio-hairline">
+                      {report.document_url && (
+                        <PillButton size="sm" onClick={() => handleDownload(report.document_url!)}>
+                          <Download className="h-3.5 w-3.5" />
+                          Download
+                        </PillButton>
+                      )}
+                      <PillButton
+                        variant="outline"
+                        size="sm"
+                        disabled={exportingId === `${report.id}-investor-summary`}
+                        onClick={() => downloadSummary(report.id, 'investor-summary')}
+                      >
+                        <TrendingUp className="h-3.5 w-3.5" />
+                        {exportingId === `${report.id}-investor-summary` ? 'Exporting...' : 'Investor summary'}
+                      </PillButton>
+                      <PillButton
+                        variant="outline"
+                        size="sm"
+                        disabled={exportingId === `${report.id}-regulatory-index`}
+                        onClick={() => downloadSummary(report.id, 'regulatory-index')}
+                      >
+                        <Scale className="h-3.5 w-3.5" />
+                        {exportingId === `${report.id}-regulatory-index` ? 'Exporting...' : 'Regulatory index'}
+                      </PillButton>
+                    </div>
+                  )}
+                </Panel>
               ))}
             </div>
           ) : (
             !generatingReportId && (
-              <Card className="border-dashed">
-                <CardContent className="py-16 text-center">
-                  <div className="h-14 w-14 rounded-full bg-secondary flex items-center justify-center mx-auto mb-4">
-                    <FileText className="h-7 w-7 text-muted-foreground" />
-                  </div>
-                  <h3 className="font-semibold text-lg mb-2">No reports yet</h3>
-                  <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
-                    Generate your first sustainability report in seconds. We will pull your emissions,
-                    products, and facility data automatically.
-                  </p>
-                  <Button
-                    className="bg-primary text-primary-foreground hover:bg-primary/90"
-                    onClick={() => setQuickGenerateOpen(true)}
-                  >
-                    <Zap className="h-4 w-4 mr-2" />
-                    Generate Your First Report
-                  </Button>
-                </CardContent>
-              </Card>
+              <div className="border-t border-studio-hairline py-10 text-center">
+                <p className="text-sm text-muted-foreground mb-4">
+                  No reports yet. Generate your first in seconds, we pull your emissions, products and facility data automatically.
+                </p>
+                <PillButton variant="room" onClick={() => setQuickGenerateOpen(true)}>
+                  Quick Generate
+                </PillButton>
+              </div>
             )
           )}
 
-          {/* Failed reports — collapsible section */}
+          {/* Failed reports — one quiet stale line + a quiet retry */}
           {failedReports.length > 0 && (
             <div className="mt-2">
               <button
                 onClick={() => setShowFailedReports(v => !v)}
                 className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
-                <AlertTriangle className="h-3.5 w-3.5 text-studio-attention" />
-                {failedReports.length} failed attempt{failedReports.length !== 1 ? 's' : ''}
+                <StateChip tone="stale">{failedReports.length} failed attempt{failedReports.length !== 1 ? 's' : ''}</StateChip>
                 <span className="underline underline-offset-2">{showFailedReports ? 'Hide' : 'Show'}</span>
               </button>
               {showFailedReports && (
-                <div className="mt-3 space-y-2">
+                <div className="mt-3 divide-y divide-border">
                   {failedReports.map(report => (
-                    <div key={report.id} className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-[6px] border border-border bg-card text-sm">
+                    <div key={report.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
                       <div className="min-w-0">
-                        <span className="font-medium truncate">{report.report_name}</span>
-                        <span className="text-muted-foreground ml-2 text-xs">
+                        <span className="font-display font-semibold text-foreground truncate">{report.report_name}</span>
+                        <span className="text-muted-foreground ml-2 font-mono text-[10px] uppercase tracking-[0.15em]">
                           {formatDistanceToNow(new Date(report.created_at), { addSuffix: true })}
                         </span>
                         <p className="text-xs text-studio-stale mt-0.5 truncate">
                           {isStaleGenerating(report) ? 'Generation timed out' : report.error_message}
                         </p>
                       </div>
-                      <Button
+                      <PillButton
                         variant="ghost"
                         size="sm"
-                        className="shrink-0 text-xs h-7"
+                        className="shrink-0"
                         onClick={() => setQuickGenerateOpen(true)}
                       >
                         Retry
-                      </Button>
+                      </PillButton>
                     </div>
                   ))}
                 </div>
@@ -597,7 +557,7 @@ function SustainabilityReportsHub() {
         <TabsContent value="materiality" className="mt-6">
           <div className="space-y-6 max-w-4xl">
             <div>
-              <h2 className="text-xl font-semibold">Materiality Assessment</h2>
+              <h2 className="font-display text-xl font-semibold text-foreground">Materiality assessment</h2>
               <p className="text-sm text-muted-foreground mt-1">
                 Identify and prioritise the sustainability topics that matter most to your business and stakeholders.
                 Your materiality assessment shapes the structure and narrative of every report you generate.
@@ -606,120 +566,98 @@ function SustainabilityReportsHub() {
 
             {/* Status banner */}
             {matComplete ? (
-              <div className="rounded-[6px] border border-border bg-card p-4 flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-studio-good shrink-0 mt-0.5" />
+              <Panel className="flex items-start justify-between gap-3">
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">{currentYear} assessment complete</p>
+                  <div className="flex items-baseline gap-3">
+                    <p className="font-display text-sm font-semibold text-foreground">{currentYear} assessment complete</p>
+                    <StateChip tone="good">Done</StateChip>
+                  </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {matTopics.length} material topics identified, {priorityCount} set as priorities.
                     Your reports will be structured around these topics.
                   </p>
                 </div>
-                <Link href={`/reports/materiality/setup?year=${currentYear}`}>
-                  <Button variant="outline" size="sm">Edit</Button>
-                </Link>
-              </div>
+                <PillButton variant="outline" size="sm" href={`/reports/materiality/setup?year=${currentYear}`}>Edit</PillButton>
+              </Panel>
             ) : matAssessment ? (
-              <div className="rounded-[6px] border border-border bg-card p-4 flex items-start gap-3">
-                <Clock className="w-5 h-5 text-studio-attention shrink-0 mt-0.5" />
+              <Panel className="flex items-start justify-between gap-3">
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">Assessment in progress</p>
+                  <div className="flex items-baseline gap-3">
+                    <p className="font-display text-sm font-semibold text-foreground">Assessment in progress</p>
+                    <StateChip tone="attention">Going</StateChip>
+                  </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {matTopics.length} topics marked as material so far. Complete the three-step setup to finalise.
                   </p>
                 </div>
-                <Link href={`/reports/materiality/setup?year=${currentYear}`}>
-                  <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">Continue</Button>
-                </Link>
-              </div>
+                <PillButton variant="room" size="sm" href={`/reports/materiality/setup?year=${currentYear}`}>Continue</PillButton>
+              </Panel>
             ) : (
-              <div className="rounded-[6px] border border-border bg-card p-4 flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+              <Panel className="flex items-start justify-between gap-3">
                 <div className="flex-1">
-                  <p className="text-sm font-medium">No assessment for {currentYear}</p>
+                  <p className="font-display text-sm font-semibold text-foreground">No assessment for {currentYear}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Complete your double-materiality assessment to unlock structured, framework-compliant reports.
                     Takes around 20 minutes.
                   </p>
                 </div>
-                <Link href={`/reports/materiality/setup?year=${currentYear}`}>
-                  <Button size="sm">Start Assessment</Button>
-                </Link>
-              </div>
+                <PillButton size="sm" href={`/reports/materiality/setup?year=${currentYear}`}>Start assessment</PillButton>
+              </Panel>
             )}
 
             {/* ESG category counts */}
             {matTopics.length > 0 && (
-              <div className="grid grid-cols-3 gap-4">
-                {[
-                  { label: 'Environmental', count: envCount, color: CATEGORY_COLOURS.environmental },
-                  { label: 'Social', count: socialCount, color: CATEGORY_COLOURS.social },
-                  { label: 'Governance', count: govCount, color: CATEGORY_COLOURS.governance },
-                ].map(({ label, count, color }) => (
-                  <Card key={label}>
-                    <CardContent className="pt-5">
-                      <div className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-1">{label}</div>
-                      <div className="font-display text-3xl font-bold tabular-nums" style={{ color }}>{count}</div>
-                      <div className="text-xs text-muted-foreground mt-1">material topics</div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+              <Panel className="grid grid-cols-3 gap-4">
+                <BigNumber value={envCount} label="Environmental" />
+                <BigNumber value={socialCount} label="Social" />
+                <BigNumber value={govCount} label="Governance" />
+              </Panel>
             )}
 
             {/* Priority topics list */}
             {matComplete && priorityCount > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Priority Topics</CardTitle>
-                  <CardDescription>
-                    These topics appear first in your reports and drive the narrative structure.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {matAssessment!.priority_topics.map((topicId, index) => {
-                      const topic = matAssessment!.topics.find(t => t.id === topicId)
-                      if (!topic) return null
-                      return (
-                        <div key={topicId} className="flex items-center gap-3 py-2 border-b border-border last:border-0">
-                          <span className="text-sm font-mono text-muted-foreground w-5 text-right">{index + 1}</span>
-                          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: CATEGORY_COLOURS[topic.category] }} />
-                          <span className="text-sm flex-1">{topic.name}</span>
-                          {topic.impactScore && topic.financialScore && (
-                            <span className="text-xs text-muted-foreground">
-                              {topic.impactScore}×{topic.financialScore} = {topic.impactScore * topic.financialScore}
-                            </span>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
+              <div>
+                <Eyebrow tone="dim">PRIORITY TOPICS</Eyebrow>
+                <p className="text-xs text-muted-foreground mt-1 mb-3">
+                  These topics appear first in your reports and drive the narrative structure.
+                </p>
+                <div className="divide-y divide-border">
+                  {matAssessment!.priority_topics.map((topicId, index) => {
+                    const topic = matAssessment!.topics.find(t => t.id === topicId)
+                    if (!topic) return null
+                    return (
+                      <div key={topicId} className="flex items-center gap-3 py-2.5">
+                        <span className="w-5 text-right font-mono text-[11px] tabular-nums text-muted-foreground">{index + 1}</span>
+                        <StateChip>{CATEGORY_TAG[topic.category] ?? topic.category}</StateChip>
+                        <span className="flex-1 text-sm text-foreground">{topic.name}</span>
+                        {topic.impactScore && topic.financialScore && (
+                          <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                            {topic.impactScore}×{topic.financialScore} = {topic.impactScore * topic.financialScore}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             )}
 
             {/* Why materiality matters */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Why materiality matters</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            <Panel>
+              <Eyebrow tone="dim">WHY MATERIALITY MATTERS</Eyebrow>
+              <div className="mt-3 space-y-3">
                 {[
-                  { icon: Layers, title: 'Report structure', desc: 'Material topics appear first in your reports. Non-material topics move to the appendix.' },
-                  { icon: BarChart2, title: 'Narrative quality', desc: 'AI section narratives are written with materiality context, specific to what matters for your business.' },
-                  { icon: CheckCircle2, title: 'CSRD compliance', desc: 'A completed double-materiality assessment is required to use the CSRD standard on your reports.' },
-                ].map(({ icon: Icon, title, desc }) => (
-                  <div key={title} className="flex gap-3">
-                    <Icon className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium">{title}</p>
-                      <p className="text-xs text-muted-foreground">{desc}</p>
-                    </div>
+                  { title: 'Report structure', desc: 'Material topics appear first in your reports. Non-material topics move to the appendix.' },
+                  { title: 'Narrative quality', desc: 'Section narratives are written with materiality context, specific to what matters for your business.' },
+                  { title: 'CSRD compliance', desc: 'A completed double-materiality assessment is required to use the CSRD standard on your reports.' },
+                ].map(({ title, desc }) => (
+                  <div key={title}>
+                    <p className="text-sm font-medium text-foreground">{title}</p>
+                    <p className="text-xs text-muted-foreground">{desc}</p>
                   </div>
                 ))}
-              </CardContent>
-            </Card>
+              </div>
+            </Panel>
           </div>
         </TabsContent>
 
@@ -727,19 +665,21 @@ function SustainabilityReportsHub() {
         <TabsContent value="transition-plan" className="mt-6">
           <div className="space-y-6 max-w-4xl">
             <div>
-              <h2 className="text-xl font-semibold">Transition Plan</h2>
+              <h2 className="font-display text-xl font-semibold text-foreground">Transition plan</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Define your decarbonisation pathway with reduction targets, milestones, and a climate risk assessment.
+                Define your decarbonisation pathway with reduction targets, milestones and a climate risk assessment.
                 Your transition plan feeds directly into generated sustainability reports.
               </p>
             </div>
 
             {/* Status banner */}
             {tpComplete ? (
-              <div className="rounded-[6px] border border-border bg-card p-4 flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-studio-good shrink-0 mt-0.5" />
+              <Panel className="flex items-start justify-between gap-3">
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">{currentYear} transition plan complete</p>
+                  <div className="flex items-baseline gap-3">
+                    <p className="font-display text-sm font-semibold text-foreground">{currentYear} transition plan complete</p>
+                    <StateChip tone="good">Done</StateChip>
+                  </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {transitionPlan!.targets.length} target{transitionPlan!.targets.length !== 1 ? 's' : ''},{' '}
                     {transitionPlan!.milestones.length} milestone{transitionPlan!.milestones.length !== 1 ? 's' : ''},{' '}
@@ -747,125 +687,91 @@ function SustainabilityReportsHub() {
                     {transitionPlan!.sbti_aligned && ' SBTi aligned.'}
                   </p>
                 </div>
-                <Link href={`/reports/transition-plan/setup?year=${currentYear}`}>
-                  <Button variant="outline" size="sm">Edit</Button>
-                </Link>
-              </div>
+                <PillButton variant="outline" size="sm" href={`/reports/transition-plan/setup?year=${currentYear}`}>Edit</PillButton>
+              </Panel>
             ) : tpInProgress ? (
-              <div className="rounded-[6px] border border-border bg-card p-4 flex items-start gap-3">
-                <Clock className="w-5 h-5 text-studio-attention shrink-0 mt-0.5" />
+              <Panel className="flex items-start justify-between gap-3">
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">Plan in progress</p>
+                  <div className="flex items-baseline gap-3">
+                    <p className="font-display text-sm font-semibold text-foreground">Plan in progress</p>
+                    <StateChip tone="attention">Going</StateChip>
+                  </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {!tpHasTargets && 'Add reduction targets. '}
                     {!tpHasMilestones && 'Add milestones. '}
                     {!tpHasRisks && 'Generate risks and opportunities to complete.'}
                   </p>
                 </div>
-                <Link href={`/reports/transition-plan/setup?year=${currentYear}`}>
-                  <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">Continue</Button>
-                </Link>
-              </div>
+                <PillButton variant="room" size="sm" href={`/reports/transition-plan/setup?year=${currentYear}`}>Continue</PillButton>
+              </Panel>
             ) : (
-              <div className="rounded-[6px] border border-border bg-card p-4 flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+              <Panel className="flex items-start justify-between gap-3">
                 <div className="flex-1">
-                  <p className="text-sm font-medium">No transition plan for {currentYear}</p>
+                  <p className="font-display text-sm font-semibold text-foreground">No transition plan for {currentYear}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Demonstrate to investors and regulators that your sustainability commitments are backed by a credible pathway.
                     Takes around 15 minutes.
                   </p>
                 </div>
-                <Link href={`/reports/transition-plan/setup?year=${currentYear}`}>
-                  <Button size="sm">Create Plan</Button>
-                </Link>
-              </div>
+                <PillButton size="sm" href={`/reports/transition-plan/setup?year=${currentYear}`}>Create plan</PillButton>
+              </Panel>
             )}
 
             {/* Summary counts */}
             {(tpHasTargets || tpHasMilestones) && transitionPlan && (
-              <div className="grid grid-cols-3 gap-4">
-                <Card>
-                  <CardContent className="pt-5">
-                    <div className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-1">Targets</div>
-                    <div className="font-display text-3xl font-bold tabular-nums">{transitionPlan.targets.length}</div>
-                    <div className="text-xs text-muted-foreground mt-1">reduction targets</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-5">
-                    <div className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-1">Milestones</div>
-                    <div className="font-display text-3xl font-bold tabular-nums">{transitionPlan.milestones.length}</div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {transitionPlan.milestones.filter(m => m.status === 'complete').length} complete
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-5">
-                    <div className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-1">
-                      <div className="flex items-center gap-1.5">
-                        Risks &amp; Opps
-                        {transitionPlan.sbti_aligned && (
-                          <StateChip tone="good">SBTi</StateChip>
-                        )}
-                      </div>
-                    </div>
-                    <div className="font-display text-3xl font-bold tabular-nums">{transitionPlan.risks_and_opportunities?.length ?? 0}</div>
-                    <div className="text-xs text-muted-foreground mt-1">identified</div>
-                  </CardContent>
-                </Card>
-              </div>
+              <Panel className="grid grid-cols-3 gap-4">
+                <BigNumber value={transitionPlan.targets.length} label="Reduction targets" />
+                <BigNumber
+                  value={transitionPlan.milestones.length}
+                  label={`Milestones · ${transitionPlan.milestones.filter(m => m.status === 'complete').length} complete`}
+                />
+                <div>
+                  <BigNumber value={transitionPlan.risks_and_opportunities?.length ?? 0} label="Risks & opps identified" />
+                  {transitionPlan.sbti_aligned && <StateChip tone="good" className="mt-1.5 inline-block">SBTi</StateChip>}
+                </div>
+              </Panel>
             )}
 
             {/* Reduction targets list */}
             {tpHasTargets && transitionPlan && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Reduction Targets</CardTitle>
-                  <CardDescription>Emission reduction commitments vs. {transitionPlan.baseline_year} baseline</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {transitionPlan.targets.map(target => (
-                      <div key={target.id} className="flex items-center gap-4">
-                        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: SCOPE_COLOURS[target.scope] }} />
-                        <div className="flex-1 text-sm">{SCOPE_LABELS[target.scope]}</div>
-                        <div className="text-sm font-semibold" style={{ color: SCOPE_COLOURS[target.scope] }}>
-                          -{target.reductionPct}% by {target.targetYear}
-                        </div>
-                        {target.reductionPct >= 50 && (
-                          <StateChip tone="good">SBTi</StateChip>
-                        )}
+              <div>
+                <Eyebrow tone="dim">REDUCTION TARGETS</Eyebrow>
+                <p className="text-xs text-muted-foreground mt-1 mb-3">
+                  Emission reduction commitments vs the {transitionPlan.baseline_year} baseline.
+                </p>
+                <div className="divide-y divide-border">
+                  {transitionPlan.targets.map(target => (
+                    <div key={target.id} className="flex items-center gap-4 py-2.5">
+                      <div className="flex-1 text-sm text-foreground">{SCOPE_LABELS[target.scope]}</div>
+                      <div className="font-display text-sm font-semibold text-room-accent">
+                        -{target.reductionPct}% by {target.targetYear}
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                      {target.reductionPct >= 50 && (
+                        <StateChip tone="good">SBTi</StateChip>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
 
             {/* Why transition planning matters */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Why transition planning matters</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            <Panel>
+              <Eyebrow tone="dim">WHY TRANSITION PLANNING MATTERS</Eyebrow>
+              <div className="mt-3 space-y-3">
                 {[
-                  { icon: Target, title: 'Investor confidence', desc: 'Investors increasingly require a credible decarbonisation pathway, not just a net zero pledge. A transition plan demonstrates that targets are backed by specific actions.' },
-                  { icon: TrendingDown, title: 'CSRD requirement', desc: 'The Corporate Sustainability Reporting Directive requires a transition plan for climate disclosures. Without one, CSRD reports are incomplete.' },
-                  { icon: MapPin, title: 'Report integration', desc: 'When a plan exists, every generated report includes a Transition Roadmap section and a Risks and Opportunities analysis.' },
-                  { icon: ShieldAlert, title: 'Risk management', desc: 'Identify physical and transition climate risks before they materialise and demonstrate governance accountability.' },
-                ].map(({ icon: Icon, title, desc }) => (
-                  <div key={title} className="flex gap-3">
-                    <Icon className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium">{title}</p>
-                      <p className="text-xs text-muted-foreground">{desc}</p>
-                    </div>
+                  { title: 'Investor confidence', desc: 'Investors increasingly require a credible decarbonisation pathway, not just a net zero pledge. A transition plan demonstrates that targets are backed by specific actions.' },
+                  { title: 'CSRD requirement', desc: 'The Corporate Sustainability Reporting Directive requires a transition plan for climate disclosures. Without one, CSRD reports are incomplete.' },
+                  { title: 'Report integration', desc: 'When a plan exists, every generated report includes a transition roadmap section and a risks and opportunities analysis.' },
+                  { title: 'Risk management', desc: 'Identify physical and transition climate risks before they materialise and demonstrate governance accountability.' },
+                ].map(({ title, desc }) => (
+                  <div key={title}>
+                    <p className="text-sm font-medium text-foreground">{title}</p>
+                    <p className="text-xs text-muted-foreground">{desc}</p>
                   </div>
                 ))}
-              </CardContent>
-            </Card>
+              </div>
+            </Panel>
           </div>
         </TabsContent>
       </Tabs>

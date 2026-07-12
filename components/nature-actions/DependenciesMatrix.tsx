@@ -8,8 +8,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Badge } from '@/components/ui/badge'
-import { Skeleton } from '@/components/ui/skeleton'
+import { StateChip } from '@/components/studio/state-chip'
+import { Eyebrow } from '@/components/studio/eyebrow'
+import type { WorkingTone } from '@/components/studio/theme'
 import {
   Select,
   SelectContent,
@@ -32,12 +33,13 @@ interface DeclaredDependency {
   notes: string | null
 }
 
-const MATERIALITY_TONE: Record<Materiality | 'undeclared', string> = {
-  undeclared: 'bg-muted text-muted-foreground',
-  low: 'bg-sky-500/10 text-sky-300 border-sky-500/30',
-  medium: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
-  high: 'bg-orange-500/10 text-orange-300 border-orange-500/30',
-  critical: 'bg-red-500/10 text-red-300 border-red-500/30',
+/** Materiality → working tone: states are typographic, never decoration. */
+const MATERIALITY_TONE: Record<Materiality | 'undeclared', WorkingTone> = {
+  undeclared: 'quiet',
+  low: 'good',
+  medium: 'attention',
+  high: 'stale',
+  critical: 'stale',
 }
 
 const CATEGORY_LABEL: Record<'provisioning' | 'regulating_maintenance' | 'cultural', string> = {
@@ -125,9 +127,9 @@ export function DependenciesMatrix() {
 
   if (declared === null) {
     return (
-      <div className="space-y-3">
+      <div className="space-y-3" aria-hidden="true">
         {[0, 1, 2, 3].map(i => (
-          <Skeleton key={i} className="h-20 w-full rounded-xl" />
+          <div key={i} className="h-20 w-full animate-pulse rounded-[6px] bg-studio-cream" />
         ))}
       </div>
     )
@@ -141,16 +143,16 @@ export function DependenciesMatrix() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-border bg-card p-4 flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 rounded-[6px] border border-studio-hairline bg-studio-cream p-4">
         <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wider">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
             Coverage of drinks-material dependencies
           </p>
-          <p className="text-2xl font-semibold tabular-nums mt-1">{coveragePct}%</p>
+          <p className="mt-1 font-display text-2xl font-bold tabular-nums">{coveragePct}%</p>
         </div>
         <div className="text-right">
           <p className="text-xs text-muted-foreground">{declaredCount} declared in total</p>
-          <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+          <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.15em] text-studio-dim tabular-nums">
             {materialDeclared} of {DRINKS_MATERIAL_DEPENDENCIES.length} sector-material
           </p>
         </div>
@@ -161,9 +163,9 @@ export function DependenciesMatrix() {
         if (items.length === 0) return null
         return (
           <div key={category}>
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+            <Eyebrow tone="dim" className="mb-2">
               {CATEGORY_LABEL[category]}
-            </h2>
+            </Eyebrow>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {items.map(dep => {
                 const current = declared.get(dep.value)
@@ -172,26 +174,17 @@ export function DependenciesMatrix() {
                   : MATERIALITY_TONE.undeclared
                 const noteValue = pendingNotes[dep.value] ?? current?.notes ?? ''
                 return (
-                  <div key={dep.value} className="rounded-xl border border-border bg-card p-4 space-y-3">
+                  <div key={dep.value} className="rounded-[6px] border border-studio-hairline bg-studio-cream p-4 space-y-3">
                     <div className="flex items-start gap-3">
-                      <span className="text-2xl leading-none">{dep.emoji}</span>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-semibold">{dep.label}</p>
+                        <div className="flex items-baseline gap-3 flex-wrap">
+                          <p className="font-display text-sm font-semibold">{dep.label}</p>
                           {dep.drinks_material && (
-                            <Badge
-                              variant="outline"
-                              className="text-[9px] h-5 bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
-                            >
-                              Drinks-material
-                            </Badge>
+                            <StateChip tone="quiet">Drinks-material</StateChip>
                           )}
-                          <Badge
-                            variant="outline"
-                            className={`text-[9px] h-5 capitalize ${tone}`}
-                          >
+                          <StateChip tone={tone}>
                             {current?.materiality ?? 'undeclared'}
-                          </Badge>
+                          </StateChip>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
                           {dep.description}

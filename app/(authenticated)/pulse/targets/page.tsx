@@ -1,9 +1,8 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { ArrowLeft, Plus, Target as TargetIcon } from 'lucide-react';
+import { Plus, Target as TargetIcon } from 'lucide-react';
 import { Eyebrow } from '@/components/studio/eyebrow';
 import { useOrganization } from '@/lib/organizationContext';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -168,14 +167,7 @@ function TargetsActionsHub() {
   return (
     <div className="space-y-6">
       <header>
-        <Link
-          href="/pulse"
-          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors duration-200 ease-studio hover:text-foreground"
-        >
-          <ArrowLeft className="h-3 w-3" />
-          Back to Pulse
-        </Link>
-        <Eyebrow className="mb-3 mt-3">PULSE · TARGETS</Eyebrow>
+        <Eyebrow className="mb-3">THE EVIDENCE · TARGETS</Eyebrow>
         <h1 className="font-display text-[clamp(2rem,4vw,3rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
           Targets &amp; actions.
         </h1>

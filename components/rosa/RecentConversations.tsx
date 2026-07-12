@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
-import { Skeleton } from '@/components/ui/skeleton'
-import { MessageSquare, ArrowRight } from 'lucide-react'
 import { useRosaContext } from '@/lib/rosa/RosaContextProvider'
 import { useRealtimeRefresh } from '@/lib/rosa/useRealtimeRefresh'
 
@@ -17,12 +15,11 @@ interface Conversation {
 }
 
 /**
- * Recent chat threads with Rosa. Pulls from gaia_conversations.
+ * Recent chat threads with Rosa, as quiet one-line rows for the page
+ * margins. Pulls from gaia_conversations. Renders nothing while loading
+ * and nothing when there is nothing to say: an empty margins row is noise.
  *
- * Clicking a thread takes the user to the chat view; today this lands them
- * on the chat with the conversations sidebar where they can pick the right
- * one. A future Phase D enhancement will deep-link the specific
- * conversation via a query param Rosa Chat picks up on mount.
+ * Clicking a thread resumes that conversation via the Rosa context.
  */
 export function RecentConversations() {
   const { currentOrganization } = useOrganization()
@@ -51,60 +48,34 @@ export function RecentConversations() {
   // surface the freshness immediately.
   useRealtimeRefresh(['gaia_conversations'], load)
 
-  if (conversations === null) {
-    return (
-      <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6 h-full">
-        <h2 className="text-sm font-medium text-muted-foreground mb-4">
-          Recent conversations
-        </h2>
-        <Skeleton className="h-4 w-full mb-2" />
-        <Skeleton className="h-4 w-3/4 mb-2" />
-        <Skeleton className="h-4 w-2/3" />
-      </div>
-    )
-  }
-
-  if (conversations.length === 0) {
-    return (
-      <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6 h-full">
-        <h2 className="text-sm font-medium text-muted-foreground mb-2">
-          Recent conversations
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          You haven&apos;t chatted with Rosa yet. Start a conversation from the
-          input bar below.
-        </p>
-      </div>
-    )
-  }
+  if (conversations === null || conversations.length === 0) return null
 
   return (
-    <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6 h-full">
-      <h2 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2">
-        <MessageSquare className="h-4 w-4 text-studio-forest" />
-        Recent conversations
-      </h2>
-      <ul className="space-y-1">
-        {conversations.map(c => (
-          <li key={c.id}>
-            <button
-              onClick={() => resumeConversation(c.id)}
-              className="group w-full text-left py-2 px-2 -mx-2 rounded-md hover:bg-muted transition-colors flex items-center gap-3"
-            >
-              <div className="flex-1 min-w-0">
-                <p className="text-sm leading-snug truncate">
-                  {c.title || 'Untitled conversation'}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {c.message_count} {c.message_count === 1 ? 'message' : 'messages'}
-                  {c.last_message_at && ` · ${fmtRelative(c.last_message_at)}`}
-                </p>
+    <div>
+      {conversations.map(c => (
+        <button
+          key={c.id}
+          type="button"
+          onClick={() => resumeConversation(c.id)}
+          className="block w-full text-left transition-colors duration-150 ease-studio hover:bg-studio-ink/[0.03]"
+        >
+          <div className="flex items-baseline justify-between gap-4 border-b border-studio-hairline py-3">
+            <div className="min-w-0 truncate text-sm">
+              <span className="font-display font-semibold text-foreground">
+                {c.title || 'Untitled conversation'}
+              </span>
+              <span className="text-studio-dim">
+                {' '}· {c.message_count} {c.message_count === 1 ? 'message' : 'messages'}
+              </span>
+            </div>
+            {c.last_message_at ? (
+              <div className="shrink-0 font-mono text-[10px] uppercase tracking-[0.15em] text-studio-dim">
+                {fmtRelative(c.last_message_at)}
               </div>
-              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-studio-forest transition-colors flex-shrink-0" />
-            </button>
-          </li>
-        ))}
-      </ul>
+            ) : null}
+          </div>
+        </button>
+      ))}
     </div>
   )
 }

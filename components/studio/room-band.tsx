@@ -51,15 +51,23 @@ export function RoomBand({
     <div className={cn('sticky top-0 z-40 h-[52px] bg-room text-room-on', className)}>
       <div className="mx-auto flex h-full max-w-6xl items-center gap-6 px-4 md:px-6">
         <DeskLink href={deskHref} />
-        {brand ?? (
-          <span className="shrink-0 font-display text-sm font-semibold tracking-[-0.01em]">
-            {room.name}
-          </span>
-        )}
+        {brand ??
+          (room.landing ? (
+            <Link
+              href={room.landing}
+              className="shrink-0 font-display text-sm font-semibold tracking-[-0.01em] transition-opacity duration-150 ease-studio hover:opacity-80"
+            >
+              {room.name}
+            </Link>
+          ) : (
+            <span className="shrink-0 font-display text-sm font-semibold tracking-[-0.01em]">
+              {room.name}
+            </span>
+          ))}
         <MonoTabs
           tabs={tabs ?? room.tabs}
           more={room.more}
-          className="min-w-0 flex-1 overflow-x-auto"
+          className="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         />
         {note ? (
           <span className="hidden shrink-0 font-mono text-[10px] uppercase tracking-[0.2em] opacity-80 md:block">

@@ -9,16 +9,16 @@
 
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { PillButton, StateChip } from '@/components/studio';
+import type { WorkingTone } from '@/components/studio/theme';
 import type { CertificationReadiness } from '@/lib/certifications/scoring';
 import { bucketLabel, topActions, type NextActionBucket } from '@/lib/certifications/roadmap';
 import { OnePagerButton } from '@/components/certifications/OnePagerButton';
 
-const BUCKET_STYLE: Record<NextActionBucket, string> = {
-  confirm: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-  mandatory: 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400',
-  gap: 'border-border/60 bg-muted/40 text-muted-foreground',
+const BUCKET_TONE: Record<NextActionBucket, WorkingTone> = {
+  confirm: 'good',
+  mandatory: 'attention',
+  gap: 'quiet',
 };
 
 export function RoadmapCard({
@@ -59,7 +59,7 @@ export function RoadmapCard({
         </div>
 
         {actions.length === 0 ? (
-          <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm text-emerald-600 dark:text-emerald-400">
+          <div className="flex items-center gap-2 rounded-[6px] border border-studio-good/30 bg-studio-cream p-3 text-sm text-studio-good">
             <CheckCircle2 className="h-4 w-4" />
             Nothing outstanding for your current year. You are on track.
           </div>
@@ -68,21 +68,21 @@ export function RoadmapCard({
             {actions.map((a) => (
               <li
                 key={a.requirementId}
-                className="flex items-start justify-between gap-3 rounded-lg border border-border/60 p-3"
+                className="flex items-start justify-between gap-3 rounded-[6px] border border-border/60 p-3"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider', BUCKET_STYLE[a.bucket])}>
+                    <StateChip tone={BUCKET_TONE[a.bucket]}>
                       {bucketLabel(a.bucket)}
-                    </span>
+                    </StateChip>
                     <span className="font-mono text-xs text-muted-foreground">{a.code}</span>
                     <span className="text-sm font-medium text-foreground">{a.name}</span>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">{a.reason}</p>
                 </div>
-                <Button variant="outline" size="sm" className="shrink-0" onClick={() => onOpen(a.requirementId)}>
+                <PillButton variant="outline" size="sm" className="shrink-0" onClick={() => onOpen(a.requirementId)}>
                   Open <ArrowRight className="ml-1 h-3 w-3" />
-                </Button>
+                </PillButton>
               </li>
             ))}
           </ul>

@@ -1,12 +1,19 @@
 'use client';
 
 /**
- * Pulse Financial -- uniform compact-card grid.
+ * Pulse Financial -- the CFO page, in the studio language.
  *
- * Same card vocabulary as the main /pulse grid, arranged as a CFO reading
- * order: annual liability → intensity → scenario sensitivity → regulatory
- * exposure → MACC → carbon budgets → top cost drivers → product cost →
- * ISSB readiness.
+ * Opens with the surface's statement ("What your impact costs.") with the
+ * annual environmental cost standing right as a display-bold figure over a
+ * mono label. The board pack pill is the surface's one room-colour act;
+ * shadow-price configuration sits beside it as the outline pill.
+ *
+ * The cards keep the uniform compact grid in CFO reading order: annual
+ * liability → scenario sensitivity → intensity → regulatory exposure →
+ * carbon budgets → MACC → top cost drivers → product cost → ISSB readiness.
+ * They render through the shared PulseCard, re-cut number-first for this
+ * surface by financial-studio.module.css (mono eyebrow labels, no header
+ * icons, display-bold figures).
  *
  * Wraps in `MetricDrillProvider` + `WidgetDrillOverlay` so clicking any card
  * opens the same full-page drill we built for /pulse. Mounts every expanded
@@ -14,15 +21,17 @@
  * + issb-disclosure) so drills resolve their content.
  */
 
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
-import { Eyebrow } from '@/components/studio/eyebrow';
+import { useMemo } from 'react';
 
+import { Statement } from '@/components/studio/statement';
+import { BigNumber } from '@/components/studio/big-number';
+import { PillButton } from '@/components/studio/pill-button';
+
+import { useAnnualEnvironmentalCost } from './use-annual-cost';
 import { MetricDrillProvider, useWidgetDrill } from '@/lib/pulse/MetricDrillContext';
 import { WidgetDrillOverlay } from '@/components/pulse/WidgetDrillOverlay';
 import { usePulseDrillUrl } from '@/hooks/usePulseDrillUrl';
 import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
-import { useMemo } from 'react';
 
 // Compact cards -- shared with /pulse.
 import { FinancialFootprintCard } from '@/components/pulse/widgets/financial-footprint/FinancialFootprintCard';
@@ -48,6 +57,7 @@ import { CostIntensityExpandedSlot } from '@/components/pulse/widgets/cost-inten
 import { IssbDisclosureExpandedSlot } from '@/components/pulse/widgets/issb-disclosure/expanded';
 
 import { BoardPackButton } from '@/components/pulse/financial/BoardPackButton';
+import styles from './financial-studio.module.css';
 
 export function PulseFinancialShell() {
   return (
@@ -89,8 +99,8 @@ function PulseFinancialShellBody() {
 
   return (
     <>
-      <div className="space-y-6 pb-12">
-        <FinancialHeader />
+      <div className="space-y-8 pb-12">
+        <FinancialStatement />
         <FinancialCardGrid />
       </div>
 
@@ -111,43 +121,31 @@ function PulseFinancialShellBody() {
   );
 }
 
-function FinancialHeader() {
+function FinancialStatement() {
+  const { figure: annualCost } = useAnnualEnvironmentalCost();
+
   return (
-    <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div className="min-w-0">
-        <Link
-          href="/pulse"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors duration-200 ease-studio hover:text-foreground"
-        >
-          <ArrowLeft className="h-3 w-3" />
-          Back to Pulse
-        </Link>
-        <Eyebrow className="mb-3 mt-3">PULSE · FINANCIAL</Eyebrow>
-        <div className="flex items-baseline gap-3">
-          <h1 className="font-display text-[clamp(2rem,4vw,3rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
-            Financial.
-          </h1>
-          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-ochre-ink">
-            Beta
-          </span>
-        </div>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-          Every figure here is your live operational data multiplied by your
-          shadow prices. Click any card for the deep view: month-by-month
-          tables, scenario analysis, compliance calendars and audit-ready
-          exports.
+    <div className="space-y-5">
+      <Statement eyebrow="PULSE · FINANCIAL" headline="What your impact costs.">
+        {annualCost !== null && (
+          <BigNumber size="display" value={annualCost} label="Last 12 months" />
+        )}
+      </Statement>
+
+      <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3">
+        <p className="max-w-2xl text-[13px] leading-relaxed text-studio-dim">
+          Live operational data multiplied by your shadow prices. Click any
+          card for the deep view: month-by-month tables, scenario analysis,
+          compliance calendars and audit-ready exports.
         </p>
+        <div className="flex shrink-0 items-center gap-2">
+          <BoardPackButton />
+          <PillButton variant="outline" href="/pulse/settings/shadow-prices/">
+            Manage prices
+          </PillButton>
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        <BoardPackButton />
-        <Link
-          href="/pulse/settings/shadow-prices/"
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors duration-200 ease-studio hover:text-foreground"
-        >
-          Manage prices
-        </Link>
-      </div>
-    </header>
+    </div>
   );
 }
 
@@ -167,7 +165,7 @@ function FinancialCardGrid() {
   // At base (mobile, 1 col) all cards stack full-width.
   return (
     <div
-      className="grid auto-rows-[200px] grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
+      className={`${styles.recut} grid auto-rows-[200px] grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4`}
       role="group"
       aria-label="Financial cards"
     >
@@ -212,3 +210,4 @@ function FinancialCardGrid() {
     </div>
   );
 }
+

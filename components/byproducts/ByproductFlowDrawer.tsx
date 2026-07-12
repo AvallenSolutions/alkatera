@@ -3,7 +3,7 @@
 /**
  * Side drawer that opens when a byproduct card is clicked. Shows the full
  * flow history, lets the user log a new mass entry, and exposes a soft-delete
- * (status='ended') control. Edits to other fields can be added later — this
+ * (status='ended') control. Edits to other fields can be added later; this
  * keeps the surface focused on the most common ops.
  */
 

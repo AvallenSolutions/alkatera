@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Panel, PillButton, StateChip } from '@/components/studio'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Link2, Loader2, CheckCircle2, AlertCircle, RefreshCw, Unlink, Building2 } from 'lucide-react'
+import { Link2, CheckCircle2, AlertCircle, RefreshCw, Unlink, Building2 } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -301,9 +300,9 @@ export function XeroConnectionCard() {
           }),
         })
       } catch {
-        // Best effort — if this also fails, stepper stale detection handles it
+        // Best effort: if this also fails, stepper stale detection handles it
       }
-      // Always refresh displayed status — earlier stages may have succeeded
+      // Always refresh displayed status; earlier stages may have succeeded
       fetchStatus()
     } finally {
       setIsSyncing(false)
@@ -338,202 +337,191 @@ export function XeroConnectionCard() {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
+      <Panel>
+        <div className="flex items-center justify-center py-12">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+            Loading
+          </span>
+        </div>
+      </Panel>
     )
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#13B5EA]/10">
-              <Link2 className="h-5 w-5 text-[#13B5EA]" />
+    <Panel className="space-y-4">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-[6px] bg-[#13B5EA]/10">
+            <Link2 className="h-5 w-5 text-[#13B5EA]" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-semibold text-foreground">Xero</h3>
+              <StateChip tone="quiet">Beta</StateChip>
+            </div>
+            <p className="text-sm text-studio-dim">
+              {status?.connected
+                ? `Connected to ${status.tenantName || 'Xero organisation'}`
+                : 'Connect your Xero account to import financial data'}
+            </p>
+          </div>
+        </div>
+        {status?.connected && (
+          <StateChip tone="good">Connected</StateChip>
+        )}
+      </div>
+
+      {status?.connected ? (
+        <div className="space-y-4">
+          {/* Connection details */}
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-studio-dim">Organisation</p>
+              <p className="font-medium">{status.tenantName || 'Unknown'}</p>
             </div>
             <div>
-              <CardTitle className="flex items-center gap-2">
-                Xero
-                <Badge variant="outline" className="text-xs font-normal">Beta</Badge>
-              </CardTitle>
-              <CardDescription>
-                {status?.connected
-                  ? `Connected to ${status.tenantName || 'Xero organisation'}`
-                  : 'Connect your Xero account to import financial data'}
-              </CardDescription>
+              <p className="text-studio-dim">Connected</p>
+              <p className="font-medium">
+                {status.connectedAt
+                  ? new Date(status.connectedAt).toLocaleDateString('en-GB', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })
+                  : 'Unknown'}
+              </p>
+            </div>
+            <div>
+              <p className="text-studio-dim">Last synced</p>
+              <p className="font-medium">
+                {status.lastSyncAt
+                  ? new Date(status.lastSyncAt).toLocaleString('en-GB', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
+                  : 'Never'}
+              </p>
+            </div>
+            <div>
+              <p className="text-studio-dim">Status</p>
+              <p className="flex items-center gap-1 font-medium">
+                {status.syncStatus === 'syncing' && (
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+                    Syncing
+                  </span>
+                )}
+                {status.syncStatus === 'error' && (
+                  <>
+                    <AlertCircle className="h-3 w-3 text-studio-stale" />
+                    <span className="text-studio-stale">Error</span>
+                  </>
+                )}
+                {status.syncStatus === 'idle' && 'Ready'}
+              </p>
             </div>
           </div>
-          {status?.connected && (
-            <Badge
-              variant="outline"
-              className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-            >
-              <CheckCircle2 className="h-3 w-3 mr-1" />
-              Connected
-            </Badge>
+
+          {status.syncError && (
+            <div className="rounded-[6px] border border-studio-stale/30 bg-studio-stale/5 p-3 text-sm text-studio-stale">
+              {status.syncError}
+            </div>
+          )}
+
+          {/* Actions */}
+          {isAdmin && (
+            <div className="flex items-center gap-2 pt-2">
+              <PillButton
+                variant="outline"
+                size="sm"
+                onClick={handleSync}
+                disabled={isSyncing || status.syncStatus === 'syncing'}
+              >
+                {isSyncing ? (
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]">
+                    {syncProgress || 'Syncing'}
+                  </span>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    Sync Now
+                  </>
+                )}
+              </PillButton>
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <PillButton
+                    variant="ghost"
+                    size="sm"
+                    className="text-studio-stale hover:text-studio-stale hover:bg-studio-stale/5"
+                    disabled={isDisconnecting}
+                  >
+                    <Unlink className="h-4 w-4" />
+                    Disconnect
+                  </PillButton>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Disconnect Xero?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will remove the Xero connection and delete all synced transaction data,
+                      account mappings, and sync history. Your existing sustainability data
+                      (utility entries, LCA data) will not be affected.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDisconnect}
+                      className="bg-studio-stale text-studio-cream hover:bg-studio-stale/90"
+                    >
+                      {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           )}
         </div>
-      </CardHeader>
-      <CardContent>
-        {status?.connected ? (
-          <div className="space-y-4">
-            {/* Connection details */}
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-muted-foreground">Organisation</p>
-                <p className="font-medium">{status.tenantName || 'Unknown'}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Connected</p>
-                <p className="font-medium">
-                  {status.connectedAt
-                    ? new Date(status.connectedAt).toLocaleDateString('en-GB', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                      })
-                    : 'Unknown'}
-                </p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Last synced</p>
-                <p className="font-medium">
-                  {status.lastSyncAt
-                    ? new Date(status.lastSyncAt).toLocaleString('en-GB', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })
-                    : 'Never'}
-                </p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Status</p>
-                <p className="font-medium flex items-center gap-1">
-                  {status.syncStatus === 'syncing' && (
-                    <>
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      Syncing...
-                    </>
-                  )}
-                  {status.syncStatus === 'error' && (
-                    <>
-                      <AlertCircle className="h-3 w-3 text-red-500" />
-                      <span className="text-red-500">Error</span>
-                    </>
-                  )}
-                  {status.syncStatus === 'idle' && 'Ready'}
-                </p>
-              </div>
-            </div>
-
-            {status.syncError && (
-              <div className="rounded-md bg-red-50 dark:bg-red-950/20 p-3 text-sm text-red-600 dark:text-red-400">
-                {status.syncError}
-              </div>
-            )}
-
-            {/* Actions */}
-            {isAdmin && (
-              <div className="flex items-center gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSync}
-                  disabled={isSyncing || status.syncStatus === 'syncing'}
-                >
-                  {isSyncing ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                  )}
-                  {isSyncing ? (syncProgress || 'Syncing...') : 'Sync Now'}
-                </Button>
-
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
-                      disabled={isDisconnecting}
-                    >
-                      <Unlink className="h-4 w-4 mr-2" />
-                      Disconnect
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Disconnect Xero?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will remove the Xero connection and delete all synced transaction data,
-                        account mappings, and sync history. Your existing sustainability data
-                        (utility entries, LCA data) will not be affected.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={handleDisconnect}
-                        className="bg-red-600 hover:bg-red-700"
-                      >
-                        {isDisconnecting ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : null}
-                        Disconnect
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Connect your Xero accounting software to automatically import expense data for
-              spend-based carbon calculations. We only request read-only access to your financial data.
+      ) : (
+        <div className="space-y-4">
+          <p className="text-sm text-studio-dim">
+            Connect your Xero accounting software to automatically import expense data for
+            spend-based carbon calculations. We only request read-only access to your financial data.
+          </p>
+          <ul className="space-y-1 text-sm text-studio-dim">
+            <li className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-studio-good" />
+              Auto-import expense transactions
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-studio-good" />
+              Classify spend into emission categories
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-studio-good" />
+              Prompt for higher-quality activity data
+            </li>
+            <li className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-studio-good" />
+              Read-only access only
+            </li>
+          </ul>
+          {isAdmin ? (
+            <Button onClick={handleConnect} disabled={isConnecting} className="bg-[#13B5EA] hover:bg-[#0ea5d9]">
+              {!isConnecting && <Link2 className="mr-2 h-4 w-4" />}
+              {isConnecting ? 'Connecting...' : 'Connect to Xero'}
+            </Button>
+          ) : (
+            <p className="text-sm italic text-studio-dim">
+              Only organisation admins can connect integrations.
             </p>
-            <ul className="text-sm text-muted-foreground space-y-1">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                Auto-import expense transactions
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                Classify spend into emission categories
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                Prompt for higher-quality activity data
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                Read-only access only
-              </li>
-            </ul>
-            {isAdmin ? (
-              <Button onClick={handleConnect} disabled={isConnecting} className="bg-[#13B5EA] hover:bg-[#0ea5d9]">
-                {isConnecting ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Link2 className="h-4 w-4 mr-2" />
-                )}
-                {isConnecting ? 'Connecting...' : 'Connect to Xero'}
-              </Button>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">
-                Only organisation admins can connect integrations.
-              </p>
-            )}
-          </div>
-        )}
-      </CardContent>
+          )}
+        </div>
+      )}
 
       {/* Tenant picker dialog (multi-org flow) */}
       <Dialog open={showTenantPicker} onOpenChange={(open) => {
@@ -556,24 +544,26 @@ export function XeroConnectionCard() {
                 key={tenant.tenantId}
                 onClick={() => handleSelectTenant(tenant.tenantId)}
                 disabled={isSelectingTenant}
-                className="flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent hover:border-[#13B5EA]/40 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex w-full items-center gap-3 rounded-[6px] border border-studio-hairline p-3 text-left transition-colors hover:border-[#13B5EA]/40 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#13B5EA]/10">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] bg-[#13B5EA]/10">
                   <Building2 className="h-4 w-4 text-[#13B5EA]" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">
+                  <p className="truncate text-sm font-medium">
                     {tenant.tenantName || 'Unnamed Organisation'}
                   </p>
                 </div>
                 {isSelectingTenant && (
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
+                  <span className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+                    Connecting
+                  </span>
                 )}
               </button>
             ))}
           </div>
         </DialogContent>
       </Dialog>
-    </Card>
+    </Panel>
   )
 }

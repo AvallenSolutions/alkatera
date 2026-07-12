@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Leaf, Package, ArrowRight, Building2, Database, Wine } from "lucide-react";
-import Link from "next/link";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { BigNumber } from "@/components/studio/big-number";
+import { StateChip } from "@/components/studio/state-chip";
+import { PillButton } from "@/components/studio/pill-button";
 import { supabase } from "@/lib/supabaseClient";
 import type { ProductIngredient, ProductPackaging } from "@/hooks/data/useProductData";
 import type { MaturationProfile } from "@/lib/types/maturation";
@@ -24,6 +23,19 @@ interface SpecificationTabProps {
   productAbvPercent?: number | null;
   onManageIngredients?: () => void;
   onManagePackaging?: () => void;
+}
+
+/** The provenance of a matched material, read as a working tone. */
+function MaterialSourceChip({ ingredient }: { ingredient: ProductIngredient | ProductPackaging }) {
+  const isProxy =
+    ingredient.matched_source_name && ingredient.matched_source_name !== ingredient.material_name;
+  return (
+    <>
+      {isProxy && <StateChip tone="attention">Proxy</StateChip>}
+      {ingredient.data_source === "supplier" && <StateChip tone="good">Primary</StateChip>}
+      {ingredient.data_source === "openlca" && <StateChip tone="quiet">Secondary</StateChip>}
+    </>
+  );
 }
 
 export function SpecificationTab({
@@ -81,7 +93,6 @@ export function SpecificationTab({
 
   // Calculate total packaging weight (convert to grams if needed)
   const totalPackagingWeight = packaging.reduce((sum, pkg) => {
-    // If unit is kg, convert to grams; otherwise assume already in grams
     const weightInGrams = pkg.unit === 'kg' ? pkg.quantity * 1000 : pkg.quantity;
     return sum + weightInGrams;
   }, 0);
@@ -89,280 +100,176 @@ export function SpecificationTab({
   // Get primary container
   const primaryContainer = packaging.find(p => p.packaging_category === 'container');
 
+  const ingredientsWeightValue =
+    totalIngredientWeight < 0.01
+      ? (totalIngredientWeight * 1000).toFixed(1)
+      : totalIngredientWeight.toFixed(2);
+  const ingredientsWeightUnit = totalIngredientWeight < 0.01 ? "G NET" : "KG NET";
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* Ingredients Summary Card */}
-      <Card className="backdrop-blur-xl bg-card dark:bg-white/5 border border-border dark:border-white/10 border-l-4 border-l-green-500 shadow-xl hover:bg-muted/50 dark:hover:bg-white/10 transition-all">
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-green-500/80 flex items-center justify-center flex-shrink-0 shadow-lg shadow-green-500/20">
-                <Leaf className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <CardTitle className="text-foreground">Ingredients</CardTitle>
-                <CardDescription className="text-muted-foreground">Recipe composition</CardDescription>
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {ingredients.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Leaf className="h-12 w-12 mx-auto mb-3 text-muted-foreground/60" />
-              <p className="text-sm font-medium mb-1 text-foreground">No ingredients added</p>
-              <p className="text-xs text-muted-foreground">
-                Add ingredients to complete your product recipe
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Total Weight */}
-              <div className="flex items-baseline justify-between pb-3 border-b border-border dark:border-white/10">
-                <span className="text-sm text-muted-foreground">Total Net Weight</span>
-                <span className="text-2xl font-bold text-foreground">
-                  {totalIngredientWeight < 0.01
-                    ? <>{(totalIngredientWeight * 1000).toFixed(1)} <span className="text-base font-normal text-muted-foreground">g</span></>
-                    : <>{totalIngredientWeight.toFixed(2)} <span className="text-base font-normal text-muted-foreground">kg</span></>}
-                </span>
-              </div>
-
-              {/* Top Ingredients */}
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium text-foreground">Top Ingredients</h4>
-                {topIngredients.map((ing, idx) => {
-                  const weight = ing.unit === 'kg' ? ing.quantity : ing.quantity / 1000;
-                  const percentage = (weight / totalIngredientWeight) * 100;
-                  return (
-                    <div key={ing.id} className="flex items-center justify-between py-2 border-b border-border/50 dark:border-white/5 last:border-0">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <span className="text-xs font-medium text-muted-foreground w-4">{idx + 1}.</span>
-                        <span className="text-sm text-foreground truncate">{ing.material_name}</span>
-                        {ing.matched_source_name && ing.matched_source_name !== ing.material_name && (
-                          <Badge variant="outline" className="text-xs bg-amber-500/20 border-amber-500/30 text-amber-400 shrink-0">
-                            Proxy
-                          </Badge>
-                        )}
-                        {ing.data_source === 'supplier' && (
-                          <Badge variant="outline" className="text-xs bg-green-500/20 border-green-500/30 text-green-400">
-                            <Building2 className="h-2.5 w-2.5 mr-1" />
-                            Primary
-                          </Badge>
-                        )}
-                        {ing.data_source === 'openlca' && (
-                          <Badge variant="outline" className="text-xs bg-yellow-500/20 border-yellow-500/30 text-yellow-400">
-                            <Database className="h-2.5 w-2.5 mr-1" />
-                            Secondary
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-medium text-foreground">
-                          {weight < 0.01
-                            ? `${(weight * 1000).toFixed(1)} g`
-                            : `${weight.toFixed(2)} kg`}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {percentage.toFixed(1)}%
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {ingredients.length > 3 && (
-                  <p className="text-xs text-muted-foreground pt-2">
-                    + {ingredients.length - 3} more ingredient{ingredients.length - 3 !== 1 ? 's' : ''}
-                  </p>
-                )}
-              </div>
-            </>
+    <div className="grid grid-cols-1 gap-x-10 gap-y-10 md:grid-cols-2">
+      {/* Ingredients summary */}
+      <section className="border-t border-border pt-5">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <Eyebrow>Ingredients</Eyebrow>
+          {ingredients.length > 0 && (
+            <BigNumber value={ingredientsWeightValue} label={ingredientsWeightUnit} />
           )}
+        </div>
 
-          {/* Action Button */}
-          {onManageIngredients ? (
-            <Button
-              onClick={onManageIngredients}
-              variant={ingredients.length === 0 ? 'default' : 'outline'}
-              className={`w-full ${ingredients.length === 0 ? 'bg-green-500 hover:bg-green-600 text-white' : ''}`}
-            >
-              {ingredients.length === 0 ? 'Add Ingredients' : 'Manage Ingredients'}
-              <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
-          ) : (
-            <Link href={`/products/${productId}/recipe?tab=ingredients`}>
-              <Button
-                variant={ingredients.length === 0 ? 'default' : 'outline'}
-                className={`w-full ${ingredients.length === 0 ? 'bg-green-500 hover:bg-green-600 text-white' : ''}`}
-              >
-                {ingredients.length === 0 ? 'Add Ingredients' : 'Manage Ingredients'}
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
-            </Link>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Packaging Summary Card */}
-      <Card className="backdrop-blur-xl bg-card dark:bg-white/5 border border-border dark:border-white/10 border-l-4 border-l-orange-500 shadow-xl hover:bg-muted/50 dark:hover:bg-white/10 transition-all">
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-orange-500/80 flex items-center justify-center flex-shrink-0 shadow-lg shadow-orange-500/20">
-                <Package className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <CardTitle className="text-foreground">Packaging</CardTitle>
-                <CardDescription className="text-muted-foreground">Material composition</CardDescription>
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {packaging.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Package className="h-12 w-12 mx-auto mb-3 text-muted-foreground/60" />
-              <p className="text-sm font-medium mb-1 text-foreground">No packaging added</p>
-              <p className="text-xs text-muted-foreground">
-                Add packaging materials to complete your product
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Total Weight */}
-              <div className="flex items-baseline justify-between pb-3 border-b border-border dark:border-white/10">
-                <span className="text-sm text-muted-foreground">Total Packaging Weight</span>
-                <span className="text-2xl font-bold text-foreground">
-                  {totalPackagingWeight.toFixed(1)} <span className="text-base font-normal text-muted-foreground">g</span>
-                </span>
-              </div>
-
-              {/* Primary Container */}
-              {primaryContainer && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-foreground">Primary Container</h4>
-                  <div className="flex items-center justify-between py-2 px-3 backdrop-blur-xl bg-muted/40 dark:bg-white/5 border border-border dark:border-white/10 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Package className="h-4 w-4 text-orange-500 dark:text-orange-400" />
-                      <span className="text-sm font-medium text-foreground">
-                        {primaryContainer.material_name}
-                      </span>
-                      {primaryContainer.matched_source_name && primaryContainer.matched_source_name !== primaryContainer.material_name && (
-                        <Badge variant="outline" className="text-xs bg-amber-500/20 border-amber-500/30 text-amber-600 dark:text-amber-400 shrink-0">
-                          Proxy
-                        </Badge>
-                      )}
+        {ingredients.length === 0 ? (
+          <p className="mb-4 text-sm text-studio-dim">
+            No ingredients yet. Add them to complete the recipe.
+          </p>
+        ) : (
+          <div className="mb-4 divide-y divide-border">
+            {topIngredients.map((ing, idx) => {
+              const weight = ing.unit === 'kg' ? ing.quantity : ing.quantity / 1000;
+              const percentage = (weight / totalIngredientWeight) * 100;
+              return (
+                <div key={ing.id} className="flex items-center justify-between gap-3 py-2.5">
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <span className="font-mono text-[10px] text-studio-dim">{idx + 1}</span>
+                    <span className="truncate text-sm text-foreground">{ing.material_name}</span>
+                    <MaterialSourceChip ingredient={ing} />
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-medium tabular-nums text-foreground">
+                      {weight < 0.01 ? `${(weight * 1000).toFixed(1)} g` : `${weight.toFixed(2)} kg`}
                     </div>
-                    <span className="text-sm text-muted-foreground">
-                      {(() => {
-                        if (primaryContainer.unit === 'kg' && primaryContainer.quantity < 1) {
-                          return `${(primaryContainer.quantity * 1000).toFixed(0)}g`;
-                        }
-                        return `${primaryContainer.quantity.toFixed(2)} ${primaryContainer.unit}`;
-                      })()}
-                    </span>
+                    <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+                      {percentage.toFixed(1)}%
+                    </div>
                   </div>
                 </div>
-              )}
+              );
+            })}
+            {ingredients.length > 3 && (
+              <p className="pt-2 text-xs text-studio-dim">
+                + {ingredients.length - 3} more ingredient{ingredients.length - 3 !== 1 ? 's' : ''}
+              </p>
+            )}
+          </div>
+        )}
 
-              {/* Component Count */}
-              <div className="grid grid-cols-4 gap-2 pt-2">
-                {['container', 'label', 'closure', 'secondary'].map(cat => {
-                  const count = packaging.filter(p => p.packaging_category === cat).length;
-                  return (
-                    <div key={cat} className="text-center">
-                      <div className="text-lg font-bold text-foreground">{count}</div>
-                      <div className="text-xs text-muted-foreground capitalize">{cat}</div>
-                    </div>
-                  );
-                })}
+        {onManageIngredients ? (
+          <PillButton variant="outline" size="sm" onClick={onManageIngredients}>
+            {ingredients.length === 0 ? 'Add ingredients' : 'Manage ingredients'}
+          </PillButton>
+        ) : (
+          <PillButton variant="outline" size="sm" href={`/products/${productId}/recipe?tab=ingredients`}>
+            {ingredients.length === 0 ? 'Add ingredients' : 'Manage ingredients'}
+          </PillButton>
+        )}
+      </section>
+
+      {/* Packaging summary */}
+      <section className="border-t border-border pt-5">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <Eyebrow>Packaging</Eyebrow>
+          {packaging.length > 0 && (
+            <BigNumber value={totalPackagingWeight.toFixed(1)} label="G TOTAL" />
+          )}
+        </div>
+
+        {packaging.length === 0 ? (
+          <p className="mb-4 text-sm text-studio-dim">
+            No packaging yet. Add materials to complete the product.
+          </p>
+        ) : (
+          <div className="mb-4 space-y-4">
+            {primaryContainer && (
+              <div>
+                <div className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+                  Primary container
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t border-border py-2.5">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-sm text-foreground">{primaryContainer.material_name}</span>
+                    <MaterialSourceChip ingredient={primaryContainer} />
+                  </div>
+                  <span className="text-sm tabular-nums text-muted-foreground">
+                    {primaryContainer.unit === 'kg' && primaryContainer.quantity < 1
+                      ? `${(primaryContainer.quantity * 1000).toFixed(0)} g`
+                      : `${primaryContainer.quantity.toFixed(2)} ${primaryContainer.unit}`}
+                  </span>
+                </div>
               </div>
-            </>
-          )}
+            )}
 
-          {/* Action Button */}
-          {onManagePackaging ? (
-            <Button
-              onClick={onManagePackaging}
-              variant={packaging.length === 0 ? 'default' : 'outline'}
-              className={`w-full ${packaging.length === 0 ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''}`}
-            >
-              {packaging.length === 0 ? 'Add Packaging' : 'Manage Packaging'}
-              <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
-          ) : (
-            <Link href={`/products/${productId}/recipe?tab=packaging`}>
-              <Button
-                variant={packaging.length === 0 ? 'default' : 'outline'}
-                className={`w-full ${packaging.length === 0 ? 'bg-orange-500 hover:bg-orange-600 text-white' : ''}`}
-              >
-                {packaging.length === 0 ? 'Add Packaging' : 'Manage Packaging'}
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
-            </Link>
-          )}
-        </CardContent>
-      </Card>
+            <div className="grid grid-cols-4 gap-2 border-t border-border pt-3">
+              {['container', 'label', 'closure', 'secondary'].map(cat => {
+                const count = packaging.filter(p => p.packaging_category === cat).length;
+                return (
+                  <div key={cat}>
+                    <div className="font-display text-lg font-bold tabular-nums text-foreground">{count}</div>
+                    <div className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-studio-dim">{cat}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
-      {/* Maturation Summary Card (only shown if profile exists) */}
+        {onManagePackaging ? (
+          <PillButton variant="outline" size="sm" onClick={onManagePackaging}>
+            {packaging.length === 0 ? 'Add packaging' : 'Manage packaging'}
+          </PillButton>
+        ) : (
+          <PillButton variant="outline" size="sm" href={`/products/${productId}/recipe?tab=packaging`}>
+            {packaging.length === 0 ? 'Add packaging' : 'Manage packaging'}
+          </PillButton>
+        )}
+      </section>
+
+      {/* Maturation summary (only shown if profile exists) */}
       {maturationProfile && maturationImpacts && (
-        <Card className="backdrop-blur-xl bg-card dark:bg-white/5 border border-border dark:border-white/10 border-l-4 border-l-amber-500 shadow-xl hover:bg-muted/50 dark:hover:bg-white/10 transition-all md:col-span-2">
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-amber-500/80 flex items-center justify-center flex-shrink-0 shadow-lg shadow-amber-500/20">
-                  <Wine className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-foreground">Maturation</CardTitle>
-                  <CardDescription className="text-muted-foreground">Barrel aging profile</CardDescription>
-                </div>
+        <section className="border-t border-border pt-5 md:col-span-2">
+          <div className="mb-4 flex items-center gap-3">
+            <Eyebrow>Maturation</Eyebrow>
+            <StateChip tone="quiet">
+              {(maturationProfile.aging_duration_months / 12).toFixed(1)} years
+            </StateChip>
+          </div>
+          <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
+            <div>
+              <div className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-studio-dim">Barrel type</div>
+              <div className="mt-1 text-sm font-medium text-foreground">
+                {BARREL_TYPE_LABELS[maturationProfile.barrel_type] || maturationProfile.barrel_type}
               </div>
-              <Badge variant="outline" className="text-xs bg-amber-500/20 border-amber-500/30 text-amber-600 dark:text-amber-400">
-                {(maturationProfile.aging_duration_months / 12).toFixed(1)} years
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Barrel Type</div>
-                <div className="text-sm font-medium text-foreground">
-                  {BARREL_TYPE_LABELS[maturationProfile.barrel_type] || maturationProfile.barrel_type}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {maturationProfile.barrel_use_number === 1 ? 'New barrel' : `${maturationProfile.barrel_use_number}${maturationProfile.barrel_use_number === 2 ? 'nd' : 'rd+'} fill`}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Climate Zone</div>
-                <div className="text-sm font-medium text-foreground">
-                  {CLIMATE_ZONE_LABELS[maturationProfile.climate_zone] || maturationProfile.climate_zone}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Angel&apos;s share: {maturationProfile.angel_share_percent_per_year}%/yr
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Volume Loss</div>
-                <div className="text-sm font-medium text-amber-600 dark:text-amber-400">
-                  {maturationImpacts.angel_share_loss_percent_total.toFixed(1)}%
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {maturationImpacts.angel_share_volume_loss_litres.toFixed(1)} L lost
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Maturation CO2e</div>
-                <div className="text-sm font-medium text-foreground">
-                  {maturationImpacts.total_maturation_co2e.toFixed(2)} kg
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {maturationImpacts.total_maturation_co2e_per_litre_output.toFixed(3)} kg/L output
-                </div>
+              <div className="text-xs text-muted-foreground">
+                {maturationProfile.barrel_use_number === 1 ? 'New barrel' : `${maturationProfile.barrel_use_number}${maturationProfile.barrel_use_number === 2 ? 'nd' : 'rd+'} fill`}
               </div>
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <div className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-studio-dim">Climate zone</div>
+              <div className="mt-1 text-sm font-medium text-foreground">
+                {CLIMATE_ZONE_LABELS[maturationProfile.climate_zone] || maturationProfile.climate_zone}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Angel&apos;s share: {maturationProfile.angel_share_percent_per_year}%/yr
+              </div>
+            </div>
+            <div>
+              <div className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-studio-dim">Volume loss</div>
+              <div className="mt-1 text-sm font-medium tabular-nums text-studio-attention">
+                {maturationImpacts.angel_share_loss_percent_total.toFixed(1)}%
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {maturationImpacts.angel_share_volume_loss_litres.toFixed(1)} L lost
+              </div>
+            </div>
+            <div>
+              <div className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-studio-dim">Maturation CO2e</div>
+              <div className="mt-1 text-sm font-medium tabular-nums text-foreground">
+                {maturationImpacts.total_maturation_co2e.toFixed(2)} kg
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {maturationImpacts.total_maturation_co2e_per_litre_output.toFixed(3)} kg/L output
+              </div>
+            </div>
+          </div>
+        </section>
       )}
     </div>
   );

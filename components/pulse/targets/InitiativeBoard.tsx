@@ -4,12 +4,11 @@ import { useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
+import { StateChip } from '@/components/studio/state-chip';
 import {
   canTransition,
   INITIATIVE_STATUSES,
@@ -20,15 +19,6 @@ import { ABATEMENT_LEVERS } from '@/lib/pulse/abatement-costs';
 import type { Initiative } from './types';
 
 const STATUS_ORDER: InitiativeStatus[] = ['pending_approval', 'active', 'draft', 'completed', 'cancelled'];
-
-// Typographic state chips: working tones from components/studio/theme.ts.
-const STATUS_BADGE: Record<string, string> = {
-  draft: 'text-studio-dim',
-  pending_approval: 'text-studio-attention',
-  active: 'text-studio-forest',
-  completed: 'text-studio-good',
-  cancelled: 'text-studio-stale',
-};
 
 interface InitiativeBoardProps {
   initiatives: Initiative[];
@@ -93,12 +83,10 @@ export function InitiativeBoard({ initiatives, viewerRole, viewerUserId, onEdit,
 
   if (initiatives.length === 0) {
     return (
-      <Card className="border-dashed border-border/60">
-        <CardContent className="p-6 text-sm text-muted-foreground">
-          No actions yet. Create one to turn your targets into a plan. Approved actions count
-          towards your B Corp evidence.
-        </CardContent>
-      </Card>
+      <p className="text-sm text-studio-dim">
+        No actions yet. Create one to turn your targets into a plan. Approved actions count
+        towards your B Corp evidence.
+      </p>
     );
   }
 
@@ -130,13 +118,13 @@ export function InitiativeBoard({ initiatives, viewerRole, viewerUserId, onEdit,
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-medium">{i.title}</p>
-                            <span className={cn('font-mono text-[10px] font-bold uppercase tracking-[0.18em]', STATUS_BADGE[i.status])}>
+                            <StateChip tone={INITIATIVE_STATUSES[i.status].tone}>
                               {INITIATIVE_STATUSES[i.status].label}
-                            </span>
+                            </StateChip>
                             {lever && (
-                              <Badge variant="outline" className="text-[10px] font-normal">
+                              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
                                 {lever.label}
-                              </Badge>
+                              </span>
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground">
@@ -181,7 +169,7 @@ export function InitiativeBoard({ initiatives, viewerRole, viewerUserId, onEdit,
 
                       {(i.status === 'active' || i.status === 'completed') && (
                         <div className="flex items-center gap-3">
-                          <Progress value={i.percent_complete} className="h-1.5 flex-1" />
+                          <Progress value={i.percent_complete} className="h-1.5 flex-1" indicatorClassName="bg-studio-good" />
                           <span className="text-xs text-muted-foreground">{i.percent_complete}%</span>
                         </div>
                       )}

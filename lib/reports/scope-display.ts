@@ -7,11 +7,15 @@
 
 import type { Scope3Breakdown } from '@/lib/calculations/corporate-emissions';
 
-/** Scope colours. Hex chosen to read in both light and dark mode. */
+/**
+ * Scope tones, studio palette. The value chain (Scope 3) is usually the
+ * dominant block, so it carries the evidence room's brick; the two smaller
+ * scopes stay quiet in ink and dim. One saturated tone, the rest ink.
+ */
 export const SCOPE_COLOURS = {
-  scope1: '#f59e0b', // amber: direct emissions you burn
-  scope2: '#38bdf8', // sky: bought energy
-  scope3: '#a78bfa', // violet: the value chain
+  scope1: '#1A1B1D', // ink: direct emissions you burn
+  scope2: '#6F6F68', // dim: bought energy
+  scope3: '#BF4B2A', // brick: the value chain
 } as const;
 
 export const SCOPE_LABELS = {

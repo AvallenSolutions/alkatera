@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -28,6 +27,10 @@ import {
 import { useOrganization } from '@/lib/organizationContext';
 import { StateChip } from '@/components/studio';
 import type { WorkingTone } from '@/components/studio/theme';
+import {
+  auditPackageStatusTone,
+  requirementResolutionTone,
+} from '@/lib/certifications/status-tones';
 import { GapAnalysisDashboard } from '@/components/certifications/GapAnalysisDashboard';
 import { FlagTargetSetting } from '@/components/certifications/FlagTargetSetting';
 import { EvidenceLinker } from '@/components/certifications/EvidenceLinker';
@@ -113,6 +116,19 @@ interface GapSummary {
   compliance_rate: number;
   total_points_available: number;
   total_points_achieved: number;
+}
+
+/** The one quiet loading label the legacy body uses everywhere. */
+function Loading({ full = false }: { full?: boolean }) {
+  return (
+    <div
+      className={`flex items-center justify-center ${full ? 'min-h-[400px]' : 'py-12'}`}
+    >
+      <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-studio-dim">
+        Loading
+      </p>
+    </div>
+  );
 }
 
 const statusConfig: Record<
@@ -275,6 +291,23 @@ function CertificationDetailsContent() {
     resolved: Record<string, { status: string; source: string; detail: string }>;
   } | null>(null);
   const [flagLoading, setFlagLoading] = useState(false);
+
+  // URL-synced tabs (?tab=) so the framework surfaces are deep-linkable.
+  const navSearchParams = useSearchParams();
+  const pathname = usePathname();
+  const defaultTab = code?.toLowerCase() === 'sbti' ? 'flag' : 'gap-analysis';
+  const [tab, setTabState] = useState(
+    () => navSearchParams.get('tab') || defaultTab,
+  );
+  const setTab = useCallback(
+    (next: string) => {
+      setTabState(next);
+      const p = new URLSearchParams(Array.from(navSearchParams.entries()));
+      p.set('tab', next);
+      router.replace(`${pathname}?${p.toString()}`, { scroll: false });
+    },
+    [router, pathname, navSearchParams],
+  );
 
   useEffect(() => {
     if (code?.toLowerCase() !== 'sbti' || !currentOrganization?.id) return;
@@ -510,13 +543,7 @@ function CertificationDetailsContent() {
   );
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-studio-dim">
-          Loading
-        </p>
-      </div>
-    );
+    return <Loading full />;
   }
 
   if (!framework) {
@@ -717,7 +744,7 @@ function CertificationDetailsContent() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue={code?.toLowerCase() === 'sbti' ? 'flag' : 'gap-analysis'} className="space-y-6">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-6">
         <TabsList>
           {code?.toLowerCase() === 'sbti' && (
             <TabsTrigger value="flag" className="flex items-center gap-2">
@@ -739,18 +766,18 @@ function CertificationDetailsContent() {
             <FileText className="h-4 w-4" />
             Evidence
             {verificationSummary.total > 0 && (
-              <Badge variant="secondary" className="text-xs ml-1">
+              <span className="ml-1 font-mono text-[10px] font-bold tabular-nums text-muted-foreground">
                 {verificationSummary.total}
-              </Badge>
+              </span>
             )}
           </TabsTrigger>
           <TabsTrigger value="audit-packages" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
             Audit Packages
             {packageStatusSummary.total > 0 && (
-              <Badge variant="secondary" className="text-xs ml-1">
+              <span className="ml-1 font-mono text-[10px] font-bold tabular-nums text-muted-foreground">
                 {packageStatusSummary.total}
-              </Badge>
+              </span>
             )}
           </TabsTrigger>
           <TabsTrigger value="requirements" className="flex items-center gap-2">
@@ -774,21 +801,11 @@ function CertificationDetailsContent() {
                   For suppliers not yet on alka<strong>tera</strong>, you can manually record their deforestation commitment here. Manual entries are marked as self-reported and do not carry the same evidential weight as platform-verified supplier data.
                 </p>
                 {flagLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-studio-dim">
-                      Loading
-                    </p>
-                  </div>
+                  <Loading />
                 ) : flagData?.requirements?.length ? (
                   <div className="space-y-4">
                     {flagData.requirements.map((req: any) => {
                       const resolution = flagData.resolved[req.id];
-                      const statusTones: Record<string, WorkingTone> = {
-                        compliant: 'good',
-                        partial: 'attention',
-                        non_compliant: 'stale',
-                        not_assessed: 'quiet',
-                      };
                       const statusLabels: Record<string, string> = {
                         compliant: 'Compliant',
                         partial: 'Partial',
@@ -807,7 +824,7 @@ function CertificationDetailsContent() {
                               </div>
                               <h4 className="text-sm font-semibold mt-1">{req.requirement_name}</h4>
                             </div>
-                            <StateChip tone={statusTones[resolution?.status || 'not_assessed']}>
+                            <StateChip tone={requirementResolutionTone(resolution?.status)}>
                               {statusLabels[resolution?.status || 'not_assessed']}
                             </StateChip>
                           </div>
@@ -847,11 +864,7 @@ function CertificationDetailsContent() {
         {/* Gap Analysis Tab */}
         <TabsContent value="gap-analysis">
           {gapLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-studio-dim">
-                Loading
-              </p>
-            </div>
+            <Loading />
           ) : gapAnalyses.length > 0 ? (
             <GapAnalysisDashboard
               analyses={gapAnalyses}
@@ -912,11 +925,7 @@ function CertificationDetailsContent() {
         {/* Evidence Tab */}
         <TabsContent value="evidence">
           {evidenceLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-studio-dim">
-                Loading
-              </p>
-            </div>
+            <Loading />
           ) : (
             <EvidenceLinker
               evidence={evidence}
@@ -974,11 +983,7 @@ function CertificationDetailsContent() {
             </CardHeader>
             <CardContent>
               {packagesLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-studio-dim">
-                    Loading
-                  </p>
-                </div>
+                <Loading />
               ) : auditPackages.length === 0 ? (
                 <div className="text-center text-muted-foreground py-8">
                   <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
@@ -990,16 +995,7 @@ function CertificationDetailsContent() {
               ) : (
                 <div className="space-y-3">
                   {auditPackages.map((pkg) => {
-                    const statusTone: WorkingTone =
-                      pkg.status === 'approved'
-                        ? 'good'
-                        : pkg.status === 'submitted'
-                          ? 'hold'
-                          : pkg.status === 'in_review'
-                            ? 'attention'
-                            : pkg.status === 'rejected'
-                              ? 'stale'
-                              : 'quiet';
+                    const statusTone = auditPackageStatusTone(pkg.status);
                     return (
                       <div
                         key={pkg.id}

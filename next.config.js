@@ -61,6 +61,8 @@ const nextConfig = {
       '/wiki/[slug]': ['./wiki/pages/**/*'],
       '/api/admin/wiki-sync': ['./wiki/pages/**/*'],
       '/api/cron/sync-wiki-to-rosa': ['./wiki/pages/**/*'],
+      // The library landing counts published wiki pages from disk too.
+      '/api/library/counts': ['./wiki/pages/**/*'],
     },
     optimizePackageImports: [
       'lucide-react',

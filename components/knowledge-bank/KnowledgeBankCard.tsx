@@ -3,13 +3,11 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import {
   FileText,
   Video,
   Link as LinkIcon,
+  Code2,
   Eye,
   Download,
   Star,
@@ -19,6 +17,8 @@ import {
 import { cn } from '@/lib/utils'
 import { KnowledgeBankItem } from '@/hooks/data/useKnowledgeBank'
 import { PartnerAuthorBadge } from '@/components/knowledge-bank/PartnerAuthorBadge'
+import { Panel } from '@/components/studio/panel'
+import { StateChip } from '@/components/studio/state-chip'
 import { supabase } from '@/lib/supabaseClient'
 import { toast } from 'sonner'
 
@@ -31,14 +31,7 @@ const contentTypeIcons = {
   document: FileText,
   video: Video,
   link: LinkIcon,
-  embedded: FileText,
-}
-
-const contentTypeColors = {
-  document: 'bg-blue-500/10 text-blue-500',
-  video: 'bg-purple-500/10 text-purple-500',
-  link: 'bg-green-500/10 text-green-500',
-  embedded: 'bg-orange-500/10 text-orange-500',
+  embedded: Code2,
 }
 
 export function KnowledgeBankCard({ item, onFavoriteToggle }: KnowledgeBankCardProps) {
@@ -101,90 +94,70 @@ export function KnowledgeBankCard({ item, onFavoriteToggle }: KnowledgeBankCardP
   }
 
   return (
-    <Link href={`/knowledge-bank/items/${item.id}`}>
-      <Card className="group h-full transition-all hover:shadow-lg hover:border-neon-lime/50">
-        <CardHeader className="space-y-2">
-          <div className="flex items-start justify-between gap-2">
-            <div className={cn(
-              'flex h-12 w-12 items-center justify-center rounded-lg transition-colors',
-              contentTypeColors[item.content_type]
-            )}>
-              <Icon className="h-6 w-6" />
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                'h-8 w-8 p-0 transition-colors',
-                isFavorited ? 'text-yellow-500 hover:text-yellow-600' : 'text-muted-foreground hover:text-yellow-500'
-              )}
-              onClick={handleFavoriteToggle}
-              disabled={isTogglingFavorite}
-            >
-              <Star className={cn('h-4 w-4', isFavorited && 'fill-current')} />
-            </Button>
+    <Link href={`/knowledge-bank/items/${item.id}`} className="group block h-full">
+      <Panel className="flex h-full flex-col gap-3 transition-colors duration-150 ease-studio group-hover:border-room-accent">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex h-12 w-12 items-center justify-center rounded-[6px] bg-room/10 text-room-accent">
+            <Icon className="h-6 w-6" />
           </div>
-
-          <div>
-            <h3 className="font-semibold text-base line-clamp-2 group-hover:text-neon-lime transition-colors">
-              {item.title}
-            </h3>
-            {item.description && (
-              <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                {item.description}
-              </p>
+          <button
+            type="button"
+            aria-label={isFavorited ? 'Remove from favourites' : 'Add to favourites'}
+            className={cn(
+              'inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors disabled:opacity-50',
+              isFavorited ? 'text-room-accent' : 'text-studio-dim hover:text-room-accent'
             )}
+            onClick={handleFavoriteToggle}
+            disabled={isTogglingFavorite}
+          >
+            <Star className={cn('h-4 w-4', isFavorited && 'fill-current')} />
+          </button>
+        </div>
+
+        <div>
+          <h3 className="font-display font-semibold text-base line-clamp-2 transition-colors group-hover:text-room-accent">
+            {item.title}
+          </h3>
+          {item.description && (
+            <p className="text-sm text-studio-dim line-clamp-2 mt-1">
+              {item.description}
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          {item.organization_id === null && <StateChip>PLATFORM</StateChip>}
+          {item.category && <StateChip>{item.category.name}</StateChip>}
+          {item.tags?.slice(0, 2).map((tag) => (
+            <StateChip key={tag}>{tag}</StateChip>
+          ))}
+          {item.tags && item.tags.length > 2 && (
+            <StateChip>+{item.tags.length - 2}</StateChip>
+          )}
+        </div>
+
+        <div className="flex items-center gap-4 font-mono text-[11px] text-studio-dim">
+          <div className="flex items-center gap-1">
+            <Eye className="h-3.5 w-3.5" />
+            <span className="tabular-nums">{item.view_count}</span>
           </div>
-        </CardHeader>
-
-        <CardContent className="space-y-3">
-          <div className="flex flex-wrap gap-1.5">
-            {item.organization_id === null && (
-              <Badge variant="outline" className="text-xs bg-neon-lime/10 text-neon-lime border-neon-lime/30">
-                Platform
-              </Badge>
-            )}
-            {item.category && (
-              <Badge variant="secondary" className="text-xs">
-                {item.category.name}
-              </Badge>
-            )}
-            {item.tags?.slice(0, 2).map((tag) => (
-              <Badge key={tag} variant="outline" className="text-xs">
-                {tag}
-              </Badge>
-            ))}
-            {item.tags && item.tags.length > 2 && (
-              <Badge variant="outline" className="text-xs">
-                +{item.tags.length - 2}
-              </Badge>
-            )}
-          </div>
-
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          {item.content_type === 'document' && (
             <div className="flex items-center gap-1">
-              <Eye className="h-3.5 w-3.5" />
-              <span>{item.view_count}</span>
+              <Download className="h-3.5 w-3.5" />
+              <span className="tabular-nums">{item.download_count}</span>
             </div>
-            {item.content_type === 'document' && (
-              <div className="flex items-center gap-1">
-                <Download className="h-3.5 w-3.5" />
-                <span>{item.download_count}</span>
-              </div>
-            )}
-            {item.file_size > 0 && (
-              <div className="text-xs">
-                {formatFileSize(item.file_size)}
-              </div>
-            )}
-          </div>
-        </CardContent>
+          )}
+          {item.file_size > 0 && (
+            <div className="tabular-nums">{formatFileSize(item.file_size)}</div>
+          )}
+        </div>
 
-        <CardFooter className="flex items-center justify-between text-xs text-muted-foreground border-t pt-3">
+        <div className="mt-auto flex items-center justify-between gap-2 border-t border-studio-hairline pt-3 text-xs text-studio-dim">
           {item.partner_attribution && item.external_author_name ? (
             <PartnerAuthorBadge
               authorName={item.external_author_name}
               photoUrl={item.external_author_photo_url}
+              partnerKey={item.partner_attribution}
               variant="compact"
             />
           ) : (
@@ -209,8 +182,8 @@ export function KnowledgeBankCard({ item, onFavoriteToggle }: KnowledgeBankCardP
               {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
             </span>
           </div>
-        </CardFooter>
-      </Card>
+        </div>
+      </Panel>
     </Link>
   )
 }

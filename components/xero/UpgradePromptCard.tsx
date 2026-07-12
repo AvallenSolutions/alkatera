@@ -1,49 +1,34 @@
 'use client'
 
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import {
-  Zap,
-  Flame,
-  Droplets,
-  Plane,
-  Train,
-  Truck,
-  Ship,
-  Package,
-  Trash2,
-  Hotel,
-  Fuel,
-  Leaf,
-  ArrowUpCircle,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  type LucideIcon,
-} from 'lucide-react'
+/**
+ * An upgrade opportunity as a quiet hairline row: bold category, mono
+ * facts, typographic state chips, one pill action. No icon box, no
+ * badge pills, no card.
+ */
+
+import { StateChip } from '@/components/studio/state-chip'
+import { PillButton } from '@/components/studio/pill-button'
 import { getUncertainty } from '@/lib/xero/spend-factors'
 
-const CATEGORY_META: Record<string, { label: string; icon: LucideIcon; scope: string }> = {
-  grid_electricity:   { label: 'Electricity',           icon: Zap,       scope: 'Scope 2' },
-  natural_gas:        { label: 'Natural Gas',           icon: Flame,     scope: 'Scope 1' },
-  diesel_stationary:  { label: 'Diesel (Stationary)',   icon: Fuel,      scope: 'Scope 1' },
-  diesel_mobile:      { label: 'Diesel (Fleet)',        icon: Fuel,      scope: 'Scope 1' },
-  petrol_mobile:      { label: 'Petrol (Fleet)',        icon: Fuel,      scope: 'Scope 1' },
-  lpg:                { label: 'LPG',                   icon: Flame,     scope: 'Scope 1' },
-  water:              { label: 'Water',                 icon: Droplets,  scope: 'Scope 3' },
-  air_travel:         { label: 'Air Travel',            icon: Plane,     scope: 'Scope 3' },
-  rail_travel:        { label: 'Rail Travel',           icon: Train,     scope: 'Scope 3' },
-  road_freight:       { label: 'Road Freight',          icon: Truck,     scope: 'Scope 3' },
-  sea_freight:        { label: 'Sea Freight',           icon: Ship,      scope: 'Scope 3' },
-  air_freight:        { label: 'Air Freight',           icon: Plane,     scope: 'Scope 3' },
-  courier:            { label: 'Courier / Parcel',      icon: Package,   scope: 'Scope 3' },
-  packaging:          { label: 'Packaging',             icon: Package,   scope: 'Scope 3' },
-  raw_materials:      { label: 'Raw Materials',         icon: Leaf,      scope: 'Scope 3' },
-  waste:              { label: 'Waste',                 icon: Trash2,    scope: 'Scope 3' },
-  accommodation:      { label: 'Accommodation',         icon: Hotel,     scope: 'Scope 3' },
-  other:              { label: 'Other',                 icon: Leaf,      scope: '' },
+const CATEGORY_META: Record<string, { label: string; scope: string }> = {
+  grid_electricity:   { label: 'Electricity',           scope: 'Scope 2' },
+  natural_gas:        { label: 'Natural Gas',           scope: 'Scope 1' },
+  diesel_stationary:  { label: 'Diesel (Stationary)',   scope: 'Scope 1' },
+  diesel_mobile:      { label: 'Diesel (Fleet)',        scope: 'Scope 1' },
+  petrol_mobile:      { label: 'Petrol (Fleet)',        scope: 'Scope 1' },
+  lpg:                { label: 'LPG',                   scope: 'Scope 1' },
+  water:              { label: 'Water',                 scope: 'Scope 3' },
+  air_travel:         { label: 'Air Travel',            scope: 'Scope 3' },
+  rail_travel:        { label: 'Rail Travel',           scope: 'Scope 3' },
+  road_freight:       { label: 'Road Freight',          scope: 'Scope 3' },
+  sea_freight:        { label: 'Sea Freight',           scope: 'Scope 3' },
+  air_freight:        { label: 'Air Freight',           scope: 'Scope 3' },
+  courier:            { label: 'Courier / Parcel',      scope: 'Scope 3' },
+  packaging:          { label: 'Packaging',             scope: 'Scope 3' },
+  raw_materials:      { label: 'Raw Materials',         scope: 'Scope 3' },
+  waste:              { label: 'Waste',                 scope: 'Scope 3' },
+  accommodation:      { label: 'Accommodation',         scope: 'Scope 3' },
+  other:              { label: 'Other',                 scope: '' },
 }
 
 interface UpgradePromptCardProps {
@@ -78,7 +63,6 @@ export function UpgradePromptCard({
   onDismiss,
 }: UpgradePromptCardProps) {
   const meta = CATEGORY_META[category] || CATEGORY_META.other
-  const Icon = meta.icon
   const uncertainty = getUncertainty(category)
   const uncertaintyPercent = Math.round(uncertainty * 100)
 
@@ -99,99 +83,53 @@ export function UpgradePromptCard({
   const dateRange = earliestDate && latestDate
     ? earliestDate.slice(0, 7) === latestDate.slice(0, 7)
       ? formatShortDate(earliestDate)
-      : `${formatShortDate(earliestDate)} \u2013 ${formatShortDate(latestDate)}`
+      : `${formatShortDate(earliestDate)} to ${formatShortDate(latestDate)}`
     : null
 
+  const showPartial =
+    !isUpgraded &&
+    typeof upgradedCount === 'number' &&
+    typeof pendingCount === 'number' &&
+    upgradedCount + pendingCount > 0 &&
+    upgradedCount > 0
+
   return (
-    <Card className={isUpgraded ? 'border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/10' : undefined}>
-      <CardContent className="py-4">
-        <div className="flex items-center gap-4">
-          {/* Icon */}
-          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-            isUpgraded
-              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
-          }`}>
-            <Icon className="h-5 w-5" />
-          </div>
+    <div className={`flex items-center gap-4 border-b border-studio-hairline py-3 ${isUpgraded ? 'opacity-70' : ''}`}>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-baseline gap-2">
+          <span className="font-display text-sm font-semibold text-foreground">{meta.label}</span>
+          {meta.scope && <StateChip tone="quiet">{meta.scope}</StateChip>}
+          {isUpgraded && <StateChip tone="good">ACTIVITY-BASED</StateChip>}
+          {!isUpgraded && <StateChip tone="attention">±{uncertaintyPercent}% UNCERTAIN</StateChip>}
+        </div>
+        <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.15em] text-studio-dim">
+          {formattedSpend} IDENTIFIED · {formattedEmissions} ESTIMATED · {transactionCount} TX
+          {dateRange ? ` · ${dateRange.toUpperCase()}` : ''}
+          {showPartial ? ` · ${upgradedCount} OF ${upgradedCount! + pendingCount!} UPGRADED` : ''}
+        </p>
+      </div>
 
-          {/* Content */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h4 className="text-sm font-semibold">{meta.label}</h4>
-              {meta.scope && (
-                <Badge variant="outline" className="text-xs font-normal">
-                  {meta.scope}
-                </Badge>
-              )}
-              {isUpgraded && (
-                <Badge
-                  variant="outline"
-                  className="text-xs border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                >
-                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                  Activity-based
-                </Badge>
-              )}
-            </div>
-            <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
-              <span>{formattedSpend} identified</span>
-              <span className="inline-flex items-center gap-1">
-                {formattedEmissions} estimated
-                {!isUpgraded && (
-                  <Badge
-                    variant="outline"
-                    className="text-[9px] ml-0.5 border-red-300 text-red-700 dark:text-red-400 dark:border-red-700"
-                  >
-                    <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />
-                    &plusmn;{uncertaintyPercent}%
-                  </Badge>
-                )}
-              </span>
-              <span>{transactionCount} transaction{transactionCount !== 1 ? 's' : ''}</span>
-              {dateRange && <span>{dateRange}</span>}
-            </div>
-            {!isUpgraded && typeof upgradedCount === 'number' && typeof pendingCount === 'number' && (upgradedCount + pendingCount) > 0 && (
-              <div className="mt-2 space-y-1">
-                <Progress
-                  value={Math.round((upgradedCount / (upgradedCount + pendingCount)) * 100)}
-                  className="h-1.5"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {upgradedCount} of {upgradedCount + pendingCount} transactions upgraded
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Actions */}
-          {!isUpgraded && (
-            <div className="flex items-center gap-2 shrink-0">
-              {canUpgrade && onUpgrade && (
-                <Button size="sm" onClick={onUpgrade}>
-                  <ArrowUpCircle className="h-4 w-4 mr-1" />
-                  Add Detail
-                </Button>
-              )}
-              {!canUpgrade && (
-                <Badge variant="outline" className="text-xs text-muted-foreground">
-                  Coming in Phase 2
-                </Badge>
-              )}
-              {onDismiss && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-muted-foreground"
-                  onClick={onDismiss}
-                >
-                  <XCircle className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
+      {!isUpgraded && (
+        <div className="flex shrink-0 items-center gap-2">
+          {canUpgrade && onUpgrade ? (
+            <PillButton size="sm" variant="outline" onClick={onUpgrade}>
+              Add detail
+            </PillButton>
+          ) : (
+            !canUpgrade && <StateChip tone="quiet">COMING IN PHASE 2</StateChip>
+          )}
+          {onDismiss && (
+            <button
+              type="button"
+              onClick={onDismiss}
+              aria-label={`Dismiss ${meta.label}`}
+              className="font-mono text-xs text-studio-dim transition-colors hover:text-foreground"
+            >
+              ×
+            </button>
           )}
         </div>
-      </CardContent>
-    </Card>
+      )}
+    </div>
   )
 }

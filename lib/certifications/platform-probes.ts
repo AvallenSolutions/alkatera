@@ -113,7 +113,7 @@ const PROBES: Record<ProbeId, ProbeDef> = {
   facilities: {
     module: 'operations',
     moduleLabel: 'Facilities',
-    moduleLink: '/operations',
+    moduleLink: '/company/facilities',
     async query(supabase, orgId) {
       const { data } = await supabase
         .from('facilities')
@@ -236,7 +236,7 @@ const PROBES: Record<ProbeId, ProbeDef> = {
   energyData: {
     module: 'operations',
     moduleLabel: 'Operations',
-    moduleLink: '/operations',
+    moduleLink: '/company/facilities',
     query: (s, o) =>
       activityProbe(
         s,
@@ -248,13 +248,13 @@ const PROBES: Record<ProbeId, ProbeDef> = {
   waterData: {
     module: 'operations',
     moduleLabel: 'Operations',
-    moduleLink: '/operations',
+    moduleLink: '/company/facilities',
     query: (s, o) => activityProbe(s, o, (c) => /water|effluent/.test(c), 'water data'),
   },
   wasteData: {
     module: 'operations',
     moduleLabel: 'Operations',
-    moduleLink: '/operations',
+    moduleLink: '/company/facilities',
     query: (s, o) => activityProbe(s, o, (c) => /waste|recycl/.test(c), 'waste data'),
   },
   metricTrend: {
@@ -342,7 +342,7 @@ const PROBES: Record<ProbeId, ProbeDef> = {
   productionLogs: {
     module: 'operations',
     moduleLabel: 'Operations',
-    moduleLink: '/operations',
+    moduleLink: '/company/facilities',
     query: (s, o) =>
       activityProbe(s, o, (c) => /production|output|volume|batch/.test(c), 'production data'),
   },

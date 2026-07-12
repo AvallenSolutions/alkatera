@@ -863,10 +863,10 @@ export function IngredientFormCard({
       <Card className="rounded-[6px] border border-border bg-card">
         <div className="p-6 space-y-4">
           <div className="flex items-start justify-between">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded bg-primary flex items-center justify-center text-primary-foreground font-medium text-sm">
-                {index + 1}
-              </div>
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim pt-1">
+                {String(index + 1).padStart(2, '0')}
+              </span>
               <div>
                 <h3 className="font-semibold text-foreground">
                   Ingredient {index + 1}

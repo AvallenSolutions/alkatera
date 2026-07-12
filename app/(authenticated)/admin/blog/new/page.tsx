@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Panel } from '@/components/studio/panel';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,7 +22,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { ImageUpload } from "@/components/blog/ImageUpload";
 
-// Lazy-load Tiptap rich text editor (~90KB) — only needed when user
+// Lazy-load Tiptap rich text editor (~90KB), only needed when user
 // starts editing content, not on initial page load.
 const RichTextEditor = dynamic(
   () => import("@/components/blog/RichTextEditor").then(mod => ({ default: mod.RichTextEditor })),
@@ -229,13 +229,13 @@ export default function NewBlogPost() {
       setHasDraft(false);
 
       if (status === 'draft') {
-        // Draft saved — redirect to edit page so they can continue working
+        // Draft saved: redirect to edit page so they can continue working
         setSuccessMessage('Draft saved successfully! Redirecting to editor...');
         setTimeout(() => {
           router.push(`/admin/blog/${data.post.id}`);
         }, 1500);
       } else {
-        // Published — redirect to blog dashboard
+        // Published: redirect to blog dashboard
         setSuccessMessage('Post published successfully! Redirecting to blog dashboard...');
         setTimeout(() => {
           router.push('/admin/blog');
@@ -282,7 +282,7 @@ export default function NewBlogPost() {
             </Link>
           </Button>
           <div>
-            <Eyebrow className="mb-3">THE WIRING · BLOG</Eyebrow>
+            <Eyebrow className="mb-3">THE WIRING · ADMIN</Eyebrow>
             <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
               New post.
             </h1>
@@ -349,11 +349,11 @@ export default function NewBlogPost() {
       <div className="grid gap-6 md:grid-cols-3">
         {/* Main Content */}
         <div className="md:col-span-2 space-y-6">
-          <Card className="rounded-[6px]">
-            <CardHeader>
-              <CardTitle>Post Content</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <Panel className="rounded-[6px]">
+            <div className="mb-4 space-y-1">
+              <h2 className="font-display text-base font-semibold text-foreground">Post Content</h2>
+            </div>
+            <div className="space-y-4">
               {/* Title */}
               <div className="space-y-2">
                 <Label htmlFor="title">{formData.content_type === 'quote' ? 'Quote Text *' : 'Title *'}</Label>
@@ -498,18 +498,18 @@ export default function NewBlogPost() {
                   />
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
         </div>
 
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Post Settings */}
-          <Card className="rounded-[6px]">
-            <CardHeader>
-              <CardTitle>Post Settings</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <Panel className="rounded-[6px]">
+            <div className="mb-4 space-y-1">
+              <h2 className="font-display text-base font-semibold text-foreground">Post Settings</h2>
+            </div>
+            <div className="space-y-4">
               {/* Content Type */}
               <div className="space-y-2">
                 <Label htmlFor="content_type">Content Type</Label>
@@ -572,16 +572,16 @@ export default function NewBlogPost() {
                   onUploadComplete={(url) => setFormData(prev => ({ ...prev, featured_image_url: url }))}
                 />
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
 
           {/* SEO Settings */}
-          <Card className="rounded-[6px]">
-            <CardHeader>
-              <CardTitle>SEO Metadata</CardTitle>
-              <CardDescription>Customize how this appears in search</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <Panel className="rounded-[6px]">
+            <div className="mb-4 space-y-1">
+              <h2 className="font-display text-base font-semibold text-foreground">SEO Metadata</h2>
+              <p className="text-sm text-studio-dim">Customize how this appears in search</p>
+            </div>
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="meta_title">Meta Title</Label>
                 <Input
@@ -602,8 +602,8 @@ export default function NewBlogPost() {
                   onChange={(e) => setFormData(prev => ({ ...prev, meta_description: e.target.value }))}
                 />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
         </div>
       </div>
     </div>

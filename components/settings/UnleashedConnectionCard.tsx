@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useOrganization } from '@/lib/organizationContext'
-import { Card, CardContent } from '@/components/ui/card'
+import { Panel } from '@/components/studio'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -141,8 +141,8 @@ export function UnleashedConnectionCard({ connection, onChanged }: UnleashedConn
   }
 
   return (
-    <Card>
-      <CardContent className="p-5">
+    <Panel flush>
+      <div className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -274,7 +274,7 @@ export function UnleashedConnectionCard({ connection, onChanged }: UnleashedConn
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   )
 }

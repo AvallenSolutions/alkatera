@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useOrganization } from '@/lib/organizationContext'
 import { useSubscription } from '@/hooks/useSubscription'
-import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Panel } from '@/components/studio'
 import { StateChip } from '@/components/studio/state-chip'
 import { toast } from 'sonner'
 import { Mail, CheckCircle2 } from 'lucide-react'
@@ -34,7 +34,7 @@ interface ConnectionRow {
 }
 
 interface IntegrationsDirectoryProps {
-  /** Compact variant used inside the onboarding wizard — hides the Xero setup stepper detail. */
+  /** Compact variant used inside the onboarding wizard: hides the Xero setup stepper detail. */
   compact?: boolean
 }
 
@@ -106,7 +106,7 @@ export function IntegrationsDirectory({ compact = false }: IntegrationsDirectory
 }
 
 // ───────────────────────────────────────────────────────────────────────────────
-// ProviderCard — renders one row in the directory grid. Three kinds:
+// ProviderCard: renders one row in the directory grid. Three kinds:
 //  - Special-case Xero (still on xero_connections table) → delegate to its card
 //  - Live providers on the generic table → render connection status + card
 //  - "Coming soon" → render Request Access button
@@ -159,7 +159,7 @@ function ProviderCard({
 }
 
 // ───────────────────────────────────────────────────────────────────────────────
-// ComingSoonCard — a card with the provider name, description, and a Request
+// ComingSoonCard: a card with the provider name, description, and a Request
 // Access button that fires /api/integrations/request. Logs demand signal.
 // ───────────────────────────────────────────────────────────────────────────────
 
@@ -191,8 +191,8 @@ function ComingSoonCard({ provider, note }: { provider: IntegrationProvider; not
   }
 
   return (
-    <Card className="flex flex-col">
-      <CardContent className="p-4 flex-1 flex flex-col gap-3">
+    <Panel flush className="flex flex-col">
+      <div className="p-4 flex-1 flex flex-col gap-3">
         <div className="flex items-start justify-between gap-2">
           <div>
             <p className="font-medium text-sm">{provider.name}</p>
@@ -208,9 +208,9 @@ function ComingSoonCard({ provider, note }: { provider: IntegrationProvider; not
         </div>
         <p className="text-xs text-muted-foreground line-clamp-3">{provider.description}</p>
         {note && <p className="text-[11px] text-studio-attention">{note}</p>}
-        <div className="flex flex-wrap gap-1 pt-1">
+        <div className="flex flex-wrap gap-x-2 gap-y-1 pt-1">
           {provider.provides.slice(0, 3).map((p) => (
-            <span key={p} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+            <span key={p} className="font-mono text-[10px] uppercase tracking-[0.14em] text-studio-dim">
               {p}
             </span>
           ))}
@@ -228,7 +228,7 @@ function ComingSoonCard({ provider, note }: { provider: IntegrationProvider; not
             </Button>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   )
 }

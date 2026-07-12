@@ -11,9 +11,9 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { PageLoader } from "@/components/ui/page-loader";
-import { ArrowLeft, Settings, Sparkles } from "lucide-react";
+import { Statement } from "@/components/studio/statement";
+import { PillButton } from "@/components/studio/pill-button";
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
 import { useIsAlkateraAdmin } from "@/hooks/usePermissions";
@@ -105,10 +105,10 @@ export default function ProductRecipePage() {
     return (
       <div className="container mx-auto p-6">
         <div className="text-center">
-          <h2 className="text-2xl font-bold">Product Not Found</h2>
-          <Link href="/products">
-            <Button className="mt-4">Back to Products</Button>
-          </Link>
+          <h2 className="font-display text-2xl font-bold tracking-[-0.02em]">Product not found.</h2>
+          <PillButton href="/products" variant="outline" className="mt-4">
+            Back to products
+          </PillButton>
         </div>
       </div>
     );
@@ -121,55 +121,52 @@ export default function ProductRecipePage() {
       : "Not specified");
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href={`/products/${productId}`}>
-          <Button variant="outline" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
+    <div className="container mx-auto p-6 max-w-7xl">
+      <div className="mb-8">
+        <Link
+          href={`/products/${productId}`}
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim transition-colors duration-150 ease-studio hover:text-foreground"
+        >
+          &larr; Back to product
         </Link>
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold">{product.name}</h1>
-          <p className="text-muted-foreground">
-            {product.sku && `SKU: ${product.sku} · `}
-            Functional Unit: {functionalUnit}
-          </p>
-        </div>
-        <div className="flex gap-2">
+      </div>
+
+      <Statement eyebrow="THE CELLAR · RECIPE" headline={<>{product.name}.</>} />
+
+      <div className="mt-4 mb-8 flex flex-wrap items-center gap-x-5 gap-y-2">
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+          {functionalUnit}
+        </span>
+        {product.sku && (
+          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+            SKU {product.sku}
+          </span>
+        )}
+      </div>
+
+      {(brewwLinked || (!brewwLinked && brewwConnected) || isAlkateraAdmin) && (
+        <div className="mb-8 flex flex-wrap items-center gap-2">
           {brewwLinked && (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => setShowBrewwImport(true)}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              <Sparkles className="h-4 w-4 mr-2" />
+            <PillButton variant="outline" size="sm" onClick={() => setShowBrewwImport(true)}>
               Import from Breww
-            </Button>
+            </PillButton>
           )}
           {!brewwLinked && brewwConnected && (
-            <Button
-              variant="outline"
+            <PillButton
+              variant="ghost"
               size="sm"
               onClick={() => router.push("/settings/integrations/breww?tab=products")}
-              className="text-[#2B46C0] border-border"
             >
-              <Sparkles className="h-4 w-4 mr-2" />
               Link to Breww
-            </Button>
+            </PillButton>
           )}
           {isAlkateraAdmin && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowOpenLCAConfig(true)}
-            >
-              <Settings className="h-4 w-4 mr-2" />
+            <PillButton variant="ghost" size="sm" onClick={() => setShowOpenLCAConfig(true)}>
               Configure OpenLCA
-            </Button>
+            </PillButton>
           )}
         </div>
-      </div>
+      )}
 
       <RecipeEditorPanel
         key={reloadKey}

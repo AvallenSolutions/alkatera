@@ -1,18 +1,16 @@
 'use client'
 
 /**
- * Venues management surface for the Hospitality module.
- * Lists an organisation's venues and provides create / edit / delete.
+ * Venues management surface for the Hospitality module: studio grammar.
+ * One statement, quiet fact rows for the venues, create / edit / delete intact.
  */
 
 import { useState } from 'react'
-import { Plus, Store, Pencil, Trash2, UtensilsCrossed, Wine, BedDouble } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -38,20 +36,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Statement } from '@/components/studio/statement'
+import { BigNumber } from '@/components/studio/big-number'
+import { PillButton } from '@/components/studio/pill-button'
+import { FactList, type FactRowItem } from '@/components/studio/fact-list'
 import { useToast } from '@/hooks/use-toast'
 import { useHospitalityVenues } from '@/hooks/data/useHospitalityVenues'
 import {
   VENUE_TYPES,
   venueTypeLabel,
   type HospitalityVenue,
-  type VenueType,
 } from '@/lib/hospitality/venue-types'
-
-const VENUE_ICON: Record<VenueType, typeof Store> = {
-  restaurant: UtensilsCrossed,
-  bar: Wine,
-  accommodation: BedDouble,
-}
 
 export function VenuesManager() {
   const { venues, isLoading, error, createVenue, updateVenue, deleteVenue } =
@@ -130,88 +125,65 @@ export function VenuesManager() {
     }
   }
 
+  const rows: FactRowItem[] = venues.map((venue) => ({
+    id: venue.id,
+    title: venue.name,
+    hint: venue.description ?? undefined,
+    meta: venueTypeLabel(venue.venue_type),
+    trailing: (
+      <span className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          className="rounded px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground transition-colors duration-150 hover:text-foreground"
+          onClick={() => openEdit(venue)}
+        >
+          Edit
+        </button>
+        <button
+          type="button"
+          aria-label={`Remove ${venue.name}`}
+          className="rounded px-2 py-1 text-base leading-none text-muted-foreground transition-colors duration-150 hover:text-studio-stale"
+          onClick={() => setPendingDelete(venue)}
+        >
+          &times;
+        </button>
+      </span>
+    ),
+  }))
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">Venues</h2>
-          <p className="text-sm text-muted-foreground">
-            Your restaurants, bars and accommodation. Each venue anchors its own impact reporting.
-          </p>
-        </div>
-        <Button onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add venue
-        </Button>
+    <div className="space-y-8">
+      <div className="min-w-0">
+        <Statement eyebrow="THE WORKBENCH · VENUES" headline="The venues.">
+          <BigNumber size="display" value={venues.length} label={venues.length === 1 ? 'Venue' : 'Venues'} />
+          <PillButton variant="room" onClick={openCreate}>
+            Add venue
+          </PillButton>
+        </Statement>
+        <p className="mt-3 max-w-xl text-sm text-muted-foreground">
+          Your restaurants, bars and accommodation. Each venue anchors its own impact reporting.
+        </p>
       </div>
 
-      {error && (
-        <p className="text-sm text-destructive">{error}</p>
-      )}
+      {error && <p className="text-sm text-studio-stale">{error}</p>}
 
       {isLoading ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-3 border-t border-border pt-6">
           {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-24 w-full rounded-lg" />
+            <Skeleton key={i} className="h-12 w-full rounded-[6px]" />
           ))}
         </div>
       ) : venues.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-12 text-center">
-          <Store className="mb-3 h-8 w-8 text-muted-foreground" />
-          <p className="font-medium">No venues yet</p>
-          <p className="mb-4 text-sm text-muted-foreground">
-            Add your first restaurant, bar or accommodation to get started.
+        <div className="border-t border-border pt-6">
+          <p className="text-sm text-muted-foreground">
+            No venues yet. Add your first restaurant, bar or accommodation to get started.
           </p>
-          <Button onClick={openCreate} variant="outline">
-            <Plus className="mr-2 h-4 w-4" />
+          <PillButton variant="room" className="mt-4" onClick={openCreate}>
             Add venue
-          </Button>
+          </PillButton>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {venues.map((venue) => {
-            const Icon = VENUE_ICON[venue.venue_type] ?? Store
-            return (
-              <div
-                key={venue.id}
-                className="group flex flex-col rounded-lg border bg-card p-4 shadow-sm"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    <Icon className="h-5 w-5 text-muted-foreground" />
-                    <span className="font-medium">{venue.name}</span>
-                  </div>
-                  <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => openEdit(venue)}
-                      aria-label="Edit venue"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive"
-                      onClick={() => setPendingDelete(venue)}
-                      aria-label="Delete venue"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <Badge variant="secondary">{venueTypeLabel(venue.venue_type)}</Badge>
-                </div>
-                {venue.description && (
-                  <p className="mt-2 text-sm text-muted-foreground">{venue.description}</p>
-                )}
-              </div>
-            )
-          })}
-        </div>
+        <FactList items={rows} className="border-t border-border" />
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

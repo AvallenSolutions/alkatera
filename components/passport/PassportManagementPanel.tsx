@@ -1,28 +1,15 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import {
-  Globe,
-  Lock,
-  Eye,
-  Calendar,
-  ExternalLink,
-  Info,
-  Loader2,
-  MapPin,
-  Package
-} from 'lucide-react';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { BigNumber } from '@/components/studio/big-number';
+import { StateChip } from '@/components/studio/state-chip';
+import { PillButton } from '@/components/studio/pill-button';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { toast } from 'sonner';
 import QRCodeDisplay from './QRCodeDisplay';
-import Link from 'next/link';
 
 interface PassportSettings {
   hiddenSections?: string[];
@@ -52,6 +39,7 @@ export default function PassportManagementPanel({
   const [viewsCount, setViewsCount] = useState(initialViewsCount);
   const [lastViewedAt, setLastViewedAt] = useState(initialLastViewedAt);
   const [isLoading, setIsLoading] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [passportSettings, setPassportSettings] = useState<PassportSettings>({
     hiddenSections: (initialPassportSettings?.hiddenSections as string[]) || [],
   });
@@ -128,6 +116,18 @@ export default function PassportManagementPanel({
     }
   }, [isEnabled]);
 
+  const handleCopyLink = async () => {
+    if (!passportUrl) return;
+    try {
+      await navigator.clipboard.writeText(passportUrl);
+      setLinkCopied(true);
+      toast.success('Link copied to clipboard');
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch (error) {
+      toast.error('Failed to copy link');
+    }
+  };
+
   const isSectionVisible = (section: string) => {
     return !passportSettings.hiddenSections?.includes(section);
   };
@@ -165,142 +165,136 @@ export default function PassportManagementPanel({
     }
   };
 
+  const formattedLastViewed = lastViewedAt
+    ? new Date(lastViewedAt).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : null;
+
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Live Product Passport</CardTitle>
-              <CardDescription>
-                Share environmental impact data publicly. Data displayed varies by subscription tier.
-              </CardDescription>
-            </div>
-            <Badge variant={isEnabled ? 'default' : 'secondary'} className="gap-1">
-              {isEnabled ? (
-                <>
-                  <Globe className="h-3 w-3" />
-                  Public
-                </>
-              ) : (
-                <>
-                  <Lock className="h-3 w-3" />
-                  Private
-                </>
-              )}
-            </Badge>
+    <div className="max-w-3xl space-y-10">
+      {/* Statement */}
+      <div>
+        <div className="flex items-center gap-3">
+          <Eyebrow>The passport</Eyebrow>
+          <StateChip tone={isEnabled ? 'good' : 'quiet'}>
+            {isEnabled ? 'Public' : 'Private'}
+          </StateChip>
+        </div>
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+          The public product passport shares this product&apos;s environmental impact with anyone who scans it.
+          What appears depends on your subscription tier: Seed shows GHG only, Blossom adds water and waste,
+          Canopy adds biodiversity.
+        </p>
+      </div>
+
+      {/* Enable / disable */}
+      <section className="border-t border-border pt-5">
+        <div className="flex items-center justify-between gap-4">
+          <Label htmlFor="passport-toggle" className="cursor-pointer">
+            <span className="block text-sm font-medium text-foreground">Enable the public passport</span>
+            <span className="mt-1 block max-w-xl text-sm font-normal text-muted-foreground">
+              Turn this on to generate a public link and QR code for {productName}.
+            </span>
+          </Label>
+          <Switch
+            id="passport-toggle"
+            checked={isEnabled}
+            onCheckedChange={handleTogglePassport}
+            disabled={isLoading}
+          />
+        </div>
+
+        {isLoading && (
+          <div className="mt-3 font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+            Updating the passport
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Alert className="border-blue-200 bg-blue-50">
-            <Info className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-900 text-sm">
-              <strong>Tier-based display:</strong> Seed shows GHG only, Blossom adds Water + Waste, Canopy adds Biodiversity metrics
-            </AlertDescription>
-          </Alert>
+        )}
 
-          <div className="flex items-center justify-between">
-            <Label htmlFor="passport-toggle" className="flex items-center gap-2">
-              <span>Enable Product Passport</span>
-            </Label>
-            <Switch
-              id="passport-toggle"
-              checked={isEnabled}
-              onCheckedChange={handleTogglePassport}
-              disabled={isLoading}
-            />
-          </div>
+        {!isEnabled && !isLoading && (
+          <p className="mt-3 text-sm text-studio-dim">
+            The passport is private. No one can view it until you enable it.
+          </p>
+        )}
+      </section>
 
-          {isLoading && (
-            <div className="flex items-center gap-2 text-sm text-neutral-600">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Updating passport...</span>
-            </div>
-          )}
-
-          {isEnabled && token && (
-            <>
-              <Separator />
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Eye className="h-4 w-4 text-neutral-500" />
-                    <span className="text-sm font-medium">Total Views</span>
-                  </div>
-                  <span className="text-2xl font-bold text-neutral-900">
-                    {viewsCount.toLocaleString()}
-                  </span>
-                </div>
-
-                {lastViewedAt && (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-neutral-500" />
-                      <span className="text-sm font-medium">Last Viewed</span>
-                    </div>
-                    <span className="text-sm text-neutral-600">
-                      {new Date(lastViewedAt).toLocaleDateString('en-GB', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <Separator />
-
-              <div>
-                <Link href={passportUrl} target="_blank">
-                  <Button variant="outline" className="w-full" size="sm">
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    View Live Passport
-                  </Button>
-                </Link>
-              </div>
-            </>
-          )}
-
-          {!isEnabled && (
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertDescription>
-                Enable the passport to generate a public URL and QR code for this product
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
-
+      {/* Reach */}
       {isEnabled && token && (
-        <QRCodeDisplay
-          url={passportUrl}
-          productName={productName}
-        />
+        <section className="border-t border-border pt-5">
+          <Eyebrow className="mb-4">Reach</Eyebrow>
+          <div className="flex flex-wrap items-end gap-x-12 gap-y-6">
+            <BigNumber value={viewsCount.toLocaleString()} label="Total views" />
+            {formattedLastViewed && (
+              <div>
+                <div className="font-display text-[1.15rem] font-bold leading-none tabular-nums text-foreground">
+                  {formattedLastViewed}
+                </div>
+                <div className="mt-1.5 font-mono text-[9.5px] uppercase tracking-[0.2em] text-foreground opacity-70">
+                  Last viewed
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
       )}
 
+      {/* Share */}
+      {isEnabled && token && (
+        <section className="border-t border-border pt-5">
+          <Eyebrow className="mb-4">Share</Eyebrow>
+          <div className="space-y-4">
+            <div>
+              <div className="mb-2 font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+                Public link
+              </div>
+              <div className="flex items-center gap-3">
+                <code className="min-w-0 flex-1 select-all truncate rounded-md border border-border bg-studio-cream px-3 py-2 font-mono text-xs text-foreground">
+                  {passportUrl}
+                </code>
+                <PillButton variant="ghost" size="sm" onClick={handleCopyLink}>
+                  {linkCopied ? 'Copied' : 'Copy'}
+                </PillButton>
+              </div>
+            </div>
+
+            <a href={passportUrl} target="_blank" rel="noreferrer" className="inline-flex">
+              <PillButton variant="room" size="sm" type="button">
+                View live passport
+              </PillButton>
+            </a>
+          </div>
+        </section>
+      )}
+
+      {/* QR code (self-contained functional renderer) */}
+      {isEnabled && token && (
+        <section className="border-t border-border pt-5">
+          <Eyebrow className="mb-4">QR code</Eyebrow>
+          <p className="mb-4 max-w-2xl text-sm text-muted-foreground">
+            Print this on packaging, marketing materials or displays so anyone can open the passport.
+          </p>
+          <QRCodeDisplay url={passportUrl} productName={productName} />
+        </section>
+      )}
+
+      {/* What the passport shows */}
       {isEnabled && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Passport Sections</CardTitle>
-            <CardDescription>
-              Choose which sections appear on your public passport. Sensitive data like ingredient origins and packaging details can be hidden.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="toggle-origins" className="flex items-center gap-3 cursor-pointer">
-                <div className="p-1.5 bg-blue-50 rounded-lg">
-                  <MapPin className="h-4 w-4 text-blue-600" />
-                </div>
-                <div>
-                  <span className="block text-sm font-medium">Ingredient Origins</span>
-                  <span className="block text-xs text-neutral-500">Show where your ingredients are sourced</span>
-                </div>
+        <section className="border-t border-border pt-5">
+          <Eyebrow className="mb-1">What the passport shows</Eyebrow>
+          <p className="mb-4 max-w-2xl text-sm text-muted-foreground">
+            Choose which sections appear publicly. Sensitive detail like ingredient origins and packaging can stay hidden.
+          </p>
+          <div className="divide-y divide-border">
+            <div className="flex items-center justify-between gap-4 py-3.5">
+              <Label htmlFor="toggle-origins" className="cursor-pointer">
+                <span className="block text-sm font-medium text-foreground">Ingredient origins</span>
+                <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                  Show where your ingredients are sourced
+                </span>
               </Label>
               <Switch
                 id="toggle-origins"
@@ -309,17 +303,12 @@ export default function PassportManagementPanel({
               />
             </div>
 
-            <Separator />
-
-            <div className="flex items-center justify-between">
-              <Label htmlFor="toggle-packaging" className="flex items-center gap-3 cursor-pointer">
-                <div className="p-1.5 bg-emerald-50 rounded-lg">
-                  <Package className="h-4 w-4 text-emerald-600" />
-                </div>
-                <div>
-                  <span className="block text-sm font-medium">Packaging &amp; Circularity</span>
-                  <span className="block text-xs text-neutral-500">Show packaging sustainability data</span>
-                </div>
+            <div className="flex items-center justify-between gap-4 py-3.5">
+              <Label htmlFor="toggle-packaging" className="cursor-pointer">
+                <span className="block text-sm font-medium text-foreground">Packaging &amp; circularity</span>
+                <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                  Show packaging sustainability data
+                </span>
               </Label>
               <Switch
                 id="toggle-packaging"
@@ -327,8 +316,8 @@ export default function PassportManagementPanel({
                 onCheckedChange={(checked) => handleToggleSection('packaging', checked)}
               />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       )}
     </div>
   );

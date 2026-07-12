@@ -1,36 +1,35 @@
 "use client";
 
+/**
+ * The fleet -- a workbench surface in the studio grammar.
+ *
+ * One statement (the year's fleet emissions standing right), a hairline
+ * figures row for the scope split, one quiet line explaining the routing,
+ * then three sections down one paper: the picture (two chart panels),
+ * the vehicles (the registry) and the log (every recorded activity).
+ * The old internal tab bar and icon stat cards are gone; the data
+ * queries, calculations, dialogs and gating are unchanged.
+ */
+
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Car,
-  Zap,
-  Fuel,
-  Plus,
-  TrendingDown,
-  Truck,
-  Users,
-  BarChart3,
-  AlertCircle,
-} from "lucide-react";
 import { useOrganization } from "@/lib/organizationContext";
 import { supabase } from "@/lib/supabaseClient";
 import dynamic from "next/dynamic";
 import { FeatureGate } from "@/components/subscription/FeatureGate";
-import { FleetOverviewCards } from "@/components/fleet/FleetOverviewCards";
+import { Statement } from "@/components/studio/statement";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { BigNumber } from "@/components/studio/big-number";
+import { Panel } from "@/components/studio/panel";
+import { PillButton } from "@/components/studio/pill-button";
 import { FleetVehicleRegistry } from "@/components/fleet/FleetVehicleRegistry";
 import { FleetActivityEntry } from "@/components/fleet/FleetActivityEntry";
 import { FleetActivityTable } from "@/components/fleet/FleetActivityTable";
 
-// Lazy-load chart component — pulls in recharts (~200KB) only when the
-// Analytics tab is viewed, not on initial fleet page load.
+// Lazy-load chart component -- pulls in recharts (~200KB) only when the
+// page renders, not in the shared bundle.
 const FleetEmissionsChart = dynamic(
   () => import("@/components/fleet/FleetEmissionsChart").then(mod => ({ default: mod.FleetEmissionsChart })),
-  { ssr: false, loading: () => <Skeleton className="h-64 w-full rounded-xl" /> }
+  { ssr: false, loading: () => <div className="h-[302px] animate-pulse rounded-[6px] bg-border/40" /> }
 );
 
 interface FleetSummary {
@@ -42,11 +41,31 @@ interface FleetSummary {
   totalEmissions: number;
 }
 
+/** A quiet section: mono eyebrow over a hairline rule, then the work. */
+function Section({
+  label,
+  blurb,
+  children,
+}: {
+  label: string;
+  blurb: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-4">
+      <div className="border-b border-studio-hairline pb-2">
+        <Eyebrow>{label}</Eyebrow>
+        <p className="mt-1 text-xs text-muted-foreground">{blurb}</p>
+      </div>
+      {children}
+    </section>
+  );
+}
+
 export default function FleetPage() {
   const { currentOrganization } = useOrganization();
   const [summary, setSummary] = useState<FleetSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("overview");
   const [showActivityModal, setShowActivityModal] = useState(false);
 
   useEffect(() => {
@@ -109,208 +128,107 @@ export default function FleetPage() {
     fetchFleetSummary();
   };
 
+  // Whole "0" for nothing recorded; decimals only once there is something.
+  const fig = (value: number | undefined) =>
+    loading || value === undefined ? (
+      <span className="text-muted-foreground">--</span>
+    ) : value === 0 ? (
+      '0'
+    ) : (
+      value.toFixed(2)
+    );
+
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Fleet Management</h1>
-          <p className="text-muted-foreground mt-1">
-            Track and manage vehicle emissions across Scope 1, 2, and 3
-          </p>
-        </div>
-        <Button onClick={() => setShowActivityModal(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Log Fleet Activity
-        </Button>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Emissions</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <>
-                <div className="text-2xl font-bold">
-                  {summary?.totalEmissions.toFixed(2)} tCO2e
-                </div>
-                <p className="text-xs text-muted-foreground">Current year</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Scope 1</CardTitle>
-            <Fuel className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <>
-                <div className="text-2xl font-bold">
-                  {summary?.scope1Emissions.toFixed(2)} tCO2e
-                </div>
-                <p className="text-xs text-muted-foreground">Direct combustion</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Scope 2</CardTitle>
-            <Zap className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <>
-                <div className="text-2xl font-bold">
-                  {summary?.scope2Emissions.toFixed(2)} tCO2e
-                </div>
-                <p className="text-xs text-muted-foreground">EV charging</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Scope 3 Cat 6</CardTitle>
-            <Users className="h-4 w-4 text-slate-500" />
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <>
-                <div className="text-2xl font-bold">
-                  {summary?.scope3Emissions.toFixed(2)} tCO2e
-                </div>
-                <p className="text-xs text-muted-foreground">Grey fleet / business travel</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="vehicles">Vehicle Registry</TabsTrigger>
-          <TabsTrigger value="activities">Activity Log</TabsTrigger>
-          <TabsTrigger value="reporting">Reporting</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-4">
-          <FleetOverviewCards />
-          <div className="grid gap-4 md:grid-cols-2">
-            <FleetEmissionsChart organizationId={currentOrganization?.id} />
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Scope Assignment Guide</CardTitle>
-                <CardDescription>
-                  How vehicle emissions are automatically categorised
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <Badge variant="secondary" className="mt-0.5">Scope 1</Badge>
-                  <div>
-                    <p className="font-medium">Company-owned ICE vehicles</p>
-                    <p className="text-sm text-muted-foreground">
-                      Diesel, petrol, LPG vehicles owned or leased by the company
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Badge className="mt-0.5">Scope 2</Badge>
-                  <div>
-                    <p className="font-medium">Company-owned EVs</p>
-                    <p className="text-sm text-muted-foreground">
-                      Electric vehicles charged using grid electricity
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Badge variant="outline" className="mt-0.5">Scope 3</Badge>
-                  <div>
-                    <p className="font-medium">Grey Fleet / Employee vehicles</p>
-                    <p className="text-sm text-muted-foreground">
-                      Employee-owned vehicles used for business purposes
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="vehicles">
-          <FeatureGate
-            feature="vehicle_registry"
-            fallback={
-              <Card className="border-dashed">
-                <CardContent className="py-12 text-center">
-                  <Truck className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="font-semibold text-lg mb-2">Vehicle Registry</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Upgrade to Blossom or Canopy to access the vehicle registry feature
-                  </p>
-                  <Button variant="outline">View Plans</Button>
-                </CardContent>
-              </Card>
+    <div className="space-y-10">
+      <div className="space-y-6">
+        <Statement eyebrow="THE WORKBENCH · FLEET" headline="The fleet.">
+          <BigNumber
+            size="display"
+            label="Fleet emissions this year"
+            value={
+              loading || !summary ? (
+                <span className="text-muted-foreground">--</span>
+              ) : (
+                <>
+                  {summary.totalEmissions === 0 ? '0' : summary.totalEmissions.toFixed(2)}
+                  <span className="ml-1 text-base font-normal text-muted-foreground">tCO2e</span>
+                </>
+              )
             }
-          >
-            <FleetVehicleRegistry
-              organizationId={currentOrganization?.id}
-              onVehicleAdded={fetchFleetSummary}
-            />
-          </FeatureGate>
-        </TabsContent>
-
-        <TabsContent value="activities">
-          <FleetActivityTable
-            organizationId={currentOrganization?.id}
-            onActivityDeleted={fetchFleetSummary}
           />
-        </TabsContent>
+        </Statement>
 
-        <TabsContent value="reporting">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  Emissions by Scope
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <FleetEmissionsChart organizationId={currentOrganization?.id} type="scope" />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Car className="h-5 w-5" />
-                  Emissions by Vehicle Type
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <FleetEmissionsChart organizationId={currentOrganization?.id} type="vehicle" />
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
+        <PillButton variant="room" onClick={() => setShowActivityModal(true)}>
+          Log activity
+        </PillButton>
+
+        {/* The figures row: the scope split and the fleet, on one hairline. */}
+        <div className="grid grid-cols-2 gap-x-8 gap-y-5 border-y border-studio-hairline py-5 lg:grid-cols-4">
+          <BigNumber label="Scope 1 · fuel" value={fig(summary?.scope1Emissions)} />
+          <BigNumber label="Scope 2 · EV charging" value={fig(summary?.scope2Emissions)} />
+          <BigNumber label="Scope 3 Cat 6 · grey fleet" value={fig(summary?.scope3Emissions)} />
+          <BigNumber
+            label={summary?.activeVehicles === 1 ? "Active vehicle" : "Active vehicles"}
+            value={
+              loading || !summary ? (
+                <span className="text-muted-foreground">--</span>
+              ) : (
+                summary.activeVehicles
+              )
+            }
+          />
+        </div>
+
+        <p className="max-w-2xl text-sm text-muted-foreground">
+          Company-owned and leased vehicles count in Scope 1 (fuel) and Scope 2 (EV charging);
+          employee-owned and hired vehicles count in Scope 3 Category 6. Every figure uses
+          official DEFRA 2025 emission factors.
+        </p>
+      </div>
+
+      <Section
+        label="THE PICTURE"
+        blurb="This year's fleet emissions, cut by scope and by vehicle type."
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <FleetEmissionsChart organizationId={currentOrganization?.id} type="scope" />
+          <FleetEmissionsChart organizationId={currentOrganization?.id} type="vehicle" />
+        </div>
+      </Section>
+
+      <Section
+        label="THE VEHICLES"
+        blurb="The registered fleet. Scope is worked out from ownership and fuel."
+      >
+        <FeatureGate
+          feature="vehicle_registry"
+          fallback={
+            <Panel className="flex flex-wrap items-center justify-between gap-4">
+              <p className="text-sm text-muted-foreground">
+                The vehicle registry is available on the Blossom and Canopy plans.
+              </p>
+              <PillButton variant="outline" size="sm" href="/settings/">
+                View plans
+              </PillButton>
+            </Panel>
+          }
+        >
+          <FleetVehicleRegistry
+            organizationId={currentOrganization?.id}
+            onVehicleAdded={fetchFleetSummary}
+          />
+        </FeatureGate>
+      </Section>
+
+      <Section
+        label="THE LOG"
+        blurb="Every recorded journey, fill-up and charge."
+      >
+        <FleetActivityTable
+          organizationId={currentOrganization?.id}
+          onActivityDeleted={fetchFleetSummary}
+        />
+      </Section>
 
       {showActivityModal && (
         <FleetActivityEntry

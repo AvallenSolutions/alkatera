@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useIsAlkateraAdmin } from '@/hooks/usePermissions';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Panel } from '@/components/studio/panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -268,11 +268,11 @@ export default function AdminImpactProxyValuesPage() {
         if (!items || items.length === 0) return null;
 
         return (
-          <Card key={capital}>
-            <CardHeader>
-              <CardTitle className="text-lg">{capitalLabels[capital]}</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <Panel key={capital}>
+            <div className="mb-4 space-y-1">
+              <h2 className="font-display text-lg font-semibold text-foreground">{capitalLabels[capital]}</h2>
+            </div>
+            <div>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -397,8 +397,8 @@ export default function AdminImpactProxyValuesPage() {
                   ))}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
         );
       })}
 
@@ -425,8 +425,8 @@ export default function AdminImpactProxyValuesPage() {
             ) : (
               <div className="space-y-3">
                 {historyItems.map((item) => (
-                  <Card key={item.id}>
-                    <CardContent className="py-3 px-4">
+                  <Panel key={item.id}>
+                    <div>
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-xs text-muted-foreground">v{item.version}</span>
@@ -453,8 +453,8 @@ export default function AdminImpactProxyValuesPage() {
                           <span className="text-sm">{item.source}</span>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </Panel>
                 ))}
               </div>
             )}

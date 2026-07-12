@@ -1,0 +1,45 @@
+/*
+ * The financial re-cut: studio presentation for the compact cards on the
+ * Financial surface only.
+ *
+ * Every card body renders through the shared PulseCard (components/pulse/
+ * PulseCard.tsx), which /pulse also uses, so this surface quietens its cards
+ * from the outside rather than forking nine widgets: the header icon goes,
+ * the label becomes a mono caps eyebrow, the figure leads display-bold
+ * tabular, and the sub line reads as the figure's mono label. Data, drills,
+ * pins and states are untouched.
+ *
+ * Coupling note: these selectors anchor on PulseCard's inner content wrapper
+ * (`.z-10`), whose children are header row / headline block / visual row /
+ * footer, in that order. If PulseCard changes shape, revisit this file.
+ */
+
+/* 1. No lucide icons in card headers. */
+.recut :global(.z-10 > div:first-child > svg) {
+  display: none;
+}
+
+/* 2. The card label is a mono caps eyebrow. */
+.recut :global(.z-10 > div:first-child > span) {
+  font-family: var(--font-data), Consolas, monospace;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+}
+
+/* 3. The figure leads: display-bold, tabular (tabular-nums is already set). */
+.recut :global(.z-10 > div:nth-child(2) > div > span) {
+  font-family: var(--font-display), 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* 4. The sub line beneath the figure reads as its mono label.
+   Error copy (text-studio-stale) keeps its own working-tone voice. */
+.recut :global(.z-10 > div:nth-child(2) > p:not(.text-studio-stale)) {
+  font-family: var(--font-data), Consolas, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: hsl(var(--foreground));
+  opacity: 0.7;
+}

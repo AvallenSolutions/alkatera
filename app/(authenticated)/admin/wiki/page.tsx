@@ -1,10 +1,12 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { BookOpen, Loader2, AlertCircle, RefreshCw, ExternalLink } from 'lucide-react'
+import { AlertCircle, ExternalLink } from 'lucide-react'
 import { useIsAlkateraAdmin } from '@/hooks/usePermissions'
+import { Statement } from '@/components/studio/statement'
+import { Panel } from '@/components/studio/panel'
+import { BigNumber } from '@/components/studio/big-number'
+import { PillButton } from '@/components/studio/pill-button'
 import { format } from 'date-fns'
 
 interface SyncStatus {
@@ -55,90 +57,85 @@ export default function AdminWikiPage() {
   if (adminLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">Loading…</p>
       </div>
     )
   }
 
   if (!isAdmin) {
     return (
-      <div className="flex items-center justify-center gap-2 py-20 text-muted-foreground">
-        <AlertCircle className="h-5 w-5" />
+      <div className="flex items-center justify-center gap-2 py-20 text-sm text-studio-dim">
+        <AlertCircle className="h-4 w-4" />
         Admin access required.
       </div>
     )
   }
 
   return (
-    <div className="space-y-6 p-6 max-w-3xl">
-      <div className="flex items-center gap-3">
-        <BookOpen className="h-6 w-6" />
-        <div>
-          <h1 className="text-2xl font-semibold">Sustainability wiki</h1>
-          <p className="text-sm text-muted-foreground">
-            The public wiki ships with each deploy from wiki/pages in the repo. Sync pushes the
-            published pages into Rosa&apos;s knowledge base so she cites them with clickable links.
-          </p>
-        </div>
+    <div className="max-w-3xl space-y-6 p-6">
+      <div>
+        <Statement eyebrow="THE WIRING · ADMIN · WIKI" headline="Sustainability wiki." />
+        <p className="mt-2 max-w-2xl text-sm text-studio-dim">
+          The public wiki ships with each deploy from wiki/pages in the repo. Sync pushes the
+          published pages into Rosa&apos;s knowledge base so she cites them with clickable links.
+        </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Rosa knowledge base sync</CardTitle>
-          <CardDescription>
+      <Panel>
+        <div className="mb-4 space-y-1">
+          <h2 className="font-display text-base font-semibold text-foreground">
+            Rosa knowledge base sync
+          </h2>
+          <p className="text-sm text-studio-dim">
             Runs automatically after every production deploy. This button is the manual fallback:
             it replaces all knowledge base entries in the &quot;wiki&quot; category with the pages
             in this deploy.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </p>
+        </div>
+        <div className="space-y-4">
           {loading ? (
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+              Loading…
+            </p>
           ) : status ? (
-            <div className="grid grid-cols-3 gap-4 text-sm">
-              <div>
-                <p className="text-2xl font-semibold">{status.pagesOnDisk}</p>
-                <p className="text-muted-foreground">published pages in this deploy</p>
-              </div>
-              <div>
-                <p className="text-2xl font-semibold">{status.syncedCount}</p>
-                <p className="text-muted-foreground">entries in Rosa&apos;s knowledge base</p>
-              </div>
-              <div>
-                <p className="text-2xl font-semibold">
-                  {status.lastSyncedAt ? format(new Date(status.lastSyncedAt), 'd MMM yyyy') : 'never'}
-                </p>
-                <p className="text-muted-foreground">last synced</p>
-              </div>
+            <div className="flex flex-wrap gap-10">
+              <BigNumber value={String(status.pagesOnDisk)} label="PAGES IN THIS DEPLOY" />
+              <BigNumber value={String(status.syncedCount)} label="ENTRIES IN ROSA" />
+              <BigNumber
+                value={
+                  status.lastSyncedAt
+                    ? format(new Date(status.lastSyncedAt), 'd MMM yyyy')
+                    : 'never'
+                }
+                label="LAST SYNCED"
+              />
             </div>
           ) : null}
 
           <div className="flex items-center gap-3">
-            <Button onClick={runSync} disabled={syncing || loading}>
-              {syncing ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="mr-2 h-4 w-4" />
-              )}
-              {syncing ? 'Syncing...' : 'Sync wiki to Rosa'}
-            </Button>
-            <Button variant="outline" asChild>
-              <a href="/wiki" target="_blank" rel="noopener noreferrer">
-                View the wiki
-                <ExternalLink className="ml-2 h-4 w-4" />
-              </a>
-            </Button>
+            <PillButton onClick={runSync} disabled={syncing || loading}>
+              {syncing ? 'Syncing…' : 'Sync wiki to Rosa'}
+            </PillButton>
+            <a
+              href="/wiki"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-studio-ink/25 bg-transparent px-4 text-sm font-medium text-foreground transition-colors duration-200 ease-studio hover:border-studio-ink/60"
+            >
+              View the wiki
+              <ExternalLink className="h-4 w-4" />
+            </a>
           </div>
 
-          {result && <p className="text-sm text-green-600">{result}</p>}
+          {result && <p className="text-sm text-studio-good">{result}</p>}
           {error && (
-            <p className="flex items-center gap-2 text-sm text-destructive">
+            <p className="flex items-center gap-2 text-sm text-studio-stale">
               <AlertCircle className="h-4 w-4" />
               {error}
             </p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     </div>
   )
 }

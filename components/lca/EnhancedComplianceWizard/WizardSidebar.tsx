@@ -1,39 +1,19 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import {
-  Sparkles,
-  Lightbulb,
-  HelpCircle,
-  ChevronDown,
-  ChevronUp,
-  RefreshCw,
-  Copy,
-  Check,
-  AlertCircle,
-  Info,
-} from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useWizardContext } from './WizardContext';
-import { useToast } from '@/hooks/use-toast';
+import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
 
 // ============================================================================
 // TYPES
 // ============================================================================
-
-interface AiSuggestion {
-  field: string;
-  suggestion: string;
-  reasoning?: string;
-  alternatives?: string[];
-}
 
 interface TermExplanation {
   term: string;
@@ -43,8 +23,14 @@ interface TermExplanation {
 // ============================================================================
 // STEP-SPECIFIC HELP CONTENT
 // ============================================================================
+//
+// Static, per-step tips and a term glossary. This is NOT a second assistant:
+// the ambient Rosa drawer is the one assistant. The old Rosa-suggestions
+// fetch panel (POST /api/lca/[pcfId]/ai-suggestions) has been removed. This
+// content now lives as a quiet HELP aside AND is handed to Rosa's page
+// context (see WizardStepHelpRosaBridge) so Rosa can answer from it.
 
-const STEP_HELP: Record<string, { tips: string[]; terms: TermExplanation[] }> = {
+export const STEP_HELP: Record<string, { tips: string[]; terms: TermExplanation[] }> = {
   'guide': {
     tips: [
       'Read through each section to understand the LCA process',
@@ -52,12 +38,12 @@ const STEP_HELP: Record<string, { tips: string[]; terms: TermExplanation[] }> = 
       'You can skip this guide in future by ticking the checkbox below',
     ],
     terms: [
-      { term: 'LCA', explanation: 'Lifecycle Assessment — a standardised method (ISO 14040/14044) for measuring the environmental impact of a product across its entire life' },
+      { term: 'LCA', explanation: 'Lifecycle Assessment, a standardised method (ISO 14040/14044) for measuring the environmental impact of a product across its entire life' },
       { term: 'ISO 14044', explanation: 'The international standard specifying the requirements and guidelines for lifecycle assessment studies' },
       { term: 'ISO 14067', explanation: 'The standard for quantifying and reporting the carbon footprint of products, based on the LCA methodology' },
       { term: 'Functional Unit', explanation: 'A quantified description of the product function (e.g., "1 litre of beer at 5% ABV delivered to retailer")' },
       { term: 'System Boundary', explanation: 'Defines which life cycle stages are included: from cradle-to-gate (manufacturing) through to cradle-to-grave (full lifecycle)' },
-      { term: 'kg CO₂e', explanation: 'Kilograms of carbon dioxide equivalent — the standard unit for expressing greenhouse gas emissions' },
+      { term: 'kg CO₂e', explanation: 'Kilograms of carbon dioxide equivalent, the standard unit for expressing greenhouse gas emissions' },
     ],
   },
   'materials': {
@@ -117,8 +103,8 @@ const STEP_HELP: Record<string, { tips: string[]; terms: TermExplanation[] }> = 
     tips: [
       'Select a scenario preset to auto-fill typical distribution routes',
       'Add multiple transport legs for multi-stage distribution (e.g. factory to warehouse, then warehouse to retail)',
-      'Product weight is auto-calculated from your materials — adjust if the total shipped weight differs',
-      'Use Ship mode for intercontinental routes — using Truck overestimates emissions by ~6×',
+      'Product weight is auto-calculated from your materials, adjust if the total shipped weight differs',
+      'Use Ship mode for intercontinental routes, using Truck overestimates emissions by ~6×',
     ],
     terms: [
       { term: 'Distribution Leg', explanation: 'A single segment of the outbound transport chain, defined by transport mode (truck, train, ship, air) and distance' },
@@ -135,7 +121,7 @@ const STEP_HELP: Record<string, { tips: string[]; terms: TermExplanation[] }> = 
     ],
     terms: [
       { term: 'Use Phase', explanation: 'The lifecycle stage covering consumer use of the product, including storage, refrigeration, and consumption' },
-      { term: 'Biogenic CO₂', explanation: 'CO₂ from biological sources (e.g., fermentation, dissolved gas) — treated differently from fossil CO₂ in LCA' },
+      { term: 'Biogenic CO₂', explanation: 'CO₂ from biological sources (e.g., fermentation, dissolved gas), treated differently from fossil CO₂ in LCA' },
     ],
   },
   'end-of-life': {
@@ -146,7 +132,7 @@ const STEP_HELP: Record<string, { tips: string[]; terms: TermExplanation[] }> = 
       'Aluminium has the highest recycling credit due to energy-intensive virgin production',
     ],
     terms: [
-      { term: 'Avoided Burden', explanation: 'Recycling credits that offset emissions by displacing virgin material production — shown as negative values' },
+      { term: 'Avoided Burden', explanation: 'Recycling credits that offset emissions by displacing virgin material production, shown as negative values' },
       { term: 'End of Life', explanation: 'The disposal phase: how materials are managed after consumer use (recycling, landfill, incineration, composting)' },
     ],
   },
@@ -208,350 +194,120 @@ const STEP_HELP: Record<string, { tips: string[]; terms: TermExplanation[] }> = 
 };
 
 // ============================================================================
-// ROSA SUGGESTION CARD
+// ROSA PAGE-CONTEXT BRIDGE
 // ============================================================================
 
-interface AiSuggestionCardProps {
-  suggestion: AiSuggestion;
-  onApply: (value: string) => void;
-  loading?: boolean;
-}
+/**
+ * Hands the current step's static tips and glossary to the ambient Rosa
+ * drawer so the one assistant can answer wizard questions without a second
+ * on-screen assistant. Mount exactly once inside the wizard shell.
+ */
+export function WizardStepHelpRosaBridge() {
+  const { progress, getStepId } = useWizardContext();
+  const currentStepId = getStepId(progress.currentStep);
+  const stepHelp = STEP_HELP[currentStepId] || { tips: [], terms: [] };
 
-function AiSuggestionCard({ suggestion, onApply, loading }: AiSuggestionCardProps) {
-  const [copied, setCopied] = useState(false);
-  const { toast } = useToast();
-
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(suggestion.suggestion);
-    setCopied(true);
-    toast({ title: 'Copied to clipboard' });
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <Card className="border-primary/20 bg-primary/5">
-      <CardContent className="p-4">
-        <div className="mb-3 flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium text-primary">Rosa Suggestion</span>
-        </div>
-
-        <p className="mb-3 text-sm leading-relaxed">{suggestion.suggestion}</p>
-
-        {suggestion.reasoning && (
-          <p className="mb-3 text-xs text-muted-foreground italic">
-            {suggestion.reasoning}
-          </p>
-        )}
-
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="default"
-            onClick={() => onApply(suggestion.suggestion)}
-            disabled={loading}
-          >
-            Apply
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleCopy}
-            disabled={loading}
-          >
-            {copied ? (
-              <Check className="h-4 w-4" />
-            ) : (
-              <Copy className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-
-        {suggestion.alternatives && suggestion.alternatives.length > 0 && (
-          <Collapsible className="mt-3">
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-auto p-0 text-xs">
-                <span>See alternatives</span>
-                <ChevronDown className="ml-1 h-3 w-3" />
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-2 space-y-2">
-              {suggestion.alternatives.map((alt, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-start justify-between gap-2 rounded bg-background p-2 text-xs"
-                >
-                  <span>{alt}</span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 px-2"
-                    onClick={() => onApply(alt)}
-                  >
-                    Use
-                  </Button>
-                </div>
-              ))}
-            </CollapsibleContent>
-          </Collapsible>
-        )}
-      </CardContent>
-    </Card>
+  const slice = useMemo(
+    () => ({
+      id: 'lca-wizard-step-help',
+      label: `LCA wizard help for the ${currentStepId} step`,
+      priority: 7,
+      data: {
+        current_step: currentStepId,
+        tips: stepHelp.tips,
+        glossary: stepHelp.terms.map((t) => ({ term: t.term, meaning: t.explanation })),
+      },
+    }),
+    [currentStepId, stepHelp.tips, stepHelp.terms],
   );
-}
 
-// ============================================================================
-// TIPS SECTION
-// ============================================================================
-
-interface TipsSectionProps {
-  tips: string[];
-}
-
-function TipsSection({ tips }: TipsSectionProps) {
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <Lightbulb className="h-4 w-4 text-yellow-500" />
-          Tips for this step
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <ul className="space-y-2">
-          {tips.map((tip, idx) => (
-            <li key={idx} className="flex items-start gap-2 text-sm">
-              <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-muted-foreground/50" />
-              <span className="text-muted-foreground">{tip}</span>
-            </li>
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
-  );
+  useRosaPageContext(slice);
+  return null;
 }
 
 // ============================================================================
 // TERMS GLOSSARY
 // ============================================================================
 
-interface TermsGlossaryProps {
-  terms: TermExplanation[];
-}
-
-function TermsGlossary({ terms }: TermsGlossaryProps) {
+function TermsGlossary({ terms }: { terms: TermExplanation[] }) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   if (terms.length === 0) return null;
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <HelpCircle className="h-4 w-4 text-blue-500" />
-          Key Terms
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <div className="space-y-2">
-          {terms.map((term) => (
-            <Collapsible
-              key={term.term}
-              open={expanded === term.term}
-              onOpenChange={(open) => setExpanded(open ? term.term : null)}
-            >
-              <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-muted">
-                <span className="font-medium">{term.term}</span>
-                {expanded === term.term ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
-              </CollapsibleTrigger>
-              <CollapsibleContent className="px-2 pb-2 pt-1">
-                <p className="text-sm text-muted-foreground">
-                  {term.explanation}
-                </p>
-              </CollapsibleContent>
-            </Collapsible>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+    <div className="space-y-1">
+      <div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+        Key terms
+      </div>
+      <div>
+        {terms.map((term) => (
+          <Collapsible
+            key={term.term}
+            open={expanded === term.term}
+            onOpenChange={(open) => setExpanded(open ? term.term : null)}
+          >
+            <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 border-b border-studio-hairline py-2 text-left text-sm transition-colors hover:text-foreground">
+              <span className="font-display font-semibold">{term.term}</span>
+              {expanded === term.term ? (
+                <ChevronUp className="h-3.5 w-3.5 shrink-0 text-studio-dim" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-studio-dim" />
+              )}
+            </CollapsibleTrigger>
+            <CollapsibleContent className="border-b border-studio-hairline py-2">
+              <p className="text-sm text-studio-dim">{term.explanation}</p>
+            </CollapsibleContent>
+          </Collapsible>
+        ))}
+      </div>
+    </div>
   );
 }
 
 // ============================================================================
-// MAIN SIDEBAR
+// MAIN HELP ASIDE (quiet static content, no assistant)
 // ============================================================================
 
-export function WizardSidebar() {
-  const { progress, pcfId, formData, updateField, getStepId } = useWizardContext();
-  const { toast } = useToast();
-
-  const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const currentStep = progress.currentStep;
-  const currentStepId = getStepId(currentStep);
+export function WizardSidebar({ className }: { className?: string }) {
+  const { progress, getStepId } = useWizardContext();
+  const currentStepId = getStepId(progress.currentStep);
   const stepHelp = STEP_HELP[currentStepId] || { tips: [], terms: [] };
 
-  // Map step ID to field for AI suggestions
-  const getFieldForStep = (stepId: string): string | null => {
-    switch (stepId) {
-      case 'goal':
-        return 'intended_application';
-      case 'boundary':
-        return 'functional_unit';
-      case 'cutoff':
-        return 'cutoff_criteria';
-      default:
-        return null;
-    }
-  };
-
-  const fetchAiSuggestion = useCallback(async () => {
-    const field = getFieldForStep(currentStepId);
-    if (!field) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`/api/lca/${pcfId}/ai-suggestions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // Cookies are sent automatically — no need for manual token
-        },
-        body: JSON.stringify({
-          field,
-          context: {
-            functionalUnit: formData.functionalUnit,
-            systemBoundary: formData.systemBoundary,
-            isComparativeAssertion: formData.isComparativeAssertion,
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get suggestion');
-      }
-
-      const data = await response.json();
-      setAiSuggestion({
-        field,
-        suggestion: data.suggestion,
-        reasoning: data.reasoning,
-        alternatives: data.alternatives,
-      });
-    } catch (err: any) {
-      console.error('[WizardSidebar] AI suggestion error:', err);
-      setError('Could not generate suggestion. Try again later.');
-    } finally {
-      setLoading(false);
-    }
-  }, [currentStepId, pcfId, formData]);
-
-  const handleApplySuggestion = (value: string) => {
-    const field = getFieldForStep(currentStepId);
-    if (!field) return;
-
-    // Map API field names to form field names
-    const fieldMap: Record<string, keyof typeof formData> = {
-      intended_application: 'intendedApplication',
-      functional_unit: 'functionalUnit',
-      cutoff_criteria: 'cutoffCriteria',
-    };
-
-    const formField = fieldMap[field];
-    if (formField) {
-      updateField(formField, value);
-      toast({ title: 'Suggestion applied' });
-    }
-  };
-
-  const canGenerateSuggestion = getFieldForStep(currentStepId) !== null;
-
   return (
-    <div className="space-y-4">
-      {/* Rosa Suggestions */}
-      {canGenerateSuggestion && (
-        <Card className="border-primary/20">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <Sparkles className="h-4 w-4 text-primary" />
-                Rosa
-              </CardTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={fetchAiSuggestion}
-                disabled={loading}
-              >
-                {loading ? (
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {error ? (
-              <div className="flex items-center gap-2 text-sm text-destructive">
-                <AlertCircle className="h-4 w-4" />
-                <span>{error}</span>
-              </div>
-            ) : aiSuggestion ? (
-              <AiSuggestionCard
-                suggestion={aiSuggestion}
-                onApply={handleApplySuggestion}
-                loading={loading}
-              />
-            ) : (
-              <div className="text-center">
-                <p className="mb-3 text-sm text-muted-foreground">
-                  Get Rosa's suggestions for this step
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={fetchAiSuggestion}
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="mr-2 h-4 w-4" />
-                  )}
-                  Generate Suggestion
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+    <div className={cn('space-y-6', className)}>
+      <div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-room-accent">
+        Help
+      </div>
+
+      {/* Tips for the current step */}
+      {stepHelp.tips.length > 0 && (
+        <div className="space-y-1">
+          <div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+            For this step
+          </div>
+          <ul className="space-y-2 pt-1">
+            {stepHelp.tips.map((tip, idx) => (
+              <li key={idx} className="flex gap-2 text-sm text-studio-dim">
+                <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-studio-dim/50" />
+                <span>{tip}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
-      {/* Tips for current step */}
-      {stepHelp.tips.length > 0 && <TipsSection tips={stepHelp.tips} />}
-
       {/* Key terms glossary */}
-      {stepHelp.terms.length > 0 && <TermsGlossary terms={stepHelp.terms} />}
+      <TermsGlossary terms={stepHelp.terms} />
 
-      {/* ISO compliance note */}
-      <Card className="bg-muted/50">
-        <CardContent className="flex items-start gap-3 p-4">
-          <Info className="h-5 w-5 flex-shrink-0 text-blue-500" />
-          <p className="text-xs text-muted-foreground">
-            This wizard ensures your LCA report meets{' '}
-            <strong>ISO 14044</strong> and <strong>ISO 14067</strong> requirements
-            for product carbon footprints.
-          </p>
-        </CardContent>
-      </Card>
+      {/* ISO compliance note, as a quiet tone row */}
+      <div className="border-t border-studio-hairline pt-4">
+        <p className="text-xs text-studio-dim">
+          This wizard ensures your LCA report meets{' '}
+          <span className="font-medium text-foreground">ISO 14044</span> and{' '}
+          <span className="font-medium text-foreground">ISO 14067</span> requirements
+          for product carbon footprints.
+        </p>
+      </div>
     </div>
   );
 }

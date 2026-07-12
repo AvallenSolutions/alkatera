@@ -1,20 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
-import {
-  CheckCircle2,
-  Loader2,
-  Calculator,
-  Info,
-  Pin,
-} from 'lucide-react';
-import {
-  OperationOverlay,
-  type OperationStep,
-} from '@/components/ui/operation-progress';
+import { Pin } from 'lucide-react';
+import { type OperationStep } from '@/components/ui/operation-progress';
+import { PillButton } from '@/components/studio/pill-button';
 import { calculateProductLCA } from '@/lib/product-lca-calculator';
 import { getBoundaryLabel } from '@/lib/system-boundaries';
 import { toast } from 'sonner';
@@ -242,56 +232,65 @@ export function CalculationStep() {
     }
   };
 
+  // The active theatrical step label, reused as the quiet progress line's text.
+  const activeCalcStep = calcSteps.find((s) => s.status === 'active');
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold">Calculate LCA</h3>
-        <p className="text-sm text-muted-foreground">
-          Run the lifecycle assessment calculation. This will create an ISO
-          14067 compliant carbon footprint analysis based on your materials
-          and facility data.
+    <div className="space-y-8">
+      <div className="space-y-2">
+        <div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-room-accent">
+          Calculate
+        </div>
+        <h3 className="font-display text-2xl font-bold tracking-tight text-foreground">
+          Run the lifecycle assessment.
+        </h3>
+        <p className="text-sm text-studio-dim">
+          This creates an ISO 14067 compliant carbon footprint from your
+          materials and facility data.
         </p>
       </div>
 
       {/* Validation in progress */}
       {preCalcState.materialDataLoading && (
-        <div className="flex items-center gap-2 rounded-[6px] border border-border bg-card p-3">
-          <Loader2 className="h-4 w-4 text-[#2B46C0]" />
-          <p className="text-sm text-muted-foreground">
-            Material validation is still running in the background. The calculate button will enable once complete.
-          </p>
-        </div>
+        <p className="text-sm text-studio-dim">
+          <span className="mr-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-attention">
+            Validating
+          </span>
+          Material validation is still running. The calculate button enables once complete.
+        </p>
       )}
 
-      {/* Summary */}
-      <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-        <h4 className="text-sm font-medium">Calculation Summary</h4>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <p className="text-muted-foreground">Materials</p>
-            <p className="font-medium">{materials.length} validated</p>
+      {/* Summary as quiet fact rows on hairlines */}
+      <div className="space-y-1">
+        <div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+          Calculation summary
+        </div>
+        <dl>
+          <div className="flex items-baseline justify-between gap-4 border-b border-studio-hairline py-3 text-sm">
+            <dt className="text-studio-dim">Materials</dt>
+            <dd className="font-display font-semibold text-foreground">{materials.length} validated</dd>
           </div>
-          <div>
-            <p className="text-muted-foreground">Facilities</p>
-            <p className="font-medium">
+          <div className="flex items-baseline justify-between gap-4 border-b border-studio-hairline py-3 text-sm">
+            <dt className="text-studio-dim">Facilities</dt>
+            <dd className="font-display font-semibold text-foreground">
               {linkedFacilities.length > 0
                 ? `${linkedFacilities.length} linked`
                 : 'None (materials only)'}
-            </p>
+            </dd>
           </div>
-          <div>
-            <p className="text-muted-foreground">System Boundary</p>
-            <p className="font-medium">{getBoundaryLabel(formData.systemBoundary)}</p>
+          <div className="flex items-baseline justify-between gap-4 border-b border-studio-hairline py-3 text-sm">
+            <dt className="text-studio-dim">System boundary</dt>
+            <dd className="font-display font-semibold text-foreground">{getBoundaryLabel(formData.systemBoundary)}</dd>
           </div>
-          <div>
-            <p className="text-muted-foreground">Reference Year</p>
-            <p className="font-medium">{formData.referenceYear}</p>
+          <div className="flex items-baseline justify-between gap-4 border-b border-studio-hairline py-3 text-sm">
+            <dt className="text-studio-dim">Reference year</dt>
+            <dd className="font-display font-semibold text-foreground">{formData.referenceYear}</dd>
           </div>
-        </div>
+        </dl>
 
         {/* Pinned-mode toggle: re-use factors from previous calculation */}
         {previousPcfId && (
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border">
+          <div className="flex items-start gap-3 rounded-[6px] border border-studio-hairline bg-studio-paper p-3">
             <Switch
               checked={usePinnedFactors}
               onCheckedChange={setUsePinnedFactors}
@@ -299,10 +298,10 @@ export function CalculationStep() {
             />
             <label htmlFor="pinned-factors" className="flex-1 cursor-pointer">
               <div className="flex items-center gap-1.5">
-                <Pin className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-sm font-medium">Use pinned emission factors</span>
+                <Pin className="h-3.5 w-3.5 text-studio-dim" />
+                <span className="text-sm font-medium text-foreground">Use pinned emission factors</span>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="mt-0.5 text-xs text-studio-dim">
                 Re-use the exact same emission factor values from the previous calculation
                 for deterministic comparison. Useful for verifying that results are
                 consistent when no data has changed.
@@ -313,73 +312,66 @@ export function CalculationStep() {
       </div>
 
       {!canCalculate && (
-        <Alert variant="destructive">
-          <Info className="h-4 w-4" />
-          <AlertDescription className="flex items-center justify-between">
-            <span>
-              Some materials are missing emission factors.
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+          <span className="text-foreground">
+            <span className="mr-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-stale">
+              Blocked
             </span>
-            <Button
-              variant="link"
-              className="h-auto p-0 text-destructive-foreground underline"
-              onClick={() => goToStep(materialsStepNumber)}
-            >
-              Go to Materials step →
-            </Button>
-          </AlertDescription>
-        </Alert>
+            Some materials are missing emission factors.
+          </span>
+          <button
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent underline underline-offset-4"
+            onClick={() => goToStep(materialsStepNumber)}
+          >
+            Go to materials
+          </button>
+        </div>
       )}
 
       {hasFacilitiesMissingVolumes && (
-        <Alert variant="destructive">
-          <Info className="h-4 w-4" />
-          <AlertDescription className="flex items-center justify-between">
-            <span>
-              Production volumes are missing for some linked facilities.
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+          <span className="text-foreground">
+            <span className="mr-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-stale">
+              Blocked
             </span>
-            <Button
-              variant="link"
-              className="h-auto p-0 text-destructive-foreground underline"
-              onClick={() => goToStep(facilitiesStepNumber)}
-            >
-              Go to Facilities step →
-            </Button>
-          </AlertDescription>
-        </Alert>
+            Production volumes are missing for some linked facilities.
+          </span>
+          <button
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent underline underline-offset-4"
+            onClick={() => goToStep(facilitiesStepNumber)}
+          >
+            Go to facilities
+          </button>
+        </div>
       )}
 
-      {/* Calculate button */}
-      <div className="flex justify-center pt-4">
-        <Button
+      {/* Calculate action */}
+      <div className="flex justify-center pt-2">
+        <PillButton
+          variant="room"
           onClick={handleCalculate}
-          disabled={
-            !canCalculate || calculating || hasFacilitiesMissingVolumes
-          }
-          size="lg"
-          className="min-w-[220px] bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
+          disabled={!canCalculate || calculating || hasFacilitiesMissingVolumes}
+          className="min-w-[220px]"
         >
-          {calculating ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4" />
-              Calculating...
-            </>
-          ) : (
-            <>
-              <Calculator className="mr-2 h-4 w-4" />
-              Start Calculation
-            </>
-          )}
-        </Button>
+          {calculating ? 'Calculating' : 'Start calculation'}
+        </PillButton>
       </div>
 
-      {/* Calculation progress overlay */}
-      <OperationOverlay
-        open={calculating}
-        title="Creating Lifecycle Assessment"
-        steps={calcSteps}
-        progress={calcProgress}
-        message="ISO 14067 compliant lifecycle assessment · usually takes 5–10 seconds"
-      />
+      {/* One quiet progress line (replaces the theatrical step overlay) */}
+      {calculating && (
+        <div className="space-y-2" aria-live="polite" aria-busy="true">
+          <div className="flex items-baseline justify-between gap-4 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+            <span>{activeCalcStep?.label ?? 'Creating lifecycle assessment'}</span>
+            <span className="tabular-nums text-room-accent">{Math.round(calcProgress)}%</span>
+          </div>
+          <div className="h-px w-full bg-studio-hairline">
+            <div
+              className="h-px bg-room-accent transition-all duration-300 ease-studio"
+              style={{ width: `${calcProgress}%` }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

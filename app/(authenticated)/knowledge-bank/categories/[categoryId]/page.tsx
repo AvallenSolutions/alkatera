@@ -1,14 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
 import { ChevronLeft } from 'lucide-react'
 import { useKnowledgeBankItems } from '@/hooks/data/useKnowledgeBank'
 import { KnowledgeBankCard } from '@/components/knowledge-bank/KnowledgeBankCard'
+import { Statement } from '@/components/studio/statement'
+import { BigNumber } from '@/components/studio/big-number'
+import { Panel } from '@/components/studio/panel'
+import { PillButton } from '@/components/studio/pill-button'
+import { PageLoader } from '@/components/ui/page-loader'
 import { supabase } from '@/lib/supabaseClient'
 
 export default function CategoryPage() {
@@ -47,85 +48,54 @@ export default function CategoryPage() {
   }, [categoryId])
 
   if (categoryLoading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-4 w-96" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-6 space-y-4">
-                <Skeleton className="h-12 w-12 rounded-lg" />
-                <Skeleton className="h-5 w-full" />
-                <Skeleton className="h-4 w-3/4" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    )
+    return <PageLoader />
   }
 
   if (!category) {
     return (
       <div className="space-y-6">
-        <Button variant="ghost" asChild>
-          <Link href="/knowledge-bank">
-            <ChevronLeft className="mr-2 h-4 w-4" />
-            Back to Knowledge Bank
-          </Link>
-        </Button>
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">Category not found</p>
-          </CardContent>
-        </Card>
+        <PillButton variant="ghost" href="/knowledge-bank">
+          <ChevronLeft className="h-4 w-4" />
+          Back to the library
+        </PillButton>
+        <Panel>
+          <p className="py-8 text-center text-sm text-studio-dim">Category not found.</p>
+        </Panel>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <Button variant="ghost" asChild>
-        <Link href="/knowledge-bank">
-          <ChevronLeft className="mr-2 h-4 w-4" />
-          Back to Knowledge Bank
-        </Link>
-      </Button>
+    <div className="space-y-8">
+      <PillButton variant="ghost" href="/knowledge-bank">
+        <ChevronLeft className="h-4 w-4" />
+        Back to the library
+      </PillButton>
 
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">{category.name}</h1>
-        {category.description && (
-          <p className="text-muted-foreground mt-2">{category.description}</p>
-        )}
-        <div className="flex items-center gap-2 mt-4">
-          <span className="text-sm text-muted-foreground">
-            {items.length} {items.length === 1 ? 'resource' : 'resources'}
-          </span>
-        </div>
-      </div>
+      <Statement eyebrow="THE LIBRARY · KNOWLEDGE" headline={category.name}>
+        <BigNumber
+          value={items.length}
+          label={items.length === 1 ? 'RESOURCE' : 'RESOURCES'}
+          size="display"
+        />
+      </Statement>
+
+      {category.description && (
+        <p className="max-w-2xl text-sm leading-relaxed text-studio-dim">{category.description}</p>
+      )}
 
       {itemsLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" aria-busy="true">
           {[...Array(6)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-6 space-y-4">
-                <Skeleton className="h-12 w-12 rounded-lg" />
-                <Skeleton className="h-5 w-full" />
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-              </CardContent>
-            </Card>
+            <div key={i} className="h-44 animate-pulse rounded-[6px] bg-studio-hairline/40" />
           ))}
         </div>
       ) : items.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">
-              No resources in this category yet
-            </p>
-          </CardContent>
-        </Card>
+        <Panel>
+          <p className="py-8 text-center text-sm text-studio-dim">
+            No resources in this category yet.
+          </p>
+        </Panel>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {items.map((item) => (

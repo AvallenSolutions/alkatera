@@ -1,7 +1,18 @@
 'use client'
 
-import Link from 'next/link'
-import { useMemo } from 'react'
+/**
+ * The spend (/data/spend-data/), recomposed in the studio grammar.
+ *
+ * One statement (the transactions awaiting classification standing right),
+ * the sync as a quiet mono margin note, one quality meter, then the page
+ * IS the queue: the classification panel leads, the AI per-transaction
+ * confirm flow folds in beneath it, upgrade opportunities and supplier
+ * engagement follow as quiet eyebrow sections, and the audit jobs keep
+ * to a mono Advanced fold. The old step pills and numbered circles are
+ * gone; all data behaviour is unchanged.
+ */
+
+import { useMemo, type ReactNode } from 'react'
 import { FeatureGate } from '@/components/subscription/FeatureGate'
 import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider'
 import {
@@ -10,9 +21,11 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Statement } from '@/components/studio/statement'
+import { Eyebrow } from '@/components/studio/eyebrow'
+import { BigNumber } from '@/components/studio/big-number'
+import { StateChip } from '@/components/studio/state-chip'
+import { PillButton } from '@/components/studio/pill-button'
 import { SupplierClassificationPanel } from '@/components/xero/SupplierClassificationPanel'
 import { ActionCentre } from '@/components/xero/ActionCentre'
 import { SupplierEngagementPrompts } from '@/components/xero/SupplierEngagementPrompts'
@@ -24,44 +37,25 @@ import { SupplierMatchingPanel } from '@/components/xero/SupplierMatchingPanel'
 import { DataQualityProgress } from '@/components/xero/DataQualityProgress'
 import { SyncDataButton } from '@/components/xero/SyncDataButton'
 import { useSpendInboxState } from '@/hooks/useSpendInboxState'
-import { CheckCircle2, Circle, Loader2, Plug, Tag, ArrowUpCircle, Settings2 } from 'lucide-react'
 
-interface StepHeaderProps {
-  index: number
-  title: string
-  description: string
-  count?: number
-  countLabel?: string
-  complete?: boolean
-}
-
-function StepHeader({ index, title, description, count, countLabel, complete }: StepHeaderProps) {
+/** A quiet section: mono eyebrow on a hairline, then the work. */
+function Section({
+  label,
+  blurb,
+  children,
+}: {
+  label: string
+  blurb: string
+  children: ReactNode
+}) {
   return (
-    <div className="flex items-start gap-3">
-      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-        complete
-          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-      }`}>
-        {complete ? <CheckCircle2 className="h-5 w-5" /> : <span className="text-sm font-semibold">{index}</span>}
+    <section className="space-y-4">
+      <div className="border-b border-studio-hairline pb-2">
+        <Eyebrow>{label}</Eyebrow>
+        <p className="mt-1 text-xs text-muted-foreground">{blurb}</p>
       </div>
-      <div className="flex-1">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h2 className="text-lg font-semibold">{title}</h2>
-          {typeof count === 'number' && countLabel && (
-            <Badge variant="outline" className="font-normal">
-              {count} {countLabel}
-            </Badge>
-          )}
-          {complete && (
-            <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-normal">
-              Complete
-            </Badge>
-          )}
-        </div>
-        <p className="text-sm text-muted-foreground mt-1">{description}</p>
-      </div>
-    </div>
+      {children}
+    </section>
   )
 }
 
@@ -86,170 +80,110 @@ export default function SpendDataPage() {
 
   return (
     <FeatureGate feature="xero_integration_beta">
-      <div className="space-y-6">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-              Spend Data
-            </h1>
-            <p className="text-sm text-muted-foreground mt-2">
-              Turn your Xero transactions into activity-based emissions data, step by step.
-            </p>
-          </div>
+      <div className="mx-auto max-w-5xl space-y-10">
+        <div className="space-y-3">
+          <Statement eyebrow="THE WORKBENCH · SPEND" headline="The spend.">
+            {state.connected && (
+              <div>
+                <BigNumber
+                  size="display"
+                  value={state.loading ? '--' : state.unclassifiedCount.toLocaleString('en-GB')}
+                  label="Transactions to classify"
+                  tone={!state.loading && state.unclassifiedCount > 0 ? 'attention' : 'ink'}
+                />
+                <div className="mt-1 h-4">
+                  {!state.loading && (
+                    <StateChip tone={state.unclassifiedCount > 0 ? 'attention' : 'good'}>
+                      {state.unclassifiedCount > 0 ? 'The queue below' : 'All classified'}
+                    </StateChip>
+                  )}
+                </div>
+              </div>
+            )}
+          </Statement>
           {state.connected && (
-            <SyncDataButton variant="outline" size="sm" onComplete={state.refetch} />
+            <div className="flex justify-end">
+              <SyncDataButton onComplete={state.refetch} />
+            </div>
           )}
         </div>
 
-        <DataQualityProgress />
-
-        {/* Progress breadcrumb */}
-        <Card>
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <StepPill icon={Plug} label="Connect" done={state.connected} active={!state.connected} />
-              <Separator />
-              <StepPill icon={Tag} label="Classify" done={state.unclassifiedCount === 0 && state.connected} active={state.connected && state.unclassifiedCount > 0} count={state.unclassifiedCount} />
-              <Separator />
-              <StepPill icon={ArrowUpCircle} label="Upgrade" done={state.pendingUpgradeCount === 0 && state.upgradedCount > 0} active={state.pendingUpgradeCount > 0} count={state.pendingUpgradeCount} />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Step 1 — Connect */}
+        {/* Not connected: one quiet line and the way in. */}
         {!state.loading && !state.connected && (
-          <section className="space-y-3">
-            <StepHeader
-              index={1}
-              title="Connect Xero"
-              description="Link your Xero account to start syncing transactions."
-            />
-            <Card>
-              <CardContent className="py-6 flex items-center justify-between gap-4">
-                <p className="text-sm text-muted-foreground">
-                  You haven&apos;t connected a Xero organisation yet.
-                </p>
-                <Button asChild>
-                  <Link href="/settings/integrations">
-                    <Plug className="h-4 w-4 mr-2" />
-                    Go to Integrations
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
+          <section className="border-t border-studio-hairline pt-6">
+            <p className="max-w-xl text-sm text-muted-foreground">
+              No accounts connected yet. Link your Xero organisation and every transaction
+              becomes an emissions estimate you can refine.
+            </p>
+            <PillButton variant="outline" size="sm" href="/settings/integrations" className="mt-4">
+              Go to Integrations
+            </PillButton>
           </section>
         )}
 
-        {/* Step 2 — Classify suppliers */}
         {state.connected && (
-          <section className="space-y-3">
-            <StepHeader
-              index={2}
-              title="Classify suppliers"
-              description="Assign each supplier to an emission category. We learn from each choice and reclassify matching transactions."
-              count={state.unclassifiedCount}
-              countLabel="unclassified"
-              complete={!state.loading && state.unclassifiedCount === 0}
-            />
-            <SupplierClassificationPanel onClassified={state.refetch} />
-          </section>
-        )}
+          <>
+            {/* The one quality meter. */}
+            <DataQualityProgress />
 
-        {/* Step 3 — Upgrade transactions */}
-        {state.connected && (
-          <section className="space-y-3">
-            <StepHeader
-              index={3}
-              title="Upgrade transactions"
-              description="Replace spend-based estimates with activity data (kWh, litres, nights) for Tier 1 and 2 accuracy."
-              count={state.pendingUpgradeCount}
-              countLabel="to upgrade"
-              complete={!state.loading && state.pendingUpgradeCount === 0 && state.upgradedCount > 0}
-            />
-            <ActionCentre />
+            {/* The page is the queue: classification leads, and the AI
+                per-transaction confirm flow folds in beneath it as one
+                quiet sub-section (one Suggest with AI story). */}
+            <section className="space-y-6">
+              <SupplierClassificationPanel onClassified={state.refetch} />
+              <div id="ai-classification">
+                <AIClassificationPanel />
+              </div>
+            </section>
+
+            <Section
+              label="UPGRADE OPPORTUNITIES"
+              blurb="Replace spend-based estimates with activity data (kWh, litres, nights) for Tier 1 and 2 accuracy."
+            >
+              <ActionCentre />
+            </Section>
+
             <SupplierEngagementPrompts />
-            <div id="ai-classification">
-              <AIClassificationPanel />
-            </div>
-          </section>
-        )}
 
-        {/* Advanced / Monitor */}
-        {state.connected && (
-          <Accordion type="single" collapsible className="border rounded-lg">
-            <AccordionItem value="advanced" className="border-0">
-              <AccordionTrigger className="px-4">
-                <div className="flex items-center gap-2">
-                  <Settings2 className="h-4 w-4" />
-                  <span className="font-semibold">Advanced</span>
-                  <span className="text-xs text-muted-foreground font-normal">
-                    Transactions browser, rules, sync history
+            {/* Advanced: the audit jobs, behind a quiet mono fold. */}
+            <Accordion type="single" collapsible>
+              <AccordionItem value="advanced" className="border-t border-studio-hairline border-b-0">
+                <AccordionTrigger className="py-4 hover:no-underline">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+                    ADVANCED · TRANSACTIONS, RULES, RECONCILIATION, SYNC HISTORY
                   </span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4 space-y-6">
-                <div>
-                  <h3 className="text-sm font-semibold mb-2">Transactions</h3>
-                  <TransactionBrowser />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold mb-2">Supplier rules</h3>
-                  <SupplierRulesManager />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold mb-2">Reconcile Xero suppliers</h3>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Match the contacts you pay in Xero to your supplier records, so spend and
-                    emissions roll up per supplier.
-                  </p>
-                  <SupplierMatchingPanel />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold mb-2">Sync history</h3>
-                  <SyncHistoryPanel />
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
+                </AccordionTrigger>
+                <AccordionContent className="space-y-8 pb-6">
+                  <div>
+                    <Eyebrow tone="dim" className="mb-2">TRANSACTIONS</Eyebrow>
+                    <TransactionBrowser />
+                  </div>
+                  <div>
+                    <Eyebrow tone="dim" className="mb-2">SUPPLIER RULES</Eyebrow>
+                    <SupplierRulesManager />
+                  </div>
+                  <div>
+                    <Eyebrow tone="dim" className="mb-2">RECONCILE XERO SUPPLIERS</Eyebrow>
+                    <p className="mb-2 text-xs text-muted-foreground">
+                      Match the contacts you pay in Xero to your supplier records, so spend and
+                      emissions roll up per supplier.
+                    </p>
+                    <SupplierMatchingPanel />
+                  </div>
+                  <div>
+                    <Eyebrow tone="dim" className="mb-2">SYNC HISTORY</Eyebrow>
+                    <SyncHistoryPanel />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </>
         )}
 
         {state.loading && !state.connected && (
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
+          <div className="h-24 animate-pulse rounded-[6px] bg-studio-cream" aria-hidden="true" />
         )}
       </div>
     </FeatureGate>
   )
 }
-
-function Separator() {
-  return <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800 min-w-4" />
-}
-
-interface StepPillProps {
-  icon: typeof Plug
-  label: string
-  done: boolean
-  active: boolean
-  count?: number
-}
-
-function StepPill({ icon: Icon, label, done, active, count }: StepPillProps) {
-  const color = done
-    ? 'text-emerald-600 dark:text-emerald-400'
-    : active
-    ? 'text-slate-900 dark:text-slate-100'
-    : 'text-muted-foreground'
-  return (
-    <div className={`flex items-center gap-2 ${color}`}>
-      {done ? <CheckCircle2 className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
-      <span className="text-sm font-medium">{label}</span>
-      {typeof count === 'number' && count > 0 && !done && (
-        <Badge variant="outline" className="text-xs font-normal">{count}</Badge>
-      )}
-      {!done && !active && !count && <Circle className="h-1.5 w-1.5 fill-current opacity-40" />}
-    </div>
-  )
-}
-

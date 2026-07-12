@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { escapeHtml } from '@/lib/utils/escape-html';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -68,14 +70,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get the user's current organisation (verified via membership, not user metadata)
-    const { data: membership } = await adminClient
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .limit(1)
-      .single();
-    const organizationId = membership?.organization_id;
+    // Resolve the caller's organisation, honouring advisor access. The
+    // service-role client bypasses RLS, so this gate is the only org scoping.
+    const organizationId = await resolveAccessibleOrg(adminClient as any, user);
 
     if (!organizationId) {
       return NextResponse.json(
@@ -83,6 +80,10 @@ export async function POST(request: NextRequest) {
         { status: 403 },
       );
     }
+
+    // Read-only advisors may view but not mutate this organisation's data.
+    const denied = await denyReadOnlyAdvisor(adminClient as any, user, organizationId);
+    if (denied) return denied;
 
     // Fetch org name for the email template
     const { data: orgData } = await adminClient

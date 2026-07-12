@@ -1,18 +1,20 @@
 'use client'
 
 /**
- * Matrix view for supplier-responsibility attestations. Six rows, each a
- * yes/no toggle with optional notes + evidence URL. Mirrors the /dependencies/
- * pattern.
+ * Matrix view for supplier-responsibility attestations. Six hairline fact
+ * rows, each a yes/no toggle with optional notes + evidence URL. Owns its
+ * own statement so the coverage number can stand right in the headline.
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Check, ExternalLink } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
+import { Statement } from '@/components/studio/statement'
+import { BigNumber } from '@/components/studio/big-number'
+import { StateChip } from '@/components/studio/state-chip'
+import { PillButton } from '@/components/studio/pill-button'
 import {
   SUPPLIER_ATTESTATIONS,
   type SupplierAttestationType,
@@ -24,6 +26,9 @@ interface DeclaredAttestation {
   evidence_url: string | null
   notes: string | null
 }
+
+const studioField =
+  'rounded-[6px] border-studio-hairline bg-studio-cream text-xs text-foreground placeholder:text-studio-dim'
 
 export function SupplierResponsibilityMatrix() {
   const [declared, setDeclared] = useState<Map<SupplierAttestationType, DeclaredAttestation> | null>(null)
@@ -91,131 +96,116 @@ export function SupplierResponsibilityMatrix() {
     }
   }, [load])
 
-  if (declared === null) {
-    return (
-      <div className="space-y-3">
-        {[0, 1, 2, 3, 4, 5].map(i => (
-          <Skeleton key={i} className="h-24 w-full rounded-xl" />
-        ))}
-      </div>
-    )
-  }
-
-  const declaredCount = declared.size
-  const coveragePct = Math.round((declaredCount / SUPPLIER_ATTESTATIONS.length) * 100)
+  const declaredCount = declared?.size ?? 0
+  const total = SUPPLIER_ATTESTATIONS.length
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-border bg-card p-4 flex items-center justify-between gap-4">
-        <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wider">
-            Due-diligence coverage
-          </p>
-          <p className="text-2xl font-semibold tabular-nums mt-1">{coveragePct}%</p>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-muted-foreground">
-            {declaredCount} of {SUPPLIER_ATTESTATIONS.length} attestations
-          </p>
-        </div>
-      </div>
+    <div className="space-y-8">
+      <Statement
+        eyebrow="THE NETWORK · SOURCING"
+        headline="Supplier responsibility."
+      >
+        <BigNumber
+          value={`${declaredCount} OF ${total}`}
+          label="ATTESTED"
+          tone="room"
+          size="display"
+        />
+      </Statement>
 
-      <div className="space-y-3">
-        {SUPPLIER_ATTESTATIONS.map(att => {
-          const current = declared.get(att.value)
-          const isAttested = !!current
-          const noteValue = pendingNotes[att.value] ?? current?.notes ?? ''
-          const urlValue = pendingUrls[att.value] ?? current?.evidence_url ?? ''
-          return (
-            <div
-              key={att.value}
-              className="rounded-xl border border-border bg-card p-4 space-y-3"
-            >
-              <div className="flex items-start gap-3">
-                <span className="text-2xl leading-none">{att.emoji}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-semibold">{att.label}</p>
-                    <Badge variant="outline" className="text-[9px] h-5 capitalize">
+      <p className="max-w-2xl text-sm text-muted-foreground">
+        Declare your supply-chain due-diligence practices: code of conduct, audits, Living Wage
+        requirements, modern-slavery policy, and more. None of this needs your suppliers to log into
+        the platform, it&rsquo;s about what you do. Aligned with CSRD ESRS S2, the UK Modern Slavery
+        Act, and B Corp Workers/Community.
+      </p>
+
+      {declared === null ? (
+        <div className="space-y-3">
+          {[0, 1, 2, 3, 4, 5].map(i => (
+            <Skeleton key={i} className="h-16 w-full rounded-[6px]" />
+          ))}
+        </div>
+      ) : (
+        <ul className="divide-y divide-studio-hairline border-t border-studio-hairline">
+          {SUPPLIER_ATTESTATIONS.map(att => {
+            const current = declared.get(att.value)
+            const isAttested = !!current
+            const noteValue = pendingNotes[att.value] ?? current?.notes ?? ''
+            const urlValue = pendingUrls[att.value] ?? current?.evidence_url ?? ''
+            return (
+              <li key={att.value} className="py-5">
+                <div className="flex items-start gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="font-display text-sm font-semibold text-foreground">
+                        {att.label}
+                      </span>
+                      <StateChip tone={isAttested ? 'good' : 'quiet'}>
+                        {isAttested ? 'Attested' : 'Not yet'}
+                      </StateChip>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{att.description}</p>
+                    <p className="mt-1.5 font-mono text-[10px] tracking-[0.12em] text-studio-dim">
                       {att.framework}
-                    </Badge>
-                    {isAttested && (
-                      <Badge variant="outline" className="text-[9px] h-5 bg-emerald-500/10 text-emerald-300 border-emerald-500/30">
-                        <Check className="h-2.5 w-2.5 mr-1" />
-                        Attested
-                      </Badge>
+                    </p>
+                  </div>
+                  <PillButton
+                    variant={isAttested ? 'ghost' : 'room'}
+                    size="sm"
+                    onClick={() => (isAttested ? remove(att.value) : upsert(att.value, true))}
+                    disabled={savingType === att.value}
+                  >
+                    {isAttested ? 'Remove' : 'Attest'}
+                  </PillButton>
+                </div>
+
+                {isAttested && (
+                  <div className="mt-4 space-y-2">
+                    <Input
+                      placeholder="Evidence URL (optional)"
+                      className={`h-9 ${studioField}`}
+                      value={urlValue}
+                      onChange={(e) =>
+                        setPendingUrls(p => ({ ...p, [att.value]: e.target.value }))
+                      }
+                      onBlur={() => {
+                        if (urlValue !== (current?.evidence_url ?? '')) {
+                          void upsert(att.value, true, current?.notes ?? undefined, urlValue)
+                        }
+                      }}
+                    />
+                    <Textarea
+                      placeholder="Notes (optional)"
+                      rows={2}
+                      className={`${studioField} py-2`}
+                      value={noteValue}
+                      onChange={(e) =>
+                        setPendingNotes(p => ({ ...p, [att.value]: e.target.value }))
+                      }
+                      onBlur={() => {
+                        if (noteValue !== (current?.notes ?? '')) {
+                          void upsert(att.value, true, noteValue, current?.evidence_url ?? undefined)
+                        }
+                      }}
+                    />
+                    {current?.evidence_url && (
+                      <a
+                        href={current.evidence_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.12em] text-room-accent hover:underline"
+                      >
+                        Open evidence <ExternalLink className="h-2.5 w-2.5" />
+                      </a>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {att.description}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {isAttested ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => remove(att.value)}
-                    disabled={savingType === att.value}
-                  >
-                    Remove attestation
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    onClick={() => upsert(att.value, true)}
-                    disabled={savingType === att.value}
-                  >
-                    Attest yes
-                  </Button>
                 )}
-              </div>
-              {isAttested && (
-                <div className="space-y-2">
-                  <Input
-                    placeholder="Evidence URL (optional)"
-                    className="text-xs"
-                    value={urlValue}
-                    onChange={(e) =>
-                      setPendingUrls(p => ({ ...p, [att.value]: e.target.value }))
-                    }
-                    onBlur={() => {
-                      if (urlValue !== (current?.evidence_url ?? '')) {
-                        void upsert(att.value, true, current?.notes ?? undefined, urlValue)
-                      }
-                    }}
-                  />
-                  <Textarea
-                    placeholder="Notes (optional)"
-                    rows={2}
-                    className="text-xs"
-                    value={noteValue}
-                    onChange={(e) =>
-                      setPendingNotes(p => ({ ...p, [att.value]: e.target.value }))
-                    }
-                    onBlur={() => {
-                      if (noteValue !== (current?.notes ?? '')) {
-                        void upsert(att.value, true, noteValue, current?.evidence_url ?? undefined)
-                      }
-                    }}
-                  />
-                  {current?.evidence_url && (
-                    <a
-                      href={current.evidence_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] text-blue-300 hover:underline inline-flex items-center gap-1"
-                    >
-                      Open evidence <ExternalLink className="h-2.5 w-2.5" />
-                    </a>
-                  )}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </div>
   )
 }

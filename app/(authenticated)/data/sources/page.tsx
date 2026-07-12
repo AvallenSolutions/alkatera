@@ -1,15 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -18,21 +15,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  BookOpen,
-  FlaskConical,
-  AlertCircle,
-  CheckCircle2,
-  Database,
-  ChevronDown,
-  ExternalLink,
-  Info,
-  Shield,
-  MessageSquarePlus,
-  Loader2,
-  Send,
-} from 'lucide-react';
+import { AlertCircle, ChevronDown, ExternalLink, Loader2 } from 'lucide-react';
+import { Statement } from '@/components/studio/statement';
 import { Eyebrow } from '@/components/studio/eyebrow';
+import { BigNumber } from '@/components/studio/big-number';
+import { StateChip } from '@/components/studio/state-chip';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 import { createTicket } from '@/lib/feedback';
@@ -85,35 +72,16 @@ interface DataSourcesResponse {
   };
 }
 
-function QualityBadge({ grade }: { grade?: string }) {
+function QualityChip({ grade }: { grade?: string }) {
   switch (grade) {
     case 'HIGH':
-      return (
-        <Badge className="bg-emerald-600 text-white text-xs">
-          <CheckCircle2 className="h-3 w-3 mr-1" />
-          Well Established
-        </Badge>
-      );
+      return <StateChip tone="good">High</StateChip>;
     case 'MEDIUM':
-      return (
-        <Badge className="bg-amber-600 text-white text-xs">
-          <FlaskConical className="h-3 w-3 mr-1" />
-          Good Estimate
-        </Badge>
-      );
+      return <StateChip tone="attention">Medium</StateChip>;
     case 'LOW':
-      return (
-        <Badge className="bg-slate-500 text-white text-xs">
-          <Info className="h-3 w-3 mr-1" />
-          Best Available
-        </Badge>
-      );
+      return <StateChip tone="quiet">Low</StateChip>;
     default:
-      return (
-        <Badge variant="secondary" className="text-xs">
-          Unknown
-        </Badge>
-      );
+      return <StateChip tone="quiet">Unknown</StateChip>;
   }
 }
 
@@ -131,10 +99,10 @@ function FactorRow({ factor }: { factor: EmissionFactor }) {
         </TableCell>
         <TableCell className="text-center">{factor.reference_unit}</TableCell>
         <TableCell className="text-center">
-          <QualityBadge grade={meta.data_quality_grade} />
+          <QualityChip grade={meta.data_quality_grade} />
         </TableCell>
         <TableCell className="text-center">
-          {factor.uncertainty_percent ? `\u00B1${factor.uncertainty_percent}%` : '-'}
+          {factor.uncertainty_percent ? `±${factor.uncertainty_percent}%` : '-'}
         </TableCell>
         <TableCell className="text-center">{factor.geographic_scope || '-'}</TableCell>
         <TableCell className="text-center">
@@ -317,238 +285,91 @@ export default function DataSourcesPage() {
 
   if (!data) return null;
 
-  const { factors, grouped, summary } = data;
+  const { grouped, summary } = data;
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <header className="space-y-3">
-        <div>
-          <Eyebrow className="mb-3">THE MEASURES · SOURCES</Eyebrow>
-          <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
-            The sources.
-          </h1>
-        </div>
+    <div className="mx-auto max-w-6xl space-y-10 p-6">
+      {/* The statement */}
+      <div className="space-y-4">
+        <Statement eyebrow="THE WORKBENCH · SOURCES" headline="The sources.">
+          <BigNumber size="display" value={summary.total} label="Factors" />
+        </Statement>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          This is the reference library that powers your carbon footprint calculations. It contains the
-          conversion numbers (called &ldquo;emission factors&rdquo;) that tell us how much CO&#8322; is released
-          for every kilogram of malt, litre of fuel, or unit of packaging your business uses.
+          The reference library behind your carbon footprint. When you log ingredients,
+          packaging or energy use elsewhere in alka<strong>tera</strong>, we multiply
+          your quantities by these conversion factors. Nothing here needs editing: this
+          page shows exactly where our numbers come from.
         </p>
-        <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
-          <Info className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="text-blue-800 dark:text-blue-200">
-            <strong>Why does this matter?</strong> When you log ingredients, packaging, or energy use elsewhere in alkatera, we
-            multiply your quantities by these numbers to calculate your carbon footprint. Better data here means more
-            accurate results for your business. You don&apos;t need to edit anything: this page is here so you can see
-            exactly where our numbers come from.
-          </AlertDescription>
-        </Alert>
-      </header>
-
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Conversion Factors</CardDescription>
-            <CardTitle className="text-3xl">{summary.total}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground">
-              Covering {summary.categories.length} categories of materials and processes
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-              Well Established
-            </CardDescription>
-            <CardTitle className="text-3xl text-emerald-600">{summary.by_quality.high}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground">
-              Backed by multiple published studies — the most reliable numbers
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <FlaskConical className="h-3 w-3 text-amber-600" />
-              Good Estimate
-            </CardDescription>
-            <CardTitle className="text-3xl text-amber-600">{summary.by_quality.medium}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground">
-              Based on one trusted source — reliable but less cross-checked
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <Info className="h-3 w-3 text-slate-500" />
-              Best Available
-            </CardDescription>
-            <CardTitle className="text-3xl text-slate-500">{summary.by_quality.low}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground">
-              Based on similar materials — used when no direct data exists yet
-            </p>
-          </CardContent>
-        </Card>
+        {/* The quality tiers, explained once */}
+        <div className="flex flex-wrap items-baseline gap-x-8 gap-y-1 text-xs text-muted-foreground">
+          <span>
+            <StateChip tone="good">High</StateChip>
+            <span className="ml-2">{summary.by_quality.high} · several studies agree</span>
+          </span>
+          <span>
+            <StateChip tone="attention">Medium</StateChip>
+            <span className="ml-2">{summary.by_quality.medium} · one trusted source</span>
+          </span>
+          <span>
+            <StateChip tone="quiet">Low</StateChip>
+            <span className="ml-2">{summary.by_quality.low} · estimated from similar materials</span>
+          </span>
+        </div>
       </div>
 
-      {/* Methodology card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
-            Where Do These Numbers Come From?
-          </CardTitle>
-          <CardDescription>
-            We use internationally recognised standards to make sure your carbon footprint is calculated correctly
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <p>
-            Every number in this library is based on real-world research and follows global best practices for
-            measuring greenhouse gas emissions. We prioritise the most reliable sources available:
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-start gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />
-              <div>
-                <p className="font-semibold text-foreground">Published Research</p>
-                <p className="text-xs">Findings from scientific studies that have been checked by other experts. These are the gold standard.</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <FlaskConical className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-              <div>
-                <p className="font-semibold text-foreground">Industry Reports</p>
-                <p className="text-xs">Data from trusted trade bodies and specialist platforms like brewing and packaging associations.</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <Info className="h-4 w-4 text-slate-500 mt-0.5 shrink-0" />
-              <div>
-                <p className="font-semibold text-foreground">Best-Available Estimates</p>
-                <p className="text-xs">When no direct data exists for a specific ingredient, we use numbers from similar materials and note the extra uncertainty.</p>
-              </div>
-            </div>
+      {/* Where the numbers come from */}
+      <section className="max-w-3xl border-t border-studio-hairline pt-4">
+        <Eyebrow tone="dim" className="mb-2">Where the numbers come from</Eyebrow>
+        <p className="text-sm text-muted-foreground">
+          Every factor is grounded in real-world research and follows global best practice
+          for measuring greenhouse gas emissions. We always prefer the most reliable source
+          available: peer-reviewed studies first, then reports from trusted trade bodies,
+          then government databases, and finally estimates from similar materials where no
+          direct data exists yet. Each factor carries its own precision, from within 10 to
+          25% for well-studied ingredients to 40 to 60% for niche materials, so you can see
+          where the data is strongest. Click any row for the original research and
+          supporting sources.
+        </p>
+      </section>
+
+      {/* Factor tables, one hairline section per category */}
+      {summary.categories.map((cat) => (
+        <section key={cat}>
+          <div className="border-b border-studio-hairline pb-2">
+            <Eyebrow>
+              {cat} · {grouped[cat]?.length || 0}
+            </Eyebrow>
           </div>
-          <p className="text-xs border-t pt-2">
-            We always prefer the most reliable source available. Published research comes first, then industry reports,
-            then government databases, and finally estimates based on similar materials. Every number also shows how
-            precise it is, so you know where the data is strongest.
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Factor tables by category */}
-      <Tabs defaultValue={summary.categories[0] || 'Ingredient'}>
-        <TabsList>
-          {summary.categories.map((cat) => (
-            <TabsTrigger key={cat} value={cat}>
-              {cat} ({grouped[cat]?.length || 0})
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
-        {summary.categories.map((cat) => (
-          <TabsContent key={cat} value={cat}>
-            <Card>
-              <CardHeader>
-                <CardTitle>{cat} Data</CardTitle>
-                <CardDescription>
-                  Click any row to see where the number comes from, including the original research and supporting sources.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table className="table-fixed w-full">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[30%]">Material</TableHead>
-                      <TableHead className="w-[10%] text-right">CO&#8322; per unit</TableHead>
-                      <TableHead className="w-[8%] text-center">Unit</TableHead>
-                      <TableHead className="w-[18%] text-center">Data Quality</TableHead>
-                      <TableHead className="w-[12%] text-center">Accuracy</TableHead>
-                      <TableHead className="w-[12%] text-center">Region</TableHead>
-                      <TableHead className="w-[10%]"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(grouped[cat] || []).map((factor) => (
-                      <FactorRow key={factor.id} factor={factor} />
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        ))}
-      </Tabs>
-
-      {/* Data quality legend */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5" />
-            Understanding Data Quality
-          </CardTitle>
-          <CardDescription>
-            Not all data is created equal. Here&apos;s what the quality badges mean and how accurate each level is
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
+          <Table className="table-fixed w-full">
             <TableHeader>
               <TableRow>
-                <TableHead>Quality</TableHead>
-                <TableHead>What It Means</TableHead>
-                <TableHead>How Precise</TableHead>
-                <TableHead>Examples</TableHead>
+                <TableHead className="w-[30%]">Material</TableHead>
+                <TableHead className="w-[10%] text-right">CO&#8322; per unit</TableHead>
+                <TableHead className="w-[8%] text-center">Unit</TableHead>
+                <TableHead className="w-[18%] text-center">Quality</TableHead>
+                <TableHead className="w-[12%] text-center">Accuracy</TableHead>
+                <TableHead className="w-[12%] text-center">Region</TableHead>
+                <TableHead className="w-[10%]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow>
-                <TableCell><QualityBadge grade="HIGH" /></TableCell>
-                <TableCell className="text-sm">Several independent studies agree on this number — it&apos;s the most reliable data we have</TableCell>
-                <TableCell className="text-sm font-mono">10&ndash;25%</TableCell>
-                <TableCell className="text-sm">Malt, hops, common grains — well-studied brewing ingredients</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell><QualityBadge grade="MEDIUM" /></TableCell>
-                <TableCell className="text-sm">One trusted source — a research paper, industry report, or specialist platform</TableCell>
-                <TableCell className="text-sm font-mono">25&ndash;40%</TableCell>
-                <TableCell className="text-sm">Yeast, spices, specialist packaging — data from trade bodies or single studies</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell><QualityBadge grade="LOW" /></TableCell>
-                <TableCell className="text-sm">No direct research exists for this specific item, so we use data from similar materials as a starting point</TableCell>
-                <TableCell className="text-sm font-mono">40&ndash;60%</TableCell>
-                <TableCell className="text-sm">Rare botanicals, niche ingredients — estimated from comparable crops or processes</TableCell>
-              </TableRow>
+              {(grouped[cat] || []).map((factor) => (
+                <FactorRow key={factor.id} factor={factor} />
+              ))}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </section>
+      ))}
 
-      {/* Request a Factor */}
-      <RequestFactorForm />
+      {/* Request a factor */}
+      <RequestFactorFoot />
     </div>
   );
 }
 
-function RequestFactorForm() {
+function RequestFactorFoot() {
   const { currentOrganization } = useOrganization();
+  const [open, setOpen] = useState(false);
   const [materialName, setMaterialName] = useState('');
   const [materialType, setMaterialType] = useState('ingredient');
   const [notes, setNotes] = useState('');
@@ -593,75 +414,80 @@ function RequestFactorForm() {
   };
 
   return (
-    <Card className="border-dashed border-2">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <MessageSquarePlus className="h-5 w-5" />
-          Missing Something?
-        </CardTitle>
-        <CardDescription>
-          If you use an ingredient, packaging material, or process that isn&apos;t listed above, let us know.
-          We&apos;ll research it and add it to the library so your carbon footprint calculations are as complete as possible.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {submitted ? (
-          <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
-            <AlertDescription className="text-green-800 dark:text-green-200">
-              Thanks for letting us know! We&apos;ve added this to our research list. The more businesses that request the same item, the higher it gets prioritised.
-            </AlertDescription>
-          </Alert>
-        ) : (
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-            <div className="space-y-1.5 md:col-span-1">
-              <Label htmlFor="req-name" className="text-sm">Material / Ingredient Name</Label>
-              <Input
-                id="req-name"
-                placeholder="e.g. Saffron, Cardamom, Shrink wrap"
-                value={materialName}
-                onChange={(e) => setMaterialName(e.target.value)}
-                disabled={submitting}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="req-type" className="text-sm">Type</Label>
-              <Select value={materialType} onValueChange={setMaterialType} disabled={submitting}>
-                <SelectTrigger id="req-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ingredient">Ingredient</SelectItem>
-                  <SelectItem value="packaging">Packaging</SelectItem>
-                  <SelectItem value="process">Process</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="req-notes" className="text-sm">Notes (optional)</Label>
-              <Textarea
-                id="req-notes"
-                placeholder="Any context that helps us find the right data..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                disabled={submitting}
-                rows={1}
-                className="min-h-[36px] resize-none"
-              />
-            </div>
-            <div>
-              <Button type="submit" disabled={submitting || !materialName.trim()} className="w-full">
-                {submitting ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Submitting...</>
-                ) : (
-                  <><Send className="h-4 w-4 mr-2" />Submit Request</>
-                )}
-              </Button>
-            </div>
-          </form>
-        )}
-      </CardContent>
-    </Card>
+    <section className="border-t border-studio-hairline">
+      {!open ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="group flex w-full items-center justify-between gap-4 py-4 text-left"
+        >
+          <span className="text-sm text-muted-foreground transition-colors group-hover:text-foreground">
+            Missing something? If you use an ingredient, packaging material or process that
+            is not listed, we will research it and add it to the library.
+          </span>
+          <span className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent">
+            Request a factor
+          </span>
+        </button>
+      ) : (
+        <div className="space-y-4 py-4">
+          <Eyebrow tone="dim">Request a factor</Eyebrow>
+          {submitted ? (
+            <p className="text-sm text-muted-foreground">
+              Thanks for letting us know. It is on our research list; the more businesses
+              that request the same item, the higher it gets prioritised.
+            </p>
+          ) : (
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+              <div className="space-y-1.5 md:col-span-1">
+                <Label htmlFor="req-name" className="text-sm">Material / ingredient name</Label>
+                <Input
+                  id="req-name"
+                  placeholder="e.g. Saffron, Cardamom, Shrink wrap"
+                  value={materialName}
+                  onChange={(e) => setMaterialName(e.target.value)}
+                  disabled={submitting}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="req-type" className="text-sm">Type</Label>
+                <Select value={materialType} onValueChange={setMaterialType} disabled={submitting}>
+                  <SelectTrigger id="req-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ingredient">Ingredient</SelectItem>
+                    <SelectItem value="packaging">Packaging</SelectItem>
+                    <SelectItem value="process">Process</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="req-notes" className="text-sm">Notes (optional)</Label>
+                <Textarea
+                  id="req-notes"
+                  placeholder="Any context that helps us find the right data..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  disabled={submitting}
+                  rows={1}
+                  className="min-h-[36px] resize-none"
+                />
+              </div>
+              <div>
+                <Button type="submit" disabled={submitting || !materialName.trim()} className="w-full">
+                  {submitting ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Submitting...</>
+                  ) : (
+                    'Submit request'
+                  )}
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+    </section>
   );
 }

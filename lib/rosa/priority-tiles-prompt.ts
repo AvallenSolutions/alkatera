@@ -77,7 +77,6 @@ export const TILE_HREF_PREFIXES = [
   '/admin/approvals/',
   '/suppliers',
   '/suppliers/',
-  '/suppliers/new',
   '/supplier-portal',
   '/supplier-portal/',
   '/supplier-portal/esg-assessment',
@@ -248,7 +247,7 @@ Use these exact paths for href; nothing else is valid. Pick the most relevant on
 - '/suppliers/' — supplier directory (use for supplier ESG asks)
 - '/admin/approvals/' — agent queue / sign-off
 - '/reports/sustainability/' — sustainability report
-- '/reports/transition-plan/' — climate transition plan
+- '/reports/sustainability?tab=transition-plan' — climate transition plan
 - '/epr/' — Extended Producer Responsibility hub
 - '/agent/' — Footprint Agent console
 - null — for purely informational tiles with no clear destination

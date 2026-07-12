@@ -1,15 +1,22 @@
 'use client'
 
+/**
+ * The per-transaction AI confirm flow, folded in beneath the supplier
+ * queue as one quiet sub-section rather than a separate Sparkles card.
+ * Same one "Suggest with AI" story as the queue above; behaviour
+ * (classify, confirm, dismiss, learn-rule) is unchanged.
+ */
+
 import { useState, useEffect, useCallback } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Loader2, Sparkles, Check, X, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
 import { CATEGORY_LABELS } from '@/lib/xero/category-labels'
 import { classifyTransactionsChunked } from '@/lib/xero/classify-ai-client'
+import { Eyebrow } from '@/components/studio/eyebrow'
+import { StateChip } from '@/components/studio/state-chip'
+import { PillButton } from '@/components/studio/pill-button'
+import type { WorkingTone } from '@/components/studio/theme'
 
 interface UnclassifiedTransaction {
   id: string
@@ -25,6 +32,12 @@ interface AISuggestion {
   suggestedCategory: string | null
   confidence: number
   reasoning: string
+}
+
+function confidenceTone(confidence: number): WorkingTone {
+  if (confidence >= 0.8) return 'good'
+  if (confidence >= 0.5) return 'attention'
+  return 'stale'
 }
 
 export function AIClassificationPanel() {
@@ -363,216 +376,151 @@ export function AIClassificationPanel() {
     new Intl.NumberFormat('en-GB', { style: 'currency', currency, minimumFractionDigits: 0 }).format(amount)
 
   if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
-    )
+    return <div className="h-16 animate-pulse rounded-[6px] bg-studio-cream" aria-hidden="true" />
   }
 
   if (unclassified.length === 0) return null
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5" />
-              AI Classification
-            </CardTitle>
-            <CardDescription>
-              {unclassified.length} unclassified transactions. Use AI to suggest emission categories.
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            {suggestions.size > 0 && visibleTransactions.length > 0 && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-emerald-700 dark:text-emerald-400"
-                  onClick={handleConfirmAll}
-                >
-                  <Check className="h-4 w-4 mr-1" />
-                  Confirm All
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleDismissAll}
-                >
-                  <X className="h-4 w-4 mr-1" />
-                  Dismiss All
-                </Button>
-              </>
-            )}
-            <Button
-              onClick={handleClassify}
-              disabled={isClassifying || unclassified.length === 0}
-              size="sm"
-            >
-              {isClassifying ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Sparkles className="h-4 w-4 mr-2" />
-              )}
-              {suggestions.size > 0 ? 'Re-classify' : 'Classify with AI'}
-            </Button>
-          </div>
+    <section className="space-y-4 border-t border-studio-hairline pt-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <Eyebrow tone="dim">
+            TRANSACTIONS THE SYNC COULD NOT PLACE · {unclassified.length}
+          </Eyebrow>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Suggest a category with AI, then confirm each one before it is applied.
+          </p>
         </div>
-      </CardHeader>
-      <CardContent>
-        {suggestions.size === 0 && (
-          <div className="text-center py-6 text-sm text-muted-foreground">
-            <Sparkles className="h-10 w-10 mx-auto mb-3 text-slate-300 dark:text-slate-700" />
-            <p>Click &quot;Classify with AI&quot; to get suggestions for unclassified transactions.</p>
-            <p className="text-xs mt-1">You must confirm each suggestion before it is applied.</p>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {suggestions.size > 0 && visibleTransactions.length > 0 && (
+            <>
+              <PillButton variant="outline" size="sm" onClick={handleConfirmAll}>
+                Confirm all
+              </PillButton>
+              <PillButton variant="ghost" size="sm" onClick={handleDismissAll}>
+                Dismiss all
+              </PillButton>
+            </>
+          )}
+          <PillButton
+            variant="outline"
+            size="sm"
+            onClick={handleClassify}
+            disabled={isClassifying || unclassified.length === 0}
+          >
+            {isClassifying ? 'Analysing…' : suggestions.size > 0 ? 'Re-classify' : 'Suggest with AI'}
+          </PillButton>
+        </div>
+      </div>
 
-        {suggestions.size > 0 && visibleTransactions.length > 0 && (
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {/* Grouped supplier rows */}
-            {supplierGroups.map(group => (
-              <div
-                key={`group-${group.contactName}`}
-                className="p-3 rounded-lg border bg-violet-50/50 dark:bg-violet-950/20 border-violet-200 dark:border-violet-800/30 space-y-2"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm truncate">
-                        {group.contactName}
-                      </span>
-                      <Badge variant="outline" className="text-xs">
-                        {group.transactions.length} transactions
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        {formatCurrency(group.totalAmount)}
-                      </span>
-                    </div>
-                  </div>
+      {suggestions.size === 0 && (
+        <p className="text-sm text-muted-foreground">
+          Run &ldquo;Suggest with AI&rdquo; to get category suggestions for these transactions.
+          You confirm each one before it is applied.
+        </p>
+      )}
+
+      {suggestions.size > 0 && visibleTransactions.length > 0 && (
+        <div className="max-h-96 overflow-y-auto">
+          {/* Grouped supplier rows */}
+          {supplierGroups.map(group => (
+            <div
+              key={`group-${group.contactName}`}
+              className="border-b border-studio-hairline py-3"
+            >
+              <div className="flex items-baseline gap-2">
+                <span className="truncate font-display text-sm font-semibold">
+                  {group.contactName}
+                </span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-studio-dim">
+                  {group.transactions.length} TX · {formatCurrency(group.totalAmount)}
+                </span>
+              </div>
+
+              <div className="mt-1.5 flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-baseline gap-2">
+                  <StateChip tone={confidenceTone(group.confidence)}>
+                    {CATEGORY_LABELS[group.category] || group.category} · {Math.round(group.confidence * 100)}%
+                  </StateChip>
+                  <span className="truncate text-xs text-muted-foreground">{group.reasoning}</span>
                 </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <PillButton
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleConfirmGroup(group)}
+                  >
+                    Confirm all
+                  </PillButton>
+                  <PillButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDismissGroup(group)}
+                    aria-label={`Dismiss ${group.contactName}`}
+                  >
+                    Dismiss
+                  </PillButton>
+                </div>
+              </div>
+            </div>
+          ))}
 
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      className={`text-xs ${
-                        group.confidence >= 0.8
-                          ? 'border-emerald-300 text-emerald-700 dark:text-emerald-400'
-                          : group.confidence >= 0.5
-                            ? 'border-amber-300 text-amber-700 dark:text-amber-400'
-                            : 'border-red-300 text-red-700 dark:text-red-400'
-                      }`}
-                    >
-                      {CATEGORY_LABELS[group.category] || group.category}
-                      <span className="ml-1 opacity-70">{Math.round(group.confidence * 100)}%</span>
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">{group.reasoning}</span>
+          {/* Individual transaction rows */}
+          {ungroupedTransactions.map(tx => {
+            const suggestion = suggestions.get(tx.id)
+            if (!suggestion) return null
+
+            return (
+              <div key={tx.id} className="border-b border-studio-hairline py-3">
+                <div className="flex items-baseline gap-2">
+                  <span className="truncate font-display text-sm font-semibold">
+                    {tx.contactName || 'Unknown'}
+                  </span>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-studio-dim">
+                    {formatCurrency(tx.amount, tx.currency)}
+                  </span>
+                </div>
+                {tx.description && (
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{tx.description}</p>
+                )}
+
+                <div className="mt-1.5 flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-baseline gap-2">
+                    <StateChip tone={confidenceTone(suggestion.confidence)}>
+                      {CATEGORY_LABELS[suggestion.suggestedCategory!] || suggestion.suggestedCategory} · {Math.round(suggestion.confidence * 100)}%
+                    </StateChip>
+                    <span className="truncate text-xs text-muted-foreground">{suggestion.reasoning}</span>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <PillButton
                       variant="outline"
                       size="sm"
-                      className="h-7 text-xs text-emerald-700 dark:text-emerald-400"
-                      onClick={() => handleConfirmGroup(group)}
+                      onClick={() => handleConfirm(tx.id)}
                     >
-                      <Check className="h-3 w-3 mr-1" />
-                      Confirm All
-                    </Button>
-                    <Button
+                      Confirm
+                    </PillButton>
+                    <PillButton
                       variant="ghost"
                       size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => handleDismissGroup(group)}
+                      onClick={() => handleDismiss(tx.id)}
+                      aria-label="Dismiss suggestion"
                     >
-                      <X className="h-3 w-3" />
-                    </Button>
+                      Dismiss
+                    </PillButton>
                   </div>
                 </div>
               </div>
-            ))}
+            )
+          })}
+        </div>
+      )}
 
-            {/* Individual transaction rows */}
-            {ungroupedTransactions.map(tx => {
-              const suggestion = suggestions.get(tx.id)
-              if (!suggestion) return null
-
-              return (
-                <div
-                  key={tx.id}
-                  className="p-3 rounded-lg border bg-slate-50 dark:bg-slate-900/50 space-y-2"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm truncate">
-                          {tx.contactName || 'Unknown'}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {formatCurrency(tx.amount, tx.currency)}
-                        </span>
-                      </div>
-                      {tx.description && (
-                        <p className="text-xs text-muted-foreground truncate mt-0.5">{tx.description}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant="outline"
-                        className={`text-xs ${
-                          suggestion.confidence >= 0.8
-                            ? 'border-emerald-300 text-emerald-700 dark:text-emerald-400'
-                            : suggestion.confidence >= 0.5
-                              ? 'border-amber-300 text-amber-700 dark:text-amber-400'
-                              : 'border-red-300 text-red-700 dark:text-red-400'
-                        }`}
-                      >
-                        {CATEGORY_LABELS[suggestion.suggestedCategory!] || suggestion.suggestedCategory}
-                        <span className="ml-1 opacity-70">{Math.round(suggestion.confidence * 100)}%</span>
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">{suggestion.reasoning}</span>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs text-emerald-700 dark:text-emerald-400"
-                        onClick={() => handleConfirm(tx.id)}
-                      >
-                        <Check className="h-3 w-3 mr-1" />
-                        Confirm
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={() => handleDismiss(tx.id)}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {confirmedIds.size > 0 && (
-          <div className="mt-3 text-xs text-muted-foreground flex items-center gap-1">
-            <Check className="h-3.5 w-3.5 text-emerald-500" />
-            {confirmedIds.size} classification{confirmedIds.size !== 1 ? 's' : ''} confirmed
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {confirmedIds.size > 0 && (
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-good">
+          {confirmedIds.size} CLASSIFICATION{confirmedIds.size !== 1 ? 'S' : ''} CONFIRMED
+        </p>
+      )}
+    </section>
   )
 }

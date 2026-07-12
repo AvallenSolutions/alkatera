@@ -1,17 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
+import Link from "next/link";
 import { useRosaPageContext } from "@/lib/rosa/RosaContextProvider";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Trash2, Building2, Zap, Pencil, History, Package, Loader2, FlaskConical, Droplets, ArrowRightLeft } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Trash2, Pencil, Loader2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Eyebrow } from "@/components/studio/eyebrow";
+import { Statement } from "@/components/studio/statement";
+import { BigNumber } from "@/components/studio/big-number";
+import { StateChip } from "@/components/studio/state-chip";
+import { PillButton } from "@/components/studio/pill-button";
+import { Panel } from "@/components/studio/panel";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +26,6 @@ import { DirectDataEntry } from "@/components/facilities/DirectDataEntry";
 import { ProductionVolumeManager } from "@/components/facilities/ProductionVolumeManager";
 import { DataQualityConfidenceCard } from "@/components/facilities/DataQualityConfidenceCard";
 import { ProductionRunDataEntry } from "@/components/facilities/ProductionRunDataEntry";
-import { Sparkles, ExternalLink, Settings2, HelpCircle, Gauge } from "lucide-react";
 import { FacilityEnergyTab } from "@/components/energy/FacilityEnergyTab";
 import { FacilityDataSourcingDialog } from "@/components/facilities/FacilityDataSourcingDialog";
 import { FacilityDataDashboard } from "@/components/facilities/FacilityDataDashboard";
@@ -101,6 +103,30 @@ interface FacilityActivityEntry {
   waste_treatment_method?: string;
   reporting_session_id?: string | null;
   activity_date?: string | null;
+}
+
+/** Quiet mono tab trigger: uppercase, tracked, 3px underline when active. */
+const MONO_TAB =
+  'relative -mb-px rounded-none border-b-[3px] border-transparent bg-transparent px-0 pb-2.5 pt-1 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim shadow-none transition-colors data-[state=active]:border-room-accent data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none';
+
+const MONO_TAB_LIST =
+  'h-auto w-full justify-start gap-6 overflow-x-auto rounded-none border-b border-border bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
+
+/** Typographic provenance state: primary data reads good, the rest attention. */
+function ProvenanceChip({ provenance }: { provenance: string | null | undefined }) {
+  const label = provenance?.includes('verified')
+    ? 'Verified'
+    : provenance?.includes('measured')
+      ? 'Measured'
+      : provenance?.includes('allocated')
+        ? 'Allocated'
+        : provenance?.includes('modelled')
+          ? 'Modelled'
+          : null;
+  if (!label) return <span className="text-xs text-muted-foreground">-</span>;
+  return (
+    <StateChip tone={provenance?.includes('primary') ? 'good' : 'attention'}>{label}</StateChip>
+  );
 }
 
 export default function FacilityDetailPage() {
@@ -350,163 +376,152 @@ export default function FacilityDetailPage() {
   if (!facility) {
     return (
       <div className="container mx-auto p-6">
-        <Alert variant="destructive">
-          <AlertDescription>Facility not found</AlertDescription>
-        </Alert>
+        <p className="text-sm text-studio-dim">Facility not found.</p>
+        <PillButton variant="outline" size="sm" className="mt-3" href="/company/facilities">
+          All facilities
+        </PillButton>
       </div>
     );
   }
 
+  const totalEntries = utilityData.length + waterData.length + wasteData.length;
+
   return (
     <div className="container mx-auto p-6 max-w-7xl">
-      <div className="mb-6">
-        <Button variant="outline" onClick={() => router.push('/company/facilities')}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Facilities
-        </Button>
+      <div className="mb-8">
+        <Link
+          href="/company/facilities"
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim transition-colors duration-150 ease-studio hover:text-foreground"
+        >
+          &larr; All facilities
+        </Link>
       </div>
 
-      <header className="mb-6">
-        <Eyebrow className="mb-3">THE MEASURES · FACILITY</Eyebrow>
-        <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
-          {facility.name}.
-        </h1>
-        <p className="mt-3 text-sm text-muted-foreground">
-          {facility.address_city}, {facility.address_country}
-        </p>
+      <Statement eyebrow="THE WORKBENCH · FACILITY" headline={<>{facility.name}.</>}>
+        <BigNumber
+          size="display"
+          value={totalEntries.toLocaleString('en-GB')}
+          label={totalEntries === 1 ? 'ENTRY LOGGED' : 'ENTRIES LOGGED'}
+        />
+      </Statement>
 
-        <div className="flex flex-wrap gap-x-4 gap-y-2 mt-4 items-center">
-          {facility.functions.map((func: string) => (
-            <span key={func} className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
-              {func}
-            </span>
-          ))}
-          <span
-            className={`font-mono text-[10px] font-bold uppercase tracking-[0.22em] ${
-              facility.operational_control === 'owned' ? 'text-studio-good' : 'text-studio-dim'
-            }`}
-          >
-            {facility.operational_control === 'owned' ? 'Owned' : 'Third-Party'}
+      <div className="mt-4 mb-10 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <span className="text-sm text-muted-foreground">
+          {[facility.address_city, facility.address_country].filter(Boolean).join(', ')}
+        </span>
+        {facility.functions.map((func: string) => (
+          <span key={func} className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+            {func}
           </span>
-          <FacilityBrewwLinkBadge facilityId={facility.id} />
-        </div>
-      </header>
+        ))}
+        <StateChip tone={facility.operational_control === 'owned' ? 'good' : 'quiet'}>
+          {facility.operational_control === 'owned' ? 'Owned' : 'Third party'}
+        </StateChip>
+        <FacilityBrewwLinkBadge facilityId={facility.id} />
+      </div>
 
       {facility.operational_control === 'third_party' &&
         (!facility.default_data_collection_mode || facility.default_data_collection_mode === 'primary') && (
-          <Alert className="mb-6 border-blue-400/60 bg-blue-500/10">
-            <HelpCircle className="h-4 w-4 text-blue-500" />
-            <AlertDescription>
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 space-y-2">
-                  <p className="font-semibold">Can this facility share their energy and water data with you?</p>
-                  <p className="text-sm text-muted-foreground">
-                    If yes, keep entering real data below. If not, tell us and we&apos;ll use an industry average so you can still run an LCA for products made here.
-                  </p>
-                </div>
-                <Button size="sm" onClick={() => setSourcingDialogOpen(true)}>
-                  Set up data source
-                </Button>
+          <Panel className="mb-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0 flex-1 space-y-1">
+                <p className="font-display text-sm font-semibold text-foreground">
+                  Can this facility share their energy and water data with you?
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  If yes, keep entering real data below. If not, tell us and we&apos;ll use an industry average so you can still run an LCA for products made here.
+                </p>
               </div>
-            </AlertDescription>
-          </Alert>
+              <PillButton size="sm" onClick={() => setSourcingDialogOpen(true)}>
+                Set up data source
+              </PillButton>
+            </div>
+          </Panel>
       )}
 
       {facility.default_data_collection_mode && facility.default_data_collection_mode !== 'primary' && (
-        <Alert className="mb-6 border-amber-400/60 bg-amber-500/10">
-          <Sparkles className="h-4 w-4 text-amber-500" />
-          <AlertDescription>
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 space-y-2">
-                <p className="font-semibold">
-                  {facility.default_data_collection_mode === 'archetype_proxy'
-                    ? 'Using an industry average for this facility'
-                    : 'Using industry average to fill data gaps'}
-                  {archetype ? ` — ${archetype.display_name}` : ''}
+        <Panel className="mb-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0 flex-1 space-y-2">
+              <StateChip tone="attention">Industry average</StateChip>
+              <p className="font-display text-sm font-semibold text-foreground">
+                {facility.default_data_collection_mode === 'archetype_proxy'
+                  ? 'Using an industry average for this facility'
+                  : 'Using an industry average to fill data gaps'}
+                {archetype ? `: ${archetype.display_name}` : ''}.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                You told us this facility can&apos;t share its real energy and water data, so LCAs for products made here use a published industry average instead. Reports will clearly say this number is an estimate. You don&apos;t need to enter data on this page. If the facility starts sharing real data later, you can switch over and the footprint will update.
+              </p>
+              {facility.default_proxy_justification && (
+                <p className="text-xs italic text-muted-foreground">
+                  Your reason: {facility.default_proxy_justification}
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  You told us this facility can&apos;t share its real energy and water data, so LCAs for products made here use a published industry average instead. Reports will clearly say this number is an estimate. You don&apos;t need to enter data on this page. If the facility starts sharing real data later, you can switch over and the footprint will update.
-                </p>
-                {facility.default_proxy_justification && (
-                  <p className="text-xs italic text-muted-foreground">
-                    Your reason: {facility.default_proxy_justification}
-                  </p>
-                )}
-                {archetype?.source_url && (
-                  <a
-                    href={archetype.source_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-primary inline-flex items-center gap-1 hover:underline"
-                  >
-                    Where this average comes from: {archetype.source_citation}
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                )}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSourcingDialogOpen(true)}
-              >
-                <Settings2 className="h-3.5 w-3.5 mr-1.5" />
-                Change
-              </Button>
+              )}
+              {archetype?.source_url && (
+                <a
+                  href={archetype.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block text-xs text-room-accent hover:underline"
+                >
+                  Where this average comes from: {archetype.source_citation}
+                </a>
+              )}
             </div>
-          </AlertDescription>
-        </Alert>
+            <PillButton variant="outline" size="sm" onClick={() => setSourcingDialogOpen(true)}>
+              Change
+            </PillButton>
+          </div>
+        </Panel>
       )}
 
       {proxyAllocations.length > 0 && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-base">Got real data for this facility?</CardTitle>
-            <CardDescription>
-              These product LCAs are currently using an industry average for this facility. If the facility has now shared real numbers with you, switch them over here. Your old reports will still add up because we keep the proxy version for audit.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Reporting period</TableHead>
-                  <TableHead>Mode</TableHead>
-                  <TableHead>Industry average used</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
+        <section className="mb-8 border-t border-border pt-5">
+          <Eyebrow className="mb-1">Got real data for this facility?</Eyebrow>
+          <p className="mb-4 max-w-3xl text-xs text-muted-foreground">
+            These product LCAs are currently using an industry average for this facility. If the facility has now shared real numbers with you, switch them over here. Your old reports will still add up because we keep the proxy version for audit.
+          </p>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Product</TableHead>
+                <TableHead>Reporting period</TableHead>
+                <TableHead>Mode</TableHead>
+                <TableHead>Industry average used</TableHead>
+                <TableHead className="text-right">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {proxyAllocations.map((a) => (
+                <TableRow key={a.id}>
+                  <TableCell className="font-medium">{a.product_name || '(unknown product)'}</TableCell>
+                  <TableCell className="text-xs">
+                    {new Date(a.reporting_period_start).toLocaleDateString()}
+                    {' to '}
+                    {new Date(a.reporting_period_end).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>
+                    <StateChip tone="attention">
+                      {a.data_collection_mode === 'hybrid' ? 'Partial' : 'Industry average'}
+                    </StateChip>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {a.archetype_display_name || '-'}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <UpgradeFacilityDataButton
+                      allocationId={a.id}
+                      facilityName={facility.name}
+                      archetypeName={a.archetype_display_name ?? undefined}
+                      onUpgraded={loadFacilityData}
+                    />
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {proxyAllocations.map((a) => (
-                  <TableRow key={a.id}>
-                    <TableCell className="font-medium">{a.product_name || '(unknown product)'}</TableCell>
-                    <TableCell className="text-xs">
-                      {new Date(a.reporting_period_start).toLocaleDateString()}
-                      {' → '}
-                      {new Date(a.reporting_period_end).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-xs">
-                        {a.data_collection_mode === 'hybrid' ? 'Partial' : 'Industry average'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {a.archetype_display_name || '-'}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <UpgradeFacilityDataButton
-                        allocationId={a.id}
-                        facilityName={facility.name}
-                        archetypeName={a.archetype_display_name ?? undefined}
-                        onUpgraded={loadFacilityData}
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+              ))}
+            </TableBody>
+          </Table>
+        </section>
       )}
 
       {facility.operational_control === 'third_party' && (
@@ -522,41 +537,35 @@ export default function FacilityDetailPage() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="data-entry">
-            <Zap className="h-4 w-4 mr-2" />
-            Data Entry
+        <TabsList className={MONO_TAB_LIST}>
+          <TabsTrigger value="data-entry" className={MONO_TAB}>
+            Data entry
           </TabsTrigger>
-          <TabsTrigger value="production">
-            <Package className="h-4 w-4 mr-2" />
+          <TabsTrigger value="production" className={MONO_TAB}>
             Production
           </TabsTrigger>
-          <TabsTrigger value="run-data">
-            <FlaskConical className="h-4 w-4 mr-2" />
-            Run Data
+          <TabsTrigger value="run-data" className={MONO_TAB}>
+            Run data
           </TabsTrigger>
-          <TabsTrigger value="history">
-            <History className="h-4 w-4 mr-2" />
+          <TabsTrigger value="history" className={MONO_TAB}>
             History
           </TabsTrigger>
-          <TabsTrigger value="energy">
-            <Gauge className="h-4 w-4 mr-2" />
+          <TabsTrigger value="energy" className={MONO_TAB}>
             Energy &amp; grid
           </TabsTrigger>
-          <TabsTrigger value="overview">
-            <Building2 className="h-4 w-4 mr-2" />
+          <TabsTrigger value="overview" className={MONO_TAB}>
             Overview
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="energy" className="space-y-6 mt-6">
+        <TabsContent value="energy" className="space-y-6 mt-8">
           <FacilityEnergyTab facilityId={facilityId} />
         </TabsContent>
 
         {/* ============================================================= */}
         {/* DATA ENTRY TAB */}
         {/* ============================================================= */}
-        <TabsContent value="data-entry" className="space-y-6 mt-6">
+        <TabsContent value="data-entry" className="space-y-6 mt-8">
           <DirectDataEntry
             facilityId={facilityId}
             organizationId={facility.organization_id}
@@ -567,7 +576,7 @@ export default function FacilityDetailPage() {
         {/* ============================================================= */}
         {/* PRODUCTION TAB */}
         {/* ============================================================= */}
-        <TabsContent value="production" className="space-y-6 mt-6">
+        <TabsContent value="production" className="space-y-6 mt-8">
           <ProductionVolumeManager
             facilityId={facilityId}
             organizationId={facility.organization_id}
@@ -577,7 +586,7 @@ export default function FacilityDetailPage() {
         {/* ============================================================= */}
         {/* RUN DATA TAB */}
         {/* ============================================================= */}
-        <TabsContent value="run-data" className="space-y-6 mt-6">
+        <TabsContent value="run-data" className="space-y-6 mt-8">
           <ProductionRunDataEntry
             facilityId={facilityId}
             organizationId={facility.organization_id}
@@ -588,7 +597,7 @@ export default function FacilityDetailPage() {
         {/* ============================================================= */}
         {/* HISTORY TAB */}
         {/* ============================================================= */}
-        <TabsContent value="history" className="space-y-6 mt-6">
+        <TabsContent value="history" className="space-y-10 mt-8">
           {/* Visual overview of the last 12 months: coverage grid + trend chart */}
           <FacilityDataDashboard
             utilityData={utilityData}
@@ -597,305 +606,275 @@ export default function FacilityDetailPage() {
             dataContracts={dataContracts}
           />
 
-          {/* Utility History */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Utility Data</CardTitle>
-              <CardDescription>
-                All energy and fuel consumption data for this facility
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {utilityData.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>No utility data recorded yet</p>
-                  <p className="text-sm mt-1">Add entries in the Data Entry tab</p>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Utility Type</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Quantity</TableHead>
-                      <TableHead>Scope</TableHead>
-                      <TableHead>Quality</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {utilityData.map((entry) => (
-                      <TableRow key={entry.id}>
-                        <TableCell className="font-medium">
-                          {getUtilityLabel(entry.utility_type)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            {entry.activity_date ? (
-                              <>{new Date(entry.activity_date).toLocaleDateString()}</>
-                            ) : (
-                              <>
-                                {new Date(entry.reporting_period_start).toLocaleDateString()} -
-                                <br />
-                                {new Date(entry.reporting_period_end).toLocaleDateString()}
-                              </>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {entry.quantity.toLocaleString()} {entry.unit}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={entry.calculated_scope === 'Scope 1' ? 'default' : 'secondary'}>
-                            {entry.calculated_scope}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs">
-                            {entry.data_quality}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openEditDialog(entry, 'utility_data_entries')}
-                            >
-                              <Pencil className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteEntry(entry.id, 'utility_data_entries')}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-600" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Water History */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Water Data</CardTitle>
-              <CardDescription>
-                All water intake, discharge, and recycling data
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {waterData.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>No water data recorded yet</p>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Activity Type</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Quantity</TableHead>
-                      <TableHead>Source</TableHead>
-                      <TableHead>Data Quality</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {waterData.map((entry) => (
-                      <TableRow key={entry.id}>
-                        <TableCell className="font-medium">
-                          {entry.activity_category === 'water_intake' && 'Water Intake'}
-                          {entry.activity_category === 'water_discharge' && 'Wastewater Discharge'}
-                          {entry.activity_category === 'water_recycled' && 'Recycled Water'}
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            {entry.activity_date ? (
-                              <>{new Date(entry.activity_date).toLocaleDateString()}</>
-                            ) : (
-                              <>
-                                {new Date(entry.reporting_period_start).toLocaleDateString()} -
-                                <br />
-                                {new Date(entry.reporting_period_end).toLocaleDateString()}
-                              </>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {entry.quantity.toLocaleString()} {entry.unit}
-                        </TableCell>
-                        <TableCell>
-                          {entry.water_source_type ? (
-                            <Badge variant="outline" className="text-xs">
-                              {entry.water_source_type.replace('_', ' ')}
-                            </Badge>
+          {/* Utility history */}
+          <section className="border-t border-border pt-5">
+            <Eyebrow className="mb-1">Utility data</Eyebrow>
+            <p className="mb-4 text-xs text-muted-foreground">
+              All energy and fuel consumption recorded for this facility.
+            </p>
+            {utilityData.length === 0 ? (
+              <div className="py-4">
+                <p className="text-sm text-studio-dim">No utility data recorded yet.</p>
+                <PillButton variant="ghost" size="sm" className="-ml-3 mt-1" onClick={() => setActiveTab('data-entry')}>
+                  Add data
+                </PillButton>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Utility type</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Quantity</TableHead>
+                    <TableHead>Scope</TableHead>
+                    <TableHead>Quality</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {utilityData.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell className="font-medium">
+                        {getUtilityLabel(entry.utility_type)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {entry.activity_date ? (
+                            <>{new Date(entry.activity_date).toLocaleDateString()}</>
                           ) : (
-                            <span className="text-xs text-muted-foreground">-</span>
+                            <>
+                              {new Date(entry.reporting_period_start).toLocaleDateString()} -
+                              <br />
+                              {new Date(entry.reporting_period_end).toLocaleDateString()}
+                            </>
                           )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={`text-xs ${
-                              entry.data_provenance?.includes('primary')
-                                ? 'bg-green-50 text-green-700 border-green-200'
-                                : 'bg-amber-50 text-amber-700 border-amber-200'
-                            }`}
+                        </div>
+                      </TableCell>
+                      <TableCell className="tabular-nums">
+                        {entry.quantity.toLocaleString()} {entry.unit}
+                      </TableCell>
+                      <TableCell>
+                        <StateChip tone="quiet">{entry.calculated_scope || '-'}</StateChip>
+                      </TableCell>
+                      <TableCell>
+                        <StateChip tone={entry.data_quality === 'actual' ? 'good' : 'attention'}>
+                          {entry.data_quality}
+                        </StateChip>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditDialog(entry, 'utility_data_entries')}
                           >
-                            {entry.data_provenance?.includes('verified') && 'Verified'}
-                            {entry.data_provenance?.includes('measured') && 'Measured'}
-                            {entry.data_provenance?.includes('allocated') && 'Allocated'}
-                            {entry.data_provenance?.includes('modelled') && 'Modelled'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openEditDialog(entry, 'facility_activity_entries')}
-                            >
-                              <Pencil className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteEntry(entry.id, 'facility_activity_entries')}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-600" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Waste History */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Waste Data</CardTitle>
-              <CardDescription>
-                All waste generation, recycling, and disposal data
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {wasteData.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>No waste data recorded yet</p>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Waste Category</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Quantity</TableHead>
-                      <TableHead>Treatment Method</TableHead>
-                      <TableHead>Data Quality</TableHead>
-                      <TableHead></TableHead>
+                            <Pencil className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteEntry(entry.id, 'utility_data_entries')}
+                          >
+                            <Trash2 className="h-4 w-4 text-studio-stale" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {wasteData.map((entry) => (
-                      <TableRow key={entry.id}>
-                        <TableCell className="font-medium">
-                          {entry.activity_category === 'waste_general' && 'General Waste'}
-                          {entry.activity_category === 'waste_hazardous' && 'Hazardous Waste'}
-                          {entry.activity_category === 'waste_recycling' && 'Recycling'}
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            {entry.activity_date ? (
-                              <>{new Date(entry.activity_date).toLocaleDateString()}</>
-                            ) : (
-                              <>
-                                {new Date(entry.reporting_period_start).toLocaleDateString()} -
-                                <br />
-                                {new Date(entry.reporting_period_end).toLocaleDateString()}
-                              </>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {entry.quantity.toLocaleString()} {entry.unit}
-                        </TableCell>
-                        <TableCell>
-                          {entry.waste_treatment_method ? (
-                            <Badge variant="outline" className="text-xs">
-                              {entry.waste_treatment_method.replace('_', ' ')}
-                            </Badge>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={`text-xs ${
-                              entry.data_provenance?.includes('primary')
-                                ? 'bg-green-50 text-green-700 border-green-200'
-                                : 'bg-amber-50 text-amber-700 border-amber-200'
-                            }`}
-                          >
-                            {entry.data_provenance?.includes('verified') && 'Verified'}
-                            {entry.data_provenance?.includes('measured') && 'Measured'}
-                            {entry.data_provenance?.includes('allocated') && 'Allocated'}
-                            {entry.data_provenance?.includes('modelled') && 'Modelled'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openEditDialog(entry, 'facility_activity_entries')}
-                            >
-                              <Pencil className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteEntry(entry.id, 'facility_activity_entries')}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-600" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </section>
 
-          {/* Production Run Resource Data History */}
+          {/* Water history */}
+          <section className="border-t border-border pt-5">
+            <Eyebrow className="mb-1">Water data</Eyebrow>
+            <p className="mb-4 text-xs text-muted-foreground">
+              All water intake, discharge and recycling recorded for this facility.
+            </p>
+            {waterData.length === 0 ? (
+              <div className="py-4">
+                <p className="text-sm text-studio-dim">No water data recorded yet.</p>
+                <PillButton variant="ghost" size="sm" className="-ml-3 mt-1" onClick={() => setActiveTab('data-entry')}>
+                  Add data
+                </PillButton>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Activity type</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Quantity</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Data quality</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {waterData.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell className="font-medium">
+                        {entry.activity_category === 'water_intake' && 'Water intake'}
+                        {entry.activity_category === 'water_discharge' && 'Wastewater discharge'}
+                        {entry.activity_category === 'water_recycled' && 'Recycled water'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {entry.activity_date ? (
+                            <>{new Date(entry.activity_date).toLocaleDateString()}</>
+                          ) : (
+                            <>
+                              {new Date(entry.reporting_period_start).toLocaleDateString()} -
+                              <br />
+                              {new Date(entry.reporting_period_end).toLocaleDateString()}
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="tabular-nums">
+                        {entry.quantity.toLocaleString()} {entry.unit}
+                      </TableCell>
+                      <TableCell>
+                        {entry.water_source_type ? (
+                          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+                            {entry.water_source_type.replace('_', ' ')}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <ProvenanceChip provenance={entry.data_provenance} />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditDialog(entry, 'facility_activity_entries')}
+                          >
+                            <Pencil className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteEntry(entry.id, 'facility_activity_entries')}
+                          >
+                            <Trash2 className="h-4 w-4 text-studio-stale" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </section>
+
+          {/* Waste history */}
+          <section className="border-t border-border pt-5">
+            <Eyebrow className="mb-1">Waste data</Eyebrow>
+            <p className="mb-4 text-xs text-muted-foreground">
+              All waste generation, recycling and disposal recorded for this facility.
+            </p>
+            {wasteData.length === 0 ? (
+              <div className="py-4">
+                <p className="text-sm text-studio-dim">No waste data recorded yet.</p>
+                <PillButton variant="ghost" size="sm" className="-ml-3 mt-1" onClick={() => setActiveTab('data-entry')}>
+                  Add data
+                </PillButton>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Waste category</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Quantity</TableHead>
+                    <TableHead>Treatment method</TableHead>
+                    <TableHead>Data quality</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {wasteData.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell className="font-medium">
+                        {entry.activity_category === 'waste_general' && 'General waste'}
+                        {entry.activity_category === 'waste_hazardous' && 'Hazardous waste'}
+                        {entry.activity_category === 'waste_recycling' && 'Recycling'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {entry.activity_date ? (
+                            <>{new Date(entry.activity_date).toLocaleDateString()}</>
+                          ) : (
+                            <>
+                              {new Date(entry.reporting_period_start).toLocaleDateString()} -
+                              <br />
+                              {new Date(entry.reporting_period_end).toLocaleDateString()}
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="tabular-nums">
+                        {entry.quantity.toLocaleString()} {entry.unit}
+                      </TableCell>
+                      <TableCell>
+                        {entry.waste_treatment_method ? (
+                          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+                            {entry.waste_treatment_method.replace('_', ' ')}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <ProvenanceChip provenance={entry.data_provenance} />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditDialog(entry, 'facility_activity_entries')}
+                          >
+                            <Pencil className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteEntry(entry.id, 'facility_activity_entries')}
+                          >
+                            <Trash2 className="h-4 w-4 text-studio-stale" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </section>
+
+          {/* Production run resource data history */}
           <ProductionRunDataEntry
             facilityId={facilityId}
             organizationId={facility.organization_id}
             onDataSaved={loadFacilityData}
           />
 
-          {/* Edit Entry Dialog */}
+          {/* Edit entry dialog */}
           <Dialog open={!!editingEntry} onOpenChange={(open) => !open && setEditingEntry(null)}>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Edit Entry</DialogTitle>
+                <DialogTitle>Edit entry</DialogTitle>
               </DialogHeader>
               {editingEntry && (
                 <div className="space-y-4 py-2">
                   <div className="space-y-2">
-                    <Label htmlFor="edit-date">Activity Date</Label>
+                    <Label htmlFor="edit-date">Activity date</Label>
                     <Input
                       id="edit-date"
                       type="date"
@@ -934,13 +913,13 @@ export default function FacilityDetailPage() {
                 </div>
               )}
               <DialogFooter>
-                <Button variant="outline" onClick={() => setEditingEntry(null)}>
+                <PillButton variant="ghost" onClick={() => setEditingEntry(null)}>
                   Cancel
-                </Button>
-                <Button onClick={handleSaveEdit} disabled={editSaving}>
-                  {editSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Save Changes
-                </Button>
+                </PillButton>
+                <PillButton onClick={handleSaveEdit} disabled={editSaving}>
+                  {editSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Save changes
+                </PillButton>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -949,74 +928,75 @@ export default function FacilityDetailPage() {
         {/* ============================================================= */}
         {/* OVERVIEW TAB */}
         {/* ============================================================= */}
-        <TabsContent value="overview" className="mt-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                  <CardTitle>Facility Information</CardTitle>
+        <TabsContent value="overview" className="mt-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+            <div className="lg:col-span-2 space-y-8">
+              <section>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+                  <Eyebrow>The facility</Eyebrow>
                   <div className="flex gap-2">
-                    <Button
-                      variant="outline"
+                    <PillButton variant="outline" size="sm" onClick={() => setEditDialogOpen(true)}>
+                      Edit facility
+                    </PillButton>
+                    <PillButton
+                      variant="ghost"
                       size="sm"
-                      onClick={() => setEditDialogOpen(true)}
-                    >
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Edit Facility
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
+                      className="text-studio-stale hover:text-studio-stale"
                       onClick={handleDeleteFacility}
                     >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete Facility
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Operational Control</p>
-                  <div className="mt-1">
-                    <Badge className={facility.operational_control === 'owned' ? 'bg-green-600' : 'bg-blue-600'}>
-                      {facility.operational_control === 'owned' ? 'Owned' : 'Third-Party'}
-                    </Badge>
+                      Delete facility
+                    </PillButton>
                   </div>
                 </div>
 
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Address</p>
-                  <p className="mt-1">
-                    {facility.address_line1}
-                    <br />
-                    {facility.address_city}, {facility.address_postcode}
-                    <br />
-                    {facility.address_country}
-                  </p>
-                </div>
+                <dl className="divide-y divide-border">
+                  <div className="flex items-start justify-between gap-6 py-3">
+                    <dt className="pt-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+                      Operational control
+                    </dt>
+                    <dd>
+                      <StateChip tone={facility.operational_control === 'owned' ? 'good' : 'quiet'}>
+                        {facility.operational_control === 'owned' ? 'Owned' : 'Third party'}
+                      </StateChip>
+                    </dd>
+                  </div>
 
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-2">Data Contracts</p>
-                  {dataContracts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No data contracts defined</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {dataContracts.map((contract) => (
-                        <div key={contract.id} className="flex items-center justify-between p-2 border rounded">
-                          <span className="text-sm">{getUtilityLabel(contract.utility_type)}</span>
-                          <div className="flex gap-2">
-                            <Badge variant="outline">{contract.frequency}</Badge>
-                            <Badge variant="outline">{contract.data_quality}</Badge>
-                          </div>
+                  <div className="flex items-start justify-between gap-6 py-3">
+                    <dt className="pt-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+                      Address
+                    </dt>
+                    <dd className="text-right text-sm text-foreground">
+                      {facility.address_line1}
+                      <br />
+                      {facility.address_city}, {facility.address_postcode}
+                      <br />
+                      {facility.address_country}
+                    </dd>
+                  </div>
+
+                  <div className="py-3">
+                    <dt className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+                      Data contracts
+                    </dt>
+                    <dd>
+                      {dataContracts.length === 0 ? (
+                        <p className="text-sm text-studio-dim">No data contracts defined.</p>
+                      ) : (
+                        <div className="divide-y divide-border">
+                          {dataContracts.map((contract) => (
+                            <div key={contract.id} className="flex items-center justify-between py-2">
+                              <span className="text-sm text-foreground">{getUtilityLabel(contract.utility_type)}</span>
+                              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+                                {contract.frequency} · {contract.data_quality}
+                              </span>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+              </section>
             </div>
             <div className="lg:col-span-1">
               <DataQualityConfidenceCard

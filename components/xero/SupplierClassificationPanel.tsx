@@ -1,9 +1,11 @@
 'use client'
 
 /**
- * Supplier-first classification panel.
+ * Supplier-first classification panel, cut the studio way: the queue sits
+ * straight on the paper under a mono eyebrow, filters are a quiet row,
+ * suppliers are hairline rows and states are typographic chips.
  *
- * Features:
+ * Behaviour is unchanged:
  *  - Bulk multi-select + batch apply
  *  - AI Review Mode (keyboard-driven accept/skip/change)
  *  - Smart near-duplicate clustering (toggle)
@@ -11,11 +13,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Progress } from '@/components/ui/progress'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
@@ -35,15 +33,16 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import {
-  Loader2, Search, Sparkles, ChevronDown, ChevronRight, Check, Ban, Users, X,
-  SkipForward, LayoutGrid, SlidersHorizontal,
-} from 'lucide-react'
+import { Search, ChevronDown, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
 import { CATEGORY_LABELS, CLASSIFICATION_SOURCE_LABELS } from '@/lib/xero/category-labels'
 import { classifyTransactionsChunked } from '@/lib/xero/classify-ai-client'
+import { Eyebrow } from '@/components/studio/eyebrow'
+import { StateChip } from '@/components/studio/state-chip'
+import { PillButton } from '@/components/studio/pill-button'
+import { Panel } from '@/components/studio/panel'
 
 interface SupplierSummary {
   contactName: string
@@ -71,7 +70,7 @@ interface SupplierCluster {
 
 const CATEGORY_GROUPS = [
   {
-    label: 'Scope 1 — Direct emissions',
+    label: 'Scope 1: Direct emissions',
     options: [
       { value: 'natural_gas', label: 'Natural Gas' },
       { value: 'diesel_stationary', label: 'Diesel (stationary)' },
@@ -81,11 +80,11 @@ const CATEGORY_GROUPS = [
     ],
   },
   {
-    label: 'Scope 2 — Purchased energy',
+    label: 'Scope 2: Purchased energy',
     options: [{ value: 'grid_electricity', label: 'Electricity' }],
   },
   {
-    label: 'Scope 3 — Travel & commuting',
+    label: 'Scope 3: Travel & commuting',
     options: [
       { value: 'air_travel', label: 'Air Travel' },
       { value: 'rail_travel', label: 'Rail Travel' },
@@ -94,7 +93,7 @@ const CATEGORY_GROUPS = [
     ],
   },
   {
-    label: 'Scope 3 — Goods & materials',
+    label: 'Scope 3: Goods & materials',
     options: [
       { value: 'raw_materials', label: 'Raw Materials' },
       { value: 'packaging', label: 'Packaging' },
@@ -103,7 +102,7 @@ const CATEGORY_GROUPS = [
     ],
   },
   {
-    label: 'Scope 3 — Logistics & freight',
+    label: 'Scope 3: Logistics & freight',
     options: [
       { value: 'road_freight', label: 'Road Freight' },
       { value: 'sea_freight', label: 'Sea Freight' },
@@ -112,7 +111,7 @@ const CATEGORY_GROUPS = [
     ],
   },
   {
-    label: 'Scope 3 — Services & utilities',
+    label: 'Scope 3: Services & utilities',
     options: [
       { value: 'professional_services', label: 'Professional Services' },
       { value: 'it_services', label: 'IT Services' },
@@ -478,26 +477,17 @@ export function SupplierClassificationPanel({ onClassified }: SupplierClassifica
 
   // ── Render ───────────────────────────────────────────────────────
   if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-sm text-muted-foreground">Loading suppliers...</span>
-        </CardContent>
-      </Card>
-    )
+    return <div className="h-40 animate-pulse rounded-[6px] bg-studio-cream" aria-hidden="true" />
   }
 
   if (suppliers.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <Users className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-          <p className="text-sm text-muted-foreground">
-            No transactions found. Sync your Xero data first from Settings &gt; Integrations.
-          </p>
-        </CardContent>
-      </Card>
+      <section className="border-b border-studio-hairline pb-6">
+        <Eyebrow className="mb-2">THE QUEUE</Eyebrow>
+        <p className="text-sm text-muted-foreground">
+          No transactions found. Sync your Xero data first from Settings &gt; Integrations.
+        </p>
+      </section>
     )
   }
 
@@ -528,166 +518,151 @@ export function SupplierClassificationPanel({ onClassified }: SupplierClassifica
   }
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3">
+    <section className="space-y-4">
+      {/* Header: eyebrow, one quiet sentence, quiet actions. */}
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-studio-hairline pb-2">
+        <div>
+          <Eyebrow>
+            THE QUEUE · {classifiedRows} OF {totalRows} {filters.clusters ? 'GROUPS' : 'SUPPLIERS'} CLASSIFIED
+          </Eyebrow>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Assign an emission category to each supplier. We learn from each choice and
+            reclassify matching transactions.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <PillButton variant="ghost" size="sm" onClick={() => setFiltersOpen(v => !v)}>
+            Filters
+          </PillButton>
+          <PillButton
+            variant="outline"
+            size="sm"
+            onClick={handleSuggestAI}
+            disabled={isSuggestingAI || unclassified.length === 0}
+          >
+            {isSuggestingAI ? 'Analysing…' : 'Suggest with AI'}
+          </PillButton>
+          {reviewQueue.length > 0 && (
+            <PillButton
+              variant="room"
+              size="sm"
+              onClick={() => { setReviewMode(true); setReviewIndex(0) }}
+            >
+              Review {reviewQueue.length} AI suggestion{reviewQueue.length === 1 ? '' : 's'}
+            </PillButton>
+          )}
+        </div>
+      </div>
+
+      {/* Progress as a mono margin line, not a second bar. */}
+      <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+        <span>
+          {totalUnclassifiedTx > 0
+            ? `${totalUnclassifiedTx} TRANSACTIONS REMAINING`
+            : 'ALL TRANSACTIONS CLASSIFIED'}
+        </span>
+        <span className="tabular-nums">{progressPct}%</span>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+        <Input
+          placeholder="Search suppliers..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          className="h-9 pl-8 text-sm"
+        />
+      </div>
+
+      {filtersOpen && (
+        <div className="grid grid-cols-2 gap-3 border-b border-studio-hairline pb-4 md:grid-cols-4">
           <div>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Classify Your Suppliers
-            </CardTitle>
-            <CardDescription className="mt-1">
-              Assign an emission category to each supplier. All their transactions are classified automatically.
-            </CardDescription>
+            <label className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">Sort</label>
+            <Select value={filters.sort} onValueChange={(v: SortKey) => setFilters({ ...filters, sort: v })}>
+              <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="spend" className="text-xs">Spend (desc)</SelectItem>
+                <SelectItem value="count" className="text-xs">Transaction count</SelectItem>
+                <SelectItem value="name" className="text-xs">A–Z</SelectItem>
+                <SelectItem value="ai_confidence" className="text-xs">AI confidence</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setFiltersOpen(v => !v)}
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5 mr-1.5" />
-              Filters
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleSuggestAI}
-              disabled={isSuggestingAI || unclassified.length === 0}
-            >
-              {isSuggestingAI ? (
-                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-              ) : (
-                <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-              )}
-              {isSuggestingAI ? 'Analysing...' : 'Suggest with AI'}
-            </Button>
-            {reviewQueue.length > 0 && (
-              <Button
+          <div>
+            <label className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">Source</label>
+            <Select value={filters.source} onValueChange={(v: SourceFilter) => setFilters({ ...filters, source: v })}>
+              <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs">All</SelectItem>
+                <SelectItem value="unclassified" className="text-xs">Unclassified only</SelectItem>
+                <SelectItem value="ai" className="text-xs">Classified by AI</SelectItem>
+                <SelectItem value="rule" className="text-xs">Classified by rule</SelectItem>
+                <SelectItem value="manual" className="text-xs">Classified manually</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">Min spend (£)</label>
+            <Input
+              type="number"
+              min={0}
+              value={filters.minSpend}
+              onChange={e => setFilters({ ...filters, minSpend: Math.max(0, Number(e.target.value) || 0) })}
+              className="mt-1 h-8 text-xs"
+            />
+          </div>
+          <div>
+            <label className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">Grouping</label>
+            <div className="mt-1">
+              <PillButton
+                variant={filters.clusters ? 'ink' : 'outline'}
                 size="sm"
-                variant="default"
-                onClick={() => { setReviewMode(true); setReviewIndex(0) }}
-              >
-                Review {reviewQueue.length} AI suggestion{reviewQueue.length === 1 ? '' : 's'}
-              </Button>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-3 space-y-1.5">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>
-              {classifiedRows} of {totalRows} {filters.clusters ? 'groups' : 'suppliers'} classified
-              {totalUnclassifiedTx > 0 && (
-                <span className="text-amber-400 ml-2">({totalUnclassifiedTx} transactions remaining)</span>
-              )}
-            </span>
-            <span>{progressPct}%</span>
-          </div>
-          <Progress value={progressPct} className="h-2" indicatorColor="lime" />
-        </div>
-
-        <div className="mt-3 relative">
-          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            placeholder="Search suppliers..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="pl-8 h-9 text-sm"
-          />
-        </div>
-
-        {filtersOpen && (
-          <div className="mt-3 p-3 rounded-md border border-border bg-muted/30 grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div>
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Sort</label>
-              <Select value={filters.sort} onValueChange={(v: SortKey) => setFilters({ ...filters, sort: v })}>
-                <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="spend" className="text-xs">Spend (desc)</SelectItem>
-                  <SelectItem value="count" className="text-xs">Transaction count</SelectItem>
-                  <SelectItem value="name" className="text-xs">A–Z</SelectItem>
-                  <SelectItem value="ai_confidence" className="text-xs">AI confidence</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Source</label>
-              <Select value={filters.source} onValueChange={(v: SourceFilter) => setFilters({ ...filters, source: v })}>
-                <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-xs">All</SelectItem>
-                  <SelectItem value="unclassified" className="text-xs">Unclassified only</SelectItem>
-                  <SelectItem value="ai" className="text-xs">Classified by AI</SelectItem>
-                  <SelectItem value="rule" className="text-xs">Classified by rule</SelectItem>
-                  <SelectItem value="manual" className="text-xs">Classified manually</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Min spend (£)</label>
-              <Input
-                type="number"
-                min={0}
-                value={filters.minSpend}
-                onChange={e => setFilters({ ...filters, minSpend: Math.max(0, Number(e.target.value) || 0) })}
-                className="h-8 text-xs mt-1"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Grouping</label>
-              <Button
-                size="sm"
-                variant={filters.clusters ? 'default' : 'outline'}
                 onClick={() => setFilters({ ...filters, clusters: !filters.clusters })}
-                className="h-8 text-xs mt-1 w-full justify-start"
+                className="w-full justify-start"
               >
-                <LayoutGrid className="h-3.5 w-3.5 mr-1.5" />
                 {filters.clusters ? 'Smart grouping on' : 'Smart grouping off'}
-              </Button>
+              </PillButton>
             </div>
           </div>
-        )}
-      </CardHeader>
-
-      {/* Bulk toolbar */}
-      {selected.size > 0 && (
-        <div className="sticky top-0 z-10 bg-background border-y border-border px-6 py-3 flex items-center gap-3">
-          <span className="text-sm font-medium">{selected.size} selected</span>
-          <div className="flex-1 max-w-xs">
-            <CategorySelect value={bulkCategory} onChange={setBulkCategory} placeholder="Category..." />
-          </div>
-          <Button size="sm" onClick={handleBulkApply} disabled={!bulkCategory || isBulkSaving}>
-            {isBulkSaving ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Check className="h-3.5 w-3.5 mr-1.5" />}
-            Apply to all
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => { setBulkCategory('exclude'); handleBulkApply() }} disabled={isBulkSaving}>
-            <Ban className="h-3.5 w-3.5 mr-1.5" /> Exclude
-          </Button>
-          <Button size="sm" variant="ghost" onClick={clearSelection}>
-            <X className="h-3.5 w-3.5" />
-          </Button>
         </div>
       )}
 
-      <CardContent className="pt-0">
+      {/* Bulk toolbar */}
+      {selected.size > 0 && (
+        <div className="sticky top-0 z-10 flex items-center gap-3 border-y border-studio-hairline bg-background py-3">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-foreground">
+            {selected.size} selected
+          </span>
+          <div className="max-w-xs flex-1">
+            <CategorySelect value={bulkCategory} onChange={setBulkCategory} placeholder="Category..." />
+          </div>
+          <PillButton size="sm" onClick={handleBulkApply} disabled={!bulkCategory || isBulkSaving}>
+            {isBulkSaving ? 'Applying…' : 'Apply to all'}
+          </PillButton>
+          <PillButton size="sm" variant="outline" onClick={() => { setBulkCategory('exclude'); handleBulkApply() }} disabled={isBulkSaving}>
+            Exclude
+          </PillButton>
+          <PillButton size="sm" variant="ghost" onClick={clearSelection} aria-label="Clear selection">
+            Clear
+          </PillButton>
+        </div>
+      )}
+
+      <div>
         {/* Unclassified */}
         {unclassified.length > 0 && (
           <div className="mb-6">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Needs Classification ({unclassified.length})
-              </div>
+            <div className="mb-1 flex items-center justify-between">
+              <Eyebrow tone="dim">NEEDS CLASSIFICATION ({unclassified.length})</Eyebrow>
               <button
                 onClick={selectAllVisible}
-                className="text-xs text-muted-foreground hover:text-foreground"
+                className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim transition-colors hover:text-foreground"
               >
                 Select all visible
               </button>
             </div>
 
-            <div className="space-y-1">
+            <div>
               {unclassified.map(row => (
                 <ClusterRow
                   key={row.key}
@@ -717,12 +692,12 @@ export function SupplierClassificationPanel({ onClassified }: SupplierClassifica
 
         {classified.length > 0 && (
           <Collapsible open={classifiedOpen} onOpenChange={setClassifiedOpen}>
-            <CollapsibleTrigger className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 hover:text-foreground transition-colors w-full">
+            <CollapsibleTrigger className="mb-1 flex w-full items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim transition-colors hover:text-foreground">
               <ChevronDown className={`h-3.5 w-3.5 transition-transform ${classifiedOpen ? '' : '-rotate-90'}`} />
-              Classified ({classified.length})
+              CLASSIFIED ({classified.length})
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="space-y-1">
+              <div>
                 {classified.map(row => (
                   <ClusterRow
                     key={row.key}
@@ -753,12 +728,12 @@ export function SupplierClassificationPanel({ onClassified }: SupplierClassifica
 
         {excluded.length > 0 && (
           <Collapsible open={excludedOpen} onOpenChange={setExcludedOpen} className="mt-4">
-            <CollapsibleTrigger className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 hover:text-foreground transition-colors w-full">
+            <CollapsibleTrigger className="mb-1 flex w-full items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim transition-colors hover:text-foreground">
               <ChevronDown className={`h-3.5 w-3.5 transition-transform ${excludedOpen ? '' : '-rotate-90'}`} />
-              Excluded ({excluded.length})
+              EXCLUDED ({excluded.length})
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="space-y-1">
+              <div>
                 {excluded.map(row => (
                   <ClusterRow
                     key={row.key}
@@ -788,12 +763,12 @@ export function SupplierClassificationPanel({ onClassified }: SupplierClassifica
         )}
 
         {filteredRows.length === 0 && searchQuery && (
-          <p className="text-sm text-muted-foreground text-center py-6">
+          <p className="py-6 text-center text-sm text-muted-foreground">
             No suppliers match &ldquo;{searchQuery}&rdquo;
           </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   )
 }
 
@@ -840,12 +815,8 @@ function ClusterRow({
   const isCluster = row.members.length > 1
 
   return (
-    <div>
-      <div className={`
-        flex items-center gap-3 py-2 px-3 rounded-md text-sm
-        ${variant === 'unclassified' ? 'bg-slate-50 dark:bg-slate-900/50' : ''}
-        ${variant === 'excluded' ? 'opacity-60' : ''}
-      `}>
+    <div className="border-b border-studio-hairline">
+      <div className={`flex items-center gap-3 py-2 text-sm ${variant === 'excluded' ? 'opacity-60' : ''}`}>
         <Checkbox
           checked={selected}
           onCheckedChange={onToggleSelected}
@@ -853,29 +824,24 @@ function ClusterRow({
         />
 
         {isCluster ? (
-          <button onClick={onToggleExpand} className="text-muted-foreground hover:text-foreground">
+          <button onClick={onToggleExpand} className="text-muted-foreground transition-colors hover:text-foreground">
             {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
           </button>
         ) : (
           <div className="w-3.5" />
         )}
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-medium truncate">{row.canonicalName}</span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2">
+            <span className="truncate font-display font-semibold text-foreground">{row.canonicalName}</span>
             {isCluster && (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                {row.members.length} variants
-              </Badge>
+              <StateChip tone="quiet">{row.members.length} VARIANTS</StateChip>
             )}
             {hasAI && variant === 'unclassified' && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger>
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-violet-400/50 text-violet-400">
-                      <Sparkles className="h-2.5 w-2.5 mr-0.5" />
-                      AI
-                    </Badge>
+                    <StateChip tone="hold">AI</StateChip>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-xs">
                     <p className="text-xs">
@@ -891,15 +857,13 @@ function ClusterRow({
               </TooltipProvider>
             )}
             {variant === 'classified' && row.classificationSource && (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+              <StateChip tone="quiet">
                 {CLASSIFICATION_SOURCE_LABELS[row.classificationSource] || row.classificationSource}
-              </Badge>
+              </StateChip>
             )}
           </div>
-          <div className="text-xs text-muted-foreground">
-            {row.transactionCount} transaction{row.transactionCount !== 1 ? 's' : ''}
-            {' · '}
-            {currencyFmt.format(row.totalSpend)}
+          <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-studio-dim">
+            {row.transactionCount} TX · {currencyFmt.format(row.totalSpend)}
           </div>
         </div>
 
@@ -907,24 +871,26 @@ function ClusterRow({
           <CategorySelect value={selectedCategory} onChange={onCategoryChange} />
         </div>
 
-        <Button
+        <PillButton
           size="sm"
-          variant={hasPendingChange ? 'default' : 'ghost'}
-          className="h-8 w-8 p-0 shrink-0"
+          variant={hasPendingChange ? 'ink' : 'ghost'}
+          className="shrink-0"
           onClick={onApply}
           disabled={!hasPendingChange || isSaving}
           aria-label="Apply"
         >
-          {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-        </Button>
+          {isSaving ? '…' : 'Apply'}
+        </PillButton>
       </div>
 
       {isCluster && isExpanded && (
-        <div className="ml-14 pl-3 border-l border-border mt-1 mb-2 space-y-0.5">
+        <div className="mb-2 ml-14 mt-1 space-y-0.5 border-l border-studio-hairline pl-3">
           {row.members.map(m => (
             <div key={m.contactName} className="flex items-center justify-between py-1 text-xs text-muted-foreground">
               <span className="truncate">{m.contactName}</span>
-              <span>{m.transactionCount} tx · {currencyFmt.format(m.totalSpend)}</span>
+              <span className="font-mono text-[10px] uppercase tracking-[0.15em]">
+                {m.transactionCount} TX · {currencyFmt.format(m.totalSpend)}
+              </span>
             </div>
           ))}
         </div>
@@ -952,7 +918,7 @@ function CategorySelect({
       <SelectContent>
         {CATEGORY_GROUPS.map(group => (
           <div key={group.label}>
-            <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+            <div className="px-2 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
               {group.label}
             </div>
             {group.options.map(opt => (
@@ -962,13 +928,11 @@ function CategorySelect({
             ))}
           </div>
         ))}
-        <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+        <div className="px-2 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
           Not emissions-relevant
         </div>
         <SelectItem value="exclude" className="text-xs">
-          <span className="flex items-center gap-1">
-            <Ban className="h-3 w-3" /> Exclude
-          </span>
+          Exclude
         </SelectItem>
       </SelectContent>
     </Select>
@@ -1009,18 +973,15 @@ function AIReviewMode({
 
   if (queue.length === 0 || !current) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-violet-400" />
-            AI Review
-          </CardTitle>
-          <CardDescription>No AI suggestions to review. Run &ldquo;Suggest with AI&rdquo; first.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button variant="outline" onClick={onExit}>Back to suppliers</Button>
-        </CardContent>
-      </Card>
+      <section className="space-y-3">
+        <div className="border-b border-studio-hairline pb-2">
+          <Eyebrow>AI REVIEW</Eyebrow>
+          <p className="mt-1 text-xs text-muted-foreground">
+            No AI suggestions to review. Run &ldquo;Suggest with AI&rdquo; first.
+          </p>
+        </div>
+        <PillButton variant="outline" size="sm" onClick={onExit}>Back to suppliers</PillButton>
+      </section>
     )
   }
 
@@ -1029,100 +990,97 @@ function AIReviewMode({
   const pendingOverride = pendingCategories[current.key]
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-violet-400" />
-              AI Review · {index + 1} of {queue.length}
-            </CardTitle>
-            <CardDescription className="mt-1">
-              Press <kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">A</kbd> accept ·{' '}
-              <kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">S</kbd> skip ·{' '}
-              <kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">J/K</kbd> next/prev ·{' '}
-              <kbd className="px-1 py-0.5 rounded bg-muted text-[10px]">Esc</kbd> exit
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            {highCount > 0 && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={onAcceptAllHigh}
-                disabled={isSaving}
-              >
-                Accept all high-confidence ({highCount})
-              </Button>
-            )}
-            <Button size="sm" variant="ghost" onClick={onExit}>Exit</Button>
-          </div>
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-studio-hairline pb-2">
+        <div>
+          <Eyebrow>AI REVIEW · {index + 1} OF {queue.length}</Eyebrow>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Press <kbd className="rounded bg-muted px-1 py-0.5 text-[10px]">A</kbd> accept ·{' '}
+            <kbd className="rounded bg-muted px-1 py-0.5 text-[10px]">S</kbd> skip ·{' '}
+            <kbd className="rounded bg-muted px-1 py-0.5 text-[10px]">J/K</kbd> next/prev ·{' '}
+            <kbd className="rounded bg-muted px-1 py-0.5 text-[10px]">Esc</kbd> exit
+          </p>
         </div>
-        <Progress value={((index + 1) / queue.length) * 100} className="h-1.5 mt-3" indicatorColor="lime" />
-      </CardHeader>
+        <div className="flex items-center gap-2">
+          {highCount > 0 && (
+            <PillButton
+              size="sm"
+              variant="outline"
+              onClick={onAcceptAllHigh}
+              disabled={isSaving}
+            >
+              Accept all high-confidence ({highCount})
+            </PillButton>
+          )}
+          <PillButton size="sm" variant="ghost" onClick={onExit}>Exit</PillButton>
+        </div>
+      </div>
 
-      <CardContent>
-        <div className="rounded-lg border border-border p-5 space-y-4">
-          <div>
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Supplier</div>
-            <div className="text-lg font-semibold mt-1">{current.canonicalName}</div>
-            <div className="text-xs text-muted-foreground mt-1">
-              {current.transactionCount} transaction{current.transactionCount === 1 ? '' : 's'} · {currencyFmt.format(current.totalSpend)}
-            </div>
-          </div>
+      <div className="h-1 w-full overflow-hidden rounded-full bg-studio-hairline">
+        <div
+          className="h-full rounded-full bg-room transition-[width] duration-300 ease-studio"
+          style={{ width: `${((index + 1) / queue.length) * 100}%` }}
+        />
+      </div>
 
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-violet-400" />
-            <span className="text-sm">AI suggests</span>
-            <Badge className="bg-violet-500/10 text-violet-400 border-violet-400/40">{suggestedLabel}</Badge>
-            {confidencePct !== null && (
-              <span className="text-xs text-muted-foreground">{confidencePct}% confidence</span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="flex-1">
-              <CategorySelect
-                value={pendingOverride || current.aiSuggestedCategory || ''}
-                onChange={cat => onChange(current, cat)}
-                placeholder="Change category..."
-              />
-            </div>
-            {pendingOverride && pendingOverride !== current.aiSuggestedCategory ? (
-              <Button onClick={() => onApplyChanged(current)} disabled={isSaving}>
-                {isSaving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Check className="h-4 w-4 mr-1.5" />}
-                Apply change
-              </Button>
-            ) : (
-              <Button onClick={onAccept} disabled={isSaving}>
-                {isSaving ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Check className="h-4 w-4 mr-1.5" />}
-                Accept
-              </Button>
-            )}
-            <Button variant="outline" onClick={onSkip} disabled={isSaving}>
-              <SkipForward className="h-4 w-4 mr-1.5" />
-              Skip
-            </Button>
+      <Panel className="space-y-4">
+        <div>
+          <div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">Supplier</div>
+          <div className="mt-1 font-display text-lg font-semibold">{current.canonicalName}</div>
+          <div className="mt-1 font-mono text-[10px] uppercase tracking-[0.15em] text-studio-dim">
+            {current.transactionCount} TX · {currencyFmt.format(current.totalSpend)}
           </div>
         </div>
 
-        <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
-          <button
-            onClick={() => onIndexChange(Math.max(0, index - 1))}
-            disabled={index === 0}
-            className="disabled:opacity-50"
-          >
-            ← Previous
-          </button>
-          <button
-            onClick={() => onIndexChange(Math.min(queue.length - 1, index + 1))}
-            disabled={index >= queue.length - 1}
-            className="disabled:opacity-50"
-          >
-            Next →
-          </button>
+        <div className="flex items-baseline gap-2">
+          <span className="text-sm">AI suggests</span>
+          <StateChip tone="hold">{suggestedLabel}</StateChip>
+          {confidencePct !== null && (
+            <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-studio-dim">
+              {confidencePct}% confidence
+            </span>
+          )}
         </div>
-      </CardContent>
-    </Card>
+
+        <div className="flex items-center gap-2">
+          <div className="flex-1">
+            <CategorySelect
+              value={pendingOverride || current.aiSuggestedCategory || ''}
+              onChange={cat => onChange(current, cat)}
+              placeholder="Change category..."
+            />
+          </div>
+          {pendingOverride && pendingOverride !== current.aiSuggestedCategory ? (
+            <PillButton onClick={() => onApplyChanged(current)} disabled={isSaving}>
+              {isSaving ? 'Applying…' : 'Apply change'}
+            </PillButton>
+          ) : (
+            <PillButton onClick={onAccept} disabled={isSaving}>
+              {isSaving ? 'Accepting…' : 'Accept'}
+            </PillButton>
+          )}
+          <PillButton variant="outline" onClick={onSkip} disabled={isSaving}>
+            Skip
+          </PillButton>
+        </div>
+      </Panel>
+
+      <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+        <button
+          onClick={() => onIndexChange(Math.max(0, index - 1))}
+          disabled={index === 0}
+          className="transition-colors hover:text-foreground disabled:opacity-50"
+        >
+          ← Previous
+        </button>
+        <button
+          onClick={() => onIndexChange(Math.min(queue.length - 1, index + 1))}
+          disabled={index >= queue.length - 1}
+          className="transition-colors hover:text-foreground disabled:opacity-50"
+        >
+          Next →
+        </button>
+      </div>
+    </section>
   )
 }

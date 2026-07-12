@@ -2,27 +2,15 @@
 
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   ToggleGroup,
   ToggleGroupItem,
 } from '@/components/ui/toggle-group';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import {
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  FileText,
-  Download,
-  Info,
-} from 'lucide-react';
-import Link from 'next/link';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { BigNumber } from '@/components/studio/big-number';
+import { StateChip } from '@/components/studio/state-chip';
+import { PillButton } from '@/components/studio/pill-button';
+import { Panel } from '@/components/studio/panel';
 
 export type ContainerType = 'bottle' | 'can' | 'keg';
 
@@ -396,17 +384,14 @@ export function ProductHeroImpact({
   const benchmarkDiff = benchmark ? ((totalCarbonFootprint - benchmark) / benchmark) * 100 : null;
   const isBetterThanBenchmark = benchmarkDiff !== null && benchmarkDiff < 0;
 
-  const TrendIcon = trendDirection === 'up' ? TrendingUp :
-                    trendDirection === 'down' ? TrendingDown : Minus;
-
   const ContainerViz = containerType === 'bottle' ? BottleVisualization :
                        containerType === 'can' ? CanVisualization : KegVisualization;
 
+  const toggleItemClass =
+    'h-8 px-3 rounded-full font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim data-[state=on]:bg-studio-ink data-[state=on]:text-studio-cream';
+
   return (
-    <div className={cn(
-      'relative overflow-hidden rounded-[6px] border border-border bg-card',
-      className
-    )}>
+    <Panel flush className={className}>
       <div className="relative z-10 p-6 lg:p-8">
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="flex flex-col items-center lg:items-start gap-4">
@@ -414,21 +399,19 @@ export function ProductHeroImpact({
               <img
                 src={productImage}
                 alt={productName}
-                className="w-32 h-32 object-cover rounded-[6px] border border-border"
+                className="w-32 h-32 object-cover rounded-[6px] border border-studio-hairline"
               />
             ) : (
-              <div className="w-32 h-32 rounded-[6px] bg-muted/50 border border-border flex items-center justify-center">
-                <span className="text-4xl opacity-50">📦</span>
-              </div>
+              <div className="w-32 h-32 rounded-[6px] bg-studio-hairline/40 border border-studio-hairline" />
             )}
 
             <div className="text-center lg:text-left">
-              <h1 className="text-xl font-bold text-foreground">{productName}</h1>
-              {sku && <p className="text-sm text-muted-foreground">SKU: {sku}</p>}
+              <h1 className="font-display text-xl font-bold text-foreground">{productName}</h1>
+              {sku && <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-studio-dim">SKU {sku}</p>}
               {category && (
-                <Badge variant="secondary" className="mt-2">
+                <p className="mt-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
                   {category}
-                </Badge>
+                </p>
               )}
             </div>
           </div>
@@ -439,133 +422,72 @@ export function ProductHeroImpact({
                 <ContainerViz breakdown={carbonBreakdown} className="w-full h-full" />
               </div>
 
-              <TooltipProvider>
-                <ToggleGroup
-                  type="single"
-                  value={containerType}
-                  onValueChange={handleContainerChange}
-                  className="flex flex-row gap-1 bg-muted p-1.5 rounded-[6px]"
-                >
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <ToggleGroupItem
-                        value="bottle"
-                        className="w-9 h-9 text-lg data-[state=on]:bg-accent rounded-md"
-                      >
-                        🍾
-                      </ToggleGroupItem>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">Bottle</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <ToggleGroupItem
-                        value="can"
-                        className="w-9 h-9 text-lg data-[state=on]:bg-accent rounded-md"
-                      >
-                        🥫
-                      </ToggleGroupItem>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">Can</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <ToggleGroupItem
-                        value="keg"
-                        className="w-9 h-9 text-lg data-[state=on]:bg-accent rounded-md"
-                      >
-                        🛢️
-                      </ToggleGroupItem>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">Keg</TooltipContent>
-                  </Tooltip>
-                </ToggleGroup>
-              </TooltipProvider>
+              <ToggleGroup
+                type="single"
+                value={containerType}
+                onValueChange={handleContainerChange}
+                className="flex flex-row gap-1 bg-studio-hairline/40 p-1 rounded-full"
+              >
+                <ToggleGroupItem value="bottle" className={toggleItemClass}>
+                  Bottle
+                </ToggleGroupItem>
+                <ToggleGroupItem value="can" className={toggleItemClass}>
+                  Can
+                </ToggleGroupItem>
+                <ToggleGroupItem value="keg" className={toggleItemClass}>
+                  Keg
+                </ToggleGroupItem>
+              </ToggleGroup>
             </div>
 
             <div className="flex-1 text-center lg:text-left">
               <div className="mb-6">
-                <p className="text-sm text-muted-foreground mb-1">Climate Impact</p>
-                <div className="flex items-baseline gap-2 justify-center lg:justify-start">
-                  <span className="text-5xl lg:text-6xl font-bold text-foreground tabular-nums">
-                    {totalCarbonFootprint.toFixed(2)}
-                  </span>
-                  <span className="text-lg text-muted-foreground">kg CO₂e</span>
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">per {functionalUnit}</p>
+                <Eyebrow tone="dim" className="mb-2">Climate impact</Eyebrow>
+                <BigNumber
+                  size="display"
+                  value={totalCarbonFootprint.toFixed(2)}
+                  label="KG CO₂E"
+                  className="inline-block"
+                />
+                <p className="mt-2 text-sm text-studio-dim">per {functionalUnit}</p>
               </div>
 
               {(benchmarkDiff !== null || trend !== undefined) && (
-                <div className="flex flex-wrap items-center gap-3 justify-center lg:justify-start mb-6">
+                <div className="flex flex-wrap items-center gap-4 justify-center lg:justify-start mb-6">
                   {benchmarkDiff !== null && (
-                    <div className={cn(
-                      'flex items-center gap-1.5 text-sm font-medium',
-                      isBetterThanBenchmark
-                        ? 'text-studio-good'
-                        : 'text-studio-stale'
-                    )}>
-                      {isBetterThanBenchmark ? (
-                        <>
-                          <TrendingDown className="h-4 w-4" />
-                          <span>{Math.abs(benchmarkDiff).toFixed(0)}% better than {benchmarkLabel}</span>
-                        </>
-                      ) : (
-                        <>
-                          <TrendingUp className="h-4 w-4" />
-                          <span>{Math.abs(benchmarkDiff).toFixed(0)}% above {benchmarkLabel}</span>
-                        </>
-                      )}
-                    </div>
+                    <StateChip tone={isBetterThanBenchmark ? 'good' : 'stale'}>
+                      {Math.abs(benchmarkDiff).toFixed(0)}% {isBetterThanBenchmark ? 'better than' : 'above'} {benchmarkLabel}
+                    </StateChip>
                   )}
 
                   {trend !== undefined && trendDirection && (
-                    <div className={cn(
-                      'flex items-center gap-1 text-sm',
-                      trendDirection === 'down' ? 'text-studio-good' :
-                      trendDirection === 'up' ? 'text-studio-stale' :
-                      'text-studio-dim'
-                    )}>
-                      <TrendIcon className="h-4 w-4" />
-                      <span>{trend > 0 ? '+' : ''}{trend}% vs last version</span>
-                    </div>
+                    <StateChip
+                      tone={trendDirection === 'down' ? 'good' : trendDirection === 'up' ? 'stale' : 'quiet'}
+                    >
+                      {trend > 0 ? '+' : ''}{trend}% vs last version
+                    </StateChip>
                   )}
                 </div>
               )}
 
               <div className="flex flex-wrap gap-2 justify-center lg:justify-start">
                 {lcaReportUrl && (
-                  <Button variant="secondary" asChild>
-                    <Link href={lcaReportUrl}>
-                      <FileText className="h-4 w-4 mr-2" />
-                      View Full LCA Report
-                    </Link>
-                  </Button>
+                  <PillButton variant="outline" href={lcaReportUrl}>
+                    View full LCA report
+                  </PillButton>
                 )}
                 {onDownloadReport && (
-                  <Button variant="ghost" onClick={onDownloadReport}>
-                    <Download className="h-4 w-4 mr-2" />
+                  <PillButton variant="ghost" onClick={onDownloadReport}>
                     Download PDF
-                  </Button>
+                  </PillButton>
                 )}
               </div>
             </div>
           </div>
         </div>
 
-        <div className="mt-6 pt-6 border-t border-border">
-          <div className="flex items-center gap-2 mb-3">
-            <h3 className="text-sm font-medium text-muted-foreground">Lifecycle Breakdown</h3>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
-                  <Info className="h-3.5 w-3.5 text-muted-foreground/60" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Emissions by lifecycle stage (ISO 14044)</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
+        <div className="mt-6 pt-6 border-t border-studio-hairline">
+          <Eyebrow tone="dim" className="mb-3">Lifecycle breakdown</Eyebrow>
           <div className="flex flex-wrap gap-4">
             {(() => {
               const entries = Object.entries(carbonBreakdown).filter(
@@ -589,11 +511,11 @@ export function ProductHeroImpact({
                 return (
                   <div key={key} className="flex items-center gap-2">
                     <div
-                      className="w-3 h-3 rounded-full"
+                      className="w-2.5 h-2.5 rounded-full"
                       style={{ backgroundColor: config.fill }}
                     />
-                    <span className="text-sm text-muted-foreground">{config.label}</span>
-                    <span className="text-sm font-medium text-foreground">{adjusted[idx]}%</span>
+                    <span className="text-sm text-studio-dim">{config.label}</span>
+                    <span className="font-mono text-xs font-bold tabular-nums text-foreground">{adjusted[idx]}%</span>
                   </div>
                 );
               });
@@ -601,7 +523,6 @@ export function ProductHeroImpact({
           </div>
         </div>
       </div>
-
-    </div>
+    </Panel>
   );
 }

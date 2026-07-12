@@ -1,22 +1,17 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   ChevronLeft,
   ChevronRight,
-  Save,
-  CheckCircle2,
-  Loader2,
-  AlertTriangle,
-  Sparkles,
+  HelpCircle,
 } from 'lucide-react';
+import { PillButton } from '@/components/studio/pill-button';
+import { StateChip } from '@/components/studio/state-chip';
+import { PageLoader } from '@/components/ui/page-loader';
 import { WizardProvider, useWizardContext } from './WizardContext';
 import { WizardProgress, CompactProgress, WIZARD_STEPS } from './WizardProgress';
-import { WizardSidebar } from './WizardSidebar';
+import { WizardSidebar, WizardStepHelpRosaBridge } from './WizardSidebar';
 import { ApplyTemplateDialog } from './ApplyTemplateDialog';
 import { SaveAsTemplateDialog } from './SaveAsTemplateDialog';
 import {
@@ -138,11 +133,11 @@ function WizardFooter() {
   // Calculate step has its own button — hide Next
   if (currentStepId === 'calculate') {
     return (
-      <div className="flex items-center justify-between border-t bg-background px-6 py-4">
-        <Button variant="outline" onClick={prevStep} disabled={saving}>
-          <ChevronLeft className="mr-2 h-4 w-4" />
+      <div className="sticky bottom-0 z-10 flex items-center justify-between border-t border-studio-hairline bg-studio-paper px-6 py-4">
+        <PillButton variant="outline" onClick={prevStep} disabled={saving}>
+          <ChevronLeft className="h-4 w-4" />
           Back
-        </Button>
+        </PillButton>
         <div />
       </div>
     );
@@ -215,19 +210,19 @@ function WizardFooter() {
   };
 
   return (
-    <div className="sticky bottom-0 z-10 flex items-center justify-between border-t bg-background px-6 py-4">
+    <div className="sticky bottom-0 z-10 flex items-center justify-between border-t border-studio-hairline bg-studio-paper px-6 py-4">
       {/* Left side: Back button */}
-      <Button
+      <PillButton
         variant="outline"
         onClick={prevStep}
         disabled={isFirstStep || saving}
       >
-        <ChevronLeft className="mr-2 h-4 w-4" />
+        <ChevronLeft className="h-4 w-4" />
         Back
-      </Button>
+      </PillButton>
 
       {/* Centre: Save status indicator */}
-      <div className="hidden sm:flex items-center">
+      <div className="hidden items-center sm:flex">
         <FooterSaveStatus />
       </div>
 
@@ -235,26 +230,20 @@ function WizardFooter() {
       <div className="flex items-center gap-3">
         {/* Save button only visible when pcfId exists (post-calculation) */}
         {pcfId && (
-          <Button
+          <PillButton
             variant="ghost"
             onClick={saveProgress}
             disabled={saving}
-            className="text-muted-foreground"
           >
-            {saving ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="mr-2 h-4 w-4" />
-            )}
-            Save Progress
-          </Button>
+            {saving ? 'SAVING' : 'Save progress'}
+          </PillButton>
         )}
 
         {isLastStep ? null : (
-          <Button onClick={handleNext} disabled={nextDisabled}>
-            {currentStepCompleted ? 'Next' : 'Mark Complete & Continue'}
-            <ChevronRight className="ml-2 h-4 w-4" />
-          </Button>
+          <PillButton variant="room" onClick={handleNext} disabled={nextDisabled}>
+            {currentStepCompleted ? 'Next' : 'Mark complete & continue'}
+            <ChevronRight className="h-4 w-4" />
+          </PillButton>
         )}
       </div>
     </div>
@@ -271,30 +260,15 @@ function FooterSaveStatus() {
   if (!pcfId) return null;
 
   if (error) {
-    return (
-      <span className="flex items-center gap-1.5 text-xs text-destructive">
-        <AlertTriangle className="h-3 w-3" />
-        Save failed
-      </span>
-    );
+    return <StateChip tone="stale">Save failed</StateChip>;
   }
 
   if (saving) {
-    return (
-      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Loader2 className="h-3 w-3 animate-spin" />
-        Saving...
-      </span>
-    );
+    return <StateChip tone="quiet">Saving</StateChip>;
   }
 
   if (progress.lastSavedAt) {
-    return (
-      <span className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
-        <CheckCircle2 className="h-3 w-3" />
-        Saved
-      </span>
-    );
+    return <StateChip tone="good">Saved</StateChip>;
   }
 
   return null;
@@ -309,32 +283,23 @@ function ErrorDisplay() {
 
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">Loading wizard data...</p>
-        </div>
+      <div className="px-6 py-10">
+        <PageLoader />
       </div>
     );
   }
 
   if (error) {
     return (
-      <Alert variant="destructive" className="m-6">
-        <AlertTriangle className="h-4 w-4" />
-        <AlertTitle>Error Loading Wizard</AlertTitle>
-        <AlertDescription className="mt-2">
-          {error}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={resetError}
-            className="ml-4"
-          >
-            Try Again
-          </Button>
-        </AlertDescription>
-      </Alert>
+      <div className="mx-auto max-w-2xl space-y-4 p-6">
+        <div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-stale">
+          Could not load the wizard
+        </div>
+        <p className="text-sm text-foreground">{error}</p>
+        <PillButton variant="outline" onClick={resetError}>
+          Try again
+        </PillButton>
+      </div>
     );
   }
 
@@ -409,28 +374,27 @@ function WizardLayout({ onClose }: { onClose?: () => void }) {
     WIZARD_STEPS.find((s) => s.id === resumeStepId)?.title || `Step ${resumeStep}`;
 
   return (
-    <div className="flex h-full flex-col bg-background">
-      {/* Resume banner */}
+    <div className="flex h-full flex-col bg-studio-paper">
+      {/* Hands the current step's tips + glossary to the ambient Rosa drawer.
+          The wizard has ONE assistant; there is no second on-screen panel. */}
+      <WizardStepHelpRosaBridge />
+
+      {/* Resume notice: quiet mono, no decorated banner */}
       {resumeAvailable && (
-        <div className="border-b bg-primary/5 px-6 py-3">
-          <div className="mx-auto flex max-w-6xl items-center justify-between">
-            <p className="text-sm">
-              <Sparkles className="mr-1.5 inline h-4 w-4 text-primary" />
-              You have saved progress. Resume from{' '}
-              <strong>
-                Step {resumeStep} ({resumeStepTitle})
-              </strong>
-              ?
+        <div className="border-b border-studio-hairline bg-studio-paper px-6 py-3">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-studio-dim">
+              <span className="mr-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-room-accent">
+                Saved progress
+              </span>
+              Resume from step {resumeStep} ({resumeStepTitle})?
             </p>
             <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={dismissResume}
-              >
+              <PillButton variant="ghost" size="sm" onClick={dismissResume}>
                 Start from beginning
-              </Button>
-              <Button
+              </PillButton>
+              <PillButton
+                variant="room"
                 size="sm"
                 onClick={() => {
                   goToStep(resumeStep);
@@ -438,14 +402,14 @@ function WizardLayout({ onClose }: { onClose?: () => void }) {
                 }}
               >
                 Resume
-              </Button>
+              </PillButton>
             </div>
           </div>
         </div>
       )}
 
-      {/* Header with progress */}
-      <header className="border-b bg-background px-6 py-4">
+      {/* Header with the quiet mono step rail */}
+      <header className="border-b border-studio-hairline bg-studio-paper px-6 py-4">
         <div className="mx-auto max-w-6xl">
           {/* Desktop progress */}
           <div className="hidden lg:block">
@@ -462,16 +426,14 @@ function WizardLayout({ onClose }: { onClose?: () => void }) {
       <div className="flex-1 overflow-auto">
         <div className="mx-auto max-w-6xl p-6">
           <div className="grid gap-6 lg:grid-cols-3">
-            {/* Main form area */}
+            {/* Main form area, on a cream panel with a hairline */}
             <div className="lg:col-span-2">
-              <Card>
-                <CardContent className="p-6">
-                  <StepContent />
-                </CardContent>
-              </Card>
+              <div className="rounded-[6px] border border-studio-hairline bg-studio-cream p-6">
+                <StepContent />
+              </div>
             </div>
 
-            {/* Sidebar with Rosa suggestions */}
+            {/* Quiet static HELP aside (not a second assistant) */}
             <div className="hidden lg:block">
               <WizardSidebar />
             </div>
@@ -485,19 +447,20 @@ function WizardLayout({ onClose }: { onClose?: () => void }) {
       {/* Auto-opened template prompts (pick on open, save on finish) */}
       <TemplatePromptDialogs />
 
-      {/* Mobile sidebar drawer */}
+      {/* Mobile help drawer */}
       <Drawer>
         <DrawerTrigger asChild>
-          <Button
-            size="icon"
-            className="fixed bottom-20 right-4 z-20 h-10 w-10 rounded-full shadow-lg lg:hidden"
+          <button
+            aria-label="Help"
+            className="fixed bottom-20 right-4 z-20 inline-flex h-10 items-center gap-2 rounded-full border border-studio-ink/25 bg-studio-cream px-4 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-foreground shadow-sm transition-colors duration-200 ease-studio hover:border-studio-ink/60 lg:hidden"
           >
-            <Sparkles className="h-4 w-4" />
-          </Button>
+            <HelpCircle className="h-4 w-4" />
+            Help
+          </button>
         </DrawerTrigger>
         <DrawerContent className="max-h-[80vh]">
           <DrawerHeader>
-            <DrawerTitle>Rosa</DrawerTitle>
+            <DrawerTitle>Help</DrawerTitle>
           </DrawerHeader>
           <div className="overflow-auto px-4 pb-6">
             <WizardSidebar />
@@ -578,8 +541,8 @@ export function EnhancedComplianceWizard({
   // Wait for preferences to load before rendering
   if (!prefsLoaded) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="px-6 py-10">
+        <PageLoader />
       </div>
     );
   }
@@ -599,10 +562,9 @@ export function EnhancedComplianceWizard({
 
 export function AiAssistanceBadge() {
   return (
-    <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-      <Sparkles className="h-3 w-3" />
-      <span>Rosa-Assisted</span>
-    </div>
+    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent">
+      Rosa-assisted
+    </span>
   );
 }
 

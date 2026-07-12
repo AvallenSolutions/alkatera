@@ -9,10 +9,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Mail, CheckCircle2, ArrowUpRight } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { ArrowUpRight } from 'lucide-react';
+import { PillButton } from '@/components/studio/pill-button';
+import { StateChip } from '@/components/studio/state-chip';
 import { SendEsgSurveyDialog } from '@/components/suppliers/SendEsgSurveyDialog';
 
 interface Row {
@@ -52,60 +51,52 @@ export function SuppliersByEmissions({ organizationId }: { organizationId: strin
   if (rows === null) return null;
   if (rows.length === 0) {
     return (
-      <Card className="border-dashed">
-        <CardContent className="py-6 text-sm text-muted-foreground">
-          Connect Xero and reconcile your suppliers (on the Spend data page) to see which suppliers
-          carry the most emissions.
-        </CardContent>
-      </Card>
+      <p className="text-sm text-muted-foreground">
+        Connect Xero and reconcile your suppliers on the spend page to rank them by emissions.
+      </p>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Your biggest-impact suppliers</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Ranked by spend-based emissions (an estimate). Ask your top suppliers for real data to
-          improve it.
-        </p>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-1.5">
-          {rows.map((r) => (
-            <div
-              key={r.id}
-              className="flex flex-wrap items-center gap-3 rounded-md border border-border/60 px-3 py-2"
+    <div>
+      <p className="mb-3 text-sm text-muted-foreground">
+        Ranked by spend-based emissions (an estimate). Ask your top suppliers for real data to
+        improve it.
+      </p>
+      <ul className="divide-y divide-studio-hairline border-t border-studio-hairline">
+        {rows.map((r) => (
+          <li key={r.id} className="flex flex-wrap items-center gap-3 py-3">
+            <Link
+              href={`/suppliers/${r.id}`}
+              className="min-w-0 flex-1 font-display text-sm font-semibold text-foreground hover:text-room-accent"
             >
-              <Link href={`/suppliers/${r.id}`} className="min-w-0 flex-1 font-medium hover:underline">
-                {r.name}
-              </Link>
-              {r.tier && (
-                <Badge variant="outline" className="text-[10px]">
-                  {TIER_LABEL[r.tier] ?? r.tier}
-                </Badge>
-              )}
-              <span className="text-sm tabular-nums text-muted-foreground">{gbp(r.annualSpendGbp)}</span>
-              <span className="w-24 text-right text-sm font-medium tabular-nums">{co2(r.spendEmissionsKg)} CO2e</span>
-              {r.esgSubmitted ? (
-                <span className="inline-flex items-center gap-1 text-xs text-emerald-500">
-                  <CheckCircle2 className="h-3.5 w-3.5" /> Data in
-                </span>
-              ) : (
-                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setSurveyFor(r)}>
-                  <Mail className="mr-1 h-3.5 w-3.5" />
-                  Ask for data
-                </Button>
-              )}
-            </div>
-          ))}
-        </div>
-        <p className="mt-3 text-xs text-muted-foreground">
-          <Link href="/data/spend-data" className="inline-flex items-center gap-1 hover:text-foreground">
-            Reconcile more Xero suppliers <ArrowUpRight className="h-3 w-3" />
-          </Link>
-        </p>
-      </CardContent>
+              {r.name}
+            </Link>
+            {r.tier && <StateChip tone="quiet">{TIER_LABEL[r.tier] ?? r.tier}</StateChip>}
+            <span className="font-mono text-xs tabular-nums text-muted-foreground">
+              {gbp(r.annualSpendGbp)}
+            </span>
+            <span className="w-24 text-right font-display text-sm font-bold tabular-nums text-foreground">
+              {co2(r.spendEmissionsKg)}
+              <span className="ml-1 font-mono text-[10px] font-normal uppercase tracking-[0.14em] text-muted-foreground">
+                CO2e
+              </span>
+            </span>
+            {r.esgSubmitted ? (
+              <StateChip tone="good">DATA IN</StateChip>
+            ) : (
+              <PillButton variant="outline" size="sm" onClick={() => setSurveyFor(r)}>
+                Ask for data
+              </PillButton>
+            )}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-xs text-muted-foreground">
+        <Link href="/data/spend-data" className="inline-flex items-center gap-1 hover:text-foreground">
+          Reconcile more Xero suppliers <ArrowUpRight className="h-3 w-3" />
+        </Link>
+      </p>
 
       <SendEsgSurveyDialog
         open={surveyFor !== null}
@@ -116,6 +107,6 @@ export function SuppliersByEmissions({ organizationId }: { organizationId: strin
           load();
         }}
       />
-    </Card>
+    </div>
   );
 }

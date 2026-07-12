@@ -177,7 +177,7 @@ export async function GET() {
     nextGap = {
       step: 'Add a supplier',
       why: 'Scope 3, the biggest chunk of a drinks footprint, needs supplier data.',
-      href: '/suppliers/new/',
+      href: '/suppliers/?invite=1',
     };
   } else if (lc === 0) {
     nextGap = {

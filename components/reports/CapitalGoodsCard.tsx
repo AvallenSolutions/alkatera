@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StateChip } from "@/components/studio";
 import { HardHat, Plus } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -122,13 +123,11 @@ export function CapitalGoodsCard({ reportId, entries, onUpdate, isNotApplicable,
   return (
     <>
       <Card className="relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 dark:bg-orange-950 rounded-full -mr-16 -mt-16 opacity-50" />
-
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-orange-100 dark:bg-orange-900 flex items-center justify-center">
-                <HardHat className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                <HardHat className="h-5 w-5 text-room-accent" />
               </div>
               <div>
                 <CardTitle className="text-lg">Capital Goods & Assets</CardTitle>
@@ -137,9 +136,9 @@ export function CapitalGoodsCard({ reportId, entries, onUpdate, isNotApplicable,
             </div>
             <div className="flex flex-col items-end gap-1.5">
               {entries.length > 0 && (
-                <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100">
+                <StateChip>
                   {entries.length} {entries.length === 1 ? "asset" : "assets"}
-                </Badge>
+                </StateChip>
               )}
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-muted-foreground">Not applicable</span>
@@ -153,7 +152,7 @@ export function CapitalGoodsCard({ reportId, entries, onUpdate, isNotApplicable,
           {entries.length > 0 ? (
             <>
               <div className="text-center py-4 border-b">
-                <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">
+                <div className="text-3xl font-bold text-foreground">
                   {formatEmissions(totalCO2e)}
                 </div>
                 <div className="text-sm text-muted-foreground mt-1">
@@ -165,7 +164,7 @@ export function CapitalGoodsCard({ reportId, entries, onUpdate, isNotApplicable,
                 {entries.map((entry) => (
                   <div
                     key={entry.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-900"
+                    className="flex items-center justify-between p-3 rounded-lg bg-secondary"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
@@ -263,7 +262,7 @@ export function CapitalGoodsCard({ reportId, entries, onUpdate, isNotApplicable,
               </div>
             </div>
 
-            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900 text-xs text-muted-foreground">
+            <div className="p-3 rounded-lg bg-secondary text-xs text-muted-foreground">
               Embodied carbon factor: 0.4 kgCO₂e per £ (EEIO average for capital goods)
             </div>
 

@@ -5,7 +5,8 @@ import { useOrganization } from '@/lib/organizationContext'
 import { useEPRHMRCDetails } from '@/hooks/data/useEPRHMRCDetails'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, ArrowRight, SkipForward, Loader2, Package } from 'lucide-react'
+import { PillButton } from '@/components/studio/pill-button'
+import { ArrowLeft, ArrowRight, SkipForward, Package } from 'lucide-react'
 import { HMRC_PACKAGING_ACTIVITY_LABELS } from '@/lib/epr/constants'
 import type { HMRCPackagingActivityLevel } from '@/lib/epr/types'
 
@@ -85,7 +86,9 @@ export function PackagingActivitiesStep({ onComplete, onBack, onSkip }: Packagin
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-neon-lime animate-spin" />
+        <span className="font-mono text-xs uppercase tracking-[0.18em] text-studio-dim">
+          Loading...
+        </span>
       </div>
     )
   }
@@ -95,10 +98,10 @@ export function PackagingActivitiesStep({ onComplete, onBack, onSkip }: Packagin
       <div className="w-full max-w-lg space-y-6">
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-neon-lime/20 backdrop-blur-md border border-neon-lime/30 rounded-2xl flex items-center justify-center">
-            <Package className="w-8 h-8 text-neon-lime" />
+          <div className="mx-auto w-16 h-16 rounded-[6px] border border-studio-hairline bg-studio-paper flex items-center justify-center">
+            <Package className="w-8 h-8 text-room-accent" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-foreground">
+          <h3 className="text-xl font-display font-bold text-foreground">
             Packaging Activities
           </h3>
           <p className="text-sm text-muted-foreground">
@@ -108,7 +111,7 @@ export function PackagingActivitiesStep({ onComplete, onBack, onSkip }: Packagin
         </div>
 
         {/* Form card */}
-        <div className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl p-6 space-y-4">
+        <div className="rounded-[6px] border border-studio-hairline bg-studio-paper p-6 space-y-4">
           {ACTIVITY_KEYS.map((key) => {
             const activity = HMRC_PACKAGING_ACTIVITY_LABELS[key]
             return (
@@ -138,7 +141,7 @@ export function PackagingActivitiesStep({ onComplete, onBack, onSkip }: Packagin
                             activities[key] === level
                               ? level === 'No'
                                 ? 'bg-muted-foreground/20 text-foreground border border-muted-foreground/30'
-                                : 'bg-neon-lime/20 text-neon-lime border border-neon-lime/30'
+                                : 'bg-room/10 text-room-accent border border-room-accent/30'
                               : 'bg-muted/30 text-muted-foreground/60 border border-transparent hover:bg-muted/50 hover:text-muted-foreground'
                           }
                           disabled:opacity-50 disabled:cursor-not-allowed
@@ -185,23 +188,16 @@ export function PackagingActivitiesStep({ onComplete, onBack, onSkip }: Packagin
                 Skip
               </Button>
             )}
-            <Button
-              onClick={handleContinue}
-              disabled={isSaving}
-              className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl"
-            >
+            <PillButton variant="ink" onClick={handleContinue} disabled={isSaving}>
               {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
+                'Saving...'
               ) : (
                 <>
                   Continue
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </>
               )}
-            </Button>
+            </PillButton>
           </div>
         </div>
       </div>

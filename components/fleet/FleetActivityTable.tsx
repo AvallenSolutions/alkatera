@@ -1,13 +1,13 @@
 "use client";
 
+/**
+ * The fleet activity log, re-cut for the studio: a flush cream panel, a
+ * quiet controls row (scope filter and CSV export), typographic state
+ * chips instead of badge pills, and mono pagination. Queries, the CSV
+ * export and deletion are unchanged.
+ */
+
 import { useState, useEffect } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -23,11 +23,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
-import { Trash2, Search, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Panel } from "@/components/studio/panel";
+import { StateChip } from "@/components/studio/state-chip";
+import { PillButton } from "@/components/studio/pill-button";
+import type { WorkingTone } from "@/components/studio/theme";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -70,7 +71,6 @@ export function FleetActivityTable({
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(0);
   const [scopeFilter, setScopeFilter] = useState<string>("all");
-  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (organizationId) {
@@ -207,10 +207,10 @@ export function FleetActivityTable({
     link.click();
   };
 
-  const getScopeColor = (scope: string) => {
-    if (scope === "Scope 1") return "secondary";
-    if (scope === "Scope 2") return "default";
-    return "outline";
+  const qualityTone = (quality: string): WorkingTone => {
+    if (quality === "Primary") return "good";
+    if (quality === "Tertiary") return "attention";
+    return "quiet";
   };
 
   const getActivityValue = (activity: FleetActivity) => {
@@ -229,17 +229,14 @@ export function FleetActivityTable({
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle>Fleet Activity Log</CardTitle>
-          <CardDescription>
-            View and manage all recorded fleet emissions activities
-          </CardDescription>
-        </div>
+    <Panel flush>
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-studio-hairline px-5 py-4">
+        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+          {loading ? "Loading" : `${totalCount} ${totalCount === 1 ? "record" : "records"}`}
+        </p>
         <div className="flex items-center gap-2">
           <Select value={scopeFilter} onValueChange={setScopeFilter}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="h-9 w-[150px] rounded-full font-mono text-xs uppercase tracking-[0.12em]">
               <SelectValue placeholder="Filter by scope" />
             </SelectTrigger>
             <SelectContent>
@@ -249,25 +246,23 @@ export function FleetActivityTable({
               <SelectItem value="Scope 3 Cat 6">Scope 3 Cat 6</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="icon" onClick={exportToCSV}>
-            <Download className="h-4 w-4" />
-          </Button>
+          <PillButton variant="outline" size="sm" onClick={exportToCSV}>
+            Export CSV
+          </PillButton>
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent>
+      <div className="px-5 py-4">
         {loading ? (
           <div className="space-y-2">
             {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full" />
+              <div key={i} className="h-12 w-full animate-pulse rounded-[6px] bg-border/40" />
             ))}
           </div>
         ) : activities.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <p>No fleet activities recorded yet</p>
-            <p className="text-sm">
-              Use the &quot;Log Fleet Activity&quot; button to record vehicle usage
-            </p>
+          <div className="py-8 text-center text-sm text-muted-foreground">
+            <p>No fleet activities recorded yet.</p>
+            <p className="mt-1">Use Log activity to record vehicle usage.</p>
           </div>
         ) : (
           <>
@@ -291,9 +286,7 @@ export function FleetActivityTable({
                       {format(new Date(activity.activity_date), "dd MMM yyyy")}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={getScopeColor(activity.scope)}>
-                        {activity.scope}
-                      </Badge>
+                      <StateChip tone="quiet">{activity.scope}</StateChip>
                     </TableCell>
                     <TableCell>
                       <div>
@@ -311,21 +304,22 @@ export function FleetActivityTable({
                       </div>
                     </TableCell>
                     <TableCell>{getActivityValue(activity)}</TableCell>
-                    <TableCell className="text-right font-mono">
+                    <TableCell className="text-right font-mono tabular-nums">
                       {activity.emissions_tco2e?.toFixed(4)} tCO2e
                     </TableCell>
                     <TableCell className="max-w-[150px] truncate">
                       {activity.purpose || "-"}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="text-xs">
+                      <StateChip tone={qualityTone(activity.data_quality)}>
                         {activity.data_quality}
-                      </Badge>
+                      </StateChip>
                     </TableCell>
                     <TableCell>
                       <Button
                         variant="ghost"
                         size="icon"
+                        aria-label="Delete activity"
                         onClick={() => handleDeleteActivity(activity.id)}
                       >
                         <Trash2 className="h-4 w-4 text-muted-foreground" />
@@ -337,26 +331,27 @@ export function FleetActivityTable({
             </Table>
 
             {totalPages > 1 && (
-              <div className="flex items-center justify-between mt-4">
-                <p className="text-sm text-muted-foreground">
-                  Showing {page * PAGE_SIZE + 1} -{" "}
-                  {Math.min((page + 1) * PAGE_SIZE, totalCount)} of {totalCount}
+              <div className="mt-4 flex items-center justify-between border-t border-studio-hairline pt-4">
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                  {page * PAGE_SIZE + 1} - {Math.min((page + 1) * PAGE_SIZE, totalCount)} of {totalCount}
                 </p>
                 <div className="flex items-center gap-2">
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="icon"
+                    aria-label="Previous page"
                     onClick={() => setPage(page - 1)}
                     disabled={page === 0}
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-                  <span className="text-sm">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                     Page {page + 1} of {totalPages}
                   </span>
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="icon"
+                    aria-label="Next page"
                     onClick={() => setPage(page + 1)}
                     disabled={page >= totalPages - 1}
                   >
@@ -367,7 +362,7 @@ export function FleetActivityTable({
             )}
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

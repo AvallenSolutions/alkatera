@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -68,7 +69,24 @@ export function CertificationExperience({
     verifyEvidence,
   } = useCertificationEvidence(frameworkId);
 
-  const [tab, setTab] = useState('overview');
+  // URL-synced tabs (?tab=) so surfaces are deep-linkable. The setter wraps the
+  // local state so every existing call site (including the focus-requirement
+  // jump) keeps working unchanged, it just also writes the tab to the URL.
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [tab, setTabState] = useState(
+    () => searchParams.get('tab') || 'overview',
+  );
+  const setTab = useCallback(
+    (next: string) => {
+      setTabState(next);
+      const params = new URLSearchParams(Array.from(searchParams.entries()));
+      params.set('tab', next);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [router, pathname, searchParams],
+  );
   const [focusRequirementId, setFocusRequirementId] = useState<string | null>(
     null,
   );

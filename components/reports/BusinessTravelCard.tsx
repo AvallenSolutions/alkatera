@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StateChip } from "@/components/studio";
 import { Plane, Plus, Trash2, Info } from "lucide-react";
 import {
   Dialog,
@@ -342,13 +343,11 @@ export function BusinessTravelCard({ reportId, entries, xeroEntries, onUpdate, i
   return (
     <>
       <Card className="relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 dark:bg-blue-950 rounded-full -mr-16 -mt-16 opacity-50" />
-
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                <Plane className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                <Plane className="h-5 w-5 text-room-accent" />
               </div>
               <div>
                 <CardTitle className="text-lg">Business Travel</CardTitle>
@@ -357,10 +356,10 @@ export function BusinessTravelCard({ reportId, entries, xeroEntries, onUpdate, i
             </div>
             <div className="flex flex-col items-end gap-1.5">
               {(entries.length > 0 || (xeroEntries && xeroEntries.length > 0)) && (
-                <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
+                <StateChip>
                   {entries.length} {entries.length === 1 ? "trip" : "trips"}
                   {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} from Xero`}
-                </Badge>
+                </StateChip>
               )}
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-muted-foreground">Not applicable</span>
@@ -374,7 +373,7 @@ export function BusinessTravelCard({ reportId, entries, xeroEntries, onUpdate, i
           {(entries.length > 0 || xeroTotal > 0) ? (
             <>
               <div className="text-center py-4 border-b">
-                <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">
+                <div className="text-3xl font-bold text-foreground">
                   {formatEmissions(combinedTotal)}
                 </div>
                 <div className="text-sm text-muted-foreground mt-1">
@@ -387,13 +386,13 @@ export function BusinessTravelCard({ reportId, entries, xeroEntries, onUpdate, i
                 {entries.map((entry) => (
                   <div
                     key={entry.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-900"
+                    className="flex items-center justify-between p-3 rounded-lg bg-secondary"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm truncate flex items-center gap-1.5">
                         {entry.description}
                         {entry.data_source === 'xero_upgrade' && (
-                          <Badge variant="outline" className="text-[9px] shrink-0 border-teal-300 text-teal-700 dark:text-teal-400 dark:border-teal-700">Xero</Badge>
+                          <StateChip className="shrink-0">Xero</StateChip>
                         )}
                       </div>
                       <div className="text-xs text-muted-foreground">
@@ -481,13 +480,13 @@ export function BusinessTravelCard({ reportId, entries, xeroEntries, onUpdate, i
                 </div>
 
                 {calculatedDistance !== null && (
-                  <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
+                  <div className="p-3 rounded-lg bg-secondary border border-studio-hairline">
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="text-sm font-medium text-green-900 dark:text-green-100">
+                        <div className="text-sm font-medium text-foreground">
                           📍 {extractCityName(originLocation!.displayName)} → {extractCityName(destinationLocation!.displayName)}
                         </div>
-                        <div className="text-sm text-green-700 dark:text-green-300">
+                        <div className="text-sm text-muted-foreground">
                           ✈️ {calculatedDistance} km (automatically calculated)
                         </div>
                       </div>
@@ -611,25 +610,25 @@ export function BusinessTravelCard({ reportId, entries, xeroEntries, onUpdate, i
             </div>
 
             {estimatedCO2e !== null && (
-              <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 space-y-3">
+              <div className="p-4 rounded-lg bg-secondary border border-studio-hairline space-y-3">
                 <div>
-                  <div className="text-sm text-blue-900 dark:text-blue-100 mb-1">
+                  <div className="text-sm text-muted-foreground mb-1">
                     {showCabinClass && cabinClass
                       ? `${getCabinClassIcon(cabinClass)} ${cabinClass} Class Emissions`
                       : "Estimated Emissions"}
                   </div>
-                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  <div className="text-2xl font-bold text-foreground">
                     {formatEmissions(estimatedCO2e)}
                   </div>
-                  <div className="text-xs text-blue-700 dark:text-blue-300 mt-2">
+                  <div className="text-xs text-muted-foreground mt-2">
                     {isReturnTrip && `${parseFloat(distance) * 2}km total • `}
                     {passengers} {parseInt(passengers) === 1 ? "passenger" : "passengers"}
                   </div>
                 </div>
 
                 {showCabinClass && Object.keys(emissionComparison).length > 0 && (
-                  <div className="pt-3 border-t border-blue-200 dark:border-blue-700">
-                    <div className="text-xs font-medium text-blue-900 dark:text-blue-100 mb-2">
+                  <div className="pt-3 border-t border-studio-hairline">
+                    <div className="text-xs font-medium text-foreground mb-2">
                       Compare with other classes:
                     </div>
                     <div className="space-y-1">
@@ -643,8 +642,8 @@ export function BusinessTravelCard({ reportId, entries, xeroEntries, onUpdate, i
                             key={value}
                             className={`text-xs flex justify-between ${
                               isSelected
-                                ? "font-medium text-blue-900 dark:text-blue-100"
-                                : "text-blue-700 dark:text-blue-300"
+                                ? "font-medium text-foreground"
+                                : "text-muted-foreground"
                             }`}
                           >
                             <span>
@@ -665,7 +664,7 @@ export function BusinessTravelCard({ reportId, entries, xeroEntries, onUpdate, i
                       })}
                     </div>
                     {cabinClass !== "Economy" && (
-                      <div className="mt-2 text-xs text-blue-700 dark:text-blue-300 flex items-start gap-1">
+                      <div className="mt-2 text-xs text-muted-foreground flex items-start gap-1">
                         <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
                         <span>
                           💡 Tip: Economy class reduces emissions by{" "}

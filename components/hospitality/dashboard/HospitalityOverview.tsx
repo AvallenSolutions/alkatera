@@ -1,16 +1,16 @@
 'use client';
 
 /**
- * Hospitality impact overview — mirrors the Company Vitality (/performance) page
- * exactly: a vitality score ring + 12-week trend hero, then the same four
+ * Hospitality impact overview: a quiet vitality panel (score ring + 12-week
+ * trend; the page above keeps the one statement headline), then the same four
  * PillarCards (Climate / Water / Waste / Nature) and a Strengths / Improvements
- * summary. Reuses the vitality components so the two dashboards are identical.
+ * summary shared with /performance.
  *
- * Reads the aggregated read model from /api/hospitality/dashboard.
+ * Reads the aggregated read model from /api/hospitality/dashboard and surfaces
+ * its counts to the page via onCounts for the manage fact rows.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Calendar, UtensilsCrossed, Wine, BedDouble } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -66,11 +66,15 @@ const KIND_LABEL: Record<Kind, string> = {
   hospitality_drink: 'Drinks',
   hospitality_room_night: 'Rooms',
 };
-const KIND_ICON: Record<Kind, typeof UtensilsCrossed> = {
-  hospitality_meal: UtensilsCrossed,
-  hospitality_drink: Wine,
-  hospitality_room_night: BedDouble,
-};
+
+/** Live counts the dashboard already knows, surfaced for the page's fact rows. */
+export interface HospitalityCounts {
+  venues: number;
+  menus: number;
+  meals: number;
+  drinks: number;
+  rooms: number;
+}
 
 const AVAILABLE_YEARS = Array.from({ length: 4 }, (_, i) => new Date().getFullYear() - i);
 
@@ -111,8 +115,8 @@ function WeeklyTrend({ weekly }: { weekly: { label: string; value: number }[] })
           return (
             <div key={i} className="flex-1 flex items-end h-full" aria-hidden="true">
               <div
-                className={cn('w-full rounded-sm transition-colors', filled ? (i === lastNonZero ? 'opacity-100' : 'opacity-65') : 'opacity-15')}
-                style={{ height: `${heightPct}%`, backgroundColor: '#2B46C0' }}
+                className={cn('w-full rounded-sm bg-room-accent transition-colors', filled ? (i === lastNonZero ? 'opacity-100' : 'opacity-65') : 'opacity-15')}
+                style={{ height: `${heightPct}%` }}
               />
             </div>
           );
@@ -126,7 +130,7 @@ function WeeklyTrend({ weekly }: { weekly: { label: string; value: number }[] })
   );
 }
 
-export function HospitalityOverview() {
+export function HospitalityOverview({ onCounts }: { onCounts?: (counts: HospitalityCounts) => void }) {
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [data, setData] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
@@ -136,13 +140,25 @@ export function HospitalityOverview() {
     setLoading(true);
     try {
       const res = await fetch(`/api/hospitality/dashboard?year=${y}`, { credentials: 'include' });
-      if (res.ok) setData(await res.json());
+      if (res.ok) {
+        const next: Dashboard = await res.json();
+        setData(next);
+        const kindCount = (kind: Kind) =>
+          next.by_kind.find((k) => k.kind === kind)?.product_count ?? 0;
+        onCounts?.({
+          venues: next.coverage.venues,
+          menus: next.coverage.menus,
+          meals: kindCount('hospitality_meal'),
+          drinks: kindCount('hospitality_drink'),
+          rooms: kindCount('hospitality_room_night'),
+        });
+      }
     } catch {
       /* keep previous */
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onCounts]);
 
   useEffect(() => {
     load(year);
@@ -189,13 +205,13 @@ export function HospitalityOverview() {
 
   return (
     <div className="space-y-6">
-      {/* Vitality hero — identical structure to /performance EsgVitalityScoreHero */}
+      {/* Vitality hero — a quiet panel; the ring is the visual, the page keeps the one headline */}
       <div className="rounded-[6px] border border-border bg-card p-6 sm:p-8">
         <div className="mb-4">
           <Eyebrow>Hospitality vitality</Eyebrow>
-          <h1 className="mt-2 font-display text-2xl sm:text-3xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+          <p className="mt-1.5 text-sm text-muted-foreground">
             {score.value > 0 ? `Your hospitality vitality is ${band}.` : 'Awaiting more data to call your score.'}
-          </h1>
+          </p>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-center">
           <div className="lg:col-span-2 flex flex-col items-center justify-center">
@@ -217,11 +233,10 @@ export function HospitalityOverview() {
       {/* Action bar — year selector (matches /performance) */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
           <select
             value={year}
             onChange={(e) => setYear(parseInt(e.target.value))}
-            className="px-3 py-1.5 text-sm font-medium rounded-[6px] border border-border text-foreground bg-transparent hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-studio-cobalt"
+            className="px-3 py-1.5 text-sm font-medium rounded-[6px] border border-border text-foreground bg-transparent hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-room-accent"
           >
             {AVAILABLE_YEARS.map((y) => (
               <option key={y} value={y}>{y} Data</option>
@@ -299,12 +314,10 @@ function ClimateDeepDive({ byKind, total }: { byKind: KindBreakdown[]; total: nu
   return (
     <div className="space-y-3">
       {active.map((k) => {
-        const Icon = KIND_ICON[k.kind];
         const share = total > 0 ? (k.contribution / total) * 100 : 0;
         return (
           <div key={k.kind} className="space-y-1">
             <div className="flex items-center gap-3">
-              <Icon className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium">{KIND_LABEL[k.kind]}</p>
                 <p className="text-xs text-muted-foreground">
@@ -314,7 +327,7 @@ function ClimateDeepDive({ byKind, total }: { byKind: KindBreakdown[]; total: nu
               <p className="flex-shrink-0 text-sm font-semibold tabular-nums">{fmtCo2(k.contribution)} CO₂e</p>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-studio-cobalt" style={{ width: `${share}%` }} />
+              <div className="h-full rounded-full bg-room-accent" style={{ width: `${share}%` }} />
             </div>
           </div>
         );

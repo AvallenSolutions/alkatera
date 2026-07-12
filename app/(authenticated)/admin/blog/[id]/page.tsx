@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Panel } from '@/components/studio/panel';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -192,7 +192,7 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
             </Link>
           </Button>
           <div>
-            <Eyebrow className="mb-3">THE WIRING · BLOG</Eyebrow>
+            <Eyebrow className="mb-3">THE WIRING · ADMIN</Eyebrow>
             <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
               Edit post.
             </h1>
@@ -263,11 +263,11 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
       <div className="grid gap-6 md:grid-cols-3">
         {/* Main Content */}
         <div className="md:col-span-2 space-y-6">
-          <Card className="rounded-[6px]">
-            <CardHeader>
-              <CardTitle>Post Content</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <Panel className="rounded-[6px]">
+            <div className="mb-4 space-y-1">
+              <h2 className="font-display text-base font-semibold text-foreground">Post Content</h2>
+            </div>
+            <div className="space-y-4">
               {/* Title */}
               <div className="space-y-2">
                 <Label htmlFor="title">{post.content_type === 'quote' ? 'Quote Text *' : 'Title *'}</Label>
@@ -344,18 +344,18 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
                   />
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
         </div>
 
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Post Settings */}
-          <Card className="rounded-[6px]">
-            <CardHeader>
-              <CardTitle>Post Settings</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <Panel className="rounded-[6px]">
+            <div className="mb-4 space-y-1">
+              <h2 className="font-display text-base font-semibold text-foreground">Post Settings</h2>
+            </div>
+            <div className="space-y-4">
               {/* Content Type */}
               <div className="space-y-2">
                 <Label htmlFor="content_type">Content Type</Label>
@@ -411,15 +411,15 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
                   onUploadComplete={(url) => setPost(prev => prev ? { ...prev, featured_image_url: url } : null)}
                 />
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
 
           {/* SEO Settings */}
-          <Card className="rounded-[6px]">
-            <CardHeader>
-              <CardTitle>SEO Metadata</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <Panel className="rounded-[6px]">
+            <div className="mb-4 space-y-1">
+              <h2 className="font-display text-base font-semibold text-foreground">SEO Metadata</h2>
+            </div>
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="meta_title">Meta Title</Label>
                 <Input
@@ -438,8 +438,8 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
                   onChange={(e) => setPost(prev => prev ? { ...prev, meta_description: e.target.value } : null)}
                 />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
         </div>
       </div>
     </div>

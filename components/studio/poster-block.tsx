@@ -44,7 +44,7 @@ export function PosterBlock({
         <div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] opacity-80">
           {eyebrow}
         </div>
-        <div className="mt-3 font-display text-2xl font-semibold leading-tight tracking-[-0.02em]">
+        <div className="mt-3 break-words font-display text-2xl font-semibold leading-tight tracking-[-0.02em]">
           {headline}
         </div>
         {(note || action) && (

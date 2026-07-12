@@ -4,10 +4,11 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Eyebrow } from '@/components/studio/eyebrow'
+import { Panel } from '@/components/studio/panel'
+import { Statement } from '@/components/studio/statement'
 import { StateChip } from '@/components/studio/state-chip'
+import { submissionStatusTone } from '@/lib/epr/status-tones'
 import {
   Select,
   SelectContent,
@@ -64,19 +65,9 @@ function deriveFeeYear(period: string): string {
 // Status badge helper
 // ---------------------------------------------------------------------------
 
-function statusBadge(status: EPRSubmission['status']) {
-  switch (status) {
-    case 'draft':
-      return <StateChip tone="quiet">Draft</StateChip>
-    case 'ready':
-      return <StateChip tone="hold">Ready</StateChip>
-    case 'submitted':
-      return <StateChip tone="good">Submitted</StateChip>
-    case 'amended':
-      return <StateChip tone="attention">Amended</StateChip>
-    default:
-      return <StateChip tone="quiet">{status}</StateChip>
-  }
+function statusChip(status: EPRSubmission['status']) {
+  const { label, tone } = submissionStatusTone(status)
+  return <StateChip tone={tone}>{label}</StateChip>
 }
 
 // ---------------------------------------------------------------------------
@@ -448,26 +439,21 @@ export default function EPRSubmissionsPage() {
     <div className="container mx-auto py-8 px-4 max-w-7xl space-y-6">
       {/* Page Header */}
       <div className="min-w-0">
-        <Eyebrow tone="inherit" className="mb-3 text-room-accent">
-          THE EVIDENCE · EPR · SUBMISSIONS
-        </Eyebrow>
-        <h1 className="font-display text-[clamp(2rem,4vw,3.25rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
-          RPD submissions.
-        </h1>
+        <Statement eyebrow="THE WIRING · EPR · SUBMISSIONS" headline="RPD submissions." />
         <p className="text-muted-foreground mt-3 text-sm">
           Generate, review and export packaging data submissions for the Defra RPD portal.
         </p>
       </div>
 
       {/* Period Selector + Generate */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Submission Period</CardTitle>
-          <CardDescription>
+      <Panel className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">Submission Period</h2>
+          <p className="text-sm text-muted-foreground mt-1">
             Select a reporting period, then generate a submission from your product packaging data.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div>
           <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
             <div className="space-y-1.5 w-full sm:w-64">
               <label className="text-sm font-medium text-muted-foreground">Period</label>
@@ -503,8 +489,8 @@ export default function EPRSubmissionsPage() {
               )}
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* Warnings */}
       {warnings.length > 0 && (
@@ -536,40 +522,35 @@ export default function EPRSubmissionsPage() {
         {loadingSubmissions ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3].map(i => (
-              <Card key={i}>
-                <CardContent className="pt-6 space-y-3">
-                  <Skeleton className="h-5 w-24" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-4 w-1/2" />
-                </CardContent>
-              </Card>
+              <Panel key={i} className="space-y-3">
+                <Skeleton className="h-5 w-24" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+              </Panel>
             ))}
           </div>
         ) : submissions.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Package className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-              <p className="text-muted-foreground">No submissions yet.</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Select a period above and click "Generate Submission" to create your first RPD submission.
-              </p>
-            </CardContent>
-          </Card>
+          <Panel className="py-12 text-center">
+            <Package className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+            <p className="text-muted-foreground">No submissions yet.</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Select a period above and click "Generate Submission" to create your first RPD submission.
+            </p>
+          </Panel>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {submissions.map(sub => (
-              <Card
-                key={sub.id}
-                className={`rounded-[6px] border-border bg-card cursor-pointer transition-colors hover:border-room-accent/50 ${
-                  activeSubmission?.id === sub.id ? 'border-room-accent ring-1 ring-room-accent/30' : ''
-                }`}
-                onClick={() => selectSubmission(sub)}
-              >
-                <CardContent className="pt-6 space-y-2">
+              <div key={sub.id} onClick={() => selectSubmission(sub)}>
+                <Panel
+                  className={`cursor-pointer transition-colors hover:border-room-accent/50 ${
+                    activeSubmission?.id === sub.id ? 'border-room-accent ring-1 ring-room-accent/30' : ''
+                  }`}
+                >
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-sm font-medium">{sub.submission_period}</span>
-                    {statusBadge(sub.status)}
+                    {statusChip(sub.status)}
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
                     <div>
@@ -593,8 +574,9 @@ export default function EPRSubmissionsPage() {
                       </span>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+                </Panel>
+              </div>
             ))}
           </div>
         )}
@@ -604,8 +586,7 @@ export default function EPRSubmissionsPage() {
       {activeSubmission && (
         <div className="space-y-6">
           {/* Actions Bar */}
-          <Card>
-            <CardContent className="pt-6">
+          <Panel>
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                   <p className="font-medium">
@@ -613,7 +594,7 @@ export default function EPRSubmissionsPage() {
                     <span className="text-muted-foreground font-normal">({activeSubmission.fee_year})</span>
                   </p>
                   <div className="flex items-center gap-2 mt-1">
-                    {statusBadge(activeSubmission.status)}
+                    {statusChip(activeSubmission.status)}
                     {activeSubmission.csv_checksum && (
                       <span className="text-xs font-mono text-muted-foreground" title="CSV Checksum">
                         SHA-256: {activeSubmission.csv_checksum.substring(0, 16)}...
@@ -654,64 +635,53 @@ export default function EPRSubmissionsPage() {
                   )}
                 </div>
               </div>
-            </CardContent>
-          </Card>
+          </Panel>
 
           {/* Summary Panel */}
           {lines.length > 0 && (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <Scale className="h-4 w-4" />
-                    <span className="text-xs uppercase tracking-wider">Total Weight</span>
-                  </div>
-                  <p className="text-2xl font-bold">{summary.totalWeightKg.toLocaleString()} kg</p>
-                  <p className="text-sm text-muted-foreground">{(summary.totalWeightKg / 1000).toFixed(2)} tonnes</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <PoundSterling className="h-4 w-4" />
-                    <span className="text-xs uppercase tracking-wider">Estimated Fee</span>
-                  </div>
-                  <p className="text-2xl font-bold">{formatCurrency(summary.totalFee)}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <Hash className="h-4 w-4" />
-                    <span className="text-xs uppercase tracking-wider">Line Items</span>
-                  </div>
-                  <p className="text-2xl font-bold">{lines.length}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <ShieldCheck className="h-4 w-4" />
-                    <span className="text-xs uppercase tracking-wider">DRS Excluded</span>
-                  </div>
-                  <p className="text-2xl font-bold">{summary.drsCount}</p>
-                </CardContent>
-              </Card>
+              <Panel>
+                <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                  <Scale className="h-4 w-4" />
+                  <span className="text-xs uppercase tracking-wider">Total Weight</span>
+                </div>
+                <p className="text-2xl font-bold">{summary.totalWeightKg.toLocaleString()} kg</p>
+                <p className="text-sm text-muted-foreground">{(summary.totalWeightKg / 1000).toFixed(2)} tonnes</p>
+              </Panel>
+              <Panel>
+                <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                  <PoundSterling className="h-4 w-4" />
+                  <span className="text-xs uppercase tracking-wider">Estimated Fee</span>
+                </div>
+                <p className="text-2xl font-bold">{formatCurrency(summary.totalFee)}</p>
+              </Panel>
+              <Panel>
+                <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                  <Hash className="h-4 w-4" />
+                  <span className="text-xs uppercase tracking-wider">Line Items</span>
+                </div>
+                <p className="text-2xl font-bold">{lines.length}</p>
+              </Panel>
+              <Panel>
+                <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                  <ShieldCheck className="h-4 w-4" />
+                  <span className="text-xs uppercase tracking-wider">DRS Excluded</span>
+                </div>
+                <p className="text-2xl font-bold">{summary.drsCount}</p>
+              </Panel>
             </div>
           )}
 
           {/* Material Breakdown */}
           {summary.materials.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Material Breakdown</CardTitle>
-              </CardHeader>
-              <CardContent>
+            <Panel className="space-y-4">
+              <h2 className="text-lg font-semibold text-foreground">Material Breakdown</h2>
+              <div>
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                   {summary.materials.map(mat => (
                     <div
                       key={mat.code}
-                      className="flex items-center justify-between p-3 rounded-[6px] bg-card border border-border"
+                      className="flex items-center justify-between p-3 rounded-[6px] border border-studio-hairline"
                     >
                       <div>
                         <p className="text-sm font-medium">{mat.name}</p>
@@ -724,19 +694,19 @@ export default function EPRSubmissionsPage() {
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </Panel>
           )}
 
           {/* Submission Lines Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Submission Lines</CardTitle>
-              <CardDescription>
+          <Panel className="space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Submission Lines</h2>
+              <p className="text-sm text-muted-foreground mt-1">
                 {lines.length} RPD line{lines.length !== 1 ? 's' : ''} for {activeSubmission.submission_period}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+              </p>
+            </div>
+            <div>
               {loadingLines ? (
                 <div className="space-y-2">
                   {[1, 2, 3, 4, 5].map(i => (
@@ -749,8 +719,8 @@ export default function EPRSubmissionsPage() {
                   <p>No submission lines found.</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto -mx-6">
-                  <div className="min-w-[1100px] px-6">
+                <div className="overflow-x-auto -mx-5">
+                  <div className="min-w-[1100px] px-5">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -813,8 +783,8 @@ export default function EPRSubmissionsPage() {
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
         </div>
       )}
     </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useOrganization } from '@/lib/organizationContext'
 import { useSubscription } from '@/hooks/useSubscription'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -35,9 +36,10 @@ import {
   Info,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Eyebrow } from '@/components/studio/eyebrow'
+import { Statement } from '@/components/studio/statement'
 import { StateChip } from '@/components/studio/state-chip'
-import type { WorkingTone } from '@/components/studio/theme'
+import { STUDIO } from '@/components/studio/theme'
+import { ramRatingTone } from '@/lib/epr/status-tones'
 
 // ---------------------------------------------------------------------------
 // Types mirroring the API response shapes
@@ -135,19 +137,6 @@ function pctChange(prev: number, curr: number): number | null {
   return ((curr - prev) / prev) * 100
 }
 
-function ramTone(rating: string | null): WorkingTone {
-  switch (rating) {
-    case 'green':
-      return 'good'
-    case 'amber':
-      return 'attention'
-    case 'red':
-      return 'stale'
-    default:
-      return 'quiet'
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -155,11 +144,16 @@ function ramTone(rating: string | null): WorkingTone {
 export default function EPRCostEstimatorPage() {
   const { currentOrganization } = useOrganization()
   const { tierLevel, isLoading: tierLoading } = useSubscription()
+  const router = useRouter()
+  const searchParams = useSearchParams()
 
   // Data state: cache both years
   const [yearDataCache, setYearDataCache] = useState<Record<string, YearData>>({})
   const [feeRatesCache, setFeeRatesCache] = useState<Record<string, FeeRate[]>>({})
-  const [activeYear, setActiveYear] = useState<string>('2025-26')
+  const [activeYear, setActiveYear] = useState<string>(() => {
+    const fromUrl = searchParams?.get('year')
+    return FEE_YEARS.some((y) => y.id === fromUrl) ? (fromUrl as string) : '2025-26'
+  })
   const [loading, setLoading] = useState(false)
   const [ratesLoading, setRatesLoading] = useState(false)
   const [ratesOpen, setRatesOpen] = useState(false)
@@ -312,21 +306,19 @@ export default function EPRCostEstimatorPage() {
     <div className="space-y-6 p-6">
       {/* Page header */}
       <div className="min-w-0">
-        <Eyebrow tone="inherit" className="mb-3 text-room-accent">
-          THE EVIDENCE · EPR · COSTS
-        </Eyebrow>
-        <h1 className="font-display text-[clamp(2rem,4vw,3.25rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
-          The cost estimator.
-        </h1>
+        <Statement eyebrow="THE WIRING · EPR · COSTS" headline="The cost estimator." />
         <p className="text-sm text-muted-foreground mt-3">
           Estimate your EPR waste management fees
         </p>
       </div>
 
-      {/* Year selector */}
+      {/* Year selector (two-way ?year= URL sync) */}
       <Tabs
         value={activeYear}
-        onValueChange={(val) => setActiveYear(val)}
+        onValueChange={(val) => {
+          setActiveYear(val)
+          router.replace(`/epr/costs?year=${val}`, { scroll: false })
+        }}
         className="w-full"
       >
         <TabsList>
@@ -565,7 +557,7 @@ function ProductBreakdownTable({
                   </TableCell>
                   <TableCell className="text-center">
                     {item.ram_rating ? (
-                      <StateChip tone={ramTone(item.ram_rating)}>
+                      <StateChip tone={ramRatingTone(item.ram_rating)}>
                         {item.ram_rating}
                       </StateChip>
                     ) : (
@@ -660,7 +652,7 @@ function MaterialCostSummary({
                     className="h-full rounded-full transition-all duration-500"
                     style={{
                       width: `${barWidth}%`,
-                      backgroundColor: '#BF4B2A',
+                      backgroundColor: STUDIO.ink,
                     }}
                   />
                 </div>
@@ -880,19 +872,19 @@ function FeeRateReference({
                         <>
                           <TableHead className="text-right">
                             <span className="flex items-center justify-end gap-1">
-                              <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
+                              <span className="inline-block h-2 w-2 rounded-full bg-studio-good" />
                               Green (&pound;/t)
                             </span>
                           </TableHead>
                           <TableHead className="text-right">
                             <span className="flex items-center justify-end gap-1">
-                              <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
+                              <span className="inline-block h-2 w-2 rounded-full bg-studio-attention" />
                               Amber (&pound;/t)
                             </span>
                           </TableHead>
                           <TableHead className="text-right">
                             <span className="flex items-center justify-end gap-1">
-                              <span className="inline-block h-2 w-2 rounded-full bg-red-400" />
+                              <span className="inline-block h-2 w-2 rounded-full bg-studio-stale" />
                               Red (&pound;/t)
                             </span>
                           </TableHead>

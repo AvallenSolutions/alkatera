@@ -4,23 +4,29 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { TopicCard } from '@/components/materiality/TopicCard'
 import { MaterialityMatrix } from '@/components/materiality/MaterialityMatrix'
 import { PriorityConfirmation } from '@/components/materiality/PriorityConfirmation'
+import { Statement, StateChip } from '@/components/studio'
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client'
 import { useOrganization } from '@/lib/organizationContext'
 import { PageLoader } from '@/components/ui/page-loader'
 import {
   TOPIC_LIBRARY,
   CATEGORY_LABELS,
-  CATEGORY_COLOURS,
   getTopPriorityTopics,
 } from '@/lib/materiality/topic-library'
 import type { MaterialityTopic, TopicStatus, TopicCategory } from '@/lib/materiality/topic-library'
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
+
+// Short mono tag per ESG category — replaces the old inline CATEGORY_COLOURS dot.
+const CATEGORY_TAG: Record<TopicCategory, string> = {
+  environmental: 'ENV',
+  social: 'SOC',
+  governance: 'GOV',
+}
 
 const STEPS = [
   { label: 'Topic Library', description: 'Choose your material topics' },
@@ -32,18 +38,16 @@ function ScoreSlider({
   label,
   value,
   onChange,
-  colour,
 }: {
   label: string
   value: number
   onChange: (v: number) => void
-  colour: string
 }) {
   return (
     <div>
       <div className="flex justify-between items-center mb-1">
         <span className="text-xs text-muted-foreground">{label}</span>
-        <span className="text-sm font-bold" style={{ color: colour }}>{value}/5</span>
+        <span className="text-sm font-bold text-room-accent">{value}/5</span>
       </div>
       <input
         type="range"
@@ -52,8 +56,8 @@ function ScoreSlider({
         step={1}
         value={value}
         onChange={e => onChange(Number(e.target.value))}
-        className="w-full accent-current h-1.5"
-        style={{ accentColor: colour }}
+        className="w-full h-1.5"
+        style={{ accentColor: 'rgb(var(--room-accent-rgb))' }}
       />
       <div className="flex justify-between text-xs text-muted-foreground/50 mt-0.5">
         <span>Low</span>
@@ -176,7 +180,7 @@ export default function MaterialitySetupPage() {
     const ok = await saveProgress(true)
     if (ok) {
       toast.success('Materiality assessment complete.')
-      router.push('/reports/materiality/')
+      router.push('/reports/sustainability?tab=materiality')
     }
   }
 
@@ -196,17 +200,12 @@ export default function MaterialitySetupPage() {
   return (
     <div className="max-w-4xl space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-end justify-between gap-4">
         <div>
-          <Link href="/reports/materiality/" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 mb-3">
+          <Link href="/reports/sustainability?tab=materiality" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 mb-3">
             <ChevronLeft className="w-3.5 h-3.5" /> Materiality
           </Link>
-          <div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-brick mb-2">
-            THE EVIDENCE · MATERIALITY
-          </div>
-          <h1 className="font-display text-3xl md:text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
-            The {year} materiality assessment.
-          </h1>
+          <Statement eyebrow="THE EVIDENCE · MATERIALITY" headline={`The ${year} materiality assessment.`} />
         </div>
         <Button variant="outline" size="sm" onClick={() => saveProgress(false)} disabled={isSaving}>
           {isSaving ? 'Saving...' : 'Save Progress'}
@@ -272,16 +271,13 @@ export default function MaterialitySetupPage() {
                 onClick={() => setCategoryFilter(cat)}
                 className={[
                   'text-xs px-3 py-1.5 rounded-full border transition-colors flex items-center gap-1.5',
-                  categoryFilter === cat ? 'bg-foreground text-background border-foreground' : 'border-border text-muted-foreground hover:border-muted-foreground',
+                  categoryFilter === cat ? 'bg-foreground text-background border-foreground' : 'border-studio-hairline text-muted-foreground hover:border-muted-foreground',
                 ].join(' ')}
               >
-                <span className="w-2 h-2 rounded-full" style={{ background: CATEGORY_COLOURS[cat] }} />
+                <span className="font-mono text-[9px] font-bold tracking-[0.18em]">{CATEGORY_TAG[cat]}</span>
                 {CATEGORY_LABELS[cat]}
                 {categoryCounts[cat] > 0 && (
-                  <span className={[
-                    'text-xs rounded-full px-1.5',
-                    categoryFilter === cat ? 'bg-background/30' : 'bg-muted',
-                  ].join(' ')}>
+                  <span className="font-mono text-[10px] tabular-nums opacity-70">
                     {categoryCounts[cat]}
                   </span>
                 )}
@@ -342,7 +338,7 @@ export default function MaterialitySetupPage() {
                   >
                     <CardContent className="p-3">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="w-2 h-2 rounded-full" style={{ background: CATEGORY_COLOURS[topic.category] }} />
+                        <StateChip>{CATEGORY_TAG[topic.category]}</StateChip>
                         <span className="text-sm font-medium">{topic.name}</span>
                       </div>
                       <div className="space-y-2">
@@ -350,13 +346,11 @@ export default function MaterialitySetupPage() {
                           label="Impact on people and planet"
                           value={topic.impactScore || 3}
                           onChange={v => handleScoreChange(topic.id, 'impactScore', v)}
-                          colour={CATEGORY_COLOURS[topic.category]}
                         />
                         <ScoreSlider
                           label="Financial risk or opportunity"
                           value={topic.financialScore || 3}
                           onChange={v => handleScoreChange(topic.id, 'financialScore', v)}
-                          colour="#2B46C0"
                         />
                         <textarea
                           className="w-full text-xs bg-transparent border border-border rounded-md p-2 resize-none h-16 placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-border"
@@ -410,7 +404,7 @@ export default function MaterialitySetupPage() {
       <div className="flex justify-between pt-4 border-t border-border">
         <Button
           variant="outline"
-          onClick={() => step > 1 ? setStep(s => s - 1) : router.push('/reports/materiality/')}
+          onClick={() => step > 1 ? setStep(s => s - 1) : router.push('/reports/sustainability?tab=materiality')}
         >
           <ChevronLeft className="w-4 h-4 mr-1" />
           {step === 1 ? 'Cancel' : 'Back'}
@@ -425,7 +419,7 @@ export default function MaterialitySetupPage() {
           <Button
             onClick={handleFinish}
             disabled={isSaving || priorityOrder.length === 0}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
+            className="bg-room text-room-on hover:opacity-90"
           >
             <Check className="w-4 h-4 mr-1" />
             Complete Assessment

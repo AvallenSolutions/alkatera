@@ -7,13 +7,13 @@ import {
   AlertTriangle,
   RefreshCw,
   ArrowRight,
-  Loader2,
   ShieldCheck,
   Package,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { PillButton } from '@/components/studio/pill-button'
+import { Panel } from '@/components/studio/panel'
+import { StateChip } from '@/components/studio/state-chip'
 import { Progress } from '@/components/ui/progress'
 import { useEPRDataCompleteness } from '@/hooks/data/useEPRDataCompleteness'
 import { useEPRHMRCDetails } from '@/hooks/data/useEPRHMRCDetails'
@@ -69,8 +69,9 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
   if (loading && !completeness) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 animate-in fade-in duration-500">
-        <Loader2 className="w-8 h-8 text-neon-lime animate-spin" />
-        <p className="text-muted-foreground text-sm">Checking data completeness...</p>
+        <span className="font-mono text-xs uppercase tracking-[0.18em] text-studio-dim">
+          Checking data completeness...
+        </span>
       </div>
     )
   }
@@ -78,7 +79,7 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
   if (error && !completeness) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 animate-in fade-in duration-500">
-        <XCircle className="w-10 h-10 text-red-400" />
+        <XCircle className="w-10 h-10 text-studio-stale" />
         <p className="text-muted-foreground text-sm">{error}</p>
         <Button
           variant="ghost"
@@ -106,8 +107,7 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
       </div>
 
       {/* Completeness Score */}
-      <Card className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl">
-        <CardContent className="p-6 md:p-8">
+      <Panel className="p-6 md:p-8">
           <div className="flex flex-col items-center gap-6">
             {/* Percentage circle */}
             <div className="relative w-32 h-32">
@@ -125,7 +125,7 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
                   cy="50"
                   r="42"
                   fill="none"
-                  stroke={isComplete ? '#047857' : '#BF4B2A'}
+                  stroke={isComplete ? '#047857' : '#B45309'}
                   strokeWidth="8"
                   strokeLinecap="round"
                   strokeDasharray={`${pct * 2.639} ${263.9 - pct * 2.639}`}
@@ -142,7 +142,7 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
             <div className="w-full max-w-sm space-y-2">
               <Progress
                 value={pct}
-                indicatorColor={isComplete ? 'emerald' : 'lime'}
+                indicatorClassName={isComplete ? 'bg-studio-good' : 'bg-studio-attention'}
                 className="h-3 bg-muted/50"
               />
               <div className="flex justify-between text-xs text-muted-foreground">
@@ -150,45 +150,44 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
                   {completeItems} of {totalItems} items complete
                 </span>
                 {incompleteItems > 0 && (
-                  <span className="text-amber-400">
+                  <span className="text-studio-attention">
                     {incompleteItems} need attention
                   </span>
                 )}
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+      </Panel>
 
       {/* Status Banner */}
       {isComplete ? (
-        <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 rounded-[6px] bg-studio-good/10 border border-studio-good/20">
+          <CheckCircle2 className="w-5 h-5 text-studio-good flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-medium text-emerald-400">
+            <p className="text-sm font-medium text-studio-good">
               All packaging data and HMRC registration details are complete!
             </p>
-            <p className="text-xs text-emerald-400/70 mt-1">
+            <p className="text-xs text-studio-good/70 mt-1">
               You&apos;re ready to generate your submission.
             </p>
           </div>
         </div>
       ) : (
-        <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
-          <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 rounded-[6px] bg-studio-attention/10 border border-studio-attention/20">
+          <AlertTriangle className="w-5 h-5 text-studio-attention flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-medium text-amber-400">
+            <p className="text-sm font-medium text-studio-attention">
               {pct < 100 && !hmrcComplete
                 ? 'Packaging data and HMRC registration details need attention'
                 : pct < 100
                 ? 'Some packaging items are missing EPR data'
                 : 'HMRC registration details are incomplete'}
             </p>
-            <p className="text-xs text-amber-400/70 mt-1">
+            <p className="text-xs text-studio-attention/70 mt-1">
               Please complete the missing items before generating your submission.{' '}
               <button
                 onClick={onBack}
-                className="underline hover:text-amber-300 transition-colors"
+                className="underline hover:text-studio-attention transition-colors"
               >
                 Go back to fix
               </button>
@@ -199,38 +198,32 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
 
       {/* Per-Product Status List */}
       {totalItems > 0 && (
-        <Card className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl">
-          <CardContent className="p-6">
+        <Panel className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <Package className="w-4 h-4" />
                 Packaging Item Status
               </h3>
-              <Badge
-                variant="outline"
-                className="text-xs border-border text-muted-foreground"
-              >
-                {totalItems} items
-              </Badge>
+              <StateChip tone="quiet">{totalItems} items</StateChip>
             </div>
 
             <div className="space-y-1 max-h-[360px] overflow-y-auto pr-1">
               {/* Complete items summary */}
               {completeItems > 0 && gaps.length > 0 && (
-                <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-emerald-500/5 mb-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                <div className="flex items-center gap-3 px-3 py-2.5 rounded-[6px] bg-studio-good/5 mb-2">
+                  <CheckCircle2 className="w-4 h-4 text-studio-good flex-shrink-0" />
                   <span className="text-sm text-muted-foreground">
                     {completeItems} item{completeItems !== 1 ? 's' : ''} fully
                     complete
                   </span>
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400/50 ml-auto" />
+                  <ShieldCheck className="w-3.5 h-3.5 text-studio-good/50 ml-auto" />
                 </div>
               )}
 
               {/* Show all-complete when 100% */}
               {isComplete && (
                 <div className="text-center py-6">
-                  <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-2" />
+                  <CheckCircle2 className="w-10 h-10 text-studio-good mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground">
                     All {totalItems} packaging items have complete EPR data.
                   </p>
@@ -247,52 +240,40 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
                     {items.map((gap) => (
                       <div
                         key={gap.product_material_id}
-                        className="flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-muted/50 transition-colors"
+                        className="flex items-start gap-3 px-3 py-2.5 rounded-[6px] hover:bg-muted/50 transition-colors"
                       >
-                        <XCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                        <XCircle className="w-4 h-4 text-studio-stale flex-shrink-0 mt-0.5" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-foreground/80 truncate">
                             {gap.material_name}
                           </p>
-                          <p className="text-xs text-red-400/70 mt-0.5">
+                          <p className="text-xs text-studio-stale/70 mt-0.5">
                             Missing: {gap.missing_fields.join(', ')}
                           </p>
                         </div>
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] border-red-400/20 text-red-400/60 flex-shrink-0"
-                        >
+                        <StateChip tone="stale" className="flex-shrink-0">
                           {gap.missing_fields.length} field
                           {gap.missing_fields.length !== 1 ? 's' : ''}
-                        </Badge>
+                        </StateChip>
                       </div>
                     ))}
                   </div>
                 )
               )}
             </div>
-          </CardContent>
-        </Card>
+        </Panel>
       )}
 
       {/* HMRC Registration Completeness */}
-      <Card className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl">
-        <CardContent className="p-6">
+      <Panel className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <Building2 className="w-4 h-4" />
               HMRC Registration Data
             </h3>
-            <Badge
-              variant="outline"
-              className={`text-xs ${
-                hmrcComplete
-                  ? 'border-emerald-500/20 text-emerald-400'
-                  : 'border-amber-500/20 text-amber-400'
-              }`}
-            >
+            <StateChip tone={hmrcComplete ? 'good' : 'attention'}>
               {hmrcComplete ? 'Complete' : 'Incomplete'}
-            </Badge>
+            </StateChip>
           </div>
 
           <div className="space-y-1.5">
@@ -301,12 +282,12 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
               return (
                 <div
                   key={check.label}
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg"
+                  className="flex items-center gap-3 px-3 py-2 rounded-[6px]"
                 >
                   {check.pass ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-studio-good flex-shrink-0" />
                   ) : (
-                    <XCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                    <XCircle className="w-4 h-4 text-studio-stale flex-shrink-0" />
                   )}
                   <Icon className="w-3.5 h-3.5 text-muted-foreground/70" />
                   <span className="text-sm text-muted-foreground">{check.label}</span>
@@ -316,18 +297,17 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
           </div>
 
           {!hmrcComplete && (
-            <p className="text-xs text-amber-400/70 mt-3 px-3">
+            <p className="text-xs text-studio-attention/70 mt-3 px-3">
               Complete the missing HMRC registration data to export all templates.{' '}
               <button
                 onClick={onBack}
-                className="underline hover:text-amber-300 transition-colors"
+                className="underline hover:text-studio-attention transition-colors"
               >
                 Go back to fix
               </button>
             </p>
           )}
-        </CardContent>
-      </Card>
+      </Panel>
 
       {/* Actions */}
       <div className="flex items-center justify-between pt-2">
@@ -346,22 +326,14 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
             disabled={refreshing}
             className="text-muted-foreground hover:text-foreground hover:bg-muted"
           >
-            {refreshing ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="w-4 h-4 mr-2" />
-            )}
-            Refresh
+            {!refreshing && <RefreshCw className="w-4 h-4 mr-2" />}
+            {refreshing ? 'Refreshing...' : 'Refresh'}
           </Button>
 
-          <Button
-            onClick={onComplete}
-            disabled={!isComplete}
-            className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
-          >
+          <PillButton variant="ink" onClick={onComplete} disabled={!isComplete}>
             Continue
             <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
+          </PillButton>
         </div>
       </div>
     </div>

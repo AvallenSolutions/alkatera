@@ -3,17 +3,19 @@
 import { useState, useEffect } from 'react';
 import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { BookOpen, PlusCircle, Trash2, Calendar } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Trash2, Calendar } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { format } from 'date-fns';
-import Link from 'next/link';
 import { toast } from 'sonner';
+
+import { PillButton } from '@/components/studio/pill-button';
+import { StateChip } from '@/components/studio/state-chip';
+import { Panel } from '@/components/studio/panel';
+import { TopicHeader, HubSkeleton, Section } from '@/components/social';
 
 interface ImpactStory {
   id: string;
@@ -133,32 +135,23 @@ function ImpactStoriesPageContent() {
     }
   };
 
+  if (loading) {
+    return <HubSkeleton />;
+  }
+
   return (
-    <div className="space-y-6 animate-fade-in-up">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <Link href="/community-impact" className="text-muted-foreground hover:text-foreground">
-              Community & Impact
-            </Link>
-            <span className="text-muted-foreground">/</span>
-            <span className="font-medium">Impact Stories</span>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2 mt-2">
-            <BookOpen className="h-6 w-6 text-amber-600" />
-            Impact Stories
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Document and share your community impact stories
-          </p>
-        </div>
+    <div className="space-y-8 animate-fade-in-up">
+      <TopicHeader
+        eyebrow={<>THE WIRING &middot; COMMUNITY IMPACT</>}
+        headline={<>Impact stories.</>}
+        description="Document and share your community impact stories."
+        backHref="/community-impact"
+        backLabel="Community impact"
+      >
+        <PillButton size="sm" onClick={() => setOpen(true)}>
+          Create story
+        </PillButton>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <PlusCircle className="h-4 w-4 mr-2" />
-              Create Story
-            </Button>
-          </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Create Impact Story</DialogTitle>
@@ -222,74 +215,51 @@ function ImpactStoriesPageContent() {
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? 'Creating...' : 'Create Story'}
+                  {isSubmitting ? 'Saving…' : 'Create Story'}
                 </Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+      </TopicHeader>
 
-      {loading ? (
-        <Card>
-          <CardContent className="p-8">
-            <p className="text-muted-foreground text-center">Loading stories...</p>
-          </CardContent>
-        </Card>
-      ) : stories.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="p-8">
-            <div className="text-center">
-              <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground mb-4">
-                No impact stories yet. Create your first story to document your community impact.
-              </p>
-              <Button onClick={() => setOpen(true)}>
-                <PlusCircle className="h-4 w-4 mr-2" />
-                Create Your First Story
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-6">
-          {stories.map((story) => (
-            <Card key={story.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
+      <Section label="IMPACT STORIES" blurb="Stories that show your community impact in the field.">
+        {stories.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No impact stories yet. Use &quot;Create story&quot; to document your first one.
+          </p>
+        ) : (
+          <div className="grid gap-4">
+            {stories.map((story) => (
+              <Panel key={story.id}>
+                <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge variant="secondary">{story.story_type}</Badge>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Calendar className="h-3 w-3" />
+                    <div className="mb-2 flex items-center gap-3">
+                      <StateChip tone="quiet">{story.story_type}</StateChip>
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Calendar className="h-3 w-3" aria-hidden="true" />
                         {format(new Date(story.story_date), 'dd MMM yyyy')}
-                      </div>
+                      </span>
                     </div>
-                    <CardTitle>{story.story_title}</CardTitle>
+                    <h3 className="text-base font-semibold tracking-tight">{story.story_title}</h3>
                     {story.impact_summary && (
-                      <CardDescription className="mt-2 font-medium text-emerald-600">
+                      <p className="mt-1 text-sm font-medium text-studio-good">
                         {story.impact_summary}
-                      </CardDescription>
+                      </p>
                     )}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(story.id)}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <PillButton variant="ghost" size="sm" onClick={() => handleDelete(story.id)}>
+                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                  </PillButton>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground whitespace-pre-line">
+                <p className="mt-3 whitespace-pre-line text-sm text-muted-foreground">
                   {story.story_content}
                 </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+              </Panel>
+            ))}
+          </div>
+        )}
+      </Section>
     </div>
   );
 }

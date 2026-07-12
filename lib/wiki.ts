@@ -9,8 +9,8 @@ import sanitizeHtml from 'sanitize-html';
 // wiki/pages/*.md with YAML frontmatter and [[slug]] wikilinks; Claude Code
 // maintains the content (see wiki/CLAUDE.md), this module reads and renders it.
 // Pages are read from disk, so consumers must be statically generated at build
-// time (or, like app/sitemap.ts, have wiki/pages included in their function
-// trace via next.config.js outputFileTracingIncludes).
+// time, or have wiki/pages included in their function trace via
+// next.config.js outputFileTracingIncludes.
 
 export type WikiPageType = 'concept' | 'standard' | 'legislation' | 'glossary' | 'guide';
 

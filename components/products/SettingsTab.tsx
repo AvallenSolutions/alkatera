@@ -1,8 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,8 +11,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Archive, Trash2, AlertTriangle } from "lucide-react";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { StateChip } from "@/components/studio/state-chip";
+import { PillButton } from "@/components/studio/pill-button";
 
 interface SettingsTabProps {
   productName: string;
@@ -53,79 +52,42 @@ export function SettingsTab({ productName, onArchive, onDelete }: SettingsTabPro
   };
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <Alert className="backdrop-blur-xl bg-amber-500/10 border border-amber-500/30">
-        <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-        <AlertDescription className="text-sm text-amber-700 dark:text-amber-200">
-          <strong>Danger Zone:</strong> These actions cannot be easily undone. Please proceed with caution.
-        </AlertDescription>
-      </Alert>
+    <div className="max-w-3xl space-y-10">
+      <div className="flex items-center gap-3">
+        <Eyebrow>Settings</Eyebrow>
+        <StateChip tone="attention">Careful</StateChip>
+      </div>
 
       {/* Archive Product */}
-      <Card className="backdrop-blur-xl bg-card dark:bg-white/5 border border-amber-500/30 shadow-xl hover:bg-muted/50 dark:hover:bg-white/10 transition-all">
-        <CardHeader>
-          <div className="flex items-start gap-3">
-            <div className="h-10 w-10 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0 shadow-lg shadow-amber-500/20">
-              <Archive className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div className="flex-1">
-              <CardTitle className="text-amber-700 dark:text-amber-100">Archive Product</CardTitle>
-              <CardDescription className="text-muted-foreground">
-                Remove this product from active listings whilst preserving all data
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <p className="text-sm text-foreground">
-              Archived products are hidden from lists and reports but can be restored at any time.
-              All calculation history and material data will be preserved.
-            </p>
-            <Button
-              variant="outline"
-              className="backdrop-blur-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
-              onClick={() => setShowArchiveDialog(true)}
-            >
-              <Archive className="h-4 w-4 mr-2" />
-              Archive Product
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <section className="border-t border-border pt-5">
+        <Eyebrow className="mb-1">Archive product</Eyebrow>
+        <p className="mb-4 max-w-2xl text-sm text-muted-foreground">
+          Archived products are hidden from lists and reports but can be restored at any time.
+          All calculation history and material data is preserved.
+        </p>
+        <PillButton variant="outline" onClick={() => setShowArchiveDialog(true)}>
+          Archive product
+        </PillButton>
+      </section>
 
       {/* Delete Product */}
-      <Card className="backdrop-blur-xl bg-card dark:bg-white/5 border border-red-500/30 shadow-xl hover:bg-muted/50 dark:hover:bg-white/10 transition-all">
-        <CardHeader>
-          <div className="flex items-start gap-3">
-            <div className="h-10 w-10 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0 shadow-lg shadow-red-500/20">
-              <Trash2 className="h-5 w-5 text-red-600 dark:text-red-400" />
-            </div>
-            <div className="flex-1">
-              <CardTitle className="text-red-700 dark:text-red-100">Delete Product</CardTitle>
-              <CardDescription className="text-muted-foreground">
-                Permanently delete this product and all associated data
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <p className="text-sm text-foreground">
-              This action permanently removes the product, all ingredients, packaging, and calculation history.
-              <strong className="text-red-600 dark:text-red-400"> This cannot be undone.</strong>
-            </p>
-            <Button
-              variant="destructive"
-              className="bg-red-500/80 hover:bg-red-500 text-white"
-              onClick={() => setShowDeleteDialog(true)}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete Product
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <section className="border-t border-border pt-5">
+        <div className="mb-1 flex items-center gap-3">
+          <Eyebrow tone="dim">Delete product</Eyebrow>
+          <StateChip tone="stale">Permanent</StateChip>
+        </div>
+        <p className="mb-4 max-w-2xl text-sm text-muted-foreground">
+          This permanently removes the product, all ingredients, packaging, and calculation history.
+          This cannot be undone.
+        </p>
+        <PillButton
+          variant="ghost"
+          className="text-studio-stale hover:text-studio-stale"
+          onClick={() => setShowDeleteDialog(true)}
+        >
+          Delete product
+        </PillButton>
+      </section>
 
       {/* Archive Confirmation Dialog */}
       <AlertDialog open={showArchiveDialog} onOpenChange={setShowArchiveDialog}>
@@ -139,12 +101,8 @@ export function SettingsTab({ productName, onArchive, onDelete }: SettingsTabPro
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isArchiving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleArchive}
-              disabled={isArchiving}
-              className="bg-amber-600 hover:bg-amber-700"
-            >
-              {isArchiving ? 'Archiving...' : 'Archive Product'}
+            <AlertDialogAction onClick={handleArchive} disabled={isArchiving}>
+              {isArchiving ? 'Archiving...' : 'Archive product'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -165,9 +123,9 @@ export function SettingsTab({ productName, onArchive, onDelete }: SettingsTabPro
             <AlertDialogAction
               onClick={handleDelete}
               disabled={isDeleting}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-studio-stale text-studio-cream hover:bg-studio-stale/90"
             >
-              {isDeleting ? 'Deleting...' : 'Delete Product'}
+              {isDeleting ? 'Deleting...' : 'Delete product'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

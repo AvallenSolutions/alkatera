@@ -66,6 +66,8 @@ export interface RoomConfig {
   tabs: RoomTab[];
   /** Overflow surfaces shown behind a "More…" menu (rare / long-tail). */
   more?: RoomTab[];
+  /** The room's landing page, when it has one. The band's room name links here. */
+  landing?: string;
 }
 
 /** "R G B" triplets for the two permitted text colours on saturated blocks. */

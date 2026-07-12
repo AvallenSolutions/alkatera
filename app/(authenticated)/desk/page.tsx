@@ -59,7 +59,7 @@ function posterContent(counts: DeskCounts | null): Record<
       note: counts
         ? n(counts.facilities, 'FACILITY', 'FACILITIES') + ' · EMISSIONS · SPEND'
         : 'FACILITIES · EMISSIONS · SPEND',
-      href: '/company/facilities/',
+      href: '/workbench/',
     },
     cellar: {
       eyebrow: 'THE CELLAR',
@@ -67,33 +67,33 @@ function posterContent(counts: DeskCounts | null): Record<
       note: counts
         ? n(counts.products, 'PRODUCT', 'PRODUCTS') + ' · LCAS'
         : 'PRODUCTS · LCAS',
-      href: '/products/',
+      href: '/cellar/',
     },
     network: {
       eyebrow: 'THE NETWORK',
       headline: "Who we're talking to.",
-      note: 'SUPPLIERS · MESSAGES · SUPPORT',
-      href: '/suppliers/',
+      note: 'SUPPLIERS · MESSAGES · EXPERTS',
+      href: '/network/',
     },
     evidence: {
       eyebrow: 'THE EVIDENCE',
       headline: 'What we can prove.',
       note: counts
-        ? n(counts.reports, 'REPORT', 'REPORTS') + ' · TARGETS · CERTIFICATIONS'
-        : 'REPORTS · TARGETS · CERTIFICATIONS',
-      href: '/reports/',
+        ? n(counts.reports, 'REPORT', 'REPORTS') + ' · CERTIFICATIONS · TARGETS'
+        : 'REPORTS · CERTIFICATIONS · TARGETS',
+      href: '/evidence/',
     },
     library: {
       eyebrow: 'THE LIBRARY',
       headline: 'What we know.',
       note: 'KNOWLEDGE · WIKI',
-      href: '/knowledge-bank/',
+      href: '/library/',
     },
     wiring: {
       eyebrow: 'THE WIRING',
       headline: 'The wiring.',
       note: 'SETTINGS · INTEGRATIONS · COMPLIANCE',
-      href: '/settings/',
+      href: '/wiring/',
     },
   };
 }

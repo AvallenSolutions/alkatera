@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { WikiMapClient } from '@/marketing/components/WikiMapClient';
+import { WikiMapClient } from '@/components/wiki/WikiMapClient';
 import { getWikiMapData, WIKI_TYPE_LABELS, WIKI_TYPE_ORDER } from '@/lib/wiki';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { Statement } from '@/components/studio/statement';
@@ -29,7 +29,7 @@ export default async function WikiIndexPage() {
 
   return (
     <div className="space-y-8">
-      <Statement eyebrow="THE EVIDENCE · WIKI" headline="The wiki.">
+      <Statement eyebrow="THE LIBRARY · WIKI" headline="The wiki.">
         <BigNumber value={nodes.length} label="PAGES" size="display" />
       </Statement>
       <p className="max-w-3xl text-sm leading-relaxed text-studio-dim">
@@ -38,6 +38,15 @@ export default async function WikiIndexPage() {
       </p>
 
       <WikiMapClient nodes={nodes} />
+
+      <p className="text-sm text-studio-dim">
+        <Link
+          href="/knowledge-bank/"
+          className="transition-colors duration-200 hover:text-room-accent"
+        >
+          Your resources live in the knowledge bank
+        </Link>
+      </p>
 
       {/* Accessible plain-list view of the same pages. */}
       <section className="border-t border-border pt-10">

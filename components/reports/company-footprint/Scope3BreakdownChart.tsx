@@ -18,7 +18,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Panel, Eyebrow } from '@/components/studio';
 import {
   Select,
   SelectContent,
@@ -53,9 +53,9 @@ export function Scope3BreakdownChart({ liveEmissions }: { liveEmissions: LiveEmi
   if (yearsWithScope3.length === 0 || bars.length === 0) return null;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-3">
-        <CardTitle>Where your supply-chain emissions come from</CardTitle>
+    <Panel>
+      <div className="mb-4 flex flex-row items-center justify-between gap-3">
+        <Eyebrow tone="dim">WHERE YOUR SUPPLY-CHAIN EMISSIONS COME FROM</Eyebrow>
         {yearsWithScope3.length > 1 && (
           <Select value={String(activeYear)} onValueChange={(v) => setYear(Number(v))}>
             <SelectTrigger className="h-8 w-24 text-xs">
@@ -70,8 +70,8 @@ export function Scope3BreakdownChart({ liveEmissions }: { liveEmissions: LiveEmi
             </SelectContent>
           </Select>
         )}
-      </CardHeader>
-      <CardContent>
+      </div>
+      <div>
         <div style={{ width: '100%', height: Math.max(200, bars.length * 38) }}>
           <ResponsiveContainer>
             <BarChart data={bars} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
@@ -113,7 +113,7 @@ export function Scope3BreakdownChart({ liveEmissions }: { liveEmissions: LiveEmi
         <p className="mt-2 text-xs text-muted-foreground">
           Your biggest reduction opportunities usually sit in the largest bars here.
         </p>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Panel } from "@/components/studio/panel";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -67,13 +67,13 @@ const statusTones: Record<FeedbackStatus, "good" | "attention" | "stale" | "hold
   closed: "quiet",
 };
 
-function StatusBadge({ status }: { status: FeedbackStatus }) {
+function StatusChip({ status }: { status: FeedbackStatus }) {
   const config = FEEDBACK_STATUSES[status];
 
   return <StateChip tone={statusTones[status]}>{config.label}</StateChip>;
 }
 
-function PriorityBadge({ priority }: { priority: string }) {
+function PriorityChip({ priority }: { priority: string }) {
   const config = FEEDBACK_PRIORITIES[priority as keyof typeof FEEDBACK_PRIORITIES];
   if (!config) return null;
 
@@ -224,14 +224,14 @@ export default function AdminFeedbackPage() {
   if (!isAlkateraAdmin) {
     return (
       <div className="container mx-auto py-8 px-4">
-        <Card className="rounded-[6px]">
-          <CardContent className="py-12 text-center">
+        <Panel>
+          <div className="py-12 text-center">
             <h3 className="text-lg font-medium mb-2">Access Denied</h3>
             <p className="text-muted-foreground">
               You do not have permission to access this page.
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
       </div>
     );
   }
@@ -240,7 +240,7 @@ export default function AdminFeedbackPage() {
     <div className="container mx-auto py-8 px-4">
       {/* Header */}
       <header className="mb-8">
-        <Eyebrow className="mb-3">THE WIRING · FEEDBACK</Eyebrow>
+        <Eyebrow className="mb-3">THE WIRING · ADMIN</Eyebrow>
         <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
           The feedback.
         </h1>
@@ -310,8 +310,8 @@ export default function AdminFeedbackPage() {
               <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">Loading.</p>
             </div>
           ) : filteredTickets.length === 0 ? (
-            <Card className="rounded-[6px]">
-              <CardContent className="py-12 text-center">
+            <Panel>
+              <div className="py-12 text-center">
                 <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                 <h3 className="text-lg font-medium mb-2">No tickets found</h3>
                 <p className="text-muted-foreground">
@@ -319,10 +319,10 @@ export default function AdminFeedbackPage() {
                     ? "Try adjusting your filters."
                     : "No feedback tickets in this category."}
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </Panel>
           ) : (
-            <Card className="rounded-[6px]">
+            <Panel flush>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -376,10 +376,10 @@ export default function AdminFeedbackPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <StatusBadge status={ticket.status} />
+                          <StatusChip status={ticket.status} />
                         </TableCell>
                         <TableCell>
-                          <PriorityBadge priority={ticket.priority} />
+                          <PriorityChip priority={ticket.priority} />
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -478,7 +478,7 @@ export default function AdminFeedbackPage() {
                   </div>
                 </div>
               )}
-            </Card>
+            </Panel>
           )}
         </TabsContent>
       </Tabs>

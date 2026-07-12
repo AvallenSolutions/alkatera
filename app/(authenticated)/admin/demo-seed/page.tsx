@@ -3,14 +3,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useIsAlkateraAdmin } from '@/hooks/usePermissions'
 import { supabase } from '@/lib/supabaseClient'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { ShieldAlert, Sprout, Wine, RotateCcw } from 'lucide-react'
-import { Eyebrow } from '@/components/studio/eyebrow'
+import { ShieldAlert } from 'lucide-react'
+import { Statement } from '@/components/studio/statement'
+import { Panel } from '@/components/studio/panel'
+import { PillButton } from '@/components/studio/pill-button'
 import { toast } from 'sonner'
 
 interface Organization { id: string; name: string }
@@ -105,35 +105,25 @@ export default function DemoSeedPage() {
   if (adminLoading) {
     return (
       <div className="flex justify-center py-12">
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">Loading…</p>
       </div>
     )
   }
 
   if (!isAlkateraAdmin) {
     return (
-      <Card className="max-w-xl mx-auto mt-12">
-        <CardContent className="py-6 flex items-start gap-3">
-          <ShieldAlert className="h-5 w-5 text-muted-foreground mt-0.5" />
-          <div>
-            <h2 className="font-semibold">Admin access required</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              This tool is only available to platform administrators.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center gap-2 py-20 text-sm text-studio-dim">
+        <ShieldAlert className="h-4 w-4" />
+        Admin access required.
+      </div>
     )
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="max-w-3xl space-y-6">
       <div>
-        <Eyebrow tone="dim" className="mb-3">THE WIRING · ADMIN</Eyebrow>
-        <h1 className="font-display text-3xl font-bold tracking-[-0.035em] text-foreground">
-          Demo seed: inventory and Xero.
-        </h1>
-        <p className="text-sm text-muted-foreground mt-2">
+        <Statement eyebrow="THE WIRING · ADMIN" headline="Demo seed: inventory and Xero." />
+        <p className="mt-2 max-w-2xl text-sm text-studio-dim">
           One-click seed so you can test the full double-counting pipeline: two products
           (one with a completed LCA, one without), three ingredients, a demo facility, and
           five unlinked Xero raw_materials invoices spread across the last six months.
@@ -141,14 +131,14 @@ export default function DemoSeedPage() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Target organisation</CardTitle>
-          <CardDescription>
+      <Panel>
+        <div className="mb-4 space-y-1">
+          <h2 className="font-display text-base font-semibold text-foreground">Target organisation</h2>
+          <p className="text-sm text-studio-dim">
             Pick the alka<strong>tera</strong> Demo org (or any test org) to seed.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-[1fr_auto] items-end">
+          </p>
+        </div>
+        <div className="grid items-end gap-4 md:grid-cols-[1fr_auto]">
           <div className="space-y-1.5">
             <Label>Organisation</Label>
             <Select value={orgId} onValueChange={setOrgId}>
@@ -160,50 +150,46 @@ export default function DemoSeedPage() {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={seed} disabled={seeding || !orgId}>
-            {!seeding && <Sprout className="h-4 w-4 mr-2" />}
+          <PillButton onClick={seed} disabled={seeding || !orgId}>
             {seeding ? 'Seeding…' : 'Seed demo data'}
-          </Button>
-        </CardContent>
-      </Card>
+          </PillButton>
+        </div>
+      </Panel>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Wine className="h-4 w-4" />
+      <Panel>
+        <div className="mb-4 space-y-1">
+          <h2 className="font-display text-base font-semibold text-foreground">
             alka<strong>tera</strong> Drinks Co: full showcase demo
-          </CardTitle>
-          <CardDescription>
+          </h2>
+          <p className="text-sm text-studio-dim">
             Builds the complete dataset for the <strong>alkatera Drinks Co</strong> org: curated
             products (wine with viticulture, Calvados with an orchard, whisky maturation, a
             multipack), ~24 months of facility energy/water/waste + production, reconciled Pulse
             trends, targets + action plan, B Corp progress, social data and a full supplier + Xero
             set. Idempotent. After seeding, run <strong>Recalculate LCAs</strong> with this org
             active to compute the real footprints.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-center gap-3">
-          <Button onClick={() => runDrinksCo('seed')} loading={drinksAction === 'seed'} disabled={drinksAction !== null}>
-            {drinksAction !== 'seed' && <Wine className="h-4 w-4 mr-2" />}
-            Seed Drinks Co demo
-          </Button>
-          <Button variant="outline" onClick={() => runDrinksCo('reset')} loading={drinksAction === 'reset'} disabled={drinksAction !== null}>
-            {drinksAction !== 'reset' && <RotateCcw className="h-4 w-4 mr-2" />}
-            Reset dataset
-          </Button>
-        </CardContent>
-      </Card>
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <PillButton onClick={() => runDrinksCo('seed')} disabled={drinksAction !== null}>
+            {drinksAction === 'seed' ? 'Seeding…' : 'Seed Drinks Co demo'}
+          </PillButton>
+          <PillButton variant="outline" onClick={() => runDrinksCo('reset')} disabled={drinksAction !== null}>
+            {drinksAction === 'reset' ? 'Resetting…' : 'Reset dataset'}
+          </PillButton>
+        </div>
+      </Panel>
 
       {drinksResult && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Drinks Co seed result</CardTitle>
-            <CardDescription>What was written. Existing rows the seed owns were replaced, not duplicated.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
+        <Panel>
+          <div className="mb-4 space-y-1">
+            <h2 className="font-display text-base font-semibold text-foreground">Drinks Co seed result</h2>
+            <p className="text-sm text-studio-dim">What was written. Existing rows the seed owns were replaced, not duplicated.</p>
+          </div>
+          <div className="space-y-3 text-sm">
             <ul className="space-y-1">
               {Object.entries(drinksResult.report).map(([k, v]) => (
-                <li key={k}><span className="font-medium">{k}:</span> <span className="text-muted-foreground">{v}</span></li>
+                <li key={k}><span className="font-medium">{k}:</span> <span className="text-studio-dim">{v}</span></li>
               ))}
             </ul>
             {drinksResult.warnings.length > 0 && (
@@ -212,28 +198,26 @@ export default function DemoSeedPage() {
                 <ul className="list-disc pl-5">{drinksResult.warnings.map((w) => <li key={w}>{w}</li>)}</ul>
               </div>
             )}
-            <ol className="list-decimal pl-5 text-muted-foreground space-y-1">
+            <ol className="list-decimal space-y-1 pl-5 text-studio-dim">
               {drinksResult.nextSteps.map((s) => <li key={s}>{s}</li>)}
             </ol>
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
       )}
 
       {result && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">What to try next</CardTitle>
-            <CardDescription>
+        <Panel>
+          <div className="mb-4 space-y-1">
+            <h2 className="font-display text-base font-semibold text-foreground">What to try next</h2>
+            <p className="text-sm text-studio-dim">
               Inserted {result.xeroTransactionsInserted} new Xero rows. Existing rows were
               left untouched.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ol className="text-sm space-y-2 list-decimal pl-5 text-muted-foreground">
-              {result.nextSteps.map((s) => <li key={s}>{s}</li>)}
-            </ol>
-          </CardContent>
-        </Card>
+            </p>
+          </div>
+          <ol className="list-decimal space-y-2 pl-5 text-sm text-studio-dim">
+            {result.nextSteps.map((s) => <li key={s}>{s}</li>)}
+          </ol>
+        </Panel>
       )}
     </div>
   )

@@ -100,7 +100,7 @@ export function ByproductCreateDialog({ open, onOpenChange, onCreated }: Props) 
         <DialogHeader>
           <DialogTitle>Add a byproduct</DialogTitle>
           <DialogDescription>
-            Register a co-product stream and where it goes. Mass logs come later — start with the partnership.
+            Register a co-product stream and where it goes. Mass logs come later; start with the partnership.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">

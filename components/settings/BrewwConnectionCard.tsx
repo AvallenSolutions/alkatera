@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useOrganization } from '@/lib/organizationContext'
-import { Card, CardContent } from '@/components/ui/card'
+import { Panel } from '@/components/studio'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -244,8 +244,8 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
 
   return (
     <>
-      <Card className={inError ? 'border-studio-attention/40' : undefined}>
-        <CardContent className="p-5 flex flex-col sm:flex-row items-start gap-4">
+      <Panel flush className={inError ? 'border-studio-attention/40' : undefined}>
+        <div className="p-5 flex flex-col sm:flex-row items-start gap-4">
           <div className="h-10 w-10 rounded-[6px] bg-secondary flex items-center justify-center flex-shrink-0">
             <Link2 className="h-5 w-5 text-foreground" />
           </div>
@@ -370,8 +370,8 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
               </>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* Disconnect confirmation */}
       <AlertDialog open={confirmDisconnect} onOpenChange={(next) => { if (!disconnecting) setConfirmDisconnect(next) }}>

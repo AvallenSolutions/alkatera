@@ -8,7 +8,6 @@ import { useRealtimeRefresh } from '@/lib/rosa/useRealtimeRefresh'
 import { trackRosa } from '@/lib/rosa/track'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
-import { HubLayoutSettings } from '@/components/rosa/HubLayoutSettings'
 import { StateChip } from '@/components/studio/state-chip'
 import { STUDIO, WORKING_TONE_HEX, type WorkingTone } from '@/components/studio/theme'
 // Round 3 (auto-research /rosa): breakdown modal is open-gated; defer it so it
@@ -227,10 +226,6 @@ export function VitalityHero() {
         )}
         aria-label="Open vitality breakdown"
       >
-        <div className="absolute top-3 right-3 z-10" onClick={e => e.stopPropagation()}>
-          <HubLayoutSettings />
-        </div>
-
         <div className="grid grid-cols-1 items-center gap-6 sm:grid-cols-5">
           <div className="min-w-0 sm:col-span-3">
             <div className="flex flex-wrap items-center gap-3">

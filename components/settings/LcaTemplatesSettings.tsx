@@ -17,13 +17,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Eyebrow, Panel } from '@/components/studio';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -149,22 +143,20 @@ export function LcaTemplatesSettings({
   }
 
   return (
-    <Card>
+    <Panel className="space-y-4">
       {showHeader && (
-        <CardHeader>
-          <CardTitle className="text-2xl font-semibold">
-            LCA report templates
-          </CardTitle>
-          <CardDescription>
+        <div className="space-y-1">
+          <Eyebrow tone="dim">LCA report templates</Eyebrow>
+          <p className="text-sm text-studio-dim">
             Reusable Goal &amp; Scope configurations for the LCA wizard. The
             organisation default auto-applies when a product has no prior LCA
             settings, eliminating drift between runs. Functional unit is
             product-specific and is never part of a template.
-          </CardDescription>
-        </CardHeader>
+          </p>
+        </div>
       )}
 
-      <CardContent className={showHeader ? '' : 'pt-6'}>
+      <div>
         {isLoading ? (
           <div className="flex items-center justify-center h-48">
             <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
@@ -184,7 +176,7 @@ export function LcaTemplatesSettings({
             </Button>
           </div>
         ) : templates.length === 0 ? (
-          <div className="rounded-[6px] border border-dashed p-8 text-center">
+          <div className="rounded-[6px] border border-studio-hairline p-8 text-center">
             <p className="text-sm font-medium">No LCA templates yet.</p>
             <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
               Open the LCA wizard on any product, configure the Goal &amp;
@@ -287,7 +279,7 @@ export function LcaTemplatesSettings({
             </Table>
           </div>
         )}
-      </CardContent>
+      </div>
 
       {/* Edit / view dialog */}
       <LcaTemplateEditorDialog
@@ -340,6 +332,6 @@ export function LcaTemplatesSettings({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card>
+    </Panel>
   );
 }

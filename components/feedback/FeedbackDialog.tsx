@@ -23,7 +23,6 @@ import {
   TrendingUp,
   Upload,
   X,
-  Loader2,
   CheckCircle,
   ImageIcon,
 } from "lucide-react";
@@ -183,9 +182,7 @@ export function FeedbackDialog({ trigger, defaultCategory }: FeedbackDialogProps
       <DialogContent className="sm:max-w-lg">
         {isSuccess ? (
           <div className="py-8 text-center">
-            <div className="mx-auto w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center mb-4">
-              <CheckCircle className="h-6 w-6 text-green-500" />
-            </div>
+            <CheckCircle className="mx-auto mb-4 h-8 w-8 text-studio-good" />
             <h3 className="text-lg font-semibold mb-2">Thank you!</h3>
             <p className="text-muted-foreground">
               Your feedback has been submitted. We&apos;ll review it and get back to you if needed.
@@ -217,14 +214,14 @@ export function FeedbackDialog({ trigger, defaultCategory }: FeedbackDialogProps
                         <Label
                           key={key}
                           htmlFor={key}
-                          className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                          className={`flex items-center gap-3 p-3 rounded-[6px] border cursor-pointer transition-colors ${
                             isSelected
-                              ? "border-primary bg-primary/5"
-                              : "border-border hover:bg-muted/50"
+                              ? "border-room-accent"
+                              : "border-studio-hairline hover:bg-studio-cream"
                           }`}
                         >
                           <RadioGroupItem value={key} id={key} className="sr-only" />
-                          <Icon className={`h-4 w-4 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
+                          <Icon className={`h-4 w-4 ${isSelected ? "text-room-accent" : "text-muted-foreground"}`} />
                           <span className={isSelected ? "font-medium" : ""}>{value.label}</span>
                         </Label>
                       );
@@ -333,14 +330,7 @@ export function FeedbackDialog({ trigger, defaultCategory }: FeedbackDialogProps
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Submitting...
-                    </>
-                  ) : (
-                    "Submit Feedback"
-                  )}
+                  {isSubmitting ? "Submitting…" : "Submit Feedback"}
                 </Button>
               </div>
             </form>

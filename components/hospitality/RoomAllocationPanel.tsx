@@ -11,11 +11,11 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Zap, Info } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { BigNumber } from '@/components/studio/big-number';
+import { PillButton } from '@/components/studio/pill-button';
 import { useToast } from '@/hooks/use-toast';
 import type { AllocatedImpact, RoomAllocationInput } from '@/lib/hospitality/room-allocation';
 
@@ -87,13 +87,10 @@ export function RoomAllocationPanel({
   const total = consumables + allocated;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center gap-2 space-y-0">
-        <Zap className="h-5 w-5" />
-        <CardTitle className="text-base">Allocated energy &amp; water</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">
+    <section className="border-t border-border pt-5">
+      <Eyebrow className="mb-4">Allocated energy &amp; water</Eyebrow>
+      <div className="space-y-4">
+        <p className="max-w-xl text-sm text-muted-foreground">
           Energy and water used per room-night. Enter the amount allocated to one night (e.g. the
           venue&apos;s annual utilities ÷ occupied room-nights).
         </p>
@@ -126,37 +123,27 @@ export function RoomAllocationPanel({
           </div>
         </div>
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-sm text-studio-stale">{error}</p>}
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={save} disabled={saving}>
+          <PillButton variant="outline" onClick={save} disabled={saving}>
             {saving ? 'Saving…' : 'Save allocation'}
-          </Button>
+          </PillButton>
         </div>
 
-        <div className="rounded-lg border bg-muted/40 p-3 text-sm">
-          <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
-            <div>
-              <p className="text-muted-foreground">Consumables</p>
-              <p className="font-semibold">{fmt(consumables)} kg CO₂e</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Allocated energy/water</p>
-              <p className="font-semibold">{fmt(allocated)} kg CO₂e</p>
-            </div>
-            <div className="col-span-2">
-              <p className="text-muted-foreground">Total per night</p>
-              <p className="text-lg font-semibold">{fmt(total)} kg CO₂e</p>
-            </div>
+        <div className="border-y border-border py-4">
+          <div className="flex flex-wrap items-end gap-x-12 gap-y-4">
+            <BigNumber value={fmt(consumables)} label="KG CO₂E CONSUMABLES" />
+            <BigNumber value={fmt(allocated)} label="KG CO₂E ALLOCATED" />
+            <BigNumber value={fmt(total)} label="KG CO₂E TOTAL / NIGHT" tone="room" />
           </div>
-          <p className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
-            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <p className="mt-3 max-w-xl text-xs text-muted-foreground">
             Allocated energy &amp; water is already counted in the venue&apos;s facility (Scope 1/2),
-            so it&apos;s shown for per-night intensity only — only the consumables are added to your
+            so it&apos;s shown for per-night intensity only: only the consumables are added to your
             company total.
           </p>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }

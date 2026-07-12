@@ -5,7 +5,6 @@ import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
 import Link from 'next/link';
 import { useOrganization } from '@/lib/organizationContext';
 import { supabase } from '@/lib/supabaseClient';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -24,11 +23,13 @@ import {
   ChevronRight,
   Dog,
   Sparkles,
+  Recycle,
+  History,
 } from 'lucide-react';
-import { FeatureGate } from '@/components/subscription/FeatureGate';
-import { Eyebrow } from '@/components/studio/eyebrow';
+import { Statement } from '@/components/studio/statement';
+import { Panel } from '@/components/studio/panel';
 import { StateChip } from '@/components/studio/state-chip';
-import type { WorkingTone } from '@/components/studio/theme';
+import { obligationStatusTone } from '@/lib/epr/status-tones';
 import {
   REPORTING_DEADLINES,
   type ReportingDeadline,
@@ -93,29 +94,6 @@ function getCompletenessColor(pct: number): string {
   if (pct >= 80) return 'text-studio-good';
   if (pct >= 50) return 'text-studio-attention';
   return 'text-studio-stale';
-}
-
-function getCompletenessBgColor(pct: number): string {
-  if (pct >= 80) return 'bg-studio-good';
-  if (pct >= 50) return 'bg-studio-attention';
-  return 'bg-studio-stale';
-}
-
-function getObligationBadge(size: ObligationResult['size'] | 'pending'): {
-  label: string;
-  tone: WorkingTone;
-} {
-  switch (size) {
-    case 'large':
-      return { label: 'Large Producer', tone: 'stale' };
-    case 'small':
-      return { label: 'Small Producer', tone: 'attention' };
-    case 'below_threshold':
-      return { label: 'Below Threshold', tone: 'good' };
-    case 'pending':
-    default:
-      return { label: 'Pending Setup', tone: 'quiet' };
-  }
 }
 
 // =============================================================================
@@ -325,16 +303,14 @@ export default function EPRDashboardPage() {
     return (
       <div className="space-y-6 animate-fade-in-up">
         <PageHeader />
-        <Card className="rounded-[6px] border-border bg-card">
-          <CardContent className="p-6 text-center">
-            <AlertTriangle className="h-8 w-8 text-studio-stale mx-auto mb-3" />
-            <p className="text-studio-stale mb-4">{error}</p>
-            <Button variant="outline" onClick={fetchData}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Try Again
-            </Button>
-          </CardContent>
-        </Card>
+        <Panel className="p-6 text-center">
+          <AlertTriangle className="h-8 w-8 text-studio-stale mx-auto mb-3" />
+          <p className="text-studio-stale mb-4">{error}</p>
+          <Button variant="outline" onClick={fetchData}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Try Again
+          </Button>
+        </Panel>
       </div>
     );
   }
@@ -345,32 +321,29 @@ export default function EPRDashboardPage() {
   const isPending = !settingsExist && (!obligation || obligation.size === 'below_threshold');
 
   return (
-    <FeatureGate feature="epr_beta">
     <div className="space-y-6 animate-fade-in-up">
       <PageHeader onRefresh={fetchData} />
 
       {/* EPR Setup Wizard CTA */}
       {!wizardCompleted && (
         <Link href="/epr/wizard">
-          <Card className="rounded-[6px] border-border bg-card hover:border-room-accent/40 transition-colors cursor-pointer group">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-5">
-                <div className="w-14 h-14 rounded-[6px] border border-border bg-secondary flex items-center justify-center flex-shrink-0">
-                  <Dog className="w-7 h-7 text-room-accent" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-base font-semibold text-foreground">EPR Setup Wizard</h3>
-                    <StateChip className="text-room-accent">New</StateChip>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Let Rosa guide you through setting up your EPR data, from organisation details to generating your RPD submission. Takes about 13 minutes.
-                  </p>
-                </div>
-                <ArrowRight className="w-5 h-5 text-studio-dim group-hover:text-room-accent transition-colors flex-shrink-0" />
+          <Panel className="p-6 hover:border-room-accent/40 transition-colors cursor-pointer group">
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 rounded-[6px] border border-studio-hairline bg-secondary flex items-center justify-center flex-shrink-0">
+                <Dog className="w-7 h-7 text-room-accent" />
               </div>
-            </CardContent>
-          </Card>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="text-base font-semibold text-foreground">EPR Setup Wizard</h3>
+                  <StateChip className="text-room-accent">New</StateChip>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Let Rosa guide you through setting up your EPR data, from organisation details to generating your RPD submission. Takes about 13 minutes.
+                </p>
+              </div>
+              <ArrowRight className="w-5 h-5 text-studio-dim group-hover:text-room-accent transition-colors flex-shrink-0" />
+            </div>
+          </Panel>
         </Link>
       )}
 
@@ -442,7 +415,6 @@ export default function EPRDashboardPage() {
       {/* Quick Actions */}
       <QuickActions wizardCompleted={wizardCompleted} />
     </div>
-    </FeatureGate>
   );
 }
 
@@ -454,12 +426,7 @@ function PageHeader({ onRefresh }: { onRefresh?: () => void }) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
       <div className="min-w-0">
-        <Eyebrow tone="inherit" className="mb-3 text-room-accent">
-          THE EVIDENCE · EPR
-        </Eyebrow>
-        <h1 className="font-display text-[clamp(2.5rem,5vw,4.25rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
-          EPR compliance.
-        </h1>
+        <Statement eyebrow="THE WIRING · EPR" headline="EPR compliance." />
         <p className="mt-3 text-sm text-muted-foreground">
           Manage your UK Extended Producer Responsibility obligations, packaging data submissions, and fee estimates.
         </p>
@@ -483,15 +450,14 @@ function ObligationStatusCard({
   packagingSummary: ObligationAPIResponse['packaging_summary'] | null;
 }) {
   const effectiveStatus = isPending ? 'pending' : (obligation?.size ?? 'pending');
-  const badge = getObligationBadge(effectiveStatus);
+  const badge = obligationStatusTone(effectiveStatus);
 
   return (
-    <Card className="rounded-[6px] border-border bg-card overflow-hidden">
-      <CardContent className="p-6">
+    <Panel className="p-6">
         <div className="flex flex-col md:flex-row md:items-center gap-6">
           {/* Status indicator */}
           <div className="flex items-center gap-4">
-            <div className="h-16 w-16 rounded-[6px] border border-border bg-secondary flex items-center justify-center">
+            <div className="h-16 w-16 rounded-[6px] border border-studio-hairline bg-secondary flex items-center justify-center">
               {effectiveStatus === 'pending' ? (
                 <Settings className="h-8 w-8 text-studio-dim" />
               ) : effectiveStatus === 'below_threshold' ? (
@@ -546,8 +512,7 @@ function ObligationStatusCard({
             )}
           </div>
         </div>
-      </CardContent>
-    </Card>
+    </Panel>
   );
 }
 
@@ -569,34 +534,32 @@ function MetricCard({
   clickable?: boolean;
 }) {
   return (
-    <Card
-      className={`rounded-[6px] border-border bg-card ${
+    <Panel
+      className={`p-4 ${
         clickable ? 'hover:border-room-accent/40 transition-colors cursor-pointer' : ''
       }`}
     >
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between mb-3">
-          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
-            {label}
-          </span>
-          <span className={accent ? 'text-room-accent' : 'text-studio-dim'}>{icon}</span>
+      <div className="flex items-center justify-between mb-3">
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+          {label}
+        </span>
+        <span className={accent ? 'text-room-accent' : 'text-studio-dim'}>{icon}</span>
+      </div>
+      <p
+        className={`text-2xl font-display font-bold tabular-nums ${
+          valueColor ?? (accent ? 'text-room-accent' : 'text-foreground')
+        }`}
+      >
+        {value}
+      </p>
+      <p className="text-xs text-muted-foreground mt-1">{sublabel}</p>
+      {clickable && (
+        <div className="flex items-center gap-1 mt-2 text-xs text-room-accent">
+          <span>View details</span>
+          <ChevronRight className="h-3 w-3" />
         </div>
-        <p
-          className={`text-2xl font-display font-bold tabular-nums ${
-            valueColor ?? (accent ? 'text-room-accent' : 'text-foreground')
-          }`}
-        >
-          {value}
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">{sublabel}</p>
-        {clickable && (
-          <div className="flex items-center gap-1 mt-2 text-xs text-room-accent">
-            <span>View details</span>
-            <ChevronRight className="h-3 w-3" />
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      )}
+    </Panel>
   );
 }
 
@@ -618,14 +581,12 @@ function DeadlineTimeline({ obligation }: { obligation: ObligationResult | null 
     .slice(0, 5);
 
   return (
-    <Card className="rounded-[6px] border-border bg-card">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
-          <Clock className="h-4 w-4 text-room-accent" />
-          Upcoming Deadlines
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <Panel>
+      <h2 className="text-base font-semibold text-foreground flex items-center gap-2 mb-4">
+        <Clock className="h-4 w-4 text-room-accent" />
+        Upcoming Deadlines
+      </h2>
+      <div className="space-y-3">
         {obligation?.size === 'below_threshold' ? (
           <p className="text-sm text-muted-foreground py-4 text-center">
             No reporting deadlines: your organisation is below EPR thresholds.
@@ -639,8 +600,8 @@ function DeadlineTimeline({ obligation }: { obligation: ObligationResult | null 
             <DeadlineRow key={deadline.period} deadline={deadline} />
           ))
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }
 
@@ -657,7 +618,7 @@ function DeadlineRow({ deadline }: { deadline: ReportingDeadline }) {
   });
 
   return (
-    <div className="flex items-center justify-between p-3 rounded-[6px] border border-border bg-secondary">
+    <div className="flex items-center justify-between p-3 rounded-[6px] border border-studio-hairline bg-secondary">
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground truncate">
           {deadline.description}
@@ -710,14 +671,12 @@ function MaterialBreakdown({
   };
 
   return (
-    <Card className="rounded-[6px] border-border bg-card">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
-          <BarChart3 className="h-4 w-4 text-room-accent" />
-          Material Breakdown
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Panel>
+      <h2 className="text-base font-semibold text-foreground flex items-center gap-2 mb-4">
+        <BarChart3 className="h-4 w-4 text-room-accent" />
+        Material Breakdown
+      </h2>
+      <div className="space-y-4">
         {sortedMaterials.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4 text-center">
             No packaging materials with production data yet. Add products and production logs to see
@@ -777,7 +736,7 @@ function MaterialBreakdown({
             </div>
 
             {/* Total row */}
-            <div className="border-t border-border pt-2 flex items-center justify-between">
+            <div className="border-t border-studio-hairline pt-2 flex items-center justify-between">
               <span className="text-sm font-medium text-foreground">Total</span>
               <div className="flex items-center gap-4 text-sm">
                 <span className="text-foreground tabular-nums font-medium">
@@ -791,8 +750,8 @@ function MaterialBreakdown({
             </div>
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }
 
@@ -801,17 +760,15 @@ function DataGapAlerts({ gaps }: { gaps: EPRDataGap[] }) {
   const visibleGaps = expanded ? gaps : gaps.slice(0, 5);
 
   return (
-    <Card className="rounded-[6px] border-border bg-card">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-studio-attention" />
-          Data Gap Alerts
-          <StateChip tone="attention" className="ml-1">
-            {gaps.length} item{gaps.length !== 1 ? 's' : ''}
-          </StateChip>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
+    <Panel>
+      <h2 className="text-base font-semibold text-foreground flex items-center gap-2 mb-4">
+        <AlertTriangle className="h-4 w-4 text-studio-attention" />
+        Data Gap Alerts
+        <StateChip tone="attention" className="ml-1">
+          {gaps.length} item{gaps.length !== 1 ? 's' : ''}
+        </StateChip>
+      </h2>
+      <div className="space-y-2">
         {visibleGaps.map((gap) => (
           <Link
             key={gap.product_material_id}
@@ -842,8 +799,8 @@ function DataGapAlerts({ gaps }: { gaps: EPRDataGap[] }) {
             {expanded ? 'Show less' : `Show all ${gaps.length} items`}
           </button>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }
 
@@ -870,6 +827,20 @@ function QuickActions({ wizardCompleted }: { wizardCompleted: boolean }) {
       icon: <Settings className="h-5 w-5" />,
       primary: false,
     },
+    {
+      label: 'PRN Obligations',
+      description: 'Track Packaging Recovery Note purchases and fulfilment',
+      href: '/epr/prn',
+      icon: <Recycle className="h-5 w-5" />,
+      primary: false,
+    },
+    {
+      label: 'Audit Trail',
+      description: 'Review the immutable log of all EPR compliance activity',
+      href: '/epr/audit',
+      icon: <History className="h-5 w-5" />,
+      primary: false,
+    },
   ];
 
   if (wizardCompleted) {
@@ -883,36 +854,32 @@ function QuickActions({ wizardCompleted }: { wizardCompleted: boolean }) {
   }
 
   return (
-    <Card className="rounded-[6px] border-border bg-card">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold text-foreground">
-          Quick Actions
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {actions.map((action) => (
-            <Link key={action.href} href={action.href}>
-              <div
-                className={`p-4 rounded-[6px] border transition-colors group cursor-pointer ${
-                  action.primary
-                    ? 'bg-secondary border-border hover:border-room-accent/40'
-                    : 'bg-card border-border hover:bg-secondary'
-                }`}
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <span className={action.primary ? 'text-room-accent' : 'text-studio-dim'}>
-                    {action.icon}
-                  </span>
-                  <span className="text-sm font-medium text-foreground">{action.label}</span>
-                  <ArrowRight className="h-3.5 w-3.5 text-studio-dim ml-auto group-hover:text-room-accent transition-colors" />
-                </div>
-                <p className="text-xs text-muted-foreground">{action.description}</p>
+    <Panel>
+      <h2 className="text-base font-semibold text-foreground mb-4">
+        Quick Actions
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {actions.map((action) => (
+          <Link key={action.href} href={action.href}>
+            <div
+              className={`p-4 rounded-[6px] border transition-colors group cursor-pointer ${
+                action.primary
+                  ? 'bg-secondary border-studio-hairline hover:border-room-accent/40'
+                  : 'border-studio-hairline hover:bg-secondary'
+              }`}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <span className={action.primary ? 'text-room-accent' : 'text-studio-dim'}>
+                  {action.icon}
+                </span>
+                <span className="text-sm font-medium text-foreground">{action.label}</span>
+                <ArrowRight className="h-3.5 w-3.5 text-studio-dim ml-auto group-hover:text-room-accent transition-colors" />
               </div>
-            </Link>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+              <p className="text-xs text-muted-foreground">{action.description}</p>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </Panel>
   );
 }

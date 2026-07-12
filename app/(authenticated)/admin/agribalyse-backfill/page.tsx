@@ -14,7 +14,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Play, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Panel } from '@/components/studio/panel';
 import { Eyebrow } from '@/components/studio/eyebrow';
 import { StateChip } from '@/components/studio/state-chip';
 import { useToast } from '@/hooks/use-toast';
@@ -113,17 +113,17 @@ export default function AgribalyseBackfillPage() {
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-base">Coverage</CardTitle>
+      <Panel>
+        <div className="mb-4 flex flex-row items-center justify-between space-y-0">
+          <h2 className="font-display text-base font-semibold text-foreground">Coverage</h2>
           <Button variant="ghost" size="sm" onClick={refresh} disabled={loading}>
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        </div>
+        <div className="space-y-4">
           {!coverage ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">Loading…</p>
           ) : (
             <>
               <div className="flex items-center gap-2">
@@ -151,8 +151,8 @@ export default function AgribalyseBackfillPage() {
               </p>
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       <div className="flex items-center gap-3">
         <Button onClick={run} disabled={running || !coverage?.configured}>

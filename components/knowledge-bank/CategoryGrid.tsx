@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Card, CardContent } from '@/components/ui/card'
+import { Panel } from '@/components/studio/panel'
 import {
   FileText,
   Video,
@@ -45,22 +45,43 @@ const iconMap: Record<string, any> = {
   ShoppingBag,
 }
 
-const colorMap: Record<string, string> = {
-  blue: 'bg-blue-500/10 text-blue-500 hover:bg-blue-500/20',
-  purple: 'bg-purple-500/10 text-purple-500 hover:bg-purple-500/20',
-  green: 'bg-green-500/10 text-green-500 hover:bg-green-500/20',
-  red: 'bg-red-500/10 text-red-500 hover:bg-red-500/20',
-  yellow: 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20',
-  orange: 'bg-orange-500/10 text-orange-500 hover:bg-orange-500/20',
-  slate: 'bg-slate-500/10 text-slate-500 hover:bg-slate-500/20',
-  sky: 'bg-sky-500/10 text-sky-500 hover:bg-sky-500/20',
-  rose: 'bg-rose-500/10 text-rose-500 hover:bg-rose-500/20',
-  violet: 'bg-violet-500/10 text-violet-500 hover:bg-violet-500/20',
-  emerald: 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20',
-  teal: 'bg-teal-500/10 text-teal-500 hover:bg-teal-500/20',
-  amber: 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20',
-  indigo: 'bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20',
-  cyan: 'bg-cyan-500/10 text-cyan-500 hover:bg-cyan-500/20',
+// The studio token map: category.color names collapse to the six room inks
+// plus dim, muted to gallery grade. Existing knowledge_bank_categories.color
+// data keeps working; the tint chip is quiet on paper. Static class strings so
+// Tailwind can see them.
+const INK_CHIP: Record<string, string> = {
+  forest: 'bg-studio-forest/10 text-studio-forest',
+  teal: 'bg-studio-teal/10 text-studio-teal',
+  cobalt: 'bg-studio-cobalt/10 text-studio-cobalt',
+  plum: 'bg-studio-plum/10 text-studio-plum',
+  ochre: 'bg-studio-ochre/15 text-studio-ochre-ink',
+  brick: 'bg-studio-brick/10 text-studio-brick',
+  dim: 'bg-studio-ink/[0.05] text-studio-dim',
+}
+
+const COLOUR_TO_INK: Record<string, keyof typeof INK_CHIP> = {
+  blue: 'cobalt',
+  cobalt: 'cobalt',
+  green: 'forest',
+  emerald: 'forest',
+  forest: 'forest',
+  purple: 'plum',
+  violet: 'plum',
+  indigo: 'plum',
+  plum: 'plum',
+  amber: 'ochre',
+  orange: 'ochre',
+  yellow: 'ochre',
+  ochre: 'ochre',
+  red: 'brick',
+  rose: 'brick',
+  brick: 'brick',
+  teal: 'teal',
+  cyan: 'teal',
+  sky: 'teal',
+  slate: 'dim',
+  gray: 'dim',
+  grey: 'dim',
 }
 
 export function CategoryGrid({ categories }: CategoryGridProps) {
@@ -68,40 +89,43 @@ export function CategoryGrid({ categories }: CategoryGridProps) {
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {categories.map((category) => {
         const Icon = iconMap[category.icon] || FolderOpen
-        const colorClass = colorMap[category.color] || colorMap.blue
+        const ink = COLOUR_TO_INK[category.color] || 'cobalt'
+        const chipClass = INK_CHIP[ink]
 
         return (
-          <Link key={category.id} href={`/knowledge-bank/categories/${category.id}`}>
-            <Card className="group h-full transition-all hover:shadow-lg hover:border-neon-lime/50">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className={cn(
-                    'flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl transition-colors',
-                    colorClass
-                  )}>
-                    <Icon className="h-7 w-7" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-lg line-clamp-1 group-hover:text-neon-lime transition-colors">
-                      {category.name}
-                    </h3>
-                    {category.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                        {category.description}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-2 mt-3">
-                      <span className="text-2xl font-bold text-foreground">
-                        {category.item_count || 0}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        {category.item_count === 1 ? 'item' : 'items'}
-                      </span>
-                    </div>
+          <Link
+            key={category.id}
+            href={`/knowledge-bank/categories/${category.id}`}
+            className="group block"
+          >
+            <Panel className="h-full transition-colors duration-150 ease-studio group-hover:border-room-accent">
+              <div className="flex items-start gap-4">
+                <div className={cn(
+                  'flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-[6px]',
+                  chipClass
+                )}>
+                  <Icon className="h-7 w-7" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-display font-semibold text-lg line-clamp-1 transition-colors group-hover:text-room-accent">
+                    {category.name}
+                  </h3>
+                  {category.description && (
+                    <p className="text-sm text-studio-dim line-clamp-2 mt-1">
+                      {category.description}
+                    </p>
+                  )}
+                  <div className="flex items-baseline gap-2 mt-3">
+                    <span className="font-display text-2xl font-bold tabular-nums text-foreground">
+                      {category.item_count || 0}
+                    </span>
+                    <span className="font-mono text-[9.5px] uppercase tracking-[0.2em] text-studio-dim">
+                      {category.item_count === 1 ? 'ITEM' : 'ITEMS'}
+                    </span>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </Panel>
           </Link>
         )
       })}

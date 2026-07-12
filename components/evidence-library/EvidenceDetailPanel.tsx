@@ -5,8 +5,10 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useOrganization } from '@/lib/organizationContext'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Statement } from '@/components/studio/statement'
+import { Eyebrow } from '@/components/studio/eyebrow'
 import { StateChip } from '@/components/studio/state-chip'
 import {
   Sparkles,
@@ -171,23 +173,12 @@ export function EvidenceDetailPanel({ docId }: Props) {
 
   const handleReject = async (suggestion: SuggestionShape) => {
     if (!orgId) return
-    // Use the same endpoint to flip status via a direct supabase update would
-    // require an extra route; instead, we call a lightweight PATCH on the
-    // generic evidence links endpoint — but we don't have one. Since
-    // /api/evidence-library/[id] handles doc-level stuff, and we want this
-    // bounded, reuse the accept endpoint only for accept. For reject we
-    // simply POST to a dedicated small fetch — but we haven't built one.
-    // Instead, optimistic local update + a tiny inline mutation:
+    // There is no dedicated reject route. The /link endpoint handles it under
+    // its PATCH verb, recognising a rejectSuggestionId query param as "hide
+    // this suggestion". We flip the row locally first so it disappears at once,
+    // then fire the PATCH; if the request fails we refetch to roll the change
+    // back.
     try {
-      // There is no dedicated PATCH, so reuse the link endpoint with a
-      // clever query: delete the suggestion via a bespoke action? Simplest:
-      // issue a direct request to the same suggestions table via a new
-      // lightweight route — but we deliberately avoid that bloat.
-      // Instead: the accept endpoint flips on POST; for reject we reuse the
-      // evidence_suggestions table directly through the link-delete pathway
-      // by crafting a small PATCH handler below. For simplicity in v1, we
-      // post to /link with a special sentinel that the route recognises as
-      // "reject". Guard: keep it optimistic and tolerate API failure.
       setDetail((prev) => prev
         ? { ...prev, suggestions: prev.suggestions.map((s) => s.id === suggestion.id ? { ...s, status: 'rejected' as const } : s) }
         : prev)
@@ -279,15 +270,37 @@ export function EvidenceDetailPanel({ docId }: Props) {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      <div className="flex items-start justify-between gap-4">
+      <div className="space-y-4">
+        <Button asChild variant="ghost" size="sm" className="text-muted-foreground -ml-2">
+          <Link href="/evidence-library">
+            <ArrowLeft className="h-3.5 w-3.5 mr-1.5" /> Library
+          </Link>
+        </Button>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <Statement eyebrow="THE EVIDENCE · LIBRARY" headline={detail.title} />
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {detail.signed_url && (
+              <Button asChild variant="outline" size="sm" className="gap-1.5">
+                <a href={detail.signed_url} target="_blank" rel="noreferrer">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Open
+                </a>
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="text-muted-foreground hover:text-studio-stale gap-1.5"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {deleting ? 'Deleting…' : 'Delete'}
+            </Button>
+          </div>
+        </div>
         <div>
-          <Button asChild variant="ghost" size="sm" className="text-muted-foreground -ml-2 mb-2">
-            <Link href="/evidence-library">
-              <ArrowLeft className="h-3.5 w-3.5 mr-1.5" /> Library
-            </Link>
-          </Button>
-          <h1 className="text-2xl sm:text-3xl font-heading font-bold tracking-tight">{detail.title}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{detail.document_name}</p>
+          <p className="text-sm text-muted-foreground">{detail.document_name}</p>
           {detail.description && (
             <p className="text-sm mt-3 max-w-2xl">{detail.description}</p>
           )}
@@ -301,36 +314,16 @@ export function EvidenceDetailPanel({ docId }: Props) {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {detail.signed_url && (
-            <Button asChild variant="outline" size="sm" className="gap-1.5">
-              <a href={detail.signed_url} target="_blank" rel="noreferrer">
-                <ExternalLink className="h-3.5 w-3.5" />
-                Open
-              </a>
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleDelete}
-            disabled={deleting}
-            className="text-muted-foreground hover:text-studio-stale gap-1.5"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            {deleting ? 'Deleting…' : 'Delete'}
-          </Button>
-        </div>
       </div>
 
       {/* Pending suggestions panel */}
       <Card className="rounded-[6px] border-border bg-card">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center justify-between gap-2">
-            <span className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-studio-brick" />
+          <div className="flex items-center justify-between gap-2">
+            <Eyebrow className="flex items-center gap-2">
+              <Sparkles className="h-3.5 w-3.5 text-studio-brick" />
               Suggested framework links
-            </span>
+            </Eyebrow>
             <div className="flex items-center gap-2">
               {highCount > 0 && (
                 <Button
@@ -353,7 +346,7 @@ export function EvidenceDetailPanel({ docId }: Props) {
                     : 'Get suggestions'}
               </Button>
             </div>
-          </CardTitle>
+          </div>
         </CardHeader>
         <CardContent>
           {pendingSuggestions.length === 0 ? (
@@ -364,9 +357,9 @@ export function EvidenceDetailPanel({ docId }: Props) {
             <div className="space-y-4">
               {Object.entries(pendingGroupedByFramework).map(([code, group]) => (
                 <div key={code}>
-                  <p className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase mb-2">
+                  <Eyebrow tone="dim" className="mb-2">
                     {group.frameworkName} ({code})
-                  </p>
+                  </Eyebrow>
                   <div className="space-y-2">
                     {group.rows
                       .sort((a, b) => b.confidence - a.confidence)
@@ -389,10 +382,10 @@ export function EvidenceDetailPanel({ docId }: Props) {
       {/* Current links */}
       <Card className="rounded-[6px] border-border">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Link2 className="h-4 w-4" />
+          <Eyebrow className="flex items-center gap-2">
+            <Link2 className="h-3.5 w-3.5" />
             Linked to {detail.links.length} requirement{detail.links.length === 1 ? '' : 's'}
-          </CardTitle>
+          </Eyebrow>
         </CardHeader>
         <CardContent>
           {detail.links.length === 0 ? (
@@ -403,9 +396,9 @@ export function EvidenceDetailPanel({ docId }: Props) {
             <div className="space-y-4">
               {Object.entries(linksByFramework).map(([code, group]) => (
                 <div key={code}>
-                  <p className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase mb-2">
+                  <Eyebrow tone="dim" className="mb-2">
                     {group.frameworkName} ({code})
-                  </p>
+                  </Eyebrow>
                   <div className="space-y-1.5">
                     {group.rows.map((l) => (
                       <div

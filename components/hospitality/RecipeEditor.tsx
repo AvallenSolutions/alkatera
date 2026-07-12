@@ -13,18 +13,20 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, Plus, Trash2, Calculator, Leaf, Droplets, Trees, Sparkles } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { calculateProductLCA } from '@/lib/product-lca-calculator';
 import { autoMatchEmissionFactor, type EmissionFactorMatch } from '@/lib/products/ef-auto-match';
 import { useOrganization } from '@/lib/organizationContext';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Statement } from '@/components/studio/statement';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { BigNumber } from '@/components/studio/big-number';
+import { PillButton } from '@/components/studio/pill-button';
+import { StateChip } from '@/components/studio/state-chip';
 import {
   Dialog,
   DialogContent,
@@ -66,24 +68,18 @@ function newRow(partial?: Partial<MealIngredient>): Row {
   };
 }
 
-type BadgeTone = 'ok' | 'warn' | 'muted';
-/** Map a row's factor-match state to a small status badge. */
-function matchStatus(row: Row): { label: string; tone: BadgeTone } | null {
-  if (row.matching) return { label: 'Checking factor…', tone: 'muted' };
+type MatchTone = 'good' | 'attention' | 'quiet';
+/** Map a row's factor-match state to a typographic state chip. */
+function matchStatus(row: Row): { label: string; tone: MatchTone } | null {
+  if (row.matching) return { label: 'Checking factor…', tone: 'quiet' };
   if (row.match === undefined) return null;
-  if (row.match === null) return { label: 'No factor match', tone: 'warn' };
+  if (row.match === null) return { label: 'No factor match', tone: 'attention' };
   const grade = row.match.ef_data_quality_grade;
   const source = row.match.ef_source_type;
-  if (source === 'primary' || grade === 'HIGH') return { label: 'Factor matched', tone: 'ok' };
-  if (grade === 'LOW') return { label: 'Approximate factor', tone: 'warn' };
-  return { label: 'Factor matched', tone: 'ok' };
+  if (source === 'primary' || grade === 'HIGH') return { label: 'Factor matched', tone: 'good' };
+  if (grade === 'LOW') return { label: 'Approximate factor', tone: 'attention' };
+  return { label: 'Factor matched', tone: 'good' };
 }
-
-const TONE_CLASS: Record<BadgeTone, string> = {
-  ok: 'border-transparent bg-primary/15 text-primary',
-  warn: 'border-transparent bg-amber-500/15 text-amber-600 dark:text-amber-400',
-  muted: 'text-muted-foreground',
-};
 
 function fmt(n: number, digits = 2): string {
   return n.toLocaleString('en-GB', { maximumFractionDigits: digits });
@@ -342,81 +338,70 @@ export function RecipeEditor({
     }
   };
 
+  const backLink = (
+    <Link
+      href={`${cfg.basePath}/`}
+      className="inline-flex font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground transition-colors hover:text-foreground"
+    >
+      ← {cfg.labelPlural}
+    </Link>
+  );
+
   if (loading) {
     return (
-      <div className="mx-auto max-w-4xl space-y-4 p-4 sm:p-6">
+      <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
         <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-64 w-full rounded-lg" />
+        <Skeleton className="h-64 w-full rounded-[6px]" />
       </div>
     );
   }
 
   if (loadError || !recipe) {
     return (
-      <div className="mx-auto max-w-4xl space-y-4 p-4 sm:p-6">
-        <Link href={`${cfg.basePath}/`} className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
-          <ChevronLeft className="mr-1 h-4 w-4" />
-          {cfg.labelPlural}
-        </Link>
-        <p className="text-sm text-destructive">{loadError || `${cfg.label} not found`}</p>
+      <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
+        {backLink}
+        <p className="text-sm text-studio-stale">{loadError || `${cfg.label} not found`}</p>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5 p-4 sm:p-6">
-      <Link href={`${cfg.basePath}/`} className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
-        <ChevronLeft className="mr-1 h-4 w-4" />
-        {cfg.labelPlural}
-      </Link>
+    <div className="mx-auto max-w-4xl space-y-8 p-4 sm:p-6">
+      {backLink}
 
-      <div>
-        <h1 className="text-2xl font-semibold">{recipe.name}</h1>
-        <p className="text-sm text-muted-foreground">
+      <div className="min-w-0">
+        <Statement
+          eyebrow={`THE WORKBENCH · ${cfg.labelPlural.toUpperCase()}`}
+          headline={recipe.name.endsWith('.') ? recipe.name : `${recipe.name}.`}
+        >
+          {recipe.impact && (
+            <>
+              <BigNumber
+                size="display"
+                value={fmt(recipe.impact.per_cover_co2e)}
+                label={`KG CO₂E / ${portion.toUpperCase()}`}
+              />
+              <BigNumber
+                size="display"
+                value={fmt(recipe.impact.per_cover_water)}
+                label={`M³ WATER / ${portion.toUpperCase()}`}
+              />
+              <BigNumber
+                size="display"
+                value={fmt(recipe.impact.per_cover_land)}
+                label={`M² LAND / ${portion.toUpperCase()}`}
+              />
+            </>
+          )}
+        </Statement>
+        <p className="mt-3 max-w-xl text-sm text-muted-foreground">
           Add the ingredients in this {cfg.label.toLowerCase()}, then calculate its impact.
         </p>
       </div>
 
-      {recipe.impact && (
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
-              <Leaf className="h-4 w-4 text-primary" />
-              <CardTitle className="text-sm font-medium text-muted-foreground">Carbon / {portion}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-semibold">{fmt(recipe.impact.per_cover_co2e)}</p>
-              <p className="text-xs text-muted-foreground">kg CO₂e</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
-              <Droplets className="h-4 w-4 text-primary" />
-              <CardTitle className="text-sm font-medium text-muted-foreground">Water / {portion}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-semibold">{fmt(recipe.impact.per_cover_water)}</p>
-              <p className="text-xs text-muted-foreground">m³</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
-              <Trees className="h-4 w-4 text-primary" />
-              <CardTitle className="text-sm font-medium text-muted-foreground">Land / {portion}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-semibold">{fmt(recipe.impact.per_cover_land)}</p>
-              <p className="text-xs text-muted-foreground">m²</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{ingredientLabel ?? 'Recipe'}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <section className="border-t border-border pt-5">
+        <Eyebrow className="mb-4">{ingredientLabel ?? 'Recipe'}</Eyebrow>
+        <div className="space-y-3">
           <div className="w-40 space-y-1">
             <Label htmlFor="recipe-covers">{portionTitle}s</Label>
             <Input
@@ -457,11 +442,7 @@ export function RecipeEditor({
                   {(() => {
                     const status = matchStatus(row);
                     if (!status) return null;
-                    return (
-                      <Badge variant="outline" className={`text-[10px] font-normal ${TONE_CLASS[status.tone]}`}>
-                        {status.label}
-                      </Badge>
-                    );
+                    return <StateChip tone={status.tone}>{status.label}</StateChip>;
                   })()}
                 </div>
                 <Input
@@ -484,43 +465,39 @@ export function RecipeEditor({
                     ))}
                   </SelectContent>
                 </Select>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-destructive"
-                  onClick={() => removeRow(row.key)}
+                <button
+                  type="button"
                   aria-label="Remove ingredient"
+                  className="justify-self-start rounded px-2 py-2 text-base leading-none text-muted-foreground transition-colors duration-150 hover:text-studio-stale sm:justify-self-auto"
+                  onClick={() => removeRow(row.key)}
                 >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                  &times;
+                </button>
               </div>
             ))}
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={addRow}>
-              <Plus className="mr-2 h-4 w-4" />
+            <PillButton variant="ghost" size="sm" onClick={addRow}>
               Add ingredient
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => { setAiError(null); setAiOpen(true); }}>
-              <Sparkles className="mr-2 h-4 w-4" />
+            </PillButton>
+            <PillButton variant="ghost" size="sm" onClick={() => { setAiError(null); setAiOpen(true); }}>
               Paste &amp; AI-fill
-            </Button>
+            </PillButton>
           </div>
 
-          {calcError && <p className="text-sm text-destructive">{calcError}</p>}
+          {calcError && <p className="text-sm text-studio-stale">{calcError}</p>}
           {progress && <p className="text-sm text-muted-foreground">{progress}…</p>}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       <div className="flex items-center gap-2">
-        <Button variant="outline" onClick={saveRecipe} disabled={busy !== null}>
+        <PillButton variant="outline" onClick={saveRecipe} disabled={busy !== null}>
           {busy === 'save' ? 'Saving…' : 'Save recipe'}
-        </Button>
-        <Button onClick={calculate} disabled={busy !== null}>
-          <Calculator className="mr-2 h-4 w-4" />
+        </PillButton>
+        <PillButton variant="room" onClick={calculate} disabled={busy !== null}>
           {busy === 'calculate' ? 'Calculating…' : 'Calculate impact'}
-        </Button>
+        </PillButton>
       </div>
 
       {renderExtra && renderExtra(recipe)}
@@ -546,7 +523,6 @@ export function RecipeEditor({
               Cancel
             </Button>
             <Button onClick={aiExtract} disabled={aiBusy || !aiText.trim()}>
-              <Sparkles className="mr-2 h-4 w-4" />
               {aiBusy ? 'Extracting…' : 'Extract ingredients'}
             </Button>
           </DialogFooter>

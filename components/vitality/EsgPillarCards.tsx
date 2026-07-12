@@ -1,8 +1,6 @@
 'use client'
 
-import { Leaf, Users, Scale } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { VitalityRing } from './VitalityRing'
 import { ScoreExplainer, type CalculationInputs } from './ScoreExplainer'
 import type {
   EnvironmentalSubScores,
@@ -70,9 +68,6 @@ export function EsgPillarCards({ e, s, g, sparklines, compact = false }: Props) 
     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
       <PillarCardCell
         title="Environmental"
-        Icon={Leaf}
-        toneClass="text-studio-forest bg-card border-border"
-        ringTone="emerald"
         pillar={e}
         subLabels={ENV_SUB_LABELS}
         sparkline={sparklines?.e}
@@ -82,9 +77,6 @@ export function EsgPillarCards({ e, s, g, sparklines, compact = false }: Props) 
       />
       <PillarCardCell
         title="Social"
-        Icon={Users}
-        toneClass="text-studio-cobalt bg-card border-border"
-        ringTone="sky"
         pillar={s}
         subLabels={SOCIAL_SUB_LABELS}
         sparkline={sparklines?.s}
@@ -94,9 +86,6 @@ export function EsgPillarCards({ e, s, g, sparklines, compact = false }: Props) 
       />
       <PillarCardCell
         title="Governance"
-        Icon={Scale}
-        toneClass="text-studio-hold bg-card border-border"
-        ringTone="purple"
         pillar={g}
         subLabels={GOV_SUB_LABELS}
         sparkline={sparklines?.g}
@@ -110,9 +99,6 @@ export function EsgPillarCards({ e, s, g, sparklines, compact = false }: Props) 
 
 interface CellProps<T extends object> {
   title: string
-  Icon: React.ComponentType<{ className?: string }>
-  toneClass: string
-  ringTone: 'emerald' | 'sky' | 'purple'
   pillar: PillarScore<T>
   subLabels: Record<keyof T, string>
   sparkline?: Array<number | null>
@@ -123,8 +109,6 @@ interface CellProps<T extends object> {
 
 function PillarCardCell<T extends object>({
   title,
-  Icon,
-  toneClass,
   pillar,
   subLabels,
   sparkline,
@@ -135,12 +119,11 @@ function PillarCardCell<T extends object>({
   const subEntries = Object.entries(pillar.sub) as Array<[keyof T, number | null]>
   return (
     <div className={cn('rounded-[6px] border border-border bg-card p-4', compact && 'p-3')}>
-      <div className="flex items-center justify-between gap-2 mb-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className={cn('rounded-md p-1.5 border', toneClass)}>
-            <Icon className="h-3.5 w-3.5" />
-          </span>
-          <p className="text-xs font-semibold uppercase tracking-wider truncate">{title}</p>
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim truncate">
+            {title}
+          </p>
           {explainerType ? (
             <ScoreExplainer
               scoreType={explainerType}
@@ -151,7 +134,7 @@ function PillarCardCell<T extends object>({
           ) : null}
         </div>
         {pillar.score !== null ? (
-          <span className="text-2xl font-semibold tabular-nums leading-none">
+          <span className="font-display text-2xl font-semibold tabular-nums leading-none">
             {pillar.score}
           </span>
         ) : (

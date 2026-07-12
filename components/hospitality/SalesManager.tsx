@@ -7,13 +7,13 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus, Upload, Trash2, BarChart3, CopyPlus, Store } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Statement } from '@/components/studio/statement';
+import { BigNumber } from '@/components/studio/big-number';
+import { PillButton } from '@/components/studio/pill-button';
 import {
   Dialog,
   DialogContent,
@@ -42,6 +42,15 @@ const KIND_LABEL: Record<string, string> = {
   hospitality_drink: 'Drink',
   hospitality_room_night: 'Room',
 };
+
+/** Quiet mono kind annotation: typographic, no badge pill. */
+function KindTag({ kind }: { kind: string }) {
+  return (
+    <span className="ml-2 font-mono text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
+      {KIND_LABEL[kind] ?? kind}
+    </span>
+  );
+}
 
 const DAY_MS = 86_400_000;
 
@@ -289,39 +298,44 @@ export function SalesManager() {
   const totalContribution = volumes.reduce((s, v) => s + (v.contribution_co2e ?? 0), 0);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <h2 className="text-lg font-semibold">Sales &amp; volumes</h2>
-          <p className="text-sm text-muted-foreground">
-            How many of each meal, drink and room were served. This drives your company total.
-          </p>
-        </div>
-        <div className="flex gap-2">
+    <div className="space-y-8">
+      <div className="min-w-0">
+        <Statement eyebrow="THE WORKBENCH · SALES" headline="The sales.">
+          <BigNumber size="display" value={fmt(totalContribution)} label="KG CO₂E RECORDED" />
+          <BigNumber
+            size="display"
+            value={volumes.length}
+            label={volumes.length === 1 ? 'Volume row' : 'Volume rows'}
+          />
+        </Statement>
+        <p className="mt-3 max-w-xl text-sm text-muted-foreground">
+          How many of each meal, drink and room were served. This drives your company total.
+        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onFile} />
-          <Button variant="outline" onClick={openCopy} disabled={volumes.length === 0}>
-            <CopyPlus className="mr-2 h-4 w-4" />
+          <PillButton variant="ghost" onClick={openCopy} disabled={volumes.length === 0}>
             Copy last period
-          </Button>
-          <Button variant="outline" onClick={() => setPosOpen(true)} disabled={products.length === 0}>
-            <Store className="mr-2 h-4 w-4" />
+          </PillButton>
+          <PillButton variant="outline" onClick={() => setPosOpen(true)} disabled={products.length === 0}>
             Import POS sales
-          </Button>
-          <Button variant="outline" onClick={() => fileRef.current?.click()}>
-            <Upload className="mr-2 h-4 w-4" />
+          </PillButton>
+          <PillButton variant="outline" onClick={() => fileRef.current?.click()}>
             Import CSV
-          </Button>
-          <Button onClick={() => { setFormError(null); setAddOpen(true); }} disabled={products.length === 0}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add
-          </Button>
+          </PillButton>
+          <PillButton
+            variant="room"
+            onClick={() => { setFormError(null); setAddOpen(true); }}
+            disabled={products.length === 0}
+          >
+            Add volume
+          </PillButton>
         </div>
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p className="text-sm text-studio-stale">{error}</p>}
 
       {importResult && (
-        <div className="space-y-3 rounded-lg border bg-muted/40 p-3 text-sm">
+        <div className="space-y-3 rounded-[6px] border border-border bg-card p-4 text-sm">
           <p>
             Imported {importResult.inserted} row(s)
             {importResult.auto_matched > 0 && ` (${importResult.auto_matched} matched by close name)`}.
@@ -374,65 +388,56 @@ export function SalesManager() {
                   </div>
                 ))}
               </div>
-              <Button size="sm" onClick={submitResolve} disabled={resolving}>
+              <PillButton size="sm" onClick={submitResolve} disabled={resolving}>
                 {resolving ? 'Adding…' : 'Add mapped rows'}
-              </Button>
+              </PillButton>
             </div>
           )}
         </div>
       )}
 
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
-          <BarChart3 className="h-4 w-4 text-primary" />
-          <CardTitle className="text-sm font-medium text-muted-foreground">
-            Recorded contribution to company total
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-2xl font-semibold">{fmt(totalContribution)} kg CO₂e</p>
-          <p className="text-xs text-muted-foreground">across {volumes.length} volume row(s)</p>
-        </CardContent>
-      </Card>
-
       {loading ? (
-        <Skeleton className="h-40 w-full rounded-lg" />
+        <Skeleton className="h-40 w-full rounded-[6px]" />
       ) : volumes.length === 0 ? (
-        <div className="rounded-lg border border-dashed py-12 text-center">
-          <p className="font-medium">No volumes yet</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Add how many covers, drinks and room-nights you served, or import a CSV
+        <div className="border-t border-border pt-6">
+          <p className="text-sm text-muted-foreground">
+            No volumes yet. Add how many covers, drinks and room-nights you served, or import a CSV
             (columns: product, units, period_start, period_end).
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border">
+        <div className="border-t border-border">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="p-2 font-medium">Product</th>
-                <th className="p-2 font-medium">Period</th>
-                <th className="p-2 text-right font-medium">Units</th>
-                <th className="p-2 text-right font-medium">Contribution</th>
+            <thead>
+              <tr className="border-b border-border text-left font-mono text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
+                <th className="py-2 pr-2 font-bold">Product</th>
+                <th className="p-2 font-bold">Period</th>
+                <th className="p-2 text-right font-bold">Units</th>
+                <th className="p-2 text-right font-bold">Contribution</th>
                 <th className="p-2" />
               </tr>
             </thead>
             <tbody>
               {volumes.map((v) => (
-                <tr key={v.id} className="border-t">
-                  <td className="p-2">
-                    <span className="font-medium">{v.product_name}</span>{' '}
-                    <Badge variant="outline" className="ml-1 text-[10px]">{KIND_LABEL[v.product_kind] ?? v.product_kind}</Badge>
+                <tr key={v.id} className="border-b border-border">
+                  <td className="py-2 pr-2">
+                    <span className="font-display font-semibold">{v.product_name}</span>
+                    <KindTag kind={v.product_kind} />
                   </td>
-                  <td className="p-2 text-muted-foreground">{v.period_start} → {v.period_end}</td>
-                  <td className="p-2 text-right">{fmt(v.units_sold, 0)}</td>
-                  <td className="p-2 text-right font-medium">
-                    {v.contribution_co2e != null ? `${fmt(v.contribution_co2e)} kg` : '—'}
+                  <td className="p-2 font-mono text-xs text-muted-foreground">{v.period_start} → {v.period_end}</td>
+                  <td className="p-2 text-right tabular-nums">{fmt(v.units_sold, 0)}</td>
+                  <td className="p-2 text-right font-semibold tabular-nums">
+                    {v.contribution_co2e != null ? `${fmt(v.contribution_co2e)} kg` : '–'}
                   </td>
                   <td className="p-2 text-right">
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => remove(v.id)} aria-label="Remove">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <button
+                      type="button"
+                      aria-label={`Remove ${v.product_name}`}
+                      className="rounded px-2 py-1 text-base leading-none text-muted-foreground transition-colors duration-150 hover:text-studio-stale"
+                      onClick={() => remove(v.id)}
+                    >
+                      &times;
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -472,8 +477,8 @@ export function SalesManager() {
               {copyRows.map((r) => (
                 <div key={r.product_id} className="grid grid-cols-[1fr,6rem] items-center gap-2">
                   <span className="truncate text-sm">
-                    {r.product_name}{' '}
-                    <Badge variant="outline" className="ml-1 text-[10px]">{KIND_LABEL[r.product_kind] ?? r.product_kind}</Badge>
+                    {r.product_name}
+                    <KindTag kind={r.product_kind} />
                   </span>
                   <Input
                     type="number"

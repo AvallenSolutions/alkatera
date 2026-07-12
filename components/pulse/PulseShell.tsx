@@ -3,24 +3,21 @@
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, LayoutGrid, MessageSquare, RefreshCw, XCircle } from 'lucide-react';
 import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
-import { Button } from '@/components/ui/button';
-import { Eyebrow } from '@/components/studio/eyebrow';
 import { StateChip } from '@/components/studio/state-chip';
+import { PillButton } from '@/components/studio/pill-button';
 // Round 2 (auto-research): lazy-load the react-grid-layout-backed grid so its
 // heavy drag/resize bundle leaves /pulse's First Load JS.
 const PulseGrid = dynamic(
   () => import('@/components/pulse/PulseGrid').then((m) => m.PulseGrid),
   { ssr: false }
 );
-import { PulseTabbedView } from '@/components/pulse/PulseTabbedView';
-import { PulseVerdictHero } from '@/components/pulse/PulseVerdictHero';
+import { PulseSections } from '@/components/pulse/PulseSections';
+import { PulseStatement } from '@/components/pulse/PulseStatement';
+import { InsightLine } from '@/components/pulse/InsightLine';
+import { PulseSetupChecklist } from '@/components/pulse/PulseSetupChecklist';
 import { DEFAULT_VIEW, type PulseView } from '@/lib/pulse/layout';
-import {
-  PulseRealtimeProvider,
-  usePulseRealtimeContext,
-} from '@/lib/pulse/PulseRealtimeContext';
+import { PulseRealtimeProvider } from '@/lib/pulse/PulseRealtimeContext';
 import { MetricDrillProvider, useWidgetDrill } from '@/lib/pulse/MetricDrillContext';
 // Round 6 (auto-research): the drill overlay and every widget's ExpandedSlot only
 // render content when a widget is drilled into. Statically importing all ~24
@@ -52,9 +49,10 @@ const IssbDisclosureExpandedSlot = dynamic(() => import('@/components/pulse/widg
 import { usePulseDrillUrl } from '@/hooks/usePulseDrillUrl';
 import { LiveMetricsStrip } from '@/components/pulse/widgets/LiveMetricsStrip';
 import { AskRosaWidget } from '@/components/pulse/widgets/AskRosaWidget';
+import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import type { WorkingTone } from '@/components/studio/theme';
 import {
   PULSE_REFRESH_JOBS,
   type PulseJobState,
@@ -62,11 +60,12 @@ import {
 } from '@/lib/pulse/refresh-jobs';
 
 /**
- * Pulse — top-level shell.
+ * Pulse -- top-level shell.
  *
- * Static at top: header (with live heartbeat) + intro hero.
- * Below the hero: PulseGrid renders a draggable, resizable, role-aware widget
- * layout backed by dashboard_layouts. Edit mode is toggled from PulseEditToolbar.
+ * One scrolling paper: a quiet mono margin note (refresh, feedback), the
+ * verdict statement with its headline figures, then Performance, Operations
+ * and Plan as sections. The Customise grid stays behind one ghost pill at
+ * the foot of the paper. Drill slots and the overlay mount once here.
  */
 export function PulseShell() {
   return (
@@ -83,7 +82,7 @@ const VIEW_STORAGE_KEY = 'pulse:view';
 /**
  * View preference, persisted per-browser in localStorage. 'advanced' opens
  * the customisable grid; anything else (including legacy persona values like
- * 'founder' or 'cfo' from the old persona toggle) maps to the tabbed view.
+ * 'founder' or 'cfo' from the old persona toggle) maps to the sections view.
  */
 function usePulseView(): [PulseView, (next: PulseView) => void] {
   const [view, setView] = useState<PulseView>(DEFAULT_VIEW);
@@ -136,9 +135,21 @@ function PulseShellBody() {
 
   return (
     <>
-      <div className="space-y-6 pb-12">
-        <PulseHeader view={view} onChangeView={setView} />
-        <PulseVerdictHero />
+      <div className="space-y-8 pb-12">
+        {/* The margins: refresh (admin-only) and feedback as quiet mono notes. */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-end gap-5">
+            <RefreshNote />
+            <Link
+              href="/settings/feedback/"
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim transition-colors duration-150 ease-studio hover:text-foreground"
+            >
+              Feedback
+            </Link>
+          </div>
+          <PulseStatement />
+        </div>
+
         {view === 'advanced' ? (
           <>
             {/* Customise mode: the full draggable grid, as before. */}
@@ -147,8 +158,23 @@ function PulseShellBody() {
             <AskRosaWidget />
           </>
         ) : (
-          <PulseTabbedView />
+          <>
+            <InsightLine />
+            <PulseSetupChecklist />
+            <PulseSections />
+          </>
         )}
+
+        {/* The foot of the paper: the advanced grid behind one ghost pill. */}
+        <div className="flex justify-center border-t border-studio-hairline pt-5">
+          <PillButton
+            variant="ghost"
+            size="sm"
+            onClick={() => setView(view === 'advanced' ? 'tabs' : 'advanced')}
+          >
+            {view === 'advanced' ? 'Back to simple view' : 'Customise'}
+          </PillButton>
+        </div>
       </div>
       {/* Drill slot mounts -- register their renderers for matching targets. */}
       <WaterfallSlotMount />
@@ -179,51 +205,6 @@ function PulseShellBody() {
   );
 }
 
-function PulseHeader({
-  view,
-  onChangeView,
-}: {
-  view: PulseView;
-  onChangeView: (next: PulseView) => void;
-}) {
-  const subtitle =
-    view === 'advanced'
-      ? 'Build your own view from every available metric. Drag, pin and customise.'
-      : 'Are we on track, what is it costing, and what needs attention.';
-
-  return (
-    <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div className="min-w-0">
-        <Eyebrow className="mb-3">TODAY · PULSE</Eyebrow>
-        <h1 className="font-display text-[clamp(2rem,4vw,3rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
-          The pulse.
-        </h1>
-        <p className="mt-2 max-w-xl text-sm text-muted-foreground">{subtitle}</p>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <ConnectionHeartbeat />
-        <RefreshPulseButton />
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-full"
-          onClick={() => onChangeView(view === 'advanced' ? 'tabs' : 'advanced')}
-        >
-          <LayoutGrid className="mr-2 h-4 w-4" />
-          {view === 'advanced' ? 'Back to simple view' : 'Customise'}
-        </Button>
-        <Button asChild variant="ghost" size="icon" title="Send feedback">
-          <Link href="/settings/feedback/">
-            <MessageSquare className="h-4 w-4" />
-            <span className="sr-only">Send feedback</span>
-          </Link>
-        </Button>
-      </div>
-    </header>
-  );
-}
-
 /**
  * Read a fetch Response as JSON without throwing on HTML error pages. A gateway
  * timeout / proxy error returns `<HTML>…`, which `res.json()` would choke on
@@ -238,46 +219,80 @@ async function safeJson(res: Response): Promise<any> {
   }
 }
 
-/** Per-job status row inside the progress panel. */
+/** "3h ago", "2d ago": the margins speak in relative mono time. */
+function timeAgo(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return 'just now';
+  const m = Math.floor(ms / 60_000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+const JOB_STATE: Record<string, { tone: WorkingTone; word: string }> = {
+  pending: { tone: 'quiet', word: 'Waiting' },
+  running: { tone: 'quiet', word: 'Running' },
+  completed: { tone: 'good', word: 'Done' },
+  failed: { tone: 'stale', word: 'Failed' },
+};
+
+/** Per-job status row inside the progress panel: typographic, no icons. */
 function JobRow({ label, state }: { label: string; state?: PulseJobState }) {
-  const status = state?.status ?? 'pending';
-  const icon =
-    status === 'completed' ? (
-      <CheckCircle2 className="h-3.5 w-3.5 text-studio-good" />
-    ) : status === 'failed' ? (
-      <XCircle className="h-3.5 w-3.5 text-studio-stale" />
-    ) : status === 'running' ? (
-      <div className="flex h-3.5 w-3.5 items-center justify-center">
-        <div className="h-2 w-2 rounded-full bg-studio-dim" />
-      </div>
-    ) : (
-      <div className="h-3.5 w-3.5 rounded-full border border-border" />
-    );
+  const { tone, word } = JOB_STATE[state?.status ?? 'pending'] ?? JOB_STATE.pending;
   return (
-    <div className="flex items-center gap-2 py-1 text-xs">
-      {icon}
-      <span className={cn(status === 'failed' && 'text-studio-stale')}>{label}</span>
+    <div className="flex items-baseline justify-between gap-3 py-1">
+      <span className="text-xs text-foreground">{label}</span>
+      <StateChip tone={tone}>{word}</StateChip>
     </div>
   );
 }
 
 /**
- * Admin-only "Refresh data" button. Kicks off all five Pulse data jobs in the
+ * Admin-only refresh, as a quiet mono note in the margins:
+ * "REFRESHED 3H AGO · REFRESH". Kicks off all five Pulse data jobs in the
  * background (via /api/pulse/admin/refresh → Inngest) and polls for live
  * per-job progress. Running them synchronously here used to time out the
  * platform gateway and crash with a JSON-parse error.
  *
- * Visible only to role 'owner' or 'admin' — the endpoint enforces the same
+ * The "refreshed" time is the latest insight's generated_at: the insights
+ * job runs in every refresh (on demand and nightly), so it is an honest
+ * proxy for when the data jobs last completed.
+ *
+ * Visible only to role 'owner' or 'admin': the endpoint enforces the same
  * check, this is just UX hiding.
  */
-function RefreshPulseButton() {
-  const { userRole } = useOrganization();
+function RefreshNote() {
+  const { userRole, currentOrganization } = useOrganization();
+  const orgId = currentOrganization?.id;
   const { toast } = useToast();
   const [runId, setRunId] = useState<string | null>(null);
   const [jobs, setJobs] = useState<Record<string, PulseJobState>>({});
   const [starting, setStarting] = useState(false);
+  const [refreshedAt, setRefreshedAt] = useState<string | null>(null);
 
   const busy = starting || runId !== null;
+  const isAdmin = userRole === 'owner' || userRole === 'admin';
+
+  // When the data was last refreshed, from the newest generated insight.
+  useEffect(() => {
+    if (!orgId || !isAdmin) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('dashboard_insights')
+        .select('generated_at')
+        .eq('organization_id', orgId)
+        .order('generated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!cancelled) setRefreshedAt((data?.generated_at as string) ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId, isAdmin]);
 
   // Poll the run's status while one is active; reload when it finishes.
   useEffect(() => {
@@ -314,7 +329,7 @@ function RefreshPulseButton() {
           }
         }
       } catch {
-        // Transient network blip — keep polling.
+        // Transient network blip: keep polling.
       }
     }
 
@@ -326,7 +341,7 @@ function RefreshPulseButton() {
     };
   }, [runId, toast]);
 
-  if (userRole !== 'owner' && userRole !== 'admin') return null;
+  if (!isAdmin) return null;
 
   async function handleClick() {
     setStarting(true);
@@ -338,7 +353,7 @@ function RefreshPulseButton() {
         setRunId(data.runId);
         toast({
           title: 'Refresh started',
-          description: 'Running the data jobs now — this takes a couple of minutes.',
+          description: 'Running the data jobs now. This takes a couple of minutes.',
         });
       } else {
         toast({
@@ -360,65 +375,29 @@ function RefreshPulseButton() {
 
   return (
     <div className="relative">
-      <Button
-        variant="outline"
-        size="sm"
-        className="rounded-full"
-        onClick={handleClick}
-        disabled={busy}
-        title="Run all Pulse data jobs now"
-      >
-        <RefreshCw className="mr-2 h-4 w-4" />
-        {busy ? 'Refreshing…' : 'Refresh data'}
-      </Button>
+      <div className="flex items-baseline gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+        {refreshedAt && <span>Refreshed {timeAgo(refreshedAt)} ·</span>}
+        <button
+          type="button"
+          onClick={handleClick}
+          disabled={busy}
+          title="Run all Pulse data jobs now"
+          className="uppercase transition-colors duration-150 ease-studio hover:text-foreground disabled:pointer-events-none disabled:opacity-60"
+        >
+          {busy ? 'Refreshing…' : 'Refresh'}
+        </button>
+      </div>
 
       {runId && (
-        <div className="absolute right-0 z-50 mt-2 w-56 rounded-[6px] border border-border bg-card p-3 shadow-sm">
-          <p className="mb-1 text-xs font-medium text-muted-foreground">Refreshing Pulse data…</p>
+        <div className="absolute right-0 z-50 mt-2 w-60 rounded-[6px] border border-studio-hairline bg-studio-cream p-3">
+          <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+            Refreshing Pulse data
+          </p>
           {PULSE_REFRESH_JOBS.map((job) => (
             <JobRow key={job.key} label={job.label} state={jobs[job.key]} />
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-/**
- * Quiet dot driven by the real Supabase Realtime connection state.
- *
- * - "live"         → good tone, "Live" label
- * - "reconnecting" → attention tone, "Reconnecting…" label
- * - "connecting"   → dim, "Connecting…" label
- */
-function ConnectionHeartbeat() {
-  const { status, lastEventAt, events } = usePulseRealtimeContext();
-
-  const dotColour =
-    status === 'live'
-      ? 'bg-studio-good'
-      : status === 'reconnecting'
-        ? 'bg-studio-attention'
-        : 'bg-studio-dim';
-  const tone = status === 'live' ? 'good' : status === 'reconnecting' ? 'attention' : 'quiet';
-  const label =
-    status === 'live'
-      ? 'Live'
-      : status === 'reconnecting'
-        ? 'Reconnecting…'
-        : 'Connecting…';
-
-  const tooltip = lastEventAt
-    ? `${events.length} event${events.length === 1 ? '' : 's'} this session · last ${lastEventAt.toLocaleTimeString('en-GB')}`
-    : 'Waiting for first event';
-
-  return (
-    <div
-      className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5"
-      title={tooltip}
-    >
-      <span className={cn('inline-flex h-2 w-2 rounded-full', dotColour)} />
-      <StateChip tone={tone}>{label}</StateChip>
     </div>
   );
 }

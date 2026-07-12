@@ -1,0 +1,2362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LCA Report · Avallen Calvados</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      background: white;
+      color: #1A1B1D;
+    }
+
+    @page { size: A4; margin: 0; }
+
+    .page {
+      width: 794px;
+      height: 1123px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      padding: 48px;
+      padding-bottom: 96px; /* Extra clearance for the absolute-positioned footer */
+      overflow: hidden;
+      page-break-after: always;
+      break-after: page;
+    }
+
+    .page:last-child { page-break-after: auto; break-after: auto; }
+
+    .dark-page { background: #F2F1EA; color: #1A1B1D; }
+    .light-page { background: #ECEAE3; color: #1A1B1D; }
+
+    /* ---- The studio kit (design language) ------------------------------- */
+    /* Statements speak in Space Grotesk; Inter explains; JetBrains Mono
+       annotates. The report's accent is forest; the room inks appear only
+       in the charts. Panels are cream with a hairline, radius 6. */
+
+    .statement {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      line-height: 0.98;
+      letter-spacing: -0.03em;
+      color: #1A1B1D;
+    }
+
+    .eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.22em;
+      color: #205E40;
+    }
+    .eyebrow.dim { color: #6F6F68; }
+
+    .lead-number {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: #205E40;
+      line-height: 0.9;
+      letter-spacing: -0.03em;
+    }
+    .lead-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: #6F6F68;
+    }
+
+    .card-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: #1A1B1D;
+    }
+
+    .body { font-size: 13px; line-height: 1.6; color: #6F6F68; }
+
+    .panel {
+      background: #F2F1EA;
+      border: 1px solid #D9D6CB;
+      border-radius: 6px;
+      padding: 20px;
+    }
+
+    .rule { border-top: 1px solid #D9D6CB; }
+    .dark-page .rule { border-top-color: rgba(26,27,29,0.12); }
+
+    /* States are typographic: mono caps in a working tone, no pill. */
+    .state {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+    }
+    .state-good { color: #047857; }
+    .state-attention { color: #B45309; }
+    .state-stale { color: #BE123C; }
+    .state-quiet { color: #6F6F68; }
+
+    /* Hairline table: mono caps headers, 1px rules, tabular figures. */
+    .studio-table { width: 100%; border-collapse: collapse; }
+    .studio-table thead th {
+      text-align: left;
+      padding: 9px 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: #6F6F68;
+      border-bottom: 1px solid #D9D6CB;
+    }
+    .studio-table tbody td {
+      padding: 9px 10px;
+      font-size: 11px;
+      color: #1A1B1D;
+      border-bottom: 1px solid #D9D6CB;
+    }
+    .studio-table tbody td .num { font-variant-numeric: tabular-nums; }
+
+    @media print {
+      body { background: white; }
+      .page { box-shadow: none; margin: 0; }
+    }
+  </style>
+</head>
+<body>
+  
+    <div class="page dark-page" style="justify-content: space-between; overflow: hidden; position: relative;">
+      <div style="position: absolute; inset: 0; background: linear-gradient(135deg, #ECEAE3, #F2F1EA); opacity: 0.55;"></div>
+      <div style="position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(242,241,234,0.55), rgba(242,241,234,0.25), rgba(242,241,234,0.9));"></div>
+
+      
+
+      <div style="position: relative; z-index: 10; padding-top: 48px;">
+        <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 40px; width: auto; object-fit: contain; filter: brightness(0);" />
+      </div>
+
+      <div style="position: relative; z-index: 10; width: 100%; max-width: 560px;">
+        <div style="display: inline-block; background: #1A1B1D; color: #F2F1EA; padding: 14px 22px; border-radius: 6px; margin-bottom: 44px;">
+          <div style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; letter-spacing: 0.22em;">LIFE CYCLE ASSESSMENT</div>
+          <div style="font-size: 10px; margin-top: 5px; opacity: 0.7; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.1em;">ISO 14067:2018 &middot; ISO 14044:2006</div>
+        </div>
+        <h1 class="statement" style="font-size: 64px; line-height: 0.95; margin-bottom: 18px;">
+          Avallen Calvados
+        </h1>
+        <p class="card-title" style="font-size: 18px; color: #6F6F68; font-weight: 500;">Avallen Spirits Ltd</p>
+        <p class="body" style="max-width: 440px; margin-top: 18px;">A single-estate calvados distilled from whole pressed apples grown in the orchards of Normandy, France. Bottled at 40% ABV in a 70cl flint glass bottle with a natural cork closure.</p>
+      </div>
+
+      <div style="position: relative; z-index: 10; display: flex; gap: 28px; margin-bottom: 84px;">
+        
+    <div style="flex: 1; padding-top: 14px; border-top: 1px solid rgba(26,27,29,0.18);">
+      <div class="lead-label" style="color: #205E40;">Functional unit</div>
+      <div class="card-title" style="font-size: 16px; margin-top: 6px;">1 x 700ml bottle</div>
+    </div>
+        
+    <div style="flex: 1; padding-top: 14px; border-top: 1px solid rgba(26,27,29,0.18);">
+      <div class="lead-label" style="color: #205E40;">System boundary</div>
+      <div class="card-title" style="font-size: 16px; margin-top: 6px;">Cradle-to-Grave</div>
+    </div>
+        
+    <div style="flex: 1; padding-top: 14px; border-top: 1px solid rgba(26,27,29,0.18);">
+      <div class="lead-label" style="color: #205E40;">Reference year</div>
+      <div class="card-title" style="font-size: 16px; margin-top: 6px;">2025</div>
+    </div>
+      </div>
+
+      
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #1A1B1D; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(242,241,234,0.5); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(242,241,234,0.5); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; " />
+        </div>
+        
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+    </div>
+
+    <div class="page light-page" style="position: relative;">
+      <svg viewBox="0 0 100 100" fill="#205E40" style="position:absolute;bottom:-57.5px;right:-57.5px;width:230px;height:230px;opacity:0.06;z-index:0;pointer-events:none;"><circle cx="50" cy="50" r="50"/></svg>
+      <div style="position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%;">
+        
+    <div style="margin-bottom: 28px; border-bottom: 1px solid #D9D6CB; padding-bottom: 22px;">
+      <div class="eyebrow" style="color: #205E40;">01 &middot; EXECUTIVE SUMMARY</div>
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-top: 14px;">
+        <div>
+          <div class="lead-number" style="font-size: 66px; color: #205E40;">0.94</div>
+          <div class="lead-label" style="margin-top: 8px;">kg CO2e per bottle</div>
+        </div>
+        <div class="statement" style="font-size: 26px; max-width: 300px; text-align: right;">Cradle-to-grave, per 1 x 700ml bottle at 40% ABV</div>
+      </div>
+    </div>
+
+        <div style="display: flex; gap: 40px; margin-bottom: 28px;">
+          
+    <div style="flex: 1;">
+      <div class="lead-number" style="font-size: 40px; color: #1A1B1D;">0.940<span style="font-size: 13px; font-weight: 600; color: #6F6F68; margin-left: 6px;">kg CO₂e</span></div>
+      <div class="lead-label" style="margin-top: 8px;">Carbon footprint, fossil</div>
+    </div>
+          
+    <div style="flex: 1;">
+      <div class="lead-number" style="font-size: 40px; color: #1A1B1D;">12.4<span style="font-size: 13px; font-weight: 600; color: #6F6F68; margin-left: 6px;">litres</span></div>
+      <div class="lead-label" style="margin-top: 8px;">Water footprint</div>
+    </div>
+          
+    <div style="flex: 1;">
+      <div class="lead-number" style="font-size: 40px; color: #1A1B1D;">71<span style="font-size: 13px; font-weight: 600; color: #6F6F68; margin-left: 6px;">%</span></div>
+      <div class="lead-label" style="margin-top: 8px;">Recycling rate</div>
+    </div>
+          <div style="width: 118px; text-align: center;">
+            <div style="width: 92px; height: 92px; border-radius: 50%; margin: 0 auto; background: conic-gradient(#047857 302.40000000000003deg, #D9D6CB 0deg); position: relative;">
+              <div style="position: absolute; inset: 10px; background: #ECEAE3; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                <span class="lead-number" style="font-size: 24px; color: #1A1B1D;">84<span style="font-size: 11px;">%</span></span>
+              </div>
+            </div>
+            <div class="state state-good" style="margin-top: 10px;">Data quality</div>
+          </div>
+        </div>
+
+        <div class="rule" style="padding-top: 20px;">
+          <div class="eyebrow dim" style="margin-bottom: 10px;">The study in brief</div>
+          <p class="body" style="font-size: 13.5px; line-height: 1.7;">The cradle-to-grave carbon footprint of one 700ml bottle of Avallen Calvados is 0.94 kg CO2e. The single largest contributor is the flint glass bottle, which accounts for just under half of the total footprint through the energy intensity of container glass manufacture. Apple cultivation and distillation together form the second cluster of impact, while distribution and end-of-life are comparatively minor. The most effective near-term reduction lever is lightweighting the glass bottle and increasing its recycled cullet content; a secondary lever is switching remaining distillery heat to a renewable source. Data quality is strong overall, anchored by primary orchard and distillery data.</p>
+        </div>
+      </div>
+
+      
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #ECEAE3; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(26,27,29,0.3); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(26,27,29,0.3); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; filter: brightness(0);" />
+        </div>
+        <div style="font-weight: 700; font-size: 12px;">1</div>
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+    </div>
+
+    <div class="page" style="background:#2B46C0; color:#F2F1EA; position:relative; justify-content:space-between; overflow:hidden;">
+      <svg viewBox="0 0 100 100" fill="#F2F1EA" style="position:absolute;bottom:-90px;right:-90px;width:360px;height:360px;opacity:0.14;z-index:0;pointer-events:none;"><polygon points="50,2 98,98 2,98"/></svg>
+      <div style="position:relative; z-index:1;">
+        <div style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:11px; letter-spacing:0.24em; text-transform:uppercase;">Chapter I &middot; The measures</div>
+      </div>
+      <div style="position:relative; z-index:1; max-width:560px;">
+        <h2 class="statement" style="font-size:72px; color:#F2F1EA; margin-bottom:22px;">The measures.</h2>
+        <p style="font-family:'Inter',sans-serif; font-size:15px; line-height:1.6; color:rgba(242,241,234,0.66); max-width:460px;">How the footprint was measured: the goal of the study, the method behind it, and the quality of the data underneath.</p>
+      </div>
+      <div style="position:relative; z-index:1; max-width:520px;">
+        <div style="display:flex; align-items:baseline; gap:14px; padding:12px 0; border-top:1px solid rgba(242,241,234,0.22);">
+        <span style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:10px; letter-spacing:0.2em; opacity:0.6; width:26px;">01</span>
+        <span class="card-title" style="font-size:16px; color:#F2F1EA;">Goal &amp; scope</span>
+      </div><div style="display:flex; align-items:baseline; gap:14px; padding:12px 0; border-top:1px solid rgba(242,241,234,0.22);">
+        <span style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:10px; letter-spacing:0.2em; opacity:0.6; width:26px;">02</span>
+        <span class="card-title" style="font-size:16px; color:#F2F1EA;">Methodology</span>
+      </div><div style="display:flex; align-items:baseline; gap:14px; padding:12px 0; border-top:1px solid rgba(242,241,234,0.22);">
+        <span style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:10px; letter-spacing:0.2em; opacity:0.6; width:26px;">03</span>
+        <span class="card-title" style="font-size:16px; color:#F2F1EA;">Data quality</span>
+      </div>
+      </div>
+    </div>
+
+    <div class="page light-page" style="position: relative;">
+      <svg viewBox="0 0 100 100" fill="#2B46C0" style="position:absolute;bottom:-57.5px;right:-57.5px;width:230px;height:230px;opacity:0.06;z-index:0;pointer-events:none;"><polygon points="50,2 98,98 2,98"/></svg>
+      <div style="position: relative; z-index: 1;">
+        
+    <div style="margin-bottom: 28px; border-bottom: 1px solid #D9D6CB; padding-bottom: 14px;">
+      <div class="eyebrow" style="color: #2B46C0;">02 &middot; GOAL &amp; SCOPE DEFINITION</div>
+      <div class="statement" style="font-size: 32px; margin-top: 8px;">Goal &amp; Scope Definition.</div>
+    </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px;">
+          <div class="eyebrow" style="color: #2B46C0;">ISO 14044:2006 &sect;4.2</div>
+          
+          <div class="lead-label">Report Version 1.2</div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px 40px; margin-bottom: 24px;">
+          
+    <div>
+      <div class="lead-label" style="margin-bottom: 8px;">Intended application</div>
+      <p class="body" style="font-size: 12px; line-height: 1.6;">To quantify the cradle-to-grave carbon and environmental footprint of a single bottle of Avallen Calvados, informing product-level reduction targets and supporting credible on-pack and marketing sustainability communication.</p>
+    </div>
+          
+    <div>
+      <div class="lead-label" style="margin-bottom: 8px;">Reasons for study</div>
+      <p class="body" style="font-size: 12px; line-height: 1.6;">Avallen Spirits is pursuing science-based reduction targets across its portfolio and needs a robust, ISO-compliant product footprint to identify hotspots, prioritise interventions, and substantiate environmental claims to trade and consumer audiences.</p>
+    </div>
+          <div>
+            <div class="lead-label" style="margin-bottom: 10px;">Intended audience</div>
+            <div><span class="state" style="color: #2B46C0; margin-right: 16px; white-space: nowrap;">Internal sustainability team</span><span class="state" style="color: #2B46C0; margin-right: 16px; white-space: nowrap;">Trade buyers &amp; distributors</span><span class="state" style="color: #2B46C0; margin-right: 16px; white-space: nowrap;">B Corp assessment</span><span class="state" style="color: #2B46C0; margin-right: 16px; white-space: nowrap;">Consumers (via summary claims)</span></div>
+          </div>
+          
+    <div>
+      <div class="lead-label" style="margin-bottom: 8px;">Comparative assertion</div>
+      <p class="body" style="font-size: 12px; line-height: 1.6;">No: this study does not support comparative assertions disclosed to the public.</p>
+    </div>
+        </div>
+
+        <div class="panel" style="margin-bottom: 24px;">
+          <div class="lead-label" style="color: #2B46C0; margin-bottom: 8px;">System boundary &middot; Cradle-to-Grave</div>
+          <p class="body" style="font-size: 12px; line-height: 1.6; margin-bottom: 16px;">The study covers apple cultivation and harvest, transport to the distillery, pressing, fermentation, double distillation, cask maturation, blending and bottling, primary and secondary packaging production, distribution to a UK regional distribution centre, and end-of-life treatment of all packaging. The use phase (consumer chilling/serving) is excluded as negligible and highly variable.</p>
+          <div style="display: flex; gap: 32px;">
+            <div style="flex: 1;">
+              <div class="lead-label" style="margin-bottom: 6px;">Cut-off criteria</div>
+              <p class="body" style="font-size: 11px; line-height: 1.5;">Mass and energy flows contributing less than 1% of the total mass or cumulative energy of the system are excluded, provided the aggregate of all excluded flows remains below 5% of total mass, energy and climate impact, in line with ISO 14044 §4.2.3.3.</p>
+            </div>
+            <div style="flex: 1;">
+              <div class="lead-label" style="margin-bottom: 6px;">Allocation procedure</div>
+              <p class="body" style="font-size: 11px; line-height: 1.5;">Co-products of distillation (pomace and lees) are handled by economic allocation. Where an ingredient or process serves multiple products, physical allocation by mass is applied. Recycling is modelled using the avoided-burden (substitution) method.</p>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <div class="lead-label" style="margin-bottom: 8px;">Assumptions &amp; limitations</div>
+          <div style="display: flex; gap: 14px; padding: 10px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="state state-quiet" style="flex-shrink: 0; align-self: flex-start; margin-top: 2px; width: 88px;">Assumption</span>
+      <span class="body" style="font-size: 11.5px; line-height: 1.5;">Apple yield and orchard inputs are averaged over the 2023 to 2025 harvests to smooth vintage variation.</span>
+    </div><div style="display: flex; gap: 14px; padding: 10px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="state state-quiet" style="flex-shrink: 0; align-self: flex-start; margin-top: 2px; width: 88px;">Assumption</span>
+      <span class="body" style="font-size: 11.5px; line-height: 1.5;">Grid electricity at the distillery uses the 2025 French residual-mix emission factor; on-site solar is deducted where metered.</span>
+    </div><div style="display: flex; gap: 14px; padding: 10px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="state state-quiet" style="flex-shrink: 0; align-self: flex-start; margin-top: 2px; width: 88px;">Assumption</span>
+      <span class="body" style="font-size: 11.5px; line-height: 1.5;">Outbound distribution assumes a single 320km road leg from the French distillery to a UK regional distribution centre, including the cross-Channel ferry.</span>
+    </div><div style="display: flex; gap: 14px; padding: 10px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="state state-quiet" style="flex-shrink: 0; align-self: flex-start; margin-top: 2px; width: 88px;">Limitation</span>
+      <span class="body" style="font-size: 11.5px; line-height: 1.5;">Cask maturation losses (the angels share) are modelled as an evaporative volume loss and do not carry a direct emission burden beyond the amortised cask.</span>
+    </div>
+        </div>
+
+        
+      </div>
+
+      
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #ECEAE3; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(26,27,29,0.3); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(26,27,29,0.3); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; filter: brightness(0);" />
+        </div>
+        <div style="font-weight: 700; font-size: 12px;">2</div>
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+    </div>
+    <div class="page light-page" style="position: relative;">
+      <svg viewBox="0 0 100 100" fill="#2B46C0" style="position:absolute;bottom:-57.5px;right:-57.5px;width:230px;height:230px;opacity:0.06;z-index:0;pointer-events:none;"><polygon points="50,2 98,98 2,98"/></svg>
+      <div style="position: relative; z-index: 1;">
+        
+    <div style="margin-bottom: 24px; border-bottom: 1px solid #D9D6CB; padding-bottom: 14px;">
+      <div class="eyebrow" style="color: #2B46C0;">02 &middot; GOAL &amp; SCOPE DEFINITION &middot; CONT.</div>
+      <div class="statement" style="font-size: 26px; margin-top: 8px;">Goal &amp; Scope Definition.</div>
+    </div>
+
+        <div style="margin-bottom: 20px;">
+          <div class="lead-label" style="margin-bottom: 8px;">Assumptions &amp; limitations (continued)</div>
+          <div style="display: flex; gap: 14px; padding: 10px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="state state-quiet" style="flex-shrink: 0; align-self: flex-start; margin-top: 2px; width: 88px;">Limitation</span>
+      <span class="body" style="font-size: 11.5px; line-height: 1.5;">Consumer use-phase impacts (refrigeration, mixers, glassware washing) are outside the system boundary owing to high variability.</span>
+    </div><div style="display: flex; gap: 14px; padding: 10px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="state state-quiet" style="flex-shrink: 0; align-self: flex-start; margin-top: 2px; width: 88px;">Assumption</span>
+      <span class="body" style="font-size: 11.5px; line-height: 1.5;">End-of-life packaging follows UK 2025 municipal recovery rates for the relevant material streams.</span>
+    </div>
+        </div>
+
+        
+    <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+      <div style="font-size: 11px; font-weight: 600; color: #0c4a6e; margin-bottom: 10px;">End-of-Life Modelling Assumptions (ISO 14044 &sect;4.4)</div>
+      <div style="display: flex; gap: 16px; margin-bottom: 10px;">
+        <div style="font-size: 10px; color: #6F6F68;"><strong>Region:</strong> United Kingdom (municipal, 2025)</div>
+        <div style="font-size: 10px; color: #6F6F68;"><strong>Method:</strong> Substitution (avoided virgin production)</div>
+        <div style="font-size: 10px; color: #6F6F68;"><strong>Data Year:</strong> 2025</div>
+      </div>
+      <table style="width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 8px;">
+        <thead>
+          <tr style="border-bottom: 1px solid #bae6fd;">
+            <th style="text-align: left; padding: 4px 6px; color: #0c4a6e; font-size: 9px;">Material</th>
+            <th style="text-align: center; padding: 4px 6px; color: #0c4a6e; font-size: 9px;">Recycling</th>
+            <th style="text-align: center; padding: 4px 6px; color: #0c4a6e; font-size: 9px;">Landfill</th>
+            <th style="text-align: center; padding: 4px 6px; color: #0c4a6e; font-size: 9px;">Incineration</th>
+            <th style="text-align: center; padding: 4px 6px; color: #0c4a6e; font-size: 9px;">Composting</th>
+            <th style="text-align: center; padding: 4px 6px; color: #0c4a6e; font-size: 9px;">AD</th>
+          </tr>
+        </thead>
+        <tbody><tr>
+      <td style="font-weight: 500; font-size: 10px;">Flint glass</td>
+      <td style="text-align: center; font-size: 10px;">76%</td>
+      <td style="text-align: center; font-size: 10px;">22%</td>
+      <td style="text-align: center; font-size: 10px;">2%</td>
+      <td style="text-align: center; font-size: 10px;">0%</td>
+      <td style="text-align: center; font-size: 10px;">0%</td>
+    </tr><tr>
+      <td style="font-weight: 500; font-size: 10px;">Corrugated board</td>
+      <td style="text-align: center; font-size: 10px;">82%</td>
+      <td style="text-align: center; font-size: 10px;">12%</td>
+      <td style="text-align: center; font-size: 10px;">6%</td>
+      <td style="text-align: center; font-size: 10px;">0%</td>
+      <td style="text-align: center; font-size: 10px;">0%</td>
+    </tr><tr>
+      <td style="font-weight: 500; font-size: 10px;">Paper label</td>
+      <td style="text-align: center; font-size: 10px;">68%</td>
+      <td style="text-align: center; font-size: 10px;">20%</td>
+      <td style="text-align: center; font-size: 10px;">12%</td>
+      <td style="text-align: center; font-size: 10px;">0%</td>
+      <td style="text-align: center; font-size: 10px;">0%</td>
+    </tr><tr>
+      <td style="font-weight: 500; font-size: 10px;">Cork</td>
+      <td style="text-align: center; font-size: 10px;">0%</td>
+      <td style="text-align: center; font-size: 10px;">60%</td>
+      <td style="text-align: center; font-size: 10px;">20%</td>
+      <td style="text-align: center; font-size: 10px;">20%</td>
+      <td style="text-align: center; font-size: 10px;">0%</td>
+    </tr><tr>
+      <td style="font-weight: 500; font-size: 10px;">Metal capsule</td>
+      <td style="text-align: center; font-size: 10px;">60%</td>
+      <td style="text-align: center; font-size: 10px;">34%</td>
+      <td style="text-align: center; font-size: 10px;">6%</td>
+      <td style="text-align: center; font-size: 10px;">0%</td>
+      <td style="text-align: center; font-size: 10px;">0%</td>
+    </tr></tbody>
+      </table>
+      <div style="font-size: 9px; color: #6F6F68;">Sources: DEFRA 2025 waste recovery statistics; ecoinvent 3.10 disposal datasets</div>
+    </div>
+      </div>
+
+      
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #ECEAE3; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(26,27,29,0.3); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(26,27,29,0.3); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; filter: brightness(0);" />
+        </div>
+        
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+    </div>
+
+    <div class="page light-page" style="position: relative;">
+      <svg viewBox="0 0 100 100" fill="#2B46C0" style="position:absolute;bottom:-57.5px;right:-57.5px;width:230px;height:230px;opacity:0.06;z-index:0;pointer-events:none;"><polygon points="50,2 98,98 2,98"/></svg>
+      <div style="position: relative; z-index: 1;">
+        
+    <div style="margin-bottom: 28px; border-bottom: 1px solid #D9D6CB; padding-bottom: 14px;">
+      <div class="eyebrow" style="color: #2B46C0;">03 &middot; METHODOLOGY</div>
+      <div class="statement" style="font-size: 32px; margin-top: 8px;">Methodology.</div>
+    </div>
+
+        <div class="eyebrow" style="color: #2B46C0; margin-bottom: 20px;">ISO 14044:2006 &sect;4.3 &amp; &sect;4.4</div>
+
+        <div style="display: flex; gap: 40px; margin-bottom: 24px;">
+          <div style="flex: 1;">
+            <div class="lead-label" style="margin-bottom: 10px;">Included stages</div>
+            <div style="display: flex; align-items: baseline; gap: 12px; padding: 7px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="state state-good" style="width: 14px; flex-shrink: 0;">&#10003;</span>
+      <span class="body" style="font-size: 12px; color: #1A1B1D;">Apple cultivation &amp; harvest</span>
+    </div><div style="display: flex; align-items: baseline; gap: 12px; padding: 7px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="state state-good" style="width: 14px; flex-shrink: 0;">&#10003;</span>
+      <span class="body" style="font-size: 12px; color: #1A1B1D;">Inbound transport to distillery</span>
+    </div><div style="display: flex; align-items: baseline; gap: 12px; padding: 7px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="state state-good" style="width: 14px; flex-shrink: 0;">&#10003;</span>
+      <span class="body" style="font-size: 12px; color: #1A1B1D;">Pressing &amp; fermentation</span>
+    </div><div style="display: flex; align-items: baseline; gap: 12px; padding: 7px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="state state-good" style="width: 14px; flex-shrink: 0;">&#10003;</span>
+      <span class="body" style="font-size: 12px; color: #1A1B1D;">Double distillation</span>
+    </div><div style="display: flex; align-items: baseline; gap: 12px; padding: 7px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="state state-good" style="width: 14px; flex-shrink: 0;">&#10003;</span>
+      <span class="body" style="font-size: 12px; color: #1A1B1D;">Cask maturation</span>
+    </div><div style="display: flex; align-items: baseline; gap: 12px; padding: 7px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="state state-good" style="width: 14px; flex-shrink: 0;">&#10003;</span>
+      <span class="body" style="font-size: 12px; color: #1A1B1D;">Blending &amp; bottling</span>
+    </div><div style="display: flex; align-items: baseline; gap: 12px; padding: 7px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="state state-good" style="width: 14px; flex-shrink: 0;">&#10003;</span>
+      <span class="body" style="font-size: 12px; color: #1A1B1D;">Packaging production</span>
+    </div><div style="display: flex; align-items: baseline; gap: 12px; padding: 7px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="state state-good" style="width: 14px; flex-shrink: 0;">&#10003;</span>
+      <span class="body" style="font-size: 12px; color: #1A1B1D;">Outbound distribution</span>
+    </div><div style="display: flex; align-items: baseline; gap: 12px; padding: 7px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="state state-good" style="width: 14px; flex-shrink: 0;">&#10003;</span>
+      <span class="body" style="font-size: 12px; color: #1A1B1D;">End-of-life treatment</span>
+    </div>
+          </div>
+          <div style="flex: 1;">
+            <div class="lead-label" style="margin-bottom: 10px;">Excluded stages</div>
+            <div style="display: flex; align-items: baseline; gap: 12px; padding: 7px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="state state-stale" style="width: 14px; flex-shrink: 0;">&#10007;</span>
+      <span class="body" style="font-size: 12px; color: #1A1B1D;">Consumer use phase (serving, chilling)</span>
+    </div><div style="display: flex; align-items: baseline; gap: 12px; padding: 7px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="state state-stale" style="width: 14px; flex-shrink: 0;">&#10007;</span>
+      <span class="body" style="font-size: 12px; color: #1A1B1D;">Retail refrigeration &amp; display</span>
+    </div><div style="display: flex; align-items: baseline; gap: 12px; padding: 7px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="state state-stale" style="width: 14px; flex-shrink: 0;">&#10007;</span>
+      <span class="body" style="font-size: 12px; color: #1A1B1D;">Capital goods (buildings, machinery manufacture)</span>
+    </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-bottom: 24px;">
+          <div class="lead-label" style="color: #2B46C0; margin-bottom: 6px;">LCIA method &middot; IPCC 2021 GWP-100 (AR6) + EF 3.1</div>
+          <p class="body" style="font-size: 11px; line-height: 1.6;">Climate impact is characterised using IPCC AR6 GWP-100 factors. Other impact categories follow the European Commission Environmental Footprint (EF) 3.1 reference package, using the recommended characterisation model for each category. Results are expressed per functional unit and are not normalised or weighted in the headline figures.</p>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <div class="lead-label" style="margin-bottom: 10px;">Data sources &amp; databases</div>
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 10px 0; border-bottom: 1px solid #D9D6CB;">
+      <div>
+        <span class="card-title" style="font-size: 13px;">ecoinvent</span>
+        <span class="lead-label" style="margin-left: 8px;">v3.10</span>
+        <div class="body" style="font-size: 10px; margin-top: 2px;">Background processes: glass, electricity, transport</div>
+      </div>
+      <span style="font-size: 13px; color: #6F6F68; font-variant-numeric: tabular-nums; white-space: nowrap;">41 factors</span>
+    </div><div style="display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 10px 0; border-bottom: 1px solid #D9D6CB;">
+      <div>
+        <span class="card-title" style="font-size: 13px;">AGRIBALYSE</span>
+        <span class="lead-label" style="margin-left: 8px;">v3.1.1</span>
+        <div class="body" style="font-size: 10px; margin-top: 2px;">Apple cultivation &amp; agricultural inputs</div>
+      </div>
+      <span style="font-size: 13px; color: #6F6F68; font-variant-numeric: tabular-nums; white-space: nowrap;">12 factors</span>
+    </div><div style="display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 10px 0; border-bottom: 1px solid #D9D6CB;">
+      <div>
+        <span class="card-title" style="font-size: 13px;">DEFRA GHG Conversion Factors</span>
+        <span class="lead-label" style="margin-left: 8px;">v2025</span>
+        <div class="body" style="font-size: 10px; margin-top: 2px;">Fuel combustion &amp; UK freight</div>
+      </div>
+      <span style="font-size: 13px; color: #6F6F68; font-variant-numeric: tabular-nums; white-space: nowrap;">18 factors</span>
+    </div><div style="display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 10px 0; border-bottom: 1px solid #D9D6CB;">
+      <div>
+        <span class="card-title" style="font-size: 13px;">Supplier primary data</span>
+        
+        <div class="body" style="font-size: 10px; margin-top: 2px;">Orchard, distillery &amp; glass supplier records</div>
+      </div>
+      <span style="font-size: 13px; color: #6F6F68; font-variant-numeric: tabular-nums; white-space: nowrap;">9 factors</span>
+    </div>
+        </div>
+
+        <div>
+          <div class="lead-label" style="margin-bottom: 10px;">Software &amp; tools</div>
+          <div style="display: flex; align-items: baseline; gap: 12px; padding: 8px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="card-title" style="font-size: 12px; width: 140px; flex-shrink: 0;">alka<span style="font-weight: 700;">tera</span> <span class="lead-label" style="letter-spacing: 0.12em;">v2025.11</span></span>
+      <span class="body" style="font-size: 11px;">LCA modelling &amp; report generation engine</span>
+    </div><div style="display: flex; align-items: baseline; gap: 12px; padding: 8px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="card-title" style="font-size: 12px; width: 140px; flex-shrink: 0;">ecoinvent <span class="lead-label" style="letter-spacing: 0.12em;">v3.10</span></span>
+      <span class="body" style="font-size: 11px;">Background life-cycle inventory database</span>
+    </div><div style="display: flex; align-items: baseline; gap: 12px; padding: 8px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="card-title" style="font-size: 12px; width: 140px; flex-shrink: 0;">AGRIBALYSE <span class="lead-label" style="letter-spacing: 0.12em;">v3.1.1</span></span>
+      <span class="body" style="font-size: 11px;">Agricultural foreground datasets</span>
+    </div>
+        </div>
+      </div>
+
+      
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #ECEAE3; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(26,27,29,0.3); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(26,27,29,0.3); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; filter: brightness(0);" />
+        </div>
+        <div style="font-weight: 700; font-size: 12px;">3</div>
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+    </div>
+
+    <div class="page light-page" style="position: relative;">
+      <svg viewBox="0 0 100 100" fill="#2B46C0" style="position:absolute;bottom:-57.5px;right:-57.5px;width:230px;height:230px;opacity:0.06;z-index:0;pointer-events:none;"><polygon points="50,2 98,98 2,98"/></svg>
+      <div style="position: relative; z-index: 1;">
+        
+    <div style="margin-bottom: 24px; border-bottom: 1px solid #D9D6CB; padding-bottom: 14px;">
+      <div class="eyebrow" style="color: #2B46C0;">03 &middot; METHODOLOGY, CHARACTERISATION MODELS &middot; CONT.</div>
+      <div class="statement" style="font-size: 26px; margin-top: 8px;">Methodology, Characterisation Models.</div>
+    </div>
+
+        <div class="eyebrow" style="color: #2B46C0; margin-bottom: 20px;">LCIA characterisation factors</div>
+
+        <table class="studio-table" style="margin-bottom: 28px;">
+          <thead><tr><th>Impact Category</th><th>Characterisation Model</th><th>Reference</th></tr></thead>
+          <tbody><tr>
+      <td>Climate change</td>
+      <td>IPCC 2021 GWP-100 (AR6)</td>
+      <td style="color: #6F6F68;">IPCC Sixth Assessment Report, 2021</td>
+    </tr><tr>
+      <td>Acidification</td>
+      <td>Accumulated Exceedance</td>
+      <td style="color: #6F6F68;">Seppälä et al. 2006; Posch et al. 2008</td>
+    </tr><tr>
+      <td>Freshwater eutrophication</td>
+      <td>EUTREND (ReCiPe)</td>
+      <td style="color: #6F6F68;">Struijs et al. 2009</td>
+    </tr><tr>
+      <td>Water scarcity</td>
+      <td>AWARE</td>
+      <td style="color: #6F6F68;">Boulay et al. 2018 (UNEP-SETAC)</td>
+    </tr><tr>
+      <td>Fossil resource use</td>
+      <td>CML — abiotic depletion (fossil)</td>
+      <td style="color: #6F6F68;">van Oers et al. 2002</td>
+    </tr><tr>
+      <td>Land use</td>
+      <td>Soil quality index (LANCA)</td>
+      <td style="color: #6F6F68;">De Laurentiis et al. 2019</td>
+    </tr></tbody>
+        </table>
+
+        <div class="panel" style="border-left: 2px solid #2B46C0;">
+          <div class="lead-label" style="color: #2B46C0; margin-bottom: 8px;">Reference standards</div>
+          <div class="body" style="font-size: 11px; padding: 3px 0;">&#8226; ISO 14040:2006 — Principles and framework</div><div class="body" style="font-size: 11px; padding: 3px 0;">&#8226; ISO 14044:2006 — Requirements and guidelines</div><div class="body" style="font-size: 11px; padding: 3px 0;">&#8226; ISO 14067:2018 — Carbon footprint of products</div><div class="body" style="font-size: 11px; padding: 3px 0;">&#8226; GHG Protocol Product Life Cycle Accounting and Reporting Standard</div><div class="body" style="font-size: 11px; padding: 3px 0;">&#8226; PAS 2050:2011</div>
+        </div>
+      </div>
+
+      
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #ECEAE3; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(26,27,29,0.3); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(26,27,29,0.3); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; filter: brightness(0);" />
+        </div>
+        <div style="font-weight: 700; font-size: 12px;">4</div>
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+    </div>
+
+    <div class="page light-page" style="position: relative;">
+      <svg viewBox="0 0 100 100" fill="#2B46C0" style="position:absolute;bottom:-57.5px;right:-57.5px;width:230px;height:230px;opacity:0.06;z-index:0;pointer-events:none;"><polygon points="50,2 98,98 2,98"/></svg>
+      <div style="position: relative; z-index: 1;">
+        
+    <div style="margin-bottom: 28px; border-bottom: 1px solid #D9D6CB; padding-bottom: 22px;">
+      <div class="eyebrow" style="color: #2B46C0;">04 &middot; DATA QUALITY ASSESSMENT</div>
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-top: 14px;">
+        <div>
+          <div class="lead-number" style="font-size: 66px; color: #2B46C0;">84%</div>
+          <div class="lead-label" style="margin-top: 8px;">Data quality · Good</div>
+        </div>
+        <div class="statement" style="font-size: 26px; max-width: 300px; text-align: right;">The data is strong.</div>
+      </div>
+    </div>
+
+        <div class="eyebrow" style="color: #2B46C0; margin-bottom: 20px;">ISO 14044:2006 &sect;4.2.3.6 &middot; Data quality requirements</div>
+
+        <div style="margin-bottom: 24px;">
+          <div class="lead-label" style="margin-bottom: 12px;">Pedigree matrix (ISO 14044 &sect;4.2.3.6)</div>
+          <div style="display: grid; grid-template-columns: 100px 1fr 180px; gap: 8px; align-items: center; margin-bottom: 8px;">
+              <span class="card-title" style="font-size: 11px;">Reliability</span>
+              <div style="display: flex; align-items: center; gap: 8px;">
+      <div style="flex: 1; height: 8px; background: #D9D6CB; border-radius: 4px; overflow: hidden;">
+        <div style="height: 100%; width: 80%; background: #047857; border-radius: 4px;"></div>
+      </div>
+      <span style="font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; width: 20px; text-align: center;">2</span>
+    </div>
+              <span class="body" style="font-size: 10px;">How data was obtained (measured, calculated, estimated)</span>
+            </div><div style="display: grid; grid-template-columns: 100px 1fr 180px; gap: 8px; align-items: center; margin-bottom: 8px;">
+              <span class="card-title" style="font-size: 11px;">Completeness</span>
+              <div style="display: flex; align-items: center; gap: 8px;">
+      <div style="flex: 1; height: 8px; background: #D9D6CB; border-radius: 4px; overflow: hidden;">
+        <div style="height: 100%; width: 80%; background: #047857; border-radius: 4px;"></div>
+      </div>
+      <span style="font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; width: 20px; text-align: center;">2</span>
+    </div>
+              <span class="body" style="font-size: 10px;">Statistical representativeness of data</span>
+            </div><div style="display: grid; grid-template-columns: 100px 1fr 180px; gap: 8px; align-items: center; margin-bottom: 8px;">
+              <span class="card-title" style="font-size: 11px;">Temporal</span>
+              <div style="display: flex; align-items: center; gap: 8px;">
+      <div style="flex: 1; height: 8px; background: #D9D6CB; border-radius: 4px; overflow: hidden;">
+        <div style="height: 100%; width: 80%; background: #047857; border-radius: 4px;"></div>
+      </div>
+      <span style="font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; width: 20px; text-align: center;">2</span>
+    </div>
+              <span class="body" style="font-size: 10px;">Age of data vs study period</span>
+            </div><div style="display: grid; grid-template-columns: 100px 1fr 180px; gap: 8px; align-items: center; margin-bottom: 8px;">
+              <span class="card-title" style="font-size: 11px;">Geographic</span>
+              <div style="display: flex; align-items: center; gap: 8px;">
+      <div style="flex: 1; height: 8px; background: #D9D6CB; border-radius: 4px; overflow: hidden;">
+        <div style="height: 100%; width: 80%; background: #047857; border-radius: 4px;"></div>
+      </div>
+      <span style="font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; width: 20px; text-align: center;">2</span>
+    </div>
+              <span class="body" style="font-size: 10px;">Match of data geography to study area</span>
+            </div><div style="display: grid; grid-template-columns: 100px 1fr 180px; gap: 8px; align-items: center; margin-bottom: 8px;">
+              <span class="card-title" style="font-size: 11px;">Technological</span>
+              <div style="display: flex; align-items: center; gap: 8px;">
+      <div style="flex: 1; height: 8px; background: #D9D6CB; border-radius: 4px; overflow: hidden;">
+        <div style="height: 100%; width: 60%; background: #B45309; border-radius: 4px;"></div>
+      </div>
+      <span style="font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; width: 20px; text-align: center;">3</span>
+    </div>
+              <span class="body" style="font-size: 10px;">Match of data technology to actual processes</span>
+            </div>
+          <div class="body" style="font-size: 9px; margin-top: 6px;">Scale: 1 (best) to 5 (worst) per ecoinvent pedigree approach</div>
+        </div>
+
+        <div class="rule" style="padding-top: 20px; margin-bottom: 24px; display: flex; gap: 32px;">
+          
+    <div style="flex: 1;">
+      <div class="lead-number" style="font-size: 30px; color: #047857;">58%</div>
+      <div class="lead-label" style="margin-top: 8px;">Primary data</div>
+      <div class="body" style="font-size: 10px; margin-top: 3px;">7 of 12 materials</div>
+    </div>
+          
+    <div style="flex: 1;">
+      <div class="lead-number" style="font-size: 30px; color: #2B46C0;">34%</div>
+      <div class="lead-label" style="margin-top: 8px;">Secondary data</div>
+      <div class="body" style="font-size: 10px; margin-top: 3px;">4 materials</div>
+    </div>
+          
+    <div style="flex: 1;">
+      <div class="lead-number" style="font-size: 30px; color: #B45309;">8%</div>
+      <div class="lead-label" style="margin-top: 8px;">Proxy data</div>
+      <div class="body" style="font-size: 10px; margin-top: 3px;">1 materials</div>
+    </div>
+          
+    <div style="flex: 1;">
+      <div class="lead-number" style="font-size: 30px; color: #1A1B1D;">12</div>
+      <div class="lead-label" style="margin-top: 8px;">Total materials</div>
+      <div class="body" style="font-size: 10px; margin-top: 3px;">in inventory</div>
+    </div>
+        </div>
+
+        <div class="lead-label" style="margin-bottom: 10px;">Material-level data quality</div>
+        <table class="studio-table">
+          <thead><tr><th>Material</th><th>Source</th><th>Grade</th><th>Confidence</th><th>Geography</th></tr></thead>
+          <tbody><tr>
+      <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Apples (Normandy)</td>
+      <td><span class="state state-good">Primary</span></td>
+      <td>A</td>
+      <td><span class="num">92%</span></td>
+      <td>FR — Normandy</td>
+    </tr><tr>
+      <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Flint glass bottle</td>
+      <td><span class="state state-good">Primary</span></td>
+      <td>A</td>
+      <td><span class="num">90%</span></td>
+      <td>FR / EU</td>
+    </tr><tr>
+      <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Natural cork closure</td>
+      <td><span class="state state-attention">Secondary</span></td>
+      <td>B</td>
+      <td><span class="num">78%</span></td>
+      <td>PT / EU</td>
+    </tr><tr>
+      <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Paper label</td>
+      <td><span class="state state-attention">Secondary</span></td>
+      <td>B</td>
+      <td><span class="num">74%</span></td>
+      <td>EU</td>
+    </tr><tr>
+      <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Distillery natural gas</td>
+      <td><span class="state state-good">Primary</span></td>
+      <td>A</td>
+      <td><span class="num">88%</span></td>
+      <td>FR</td>
+    </tr><tr>
+      <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Distillery electricity</td>
+      <td><span class="state state-good">Primary</span></td>
+      <td>A</td>
+      <td><span class="num">86%</span></td>
+      <td>FR</td>
+    </tr><tr>
+      <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Oak cask (amortised)</td>
+      <td><span class="state state-attention">Secondary</span></td>
+      <td>B</td>
+      <td><span class="num">70%</span></td>
+      <td>FR / EU</td>
+    </tr><tr>
+      <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Aluminium/tin capsule</td>
+      <td><span class="state state-stale">Proxy</span></td>
+      <td>C</td>
+      <td><span class="num">55%</span></td>
+      <td>EU (proxy)</td>
+    </tr><tr>
+      <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Corrugated shipper</td>
+      <td><span class="state state-attention">Secondary</span></td>
+      <td>B</td>
+      <td><span class="num">80%</span></td>
+      <td>EU</td>
+    </tr><tr>
+      <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Inbound apple transport</td>
+      <td><span class="state state-good">Primary</span></td>
+      <td>A</td>
+      <td><span class="num">85%</span></td>
+      <td>FR</td>
+    </tr><tr>
+      <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Outbound distribution</td>
+      <td><span class="state state-good">Primary</span></td>
+      <td>A</td>
+      <td><span class="num">82%</span></td>
+      <td>FR → UK</td>
+    </tr><tr>
+      <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">End-of-life (packaging)</td>
+      <td><span class="state state-attention">Secondary</span></td>
+      <td>B</td>
+      <td><span class="num">76%</span></td>
+      <td>UK</td>
+    </tr></tbody>
+        </table>
+      </div>
+
+      
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #ECEAE3; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(26,27,29,0.3); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(26,27,29,0.3); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; filter: brightness(0);" />
+        </div>
+        <div style="font-weight: 700; font-size: 12px;">5</div>
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+    </div>
+
+    <div class="page light-page" style="position: relative;">
+      <svg viewBox="0 0 100 100" fill="#2B46C0" style="position:absolute;bottom:-57.5px;right:-57.5px;width:230px;height:230px;opacity:0.06;z-index:0;pointer-events:none;"><polygon points="50,2 98,98 2,98"/></svg>
+      <div style="position: relative; z-index: 1;">
+        
+    <div style="margin-bottom: 24px; border-bottom: 1px solid #D9D6CB; padding-bottom: 14px;">
+      <div class="eyebrow" style="color: #2B46C0;">04 &middot; DATA QUALITY, NOTES &middot; CONT.</div>
+      <div class="statement" style="font-size: 26px; margin-top: 8px;">Data Quality, Notes.</div>
+    </div>
+
+        <div class="panel" style="margin-bottom: 16px;">
+          <div class="lead-label" style="margin-bottom: 8px;">Missing data treatment (ISO 14044 &sect;4.2.3.6.3)</div>
+          <p class="body" style="font-size: 12px; line-height: 1.7;">Where a directly matching dataset was unavailable (the metal capsule), the closest technological proxy from ecoinvent was substituted and flagged. No lifecycle stage within the system boundary was omitted; all foreground flows are populated with either primary or secondary data.</p>
+        </div>
+
+        <div class="panel" style="margin-bottom: 16px;">
+          <div class="lead-label" style="margin-bottom: 8px;">Uncertainty assessment</div>
+          <p class="body" style="font-size: 12px; line-height: 1.7;">Uncertainty is dominated by the glass container emission factor and the orchard nitrous-oxide term. A pedigree-matrix-based lognormal uncertainty was assigned to each flow and propagated by Monte Carlo simulation (10,000 runs), giving a 95% confidence interval of ±11% on the headline result.</p>
+        </div>
+
+        <div class="panel" style="margin-bottom: 16px;">
+          <div class="lead-label" style="margin-bottom: 12px;">Data quality improvement roadmap</div>
+          <div style="display: grid; grid-template-columns: auto 1fr; gap: 10px 16px; align-items: baseline;">
+            <div class="state state-stale">Priority 1</div>
+            <div class="body" style="font-size: 12px; line-height: 1.6;">Collect primary data from the top 3 impact contributors: this typically addresses &gt;60% of total climate impact uncertainty.</div>
+            <div class="state state-attention">Priority 2</div>
+            <div class="body" style="font-size: 12px; line-height: 1.6;">Replace proxy emission factors with material-specific secondary data from ecoinvent or AGRIBALYSE for improved geographic and technological representativeness.</div>
+            <div class="state state-attention">Priority 3</div>
+            <div class="body" style="font-size: 12px; line-height: 1.6;">Verify transport distances and modes with suppliers to refine distribution stage estimates currently based on distance &times; freight factor calculations.</div>
+            <div class="state state-good">Ongoing</div>
+            <div class="body" style="font-size: 12px; line-height: 1.6;">Annual data refresh with updated DEFRA emission factors and database versions. Re-assess data quality scores after each improvement cycle.</div>
+          </div>
+        </div>
+
+        <div class="panel" style="border-left: 2px solid #2B46C0;">
+          <div class="lead-label" style="color: #2B46C0; margin-bottom: 12px;">Data source distribution</div>
+          <div style="display: flex; gap: 24px; align-items: center;">
+            <div style="flex: 1; height: 24px; border-radius: 6px; overflow: hidden; display: flex; background: #D9D6CB;">
+              <div style="width: 58%; background: #047857; min-width: 2px;"></div>
+              <div style="width: 34%; background: #2B46C0;"></div>
+              <div style="width: 8%; background: #B45309;"></div>
+            </div>
+            <div class="lead-label" style="white-space: nowrap; letter-spacing: 0.12em;">
+              <span style="display: inline-block; width: 8px; height: 8px; background: #047857; border-radius: 2px; margin-right: 4px;"></span>Primary 58%
+              <span style="display: inline-block; width: 8px; height: 8px; background: #2B46C0; border-radius: 2px; margin-left: 12px; margin-right: 4px;"></span>Secondary 34%
+              <span style="display: inline-block; width: 8px; height: 8px; background: #B45309; border-radius: 2px; margin-left: 12px; margin-right: 4px;"></span>Proxy 8%
+            </div>
+          </div>
+        </div>
+      </div>
+
+      
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #ECEAE3; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(26,27,29,0.3); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(26,27,29,0.3); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; filter: brightness(0);" />
+        </div>
+        <div style="font-weight: 700; font-size: 12px;">6</div>
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+    </div>
+
+    <div class="page" style="background:#6D3A5D; color:#F2F1EA; position:relative; justify-content:space-between; overflow:hidden;">
+      <svg viewBox="0 0 100 100" fill="#F2F1EA" style="position:absolute;bottom:-90px;right:-90px;width:360px;height:360px;opacity:0.14;z-index:0;pointer-events:none;"><polygon points="50,2 98,50 50,98 2,50"/></svg>
+      <div style="position:relative; z-index:1;">
+        <div style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:11px; letter-spacing:0.24em; text-transform:uppercase;">Chapter II &middot; The cellar</div>
+      </div>
+      <div style="position:relative; z-index:1; max-width:560px;">
+        <h2 class="statement" style="font-size:72px; color:#F2F1EA; margin-bottom:22px;">The footprint.</h2>
+        <p style="font-family:'Inter',sans-serif; font-size:15px; line-height:1.6; color:rgba(242,241,234,0.66); max-width:460px;">What the product costs the planet: the greenhouse gases behind the number, and the water, land and circularity alongside it.</p>
+      </div>
+      <div style="position:relative; z-index:1; max-width:520px;">
+        <div style="display:flex; align-items:baseline; gap:14px; padding:12px 0; border-top:1px solid rgba(242,241,234,0.22);">
+        <span style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:10px; letter-spacing:0.2em; opacity:0.6; width:26px;">01</span>
+        <span class="card-title" style="font-size:16px; color:#F2F1EA;">Climate impact</span>
+      </div><div style="display:flex; align-items:baseline; gap:14px; padding:12px 0; border-top:1px solid rgba(242,241,234,0.22);">
+        <span style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:10px; letter-spacing:0.2em; opacity:0.6; width:26px;">02</span>
+        <span class="card-title" style="font-size:16px; color:#F2F1EA;">Detailed GHG reporting</span>
+      </div><div style="display:flex; align-items:baseline; gap:14px; padding:12px 0; border-top:1px solid rgba(242,241,234,0.22);">
+        <span style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:10px; letter-spacing:0.2em; opacity:0.6; width:26px;">03</span>
+        <span class="card-title" style="font-size:16px; color:#F2F1EA;">Impact categories</span>
+      </div><div style="display:flex; align-items:baseline; gap:14px; padding:12px 0; border-top:1px solid rgba(242,241,234,0.22);">
+        <span style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:10px; letter-spacing:0.2em; opacity:0.6; width:26px;">04</span>
+        <span class="card-title" style="font-size:16px; color:#F2F1EA;">Water footprint</span>
+      </div><div style="display:flex; align-items:baseline; gap:14px; padding:12px 0; border-top:1px solid rgba(242,241,234,0.22);">
+        <span style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:10px; letter-spacing:0.2em; opacity:0.6; width:26px;">05</span>
+        <span class="card-title" style="font-size:16px; color:#F2F1EA;">Circularity &amp; waste</span>
+      </div><div style="display:flex; align-items:baseline; gap:14px; padding:12px 0; border-top:1px solid rgba(242,241,234,0.22);">
+        <span style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:10px; letter-spacing:0.2em; opacity:0.6; width:26px;">06</span>
+        <span class="card-title" style="font-size:16px; color:#F2F1EA;">Land use</span>
+      </div>
+      </div>
+    </div>
+
+    <div class="page dark-page" style="position: relative;">
+      <svg viewBox="0 0 100 100" fill="#6D3A5D" style="position:absolute;bottom:-57.5px;right:-57.5px;width:230px;height:230px;opacity:0.06;z-index:0;pointer-events:none;"><polygon points="50,2 98,50 50,98 2,50"/></svg>
+      <div style="position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%;">
+        
+    <div style="margin-bottom: 28px; border-bottom: 1px solid rgba(26,27,29,0.12); padding-bottom: 22px;">
+      <div class="eyebrow" style="color: #6D3A5D;">05 &middot; CLIMATE IMPACT</div>
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-top: 14px;">
+        <div>
+          <div class="lead-number" style="font-size: 66px; color: #6D3A5D;">0.940<span style="font-size: 18px; font-weight: 600; color: #6F6F68; margin-left: 10px;">kg CO₂e</span></div>
+          <div class="lead-label" style="margin-top: 8px;">Fossil carbon footprint, GWP-100 · per 1 x 700ml bottle</div>
+        </div>
+        <div class="statement" style="font-size: 26px; max-width: 300px; text-align: right;">The packaging is the hotspot.</div>
+      </div>
+    </div>
+
+        <div style="display: flex; gap: 32px; align-items: flex-start;">
+          <div style="flex: 1;">
+            <div class="eyebrow dim" style="margin-bottom: 16px;">Lifecycle stage breakdown</div>
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 11px;">
+      <div class="lead-label" style="width: 108px; text-align: right; flex-shrink: 0; color: #6F6F68;">Raw materials</div>
+      <div style="flex: 1; height: 16px; background: #D9D6CB; border-radius: 6px; overflow: hidden;">
+        <div style="height: 100%; width: 30.18867924528302%; background: #8FBF9F; border-radius: 6px;"></div>
+      </div>
+      <div style="width: 96px; font-size: 11px; font-variant-numeric: tabular-nums; color: #6F6F68; flex-shrink: 0;">0.1600 kg CO2e</div>
+      <div class="lead-number" style="width: 46px; font-size: 14px; text-align: right; flex-shrink: 0; color: #6D3A5D;">16.5<span style="font-size: 9px;">%</span></div>
+    </div><div style="display: flex; align-items: center; gap: 12px; margin-bottom: 11px;">
+      <div class="lead-label" style="width: 108px; text-align: right; flex-shrink: 0; color: #6F6F68;">Packaging</div>
+      <div style="flex: 1; height: 16px; background: #D9D6CB; border-radius: 6px; overflow: hidden;">
+        <div style="height: 100%; width: 100%; background: #205E40; border-radius: 6px;"></div>
+      </div>
+      <div style="width: 96px; font-size: 11px; font-variant-numeric: tabular-nums; color: #6F6F68; flex-shrink: 0;">0.5300 kg CO2e</div>
+      <div class="lead-number" style="width: 46px; font-size: 14px; text-align: right; flex-shrink: 0; color: #6D3A5D;">54.6<span style="font-size: 9px;">%</span></div>
+    </div><div style="display: flex; align-items: center; gap: 12px; margin-bottom: 11px;">
+      <div class="lead-label" style="width: 108px; text-align: right; flex-shrink: 0; color: #6F6F68;">Processing</div>
+      <div style="flex: 1; height: 16px; background: #D9D6CB; border-radius: 6px; overflow: hidden;">
+        <div style="height: 100%; width: 28.30188679245283%; background: #B45309; border-radius: 6px;"></div>
+      </div>
+      <div style="width: 96px; font-size: 11px; font-variant-numeric: tabular-nums; color: #6F6F68; flex-shrink: 0;">0.1500 kg CO2e</div>
+      <div class="lead-number" style="width: 46px; font-size: 14px; text-align: right; flex-shrink: 0; color: #6D3A5D;">15.5<span style="font-size: 9px;">%</span></div>
+    </div><div style="display: flex; align-items: center; gap: 12px; margin-bottom: 11px;">
+      <div class="lead-label" style="width: 108px; text-align: right; flex-shrink: 0; color: #6F6F68;">Distribution</div>
+      <div style="flex: 1; height: 16px; background: #D9D6CB; border-radius: 6px; overflow: hidden;">
+        <div style="height: 100%; width: 13.20754716981132%; background: #2B46C0; border-radius: 6px;"></div>
+      </div>
+      <div style="width: 96px; font-size: 11px; font-variant-numeric: tabular-nums; color: #6F6F68; flex-shrink: 0;">0.0700 kg CO2e</div>
+      <div class="lead-number" style="width: 46px; font-size: 14px; text-align: right; flex-shrink: 0; color: #6D3A5D;">7.2<span style="font-size: 9px;">%</span></div>
+    </div><div style="display: flex; align-items: center; gap: 12px; margin-bottom: 11px;">
+      <div class="lead-label" style="width: 108px; text-align: right; flex-shrink: 0; color: #6F6F68;">End-of-life</div>
+      <div style="flex: 1; height: 16px; background: #D9D6CB; border-radius: 6px; overflow: hidden;">
+        <div style="height: 100%; width: 5.660377358490566%; background: #6F6F68; border-radius: 6px;"></div>
+      </div>
+      <div style="width: 96px; font-size: 11px; font-variant-numeric: tabular-nums; color: #6F6F68; flex-shrink: 0;">0.0300 kg CO2e</div>
+      <div class="lead-number" style="width: 46px; font-size: 14px; text-align: right; flex-shrink: 0; color: #6D3A5D;">3.1<span style="font-size: 9px;">%</span></div>
+    </div><div style="display: flex; align-items: center; gap: 12px; margin-bottom: 11px;">
+      <div class="lead-label" style="width: 108px; text-align: right; flex-shrink: 0; color: #6F6F68;">Use phase</div>
+      <div style="flex: 1; height: 16px; background: #D9D6CB; border-radius: 6px; overflow: hidden;">
+        <div style="height: 100%; width: 5.660377358490566%; background: #D9D6CB; border-radius: 6px;"></div>
+      </div>
+      <div style="width: 96px; font-size: 11px; font-variant-numeric: tabular-nums; color: #6F6F68; flex-shrink: 0;">0.0300 kg CO2e</div>
+      <div class="lead-number" style="width: 46px; font-size: 14px; text-align: right; flex-shrink: 0; color: #6D3A5D;">3.1<span style="font-size: 9px;">%</span></div>
+    </div>
+            <div style="font-size: 9px; color: #6F6F68; margin-top: 8px; line-height: 1.4; max-width: 340px;">Fossil carbon footprint per ISO 14067:2018. Biogenic carbon (0.0320 kg CO&#8322;e) is reported separately in Section 06 and excluded here. The lifecycle stage bars below include biogenic carbon and sum to 0.9720 kg CO&#8322;e.</div>
+          </div>
+          <div style="width: 168px; height: 168px; border-radius: 50%; background: conic-gradient(#205E40 0deg 168.51063829787233deg, #8FBF9F 168.51063829787233deg 229.7872340425532deg, #B45309 229.7872340425532deg 287.2340425531915deg, #D9B382 287.2340425531915deg 321.7021276595745deg, #2B46C0 321.7021276595745deg 348.51063829787233deg, #6F6F68 348.51063829787233deg 360deg); position: relative; flex-shrink: 0;">
+            <div style="position: absolute; inset: 42px; background: #F2F1EA; border-radius: 50%;"></div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 18px;">
+          <div style="display: flex; align-items: center; gap: 7px;">
+              <div style="width: 9px; height: 9px; border-radius: 50%; background: #205E40;"></div>
+              <span class="lead-label" style="color: #6F6F68;">Glass bottle</span>
+            </div><div style="display: flex; align-items: center; gap: 7px;">
+              <div style="width: 9px; height: 9px; border-radius: 50%; background: #8FBF9F;"></div>
+              <span class="lead-label" style="color: #6F6F68;">Apples &amp; cultivation</span>
+            </div><div style="display: flex; align-items: center; gap: 7px;">
+              <div style="width: 9px; height: 9px; border-radius: 50%; background: #B45309;"></div>
+              <span class="lead-label" style="color: #6F6F68;">Distillation &amp; maturation</span>
+            </div><div style="display: flex; align-items: center; gap: 7px;">
+              <div style="width: 9px; height: 9px; border-radius: 50%; background: #D9B382;"></div>
+              <span class="lead-label" style="color: #6F6F68;">Other packaging</span>
+            </div><div style="display: flex; align-items: center; gap: 7px;">
+              <div style="width: 9px; height: 9px; border-radius: 50%; background: #2B46C0;"></div>
+              <span class="lead-label" style="color: #6F6F68;">Distribution</span>
+            </div><div style="display: flex; align-items: center; gap: 7px;">
+              <div style="width: 9px; height: 9px; border-radius: 50%; background: #6F6F68;"></div>
+              <span class="lead-label" style="color: #6F6F68;">End-of-life</span>
+            </div>
+        </div>
+
+        <div class="rule" style="margin-top: 22px; padding-top: 20px; display: flex; gap: 40px;">
+          <div>
+              <div class="lead-number" style="font-size: 30px; color: #1A1B1D;">9<span style="font-size: 13px;">%</span></div>
+              <div class="lead-label" style="margin-top: 6px;">Scope 1 (direct)</div>
+            </div><div>
+              <div class="lead-number" style="font-size: 30px; color: #1A1B1D;">7<span style="font-size: 13px;">%</span></div>
+              <div class="lead-label" style="margin-top: 6px;">Scope 2 (energy)</div>
+            </div><div>
+              <div class="lead-number" style="font-size: 30px; color: #1A1B1D;">84<span style="font-size: 13px;">%</span></div>
+              <div class="lead-label" style="margin-top: 6px;">Scope 3 (value chain)</div>
+            </div>
+        </div>
+
+        
+          <div class="panel" style="margin-top: 22px; border-left: 2px solid #6D3A5D;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+              <span class="eyebrow" style="color: #6D3A5D;">Scope attribution</span>
+              <span class="state state-good">Correct</span>
+            </div>
+            <div class="body" style="font-size: 11.5px;">Avallen Calvados is produced at the brand-operated Normandy distillery, so distillery combustion and electricity sit in Scope 1 and Scope 2 respectively rather than in Scope 3 Category 1.</div>
+          </div>
+        
+      </div>
+
+      
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #1A1B1D; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(242,241,234,0.5); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(242,241,234,0.5); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; " />
+        </div>
+        <div style="font-weight: 700; font-size: 12px;">7</div>
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+    </div>
+
+    <div class="page light-page" style="position: relative;">
+      <svg viewBox="0 0 100 100" fill="#6D3A5D" style="position:absolute;bottom:-57.5px;right:-57.5px;width:230px;height:230px;opacity:0.06;z-index:0;pointer-events:none;"><polygon points="50,2 98,50 50,98 2,50"/></svg>
+      <div style="position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%;">
+        
+    <div style="margin-bottom: 28px; border-bottom: 1px solid #D9D6CB; padding-bottom: 22px;">
+      <div class="eyebrow" style="color: #6D3A5D;">06 &middot; DETAILED GHG REPORTING</div>
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-top: 14px;">
+        <div>
+          <div class="lead-number" style="font-size: 66px; color: #6D3A5D;">0.9720<span style="font-size: 18px; font-weight: 600; color: #6F6F68; margin-left: 10px;">kg CO₂e</span></div>
+          <div class="lead-label" style="margin-top: 8px;">Total GWP-100, all species · ISO 14067:2018</div>
+        </div>
+        <div class="statement" style="font-size: 26px; max-width: 300px; text-align: right;">The gases behind the number, itemised.</div>
+      </div>
+    </div>
+
+        <div style="display: flex; gap: 40px; margin-bottom: 26px;">
+          <div style="flex: 1;">
+              <div class="lead-number" style="font-size: 34px; color: #BE123C;">0.8700</div>
+              <div class="lead-label" style="margin-top: 8px;">Fossil CO₂</div>
+              <div class="lead-label" style="margin-top: 3px; letter-spacing: 0.14em; opacity: 0.7;">kg CO₂e</div>
+            </div><div style="flex: 1;">
+              <div class="lead-number" style="font-size: 34px; color: #047857;">0.0320</div>
+              <div class="lead-label" style="margin-top: 8px;">Biogenic CO₂</div>
+              <div class="lead-label" style="margin-top: 3px; letter-spacing: 0.14em; opacity: 0.7;">kg CO₂e</div>
+            </div><div style="flex: 1;">
+              <div class="lead-number" style="font-size: 34px; color: #B45309;">0.0000</div>
+              <div class="lead-label" style="margin-top: 8px;">LULUC CO₂</div>
+              <div class="lead-label" style="margin-top: 3px; letter-spacing: 0.14em; opacity: 0.7;">kg CO₂e</div>
+            </div>
+        </div>
+
+        <table class="studio-table" style="margin-bottom: 22px;">
+          <thead><tr><th>GHG species</th><th>Mass (kg)</th><th>CO₂e (kg)</th><th>GWP-100</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>CO₂ (fossil)</td>
+              <td class="num">0.8700</td>
+              <td class="num">0.8700</td>
+              <td class="num">1</td>
+            </tr>
+            <tr>
+              <td>CO₂ (biogenic)</td>
+              <td class="num">0.0320</td>
+              <td class="num">0.0320</td>
+              <td class="num">1*</td>
+            </tr>
+            <tr>
+              <td>CO₂ (LULUC)</td>
+              <td class="num">0.0000</td>
+              <td class="num">0.0000</td>
+              <td class="num">1</td>
+            </tr>
+            <tr>
+              <td>CH₄ (fossil)</td>
+              <td class="num">0.00090</td>
+              <td class="num">0.0268</td>
+              <td class="num">29.8</td>
+            </tr>
+            <tr>
+              <td>CH₄ (biogenic)</td>
+              <td class="num">0.00040</td>
+              <td class="num">0.0108</td>
+              <td class="num">27.0</td>
+            </tr>
+            <tr>
+              <td>N₂O</td>
+              <td class="num">0.00016</td>
+              <td class="num">0.0437</td>
+              <td class="num">273</td>
+            </tr>
+            <tr>
+              <td>HFCs / PFCs</td>
+              <td class="num">·</td>
+              <td class="num">0.0000</td>
+              <td class="num">Variable</td>
+            </tr>
+            <tr>
+              <td style="font-weight: 700;">Total GWP-100 (all species)</td>
+              <td></td>
+              <td class="num" style="font-weight: 700; color: #6D3A5D;">0.9720</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td style="font-weight: 700;">Fossil carbon footprint (excl. biogenic)</td>
+              <td></td>
+              <td class="num" style="font-weight: 700; color: #1A1B1D;">0.9400</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="panel" style="margin-bottom: 16px; border-left: 2px solid #6D3A5D;">
+          <div class="eyebrow" style="color: #6D3A5D; margin-bottom: 8px;">Biogenic carbon note · ISO 14067:2018</div>
+          <p class="body" style="font-size: 11.5px;">Biogenic CO2 uptake in the apple orchard and its subsequent release at fermentation and end-of-life are inventoried separately and characterised at GWP=1. Per ISO 14067:2018 §6.4.9.3, the net biogenic balance is reported apart from the headline fossil carbon footprint and does not alter the 0.94 kg CO2e fossil figure.</p>
+        </div>
+
+        <div class="body" style="font-size: 11px; margin-bottom: 8px;">
+          <strong style="color: #1A1B1D;">GWP method:</strong> IPCC AR6 GWP-100 · all GWP-100 values from IPCC Sixth Assessment Report (AR6, 2021).
+        </div>
+        <div class="body" style="font-size: 10px;">
+          * Per ISO 14067:2018 §6.4.9.3, biogenic CO₂ is characterised at GWP=1 for the species inventory but reported separately from the fossil carbon footprint. The net biogenic carbon balance (uptake minus end-of-life release) is excluded from the headline fossil footprint figure.
+        </div>
+      </div>
+
+      
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #ECEAE3; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(26,27,29,0.3); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(26,27,29,0.3); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; filter: brightness(0);" />
+        </div>
+        <div style="font-weight: 700; font-size: 12px;">8</div>
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+    </div>
+
+      <div class="page light-page" style="position: relative;">
+        <svg viewBox="0 0 100 100" fill="#6D3A5D" style="position:absolute;bottom:-57.5px;right:-57.5px;width:230px;height:230px;opacity:0.06;z-index:0;pointer-events:none;"><polygon points="50,2 98,50 50,98 2,50"/></svg>
+        <div style="position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%;">
+          
+    <div style="margin-bottom: 28px; border-bottom: 1px solid #D9D6CB; padding-bottom: 14px;">
+      <div class="eyebrow" style="color: #6D3A5D;">07 &middot; ENVIRONMENTAL IMPACT CATEGORIES</div>
+      <div class="statement" style="font-size: 32px; margin-top: 8px;">Environmental Impact Categories.</div>
+    </div>
+
+          
+            <div class="eyebrow" style="color: #6D3A5D; margin-bottom: 10px;">ISO 14044:2006 §4.4 · life cycle impact assessment</div>
+            <div class="panel" style="margin-bottom: 22px; border-left: 2px solid #6D3A5D;">
+              <p class="body" style="font-size: 11.5px;"><strong style="color: #1A1B1D;">Method:</strong> EF 3.1 (Environmental Footprint) · Values are characterised results per functional unit. No normalisation or weighting is applied, so categories should not be summed or directly compared against one another.</p>
+            </div>
+          
+
+          
+        <div class="" style="padding: 0 0 18px 0;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 24px;">
+            <div>
+              <div class="card-title" style="font-size: 15px;">Acidification</div>
+              <div class="lead-label" style="margin-top: 4px;">Accumulated Exceedance</div>
+            </div>
+            <div style="text-align: right; flex-shrink: 0;">
+              <span class="lead-number" style="font-size: 26px; color: #1A1B1D;">0.0071</span>
+              <span class="lead-label" style="margin-left: 8px;">mol H+ eq</span>
+            </div>
+          </div>
+          <p class="body" style="font-size: 11px; margin-top: 8px;">Driven mainly by nitrogen and sulphur emissions from orchard fertiliser and distillery fuel combustion.</p>
+          <div class="lead-label" style="margin-top: 8px; letter-spacing: 0.14em; opacity: 0.7;">Top contributors</div>
+           <div style="display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 5px;">
+             <span class="body" style="font-size: 10px;">Glass bottle <span style="color: #6D3A5D; font-variant-numeric: tabular-nums;">44%</span></span><span class="body" style="font-size: 10px;">Apple cultivation <span style="color: #6D3A5D; font-variant-numeric: tabular-nums;">28%</span></span><span class="body" style="font-size: 10px;">Distillation <span style="color: #6D3A5D; font-variant-numeric: tabular-nums;">18%</span></span>
+           </div>
+        </div>
+        <div class="rule" style="padding: 18px 0 18px 0;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 24px;">
+            <div>
+              <div class="card-title" style="font-size: 15px;">Freshwater eutrophication</div>
+              <div class="lead-label" style="margin-top: 4px;">Fraction of P to freshwater</div>
+            </div>
+            <div style="text-align: right; flex-shrink: 0;">
+              <span class="lead-number" style="font-size: 26px; color: #1A1B1D;">0.00028</span>
+              <span class="lead-label" style="margin-left: 8px;">kg P eq</span>
+            </div>
+          </div>
+          <p class="body" style="font-size: 11px; margin-top: 8px;">Phosphorus losses associated with orchard nutrient management dominate this category.</p>
+          <div class="lead-label" style="margin-top: 8px; letter-spacing: 0.14em; opacity: 0.7;">Top contributors</div>
+           <div style="display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 5px;">
+             <span class="body" style="font-size: 10px;">Apple cultivation <span style="color: #6D3A5D; font-variant-numeric: tabular-nums;">68%</span></span><span class="body" style="font-size: 10px;">Glass bottle <span style="color: #6D3A5D; font-variant-numeric: tabular-nums;">18%</span></span>
+           </div>
+        </div>
+        <div class="rule" style="padding: 18px 0 18px 0;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 24px;">
+            <div>
+              <div class="card-title" style="font-size: 15px;">Photochemical ozone formation</div>
+              <div class="lead-label" style="margin-top: 4px;">Tropospheric ozone (human health)</div>
+            </div>
+            <div style="text-align: right; flex-shrink: 0;">
+              <span class="lead-number" style="font-size: 26px; color: #1A1B1D;">0.0043</span>
+              <span class="lead-label" style="margin-left: 8px;">kg NMVOC eq</span>
+            </div>
+          </div>
+          <p class="body" style="font-size: 11px; margin-top: 8px;">NOx from combustion and freight transport is the principal driver of ground-level ozone formation.</p>
+          <div class="lead-label" style="margin-top: 8px; letter-spacing: 0.14em; opacity: 0.7;">Top contributors</div>
+           <div style="display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 5px;">
+             <span class="body" style="font-size: 10px;">Distribution <span style="color: #6D3A5D; font-variant-numeric: tabular-nums;">37%</span></span><span class="body" style="font-size: 10px;">Glass bottle <span style="color: #6D3A5D; font-variant-numeric: tabular-nums;">35%</span></span><span class="body" style="font-size: 10px;">Distillation <span style="color: #6D3A5D; font-variant-numeric: tabular-nums;">21%</span></span>
+           </div>
+        </div>
+        <div class="rule" style="padding: 18px 0 18px 0;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 24px;">
+            <div>
+              <div class="card-title" style="font-size: 15px;">Fossil resource use</div>
+              <div class="lead-label" style="margin-top: 4px;">Abiotic depletion (fossil)</div>
+            </div>
+            <div style="text-align: right; flex-shrink: 0;">
+              <span class="lead-number" style="font-size: 26px; color: #1A1B1D;">13.6</span>
+              <span class="lead-label" style="margin-left: 8px;">MJ</span>
+            </div>
+          </div>
+          <p class="body" style="font-size: 11px; margin-top: 8px;">Reflects the natural gas and grid electricity used in glass manufacture and distillation.</p>
+          <div class="lead-label" style="margin-top: 8px; letter-spacing: 0.14em; opacity: 0.7;">Top contributors</div>
+           <div style="display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 5px;">
+             <span class="body" style="font-size: 10px;">Glass bottle <span style="color: #6D3A5D; font-variant-numeric: tabular-nums;">51%</span></span><span class="body" style="font-size: 10px;">Distillation <span style="color: #6D3A5D; font-variant-numeric: tabular-nums;">23%</span></span><span class="body" style="font-size: 10px;">Distribution <span style="color: #6D3A5D; font-variant-numeric: tabular-nums;">14%</span></span>
+           </div>
+        </div>
+        <div class="rule" style="padding: 18px 0 18px 0;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 24px;">
+            <div>
+              <div class="card-title" style="font-size: 15px;">Particulate matter</div>
+              <div class="lead-label" style="margin-top: 4px;">Disease incidence</div>
+            </div>
+            <div style="text-align: right; flex-shrink: 0;">
+              <span class="lead-number" style="font-size: 26px; color: #1A1B1D;">6.2e-8</span>
+              <span class="lead-label" style="margin-left: 8px;">disease inc.</span>
+            </div>
+          </div>
+          <p class="body" style="font-size: 11px; margin-top: 8px;">Combustion particulates from freight and distillery heat are the main sources.</p>
+          <div class="lead-label" style="margin-top: 8px; letter-spacing: 0.14em; opacity: 0.7;">Top contributors</div>
+           <div style="display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 5px;">
+             <span class="body" style="font-size: 10px;">Distribution <span style="color: #6D3A5D; font-variant-numeric: tabular-nums;">39%</span></span><span class="body" style="font-size: 10px;">Glass bottle <span style="color: #6D3A5D; font-variant-numeric: tabular-nums;">34%</span></span>
+           </div>
+        </div>
+        <div class="rule" style="padding: 18px 0 18px 0;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 24px;">
+            <div>
+              <div class="card-title" style="font-size: 15px;">Ozone depletion</div>
+              <div class="lead-label" style="margin-top: 4px;">ODP</div>
+            </div>
+            <div style="text-align: right; flex-shrink: 0;">
+              <span class="lead-number" style="font-size: 26px; color: #1A1B1D;">4.1e-8</span>
+              <span class="lead-label" style="margin-left: 8px;">kg CFC-11 eq</span>
+            </div>
+          </div>
+          <p class="body" style="font-size: 11px; margin-top: 8px;">Trace refrigerant and combustion emissions; negligible in absolute terms.</p>
+          <div class="lead-label" style="margin-top: 8px; letter-spacing: 0.14em; opacity: 0.7;">Top contributors</div>
+           <div style="display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 5px;">
+             <span class="body" style="font-size: 10px;">Distillation <span style="color: #6D3A5D; font-variant-numeric: tabular-nums;">46%</span></span><span class="body" style="font-size: 10px;">Distribution <span style="color: #6D3A5D; font-variant-numeric: tabular-nums;">29%</span></span>
+           </div>
+        </div>
+
+          
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #ECEAE3; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(26,27,29,0.3); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(26,27,29,0.3); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; filter: brightness(0);" />
+        </div>
+        <div style="font-weight: 700; font-size: 12px;">9</div>
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+        </div>
+      </div>
+
+    <div class="page light-page" style="position: relative;">
+      <svg viewBox="0 0 100 100" fill="#6D3A5D" style="position:absolute;bottom:-57.5px;right:-57.5px;width:230px;height:230px;opacity:0.06;z-index:0;pointer-events:none;"><polygon points="50,2 98,50 50,98 2,50"/></svg>
+      <div style="position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%;">
+        
+    <div style="margin-bottom: 28px; border-bottom: 1px solid #D9D6CB; padding-bottom: 22px;">
+      <div class="eyebrow" style="color: #6D3A5D;">09 &middot; WATER FOOTPRINT</div>
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-top: 14px;">
+        <div>
+          <div class="lead-number" style="font-size: 66px; color: #6D3A5D;">12.4<span style="font-size: 18px; font-weight: 600; color: #6F6F68; margin-left: 10px;">litres</span></div>
+          <div class="lead-label" style="margin-top: 8px;">Total consumption · per functional unit</div>
+        </div>
+        <div class="statement" style="font-size: 26px; max-width: 300px; text-align: right;">The water behind the product, and where it is scarce.</div>
+      </div>
+    </div>
+
+        <div class="rule" style="padding-top: 22px; margin-bottom: 28px; display: flex; gap: 56px;">
+          <div>
+            <div class="lead-number" style="font-size: 40px; color: #6D3A5D;">12.4</div>
+            <div class="lead-label" style="margin-top: 8px;">Consumption · litres</div>
+          </div>
+          <div>
+            <div class="lead-number" style="font-size: 40px; color: #1A1B1D;">86</div>
+            <div class="lead-label" style="margin-top: 8px;">Scarcity-weighted · litres eq.</div>
+          </div>
+        </div>
+
+        
+          <div class="eyebrow" style="color: #6D3A5D; margin-bottom: 14px;">Water sources</div>
+          <table class="studio-table">
+            <thead><tr><th>Source</th><th>Location</th><th>Volume</th><th>Risk level</th></tr></thead>
+            <tbody>
+              
+                <tr>
+                  <td>Rain-fed orchard (green water)</td>
+                  <td>Normandy, France</td>
+                  <td class="num">5.9 L</td>
+                  <td><span class="state state-good">Low</span></td>
+                </tr>
+              
+                <tr>
+                  <td>Irrigation (blue water)</td>
+                  <td>Normandy, France</td>
+                  <td class="num">0.5 L</td>
+                  <td><span class="state state-good">Low</span></td>
+                </tr>
+              
+                <tr>
+                  <td>Process water — distillery</td>
+                  <td>Normandy, France</td>
+                  <td class="num">1.8 L</td>
+                  <td><span class="state state-good">Low</span></td>
+                </tr>
+              
+                <tr>
+                  <td>Glass supplier process water</td>
+                  <td>France / EU</td>
+                  <td class="num">3.1 L</td>
+                  <td><span class="state state-attention">Medium</span></td>
+                </tr>
+              
+            </tbody>
+          </table>
+        
+      </div>
+
+      
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #ECEAE3; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(26,27,29,0.3); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(26,27,29,0.3); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; filter: brightness(0);" />
+        </div>
+        <div style="font-weight: 700; font-size: 12px;">10</div>
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+    </div>
+
+    <div class="page light-page" style="position: relative;">
+      <svg viewBox="0 0 100 100" fill="#6D3A5D" style="position:absolute;bottom:-57.5px;right:-57.5px;width:230px;height:230px;opacity:0.06;z-index:0;pointer-events:none;"><polygon points="50,2 98,50 50,98 2,50"/></svg>
+      <div style="position: relative; z-index: 1;">
+        
+    <div style="margin-bottom: 28px; border-bottom: 1px solid #D9D6CB; padding-bottom: 22px;">
+      <div class="eyebrow" style="color: #6D3A5D;">10 &middot; CIRCULARITY &amp; WASTE</div>
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-top: 14px;">
+        <div>
+          <div class="lead-number" style="font-size: 66px; color: #6D3A5D;">B+</div>
+          <div class="lead-label" style="margin-top: 8px;">Circularity score · input reuse and end-of-life recovery</div>
+        </div>
+        <div class="statement" style="font-size: 26px; max-width: 300px; text-align: right;">71% of packaging is recovered at disposal.</div>
+      </div>
+    </div>
+
+        <div style="display: flex; gap: 32px; align-items: center; margin-bottom: 26px;">
+          <div style="display: flex; gap: 28px; flex-shrink: 0;">
+            <div style="text-align: center;">
+              <div style="width: 116px; height: 116px; border-radius: 50%; background: conic-gradient(#047857 0deg 151.2deg, #D9D6CB 151.2deg 360deg); position: relative;">
+                <div style="position: absolute; inset: 13px; background: #F2F1EA; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                  <span class="lead-number" style="font-size: 26px; color: #047857;">42<span style="font-size: 12px;">%</span></span>
+                </div>
+              </div>
+              <div class="lead-label" style="margin-top: 12px;">Recycled content</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="width: 116px; height: 116px; border-radius: 50%; background: conic-gradient(#2B46C0 0deg 255.6deg, #D9D6CB 255.6deg 360deg); position: relative;">
+                <div style="position: absolute; inset: 13px; background: #F2F1EA; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                  <span class="lead-number" style="font-size: 26px; color: #2B46C0;">71<span style="font-size: 12px;">%</span></span>
+                </div>
+              </div>
+              <div class="lead-label" style="margin-top: 12px;">EoL recycling rate</div>
+            </div>
+          </div>
+          <div style="flex: 1;">
+            <div class="body" style="font-size: 12px; margin-bottom: 14px;">Recycled content is the circular input, the recycled material used in production. The recycling rate is the circular output, the packaging recovered at end of life.</div>
+            <div class="rule" style="padding-top: 14px;">
+              <div class="lead-number" style="font-size: 34px; color: #6D3A5D;">0.610 kg</div>
+              <div class="lead-label" style="margin-top: 6px;">Total packaging waste</div>
+            </div>
+          </div>
+        </div>
+
+      
+        <div class="rule" style="padding-top: 20px; margin-bottom: 22px; display: flex; gap: 44px;">
+          <div>
+            <div class="lead-number" style="font-size: 30px; color: #BE123C;">0.0239</div>
+            <div class="lead-label" style="margin-top: 6px;">Gross EoL emissions <span class="state state-quiet">kg CO&#8322;e</span></div>
+          </div>
+          <div>
+            <div class="lead-number" style="font-size: 30px; color: #047857;">-0.0157</div>
+            <div class="lead-label" style="margin-top: 6px;">Recycling credits <span class="state state-good">avoided</span></div>
+          </div>
+          <div>
+            <div class="lead-number" style="font-size: 30px; color: #B45309;">0.0082</div>
+            <div class="lead-label" style="margin-top: 6px;">Net EoL impact <span class="state state-attention">kg CO&#8322;e</span></div>
+          </div>
+        </div>
+
+        <div class="eyebrow" style="color: #6D3A5D; margin-bottom: 12px;">Per-material disposal pathways</div>
+        <table class="studio-table" style="margin-bottom: 4px;">
+          <thead><tr>
+            <th>Material</th>
+            <th>Mass</th>
+            <th style="text-align: center;">Recycle</th>
+            <th style="text-align: center;">Landfill</th>
+            <th style="text-align: center;">Incin.</th>
+            <th style="text-align: center;">Compost</th>
+            <th style="text-align: center;">AD</th>
+            <th style="text-align: right;">Net (kg CO&#8322;e)</th>
+          </tr></thead>
+          <tbody>
+            
+              <tr>
+                <td style="font-weight: 500;">Flint glass</td>
+                <td><span class="num">0.530</span> kg</td>
+                <td style="text-align: center;"><span class="num">76</span>%</td>
+                <td style="text-align: center;"><span class="num">22</span>%</td>
+                <td style="text-align: center;"><span class="num">2</span>%</td>
+                <td style="text-align: center;"><span class="num">0</span>%</td>
+                <td style="text-align: center;"><span class="num">0</span>%</td>
+                <td style="text-align: right; color: #6F6F68;"><span class="num">0.0060</span></td>
+              </tr>
+            
+              <tr>
+                <td style="font-weight: 500;">Corrugated board</td>
+                <td><span class="num">0.070</span> kg</td>
+                <td style="text-align: center;"><span class="num">82</span>%</td>
+                <td style="text-align: center;"><span class="num">12</span>%</td>
+                <td style="text-align: center;"><span class="num">6</span>%</td>
+                <td style="text-align: center;"><span class="num">0</span>%</td>
+                <td style="text-align: center;"><span class="num">0</span>%</td>
+                <td style="text-align: right; color: #6F6F68;"><span class="num">0.0018</span></td>
+              </tr>
+            
+              <tr>
+                <td style="font-weight: 500;">Paper label</td>
+                <td><span class="num">0.003</span> kg</td>
+                <td style="text-align: center;"><span class="num">68</span>%</td>
+                <td style="text-align: center;"><span class="num">20</span>%</td>
+                <td style="text-align: center;"><span class="num">12</span>%</td>
+                <td style="text-align: center;"><span class="num">0</span>%</td>
+                <td style="text-align: center;"><span class="num">0</span>%</td>
+                <td style="text-align: right; color: #6F6F68;"><span class="num">0.0002</span></td>
+              </tr>
+            
+              <tr>
+                <td style="font-weight: 500;">Cork</td>
+                <td><span class="num">0.005</span> kg</td>
+                <td style="text-align: center;"><span class="num">0</span>%</td>
+                <td style="text-align: center;"><span class="num">60</span>%</td>
+                <td style="text-align: center;"><span class="num">20</span>%</td>
+                <td style="text-align: center;"><span class="num">20</span>%</td>
+                <td style="text-align: center;"><span class="num">0</span>%</td>
+                <td style="text-align: right; color: #6F6F68;"><span class="num">0.0004</span></td>
+              </tr>
+            
+              <tr>
+                <td style="font-weight: 500;">Metal capsule</td>
+                <td><span class="num">0.002</span> kg</td>
+                <td style="text-align: center;"><span class="num">60</span>%</td>
+                <td style="text-align: center;"><span class="num">34</span>%</td>
+                <td style="text-align: center;"><span class="num">6</span>%</td>
+                <td style="text-align: center;"><span class="num">0</span>%</td>
+                <td style="text-align: center;"><span class="num">0</span>%</td>
+                <td style="text-align: right; color: #047857;"><span class="num">-0.0002</span></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
+
+      
+        <div class="panel" style="margin-top: 20px; border-left: 2px solid #6D3A5D;">
+          <div class="eyebrow" style="color: #6D3A5D; margin-bottom: 8px;">Method</div>
+          <div class="body" style="font-size: 11.5px;">Recycled content measures circular input (recycled material used in production). EoL recycling rate measures circular output (packaging recycled at end of life, based on regional defaults). These are independent metrics per ISO 14044 &sect;4.4.5. Aligned in spirit with ISO 14044 §4.4.5 and the Ellen MacArthur Foundation Material Circularity Indicator.</div>
+        </div>
+      
+      </div>
+
+      
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #ECEAE3; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(26,27,29,0.3); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(26,27,29,0.3); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; filter: brightness(0);" />
+        </div>
+        <div style="font-weight: 700; font-size: 12px;">11</div>
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+    </div>
+
+    <div class="page light-page" style="position: relative;">
+      <svg viewBox="0 0 100 100" fill="#6D3A5D" style="position:absolute;bottom:-57.5px;right:-57.5px;width:230px;height:230px;opacity:0.06;z-index:0;pointer-events:none;"><polygon points="50,2 98,50 50,98 2,50"/></svg>
+      <div style="position: relative; z-index: 1;">
+        
+    <div style="margin-bottom: 28px; border-bottom: 1px solid #D9D6CB; padding-bottom: 22px;">
+      <div class="eyebrow" style="color: #6D3A5D;">11 &middot; LAND USE</div>
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-top: 14px;">
+        <div>
+          <div class="lead-number" style="font-size: 66px; color: #6D3A5D;">0.68<span style="font-size: 18px; font-weight: 600; color: #6F6F68; margin-left: 10px;">m² per year</span></div>
+          <div class="lead-label" style="margin-top: 8px;">Total land occupation across the product</div>
+        </div>
+        <div class="statement" style="font-size: 26px; max-width: 300px; text-align: right;">The land the product asks of the earth.</div>
+      </div>
+    </div>
+
+        
+          <div class="eyebrow" style="color: #6D3A5D; margin-bottom: 12px;">Material breakdown</div>
+          <table class="studio-table">
+            <thead><tr>
+              <th>Material</th>
+              <th>Origin</th>
+              <th style="text-align: right;">Mass</th>
+              <th style="text-align: right;">Intensity</th>
+              <th style="text-align: right;">Footprint</th>
+            </tr></thead>
+            <tbody>
+              
+                <tr>
+                  <td style="font-weight: 500;">Apples (orchard)</td>
+                  <td>Normandy, France</td>
+                  <td style="text-align: right;"><span class="num">4.20 kg</span></td>
+                  <td style="text-align: right;"><span class="num">0.61</span></td>
+                  <td style="text-align: right;"><span class="num">0.61 m2a</span></td>
+                </tr>
+              
+                <tr>
+                  <td style="font-weight: 500;">Oak cask (amortised)</td>
+                  <td>France</td>
+                  <td style="text-align: right;"><span class="num">0.045 kg</span></td>
+                  <td style="text-align: right;"><span class="num">0.67</span></td>
+                  <td style="text-align: right;"><span class="num">0.03 m2a</span></td>
+                </tr>
+              
+                <tr>
+                  <td style="font-weight: 500;">Cork closure</td>
+                  <td>Portugal</td>
+                  <td style="text-align: right;"><span class="num">0.005 kg</span></td>
+                  <td style="text-align: right;"><span class="num">4.00</span></td>
+                  <td style="text-align: right;"><span class="num">0.02 m2a</span></td>
+                </tr>
+              
+                <tr>
+                  <td style="font-weight: 500;">Corrugated &amp; paper</td>
+                  <td>EU</td>
+                  <td style="text-align: right;"><span class="num">0.073 kg</span></td>
+                  <td style="text-align: right;"><span class="num">0.82</span></td>
+                  <td style="text-align: right;"><span class="num">0.06 m2a</span></td>
+                </tr>
+              
+            </tbody>
+          </table>
+        
+      </div>
+
+      
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #ECEAE3; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(26,27,29,0.3); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(26,27,29,0.3); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; filter: brightness(0);" />
+        </div>
+        <div style="font-weight: 700; font-size: 12px;">12</div>
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+    </div>
+
+    <div class="page" style="background:#DFA32B; color:#1A1B1D; position:relative; justify-content:space-between; overflow:hidden;">
+      <svg viewBox="0 0 100 100" fill="#1A1B1D" style="position:absolute;bottom:-90px;right:-90px;width:360px;height:360px;opacity:0.14;z-index:0;pointer-events:none;"><rect x="16" y="16" width="68" height="68" transform="rotate(14 50 50)"/></svg>
+      <div style="position:relative; z-index:1;">
+        <div style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:11px; letter-spacing:0.24em; text-transform:uppercase;">Chapter III &middot; The network</div>
+      </div>
+      <div style="position:relative; z-index:1; max-width:560px;">
+        <h2 class="statement" style="font-size:72px; color:#1A1B1D; margin-bottom:22px;">The sources.</h2>
+        <p style="font-family:'Inter',sans-serif; font-size:15px; line-height:1.6; color:rgba(26,27,29,0.62); max-width:460px;">Where it comes from: every ingredient and its factor, and the supply chain that carries them.</p>
+      </div>
+      <div style="position:relative; z-index:1; max-width:520px;">
+        <div style="display:flex; align-items:baseline; gap:14px; padding:12px 0; border-top:1px solid rgba(26,27,29,0.18);">
+        <span style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:10px; letter-spacing:0.2em; opacity:0.6; width:26px;">01</span>
+        <span class="card-title" style="font-size:16px; color:#1A1B1D;">Ingredient breakdown</span>
+      </div><div style="display:flex; align-items:baseline; gap:14px; padding:12px 0; border-top:1px solid rgba(26,27,29,0.18);">
+        <span style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:10px; letter-spacing:0.2em; opacity:0.6; width:26px;">02</span>
+        <span class="card-title" style="font-size:16px; color:#1A1B1D;">Supply chain</span>
+      </div>
+      </div>
+    </div>
+
+      <div class="page light-page" style="position: relative;">
+        <svg viewBox="0 0 100 100" fill="#A97C14" style="position:absolute;bottom:-57.5px;right:-57.5px;width:230px;height:230px;opacity:0.06;z-index:0;pointer-events:none;"><rect x="16" y="16" width="68" height="68" transform="rotate(14 50 50)"/></svg>
+        <div style="position: relative; z-index: 1;">
+        
+    <div style="margin-bottom: 28px; border-bottom: 1px solid #D9D6CB; padding-bottom: 22px;">
+      <div class="eyebrow" style="color: #A97C14;">08 &middot; INGREDIENT BREAKDOWN</div>
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-top: 14px;">
+        <div>
+          <div class="lead-number" style="font-size: 66px; color: #A97C14;">0.940<span style="font-size: 18px; font-weight: 600; color: #6F6F68; margin-left: 10px;">kg CO₂e</span></div>
+          <div class="lead-label" style="margin-top: 8px;">Per-ingredient contribution · per 1 x 700ml bottle</div>
+        </div>
+        <div class="statement" style="font-size: 26px; max-width: 300px; text-align: right;">Flint glass bottle (530g) carries the most.</div>
+      </div>
+    </div>
+
+        
+          <div class="body" style="font-size: 11.5px; margin-bottom: 18px; max-width: 640px;">
+            The <strong style="color: #1A1B1D;">GWP (kg CO&#8322;e)</strong> column shows each ingredient's material production impact. Inbound transport is itemised separately on a sub-line beneath the ingredient where present, and is included in the product total. The most significant ingredients shown here are restated in the Interpretation hotspots (Section 13) using these same production figures.
+          </div>
+        
+
+        
+          <div class="panel" style="margin-bottom: 18px; border-left: 2px solid #A97C14; padding: 14px 16px;">
+            <div class="body" style="font-size: 11px;">
+              <span class="state state-attention">Proxy factors in use</span>&nbsp; One or more ingredients are calculated using the closest matching dataset from ecoinvent, AGRIBALYSE, or DEFRA. The user's actual ingredient name is shown first; the proxy factor and database are shown beneath it. All proxy selections are documented per ISO 14044 §4.2.3.6.3.
+            </div>
+          </div>
+        
+
+        <table class="studio-table">
+          <thead><tr>
+            <th>Ingredient / Calc. Factor</th>
+            <th>Qty</th>
+            <th>Origin</th>
+            <th>GWP (kg CO&#8322;e)</th>
+            <th>% Climate</th>
+            <th>Acid. (SO&#8322;-eq)</th>
+            <th>Eutroph. (P-eq)</th>
+            <th>Source / Quality</th>
+          </tr></thead>
+          <tbody><tr>
+        <td style="min-width: 160px; max-width: 220px; word-wrap: break-word;">
+            <div class="card-title" style="font-size: 11.5px;">Flint glass bottle (530g)</div>
+            <div style="font-size: 8.5px; color: #6F6F68; margin-top: 2px;">ecoinvent 3.10 (supplier EPD adjusted)</div>
+           </td>
+        <td class="num">0.530 kg</td>
+        <td>France</td>
+        <td class="num">0.4400<div style="font-size: 8.5px; color: #6F6F68; margin-top: 2px;">incl. 0.006 kg CO₂e inbound transport · Road · 210 km</div></td>
+        <td class="num" style="color: #A97C14;">46.8%</td>
+        <td class="num">0.0031</td>
+        <td class="num">0.00005</td>
+        <td><span class="state state-good">Primary</span><span class="state state-good" style="margin-left: 8px;">High</span><div style="font-size: 8.5px; color: #6F6F68; margin-top: 3px;">90% confidence</div></td>
+      </tr><tr>
+        <td style="min-width: 160px; max-width: 220px; word-wrap: break-word;">
+            <div class="card-title" style="font-size: 11.5px;">Apples, Normandy cider varieties</div>
+            <div style="font-size: 8.5px; color: #6F6F68; margin-top: 2px;">AGRIBALYSE 3.1.1</div>
+           </td>
+        <td class="num">4.20 kg</td>
+        <td>Normandy, France</td>
+        <td class="num">0.1600<div style="font-size: 8.5px; color: #6F6F68; margin-top: 2px;">incl. 0.004 kg CO₂e inbound transport · Road · 35 km</div></td>
+        <td class="num" style="color: #A97C14;">17.0%</td>
+        <td class="num">0.0020</td>
+        <td class="num">0.00019</td>
+        <td><span class="state state-good">Primary</span><span class="state state-good" style="margin-left: 8px;">High</span><div style="font-size: 8.5px; color: #6F6F68; margin-top: 3px;">92% confidence</div></td>
+      </tr><tr>
+        <td style="min-width: 160px; max-width: 220px; word-wrap: break-word;">
+            <div class="card-title" style="font-size: 11.5px;">Natural gas (distillation heat)</div>
+            <div style="font-size: 8.5px; color: #6F6F68; margin-top: 2px;">ecoinvent 3.10</div>
+           </td>
+        <td class="num">0.62 kWh</td>
+        <td>France</td>
+        <td class="num">0.1100</td>
+        <td class="num" style="color: #A97C14;">11.7%</td>
+        <td class="num">0.0009</td>
+        <td class="num">0.00002</td>
+        <td><span class="state state-good">Primary</span><span class="state state-good" style="margin-left: 8px;">High</span><div style="font-size: 8.5px; color: #6F6F68; margin-top: 3px;">88% confidence</div></td>
+      </tr><tr>
+        <td style="min-width: 160px; max-width: 220px; word-wrap: break-word;">
+            <div class="card-title" style="font-size: 11.5px;">Oak cask (amortised per bottle)</div>
+            <div style="font-size: 8.5px; color: #6F6F68; margin-top: 2px;">ecoinvent 3.10</div>
+           </td>
+        <td class="num">0.045 kg</td>
+        <td>France</td>
+        <td class="num">0.0400</td>
+        <td class="num" style="color: #A97C14;">4.3%</td>
+        <td class="num">0.0003</td>
+        <td class="num">0.00001</td>
+        <td><span class="state state-attention">Secondary</span><span class="state state-attention" style="margin-left: 8px;">Medium</span><div style="font-size: 8.5px; color: #6F6F68; margin-top: 3px;">70% confidence</div></td>
+      </tr><tr>
+        <td style="min-width: 160px; max-width: 220px; word-wrap: break-word;">
+            <div class="card-title" style="font-size: 11.5px;">Corrugated shipper (per bottle)</div>
+            <div style="font-size: 8.5px; color: #6F6F68; margin-top: 2px;">ecoinvent 3.10</div>
+           </td>
+        <td class="num">0.070 kg</td>
+        <td>EU</td>
+        <td class="num">0.0500</td>
+        <td class="num" style="color: #A97C14;">5.3%</td>
+        <td class="num">0.0004</td>
+        <td class="num">0.00003</td>
+        <td><span class="state state-attention">Secondary</span><span class="state state-attention" style="margin-left: 8px;">Medium</span><div style="font-size: 8.5px; color: #6F6F68; margin-top: 3px;">80% confidence</div></td>
+      </tr><tr>
+        <td style="min-width: 160px; max-width: 220px; word-wrap: break-word;">
+            <div class="card-title" style="font-size: 11.5px;">Natural cork closure</div>
+            <div style="font-size: 8.5px; color: #6F6F68; margin-top: 2px;">ecoinvent 3.10</div>
+           </td>
+        <td class="num">0.005 kg</td>
+        <td>Portugal</td>
+        <td class="num">0.0060<div style="font-size: 8.5px; color: #6F6F68; margin-top: 2px;">incl. 0.003 kg CO₂e inbound transport · Road · 1450 km</div></td>
+        <td class="num" style="color: #A97C14;">0.6%</td>
+        <td class="num">0.00004</td>
+        <td class="num">0.000004</td>
+        <td><span class="state state-attention">Secondary</span><span class="state state-attention" style="margin-left: 8px;">Medium</span><div style="font-size: 8.5px; color: #6F6F68; margin-top: 3px;">78% confidence</div></td>
+      </tr><tr>
+        <td style="min-width: 160px; max-width: 220px; word-wrap: break-word;">
+            <div class="card-title" style="font-size: 11.5px;">Paper label</div>
+            <div style="font-size: 8.5px; color: #6F6F68; margin-top: 2px;">ecoinvent 3.10</div>
+           </td>
+        <td class="num">0.003 kg</td>
+        <td>EU</td>
+        <td class="num">0.0040</td>
+        <td class="num" style="color: #A97C14;">0.4%</td>
+        <td class="num">0.00003</td>
+        <td class="num">0.000003</td>
+        <td><span class="state state-attention">Secondary</span><span class="state state-attention" style="margin-left: 8px;">Medium</span><div style="font-size: 8.5px; color: #6F6F68; margin-top: 3px;">74% confidence</div></td>
+      </tr><tr>
+        <td style="min-width: 160px; max-width: 220px;">
+            <div class="card-title" style="font-size: 11.5px; word-wrap: break-word;">Metal capsule (tin/aluminium)</div>
+            <div class="state state-attention" style="font-size: 8.5px; letter-spacing: 0.05em; margin-top: 3px; text-transform: none; word-wrap: break-word;">
+              &#8627; Proxy: Aluminium foil, generic (proxy)
+            </div>
+            <div style="font-size: 8.5px; color: #6F6F68; margin-top: 1px;">ecoinvent 3.10 (proxy)</div>
+           </td>
+        <td class="num">0.002 kg</td>
+        <td>EU</td>
+        <td class="num">0.0090</td>
+        <td class="num" style="color: #A97C14;">1.0%</td>
+        <td class="num">0.00006</td>
+        <td class="num">0.000004</td>
+        <td><span class="state state-stale">Proxy</span><span class="state state-stale" style="margin-left: 8px;">Low</span><div style="font-size: 8.5px; color: #6F6F68; margin-top: 3px;">55% confidence</div></td>
+      </tr><tr>
+            <td>Other lifecycle stages
+              <div style="font-size: 8.5px; color: #6F6F68; margin-top: 2px;">Inbound transport, processing, distribution, use &amp; end-of-life</div>
+            </td>
+            <td></td><td></td>
+            <td class="num">0.1210</td>
+            <td class="num" style="color: #A97C14;">12.9%</td>
+            <td></td><td></td><td></td>
+          </tr>
+          <tr style="border-top: 2px solid #D9D6CB;">
+            <td class="card-title" style="font-size: 12px;">Total carbon footprint</td>
+            <td></td><td></td>
+            <td class="num" style="font-weight: 700; color: #1A1B1D;">0.940</td>
+            <td class="num" style="font-weight: 700; color: #A97C14;">100%</td>
+            <td></td><td></td><td></td>
+          </tr></tbody>
+        </table>
+
+        
+          <div class="panel" style="margin-top: 22px;">
+            <div class="body" style="font-size: 11px;">
+              <span class="eyebrow" style="color: #A97C14;">Coverage</span>&nbsp; The ingredients and packaging listed above are material-production impacts and account for 87.1% of the 0.940 kg CO&#8322;e total per functional unit. The remaining 12.9% comes from inbound transport and the non-material lifecycle stages (processing, distribution, use and end-of-life), shown in the "Other lifecycle stages" row and detailed in Sections 05 to 07. Acidification values in kg SO&#8322;-eq (terrestrial); eutrophication in kg P-eq (freshwater); values below detection shown as 0.000e+0.
+               &#x26A0; Proxy factors are used where a direct dataset match was not available (see the Data Quality section).
+            </div>
+          </div>
+        
+        </div>
+
+        
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #ECEAE3; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(26,27,29,0.3); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(26,27,29,0.3); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; filter: brightness(0);" />
+        </div>
+        <div style="font-weight: 700; font-size: 12px;">13</div>
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+      </div>
+
+    <div class="page light-page" style="position: relative;">
+      <svg viewBox="0 0 100 100" fill="#A97C14" style="position:absolute;bottom:-57.5px;right:-57.5px;width:230px;height:230px;opacity:0.06;z-index:0;pointer-events:none;"><rect x="16" y="16" width="68" height="68" transform="rotate(14 50 50)"/></svg>
+      <div style="position: relative; z-index: 1;">
+        
+    <div style="margin-bottom: 28px; border-bottom: 1px solid #D9D6CB; padding-bottom: 22px;">
+      <div class="eyebrow" style="color: #A97C14;">12 &middot; SUPPLY CHAIN</div>
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-top: 14px;">
+        <div>
+          <div class="lead-number" style="font-size: 66px; color: #A97C14;">1,995 km</div>
+          <div class="lead-label" style="margin-top: 8px;">Total transport distance · 7 of 9 verified suppliers</div>
+        </div>
+        <div class="statement" style="font-size: 26px; max-width: 300px; text-align: right;">Where it comes from.</div>
+      </div>
+    </div>
+
+        
+    <div style="margin-bottom: 26px;">
+      <div class="eyebrow" style="color: #A97C14; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #D9D6CB;">Raw materials</div>
+      
+        <div style="padding: 12px 0; border-top: 1px solid #D9D6CB;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 20px;">
+            <div>
+              <div class="card-title" style="font-size: 13px;">Normandy apple growers</div>
+              <div class="body" style="font-size: 11.5px; margin-top: 2px;">Normandy, France</div>
+              <div class="lead-label" style="margin-top: 5px;">Transport &middot; Road</div>
+            </div>
+            <div style="text-align: right; flex-shrink: 0;">
+              <div class="lead-number" style="font-size: 16px; color: #1A1B1D;">35 km</div>
+              <div class="body" style="font-size: 11px; margin-top: 3px; font-variant-numeric: tabular-nums;">0.004 kg CO2e</div>
+            </div>
+          </div>
+          
+        </div>
+      
+        <div style="padding: 12px 0; border-top: 1px solid #D9D6CB;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 20px;">
+            <div>
+              <div class="card-title" style="font-size: 13px;">Cork supplier</div>
+              <div class="body" style="font-size: 11.5px; margin-top: 2px;">Alentejo, Portugal</div>
+              <div class="lead-label" style="margin-top: 5px;">Transport &middot; Road</div>
+            </div>
+            <div style="text-align: right; flex-shrink: 0;">
+              <div class="lead-number" style="font-size: 16px; color: #1A1B1D;">1,450 km</div>
+              <div class="body" style="font-size: 11px; margin-top: 3px; font-variant-numeric: tabular-nums;">0.003 kg CO2e</div>
+            </div>
+          </div>
+          
+        </div>
+      
+    </div>
+  
+    <div style="margin-bottom: 26px;">
+      <div class="eyebrow" style="color: #A97C14; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #D9D6CB;">Packaging</div>
+      
+        <div style="padding: 12px 0; border-top: 1px solid #D9D6CB;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 20px;">
+            <div>
+              <div class="card-title" style="font-size: 13px;">Glass manufacturer</div>
+              <div class="body" style="font-size: 11.5px; margin-top: 2px;">Cognac region, France</div>
+              <div class="lead-label" style="margin-top: 5px;">Transport &middot; Road</div>
+            </div>
+            <div style="text-align: right; flex-shrink: 0;">
+              <div class="lead-number" style="font-size: 16px; color: #1A1B1D;">210 km</div>
+              <div class="body" style="font-size: 11px; margin-top: 3px; font-variant-numeric: tabular-nums;">0.006 kg CO2e</div>
+            </div>
+          </div>
+          
+        </div>
+      
+        <div style="padding: 12px 0; border-top: 1px solid #D9D6CB;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 20px;">
+            <div>
+              <div class="card-title" style="font-size: 13px;">Carton &amp; label converter</div>
+              <div class="body" style="font-size: 11.5px; margin-top: 2px;">Northern France</div>
+              <div class="lead-label" style="margin-top: 5px;">Transport &middot; Road</div>
+            </div>
+            <div style="text-align: right; flex-shrink: 0;">
+              <div class="lead-number" style="font-size: 16px; color: #1A1B1D;">90 km</div>
+              <div class="body" style="font-size: 11px; margin-top: 3px; font-variant-numeric: tabular-nums;">0.002 kg CO2e</div>
+            </div>
+          </div>
+          
+        </div>
+      
+    </div>
+  
+    <div style="margin-bottom: 26px;">
+      <div class="eyebrow" style="color: #A97C14; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #D9D6CB;">Distribution</div>
+      
+        <div style="padding: 12px 0; border-top: 1px solid #D9D6CB;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 20px;">
+            <div>
+              <div class="card-title" style="font-size: 13px;">UK regional distribution centre</div>
+              <div class="body" style="font-size: 11.5px; margin-top: 2px;">South East England</div>
+              <div class="lead-label" style="margin-top: 5px;">Transport &middot; Multi-modal</div>
+            </div>
+            <div style="text-align: right; flex-shrink: 0;">
+              <div class="lead-number" style="font-size: 16px; color: #1A1B1D;">320 km</div>
+              <div class="body" style="font-size: 11px; margin-top: 3px; font-variant-numeric: tabular-nums;">0.052 kg CO2e</div>
+            </div>
+          </div>
+          
+        </div>
+      
+    </div>
+  
+      </div>
+
+      
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #ECEAE3; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(26,27,29,0.3); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(26,27,29,0.3); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; filter: brightness(0);" />
+        </div>
+        <div style="font-weight: 700; font-size: 12px;">14</div>
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+    </div>
+
+    <div class="page" style="background:#BF4B2A; color:#F2F1EA; position:relative; justify-content:space-between; overflow:hidden;">
+      <svg viewBox="0 0 100 100" fill="#F2F1EA" style="position:absolute;bottom:-90px;right:-90px;width:360px;height:360px;opacity:0.14;z-index:0;pointer-events:none;"><path d="M 0 100 A 100 100 0 0 1 100 0 L 100 100 Z"/></svg>
+      <div style="position:relative; z-index:1;">
+        <div style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:11px; letter-spacing:0.24em; text-transform:uppercase;">Chapter IV &middot; The evidence</div>
+      </div>
+      <div style="position:relative; z-index:1; max-width:560px;">
+        <h2 class="statement" style="font-size:72px; color:#F2F1EA; margin-bottom:22px;">The evidence.</h2>
+        <p style="font-family:'Inter',sans-serif; font-size:15px; line-height:1.6; color:rgba(242,241,234,0.66); max-width:460px;">How we know it is sound: the interpretation, the uncertainty, and the critical review of the study.</p>
+      </div>
+      <div style="position:relative; z-index:1; max-width:520px;">
+        <div style="display:flex; align-items:baseline; gap:14px; padding:12px 0; border-top:1px solid rgba(242,241,234,0.22);">
+        <span style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:10px; letter-spacing:0.2em; opacity:0.6; width:26px;">01</span>
+        <span class="card-title" style="font-size:16px; color:#F2F1EA;">Interpretation</span>
+      </div><div style="display:flex; align-items:baseline; gap:14px; padding:12px 0; border-top:1px solid rgba(242,241,234,0.22);">
+        <span style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:10px; letter-spacing:0.2em; opacity:0.6; width:26px;">02</span>
+        <span class="card-title" style="font-size:16px; color:#F2F1EA;">Uncertainty &amp; sensitivity</span>
+      </div><div style="display:flex; align-items:baseline; gap:14px; padding:12px 0; border-top:1px solid rgba(242,241,234,0.22);">
+        <span style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:10px; letter-spacing:0.2em; opacity:0.6; width:26px;">03</span>
+        <span class="card-title" style="font-size:16px; color:#F2F1EA;">Critical review</span>
+      </div><div style="display:flex; align-items:baseline; gap:14px; padding:12px 0; border-top:1px solid rgba(242,241,234,0.22);">
+        <span style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:10px; letter-spacing:0.2em; opacity:0.6; width:26px;">04</span>
+        <span class="card-title" style="font-size:16px; color:#F2F1EA;">Assisted review</span>
+      </div>
+      </div>
+    </div>
+
+    <div class="page light-page" style="position: relative; overflow: hidden;">
+      <svg viewBox="0 0 100 100" fill="#BF4B2A" style="position:absolute;bottom:-57.5px;right:-57.5px;width:230px;height:230px;opacity:0.06;z-index:0;pointer-events:none;"><path d="M 0 100 A 100 100 0 0 1 100 0 L 100 100 Z"/></svg>
+      <div style="position: relative; z-index: 1;">
+        
+    <div style="margin-bottom: 28px; border-bottom: 1px solid #D9D6CB; padding-bottom: 22px;">
+      <div class="eyebrow" style="color: #BF4B2A;">13 &middot; INTERPRETATION · ISO 14044 §4.5</div>
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-top: 14px;">
+        <div>
+          <div class="lead-number" style="font-size: 66px; color: #BF4B2A;">55<span style="font-size: 18px; font-weight: 600; color: #6F6F68; margin-left: 10px;">%</span></div>
+          <div class="lead-label" style="margin-top: 8px;">Dominant lifecycle stage · Packaging</div>
+        </div>
+        <div class="statement" style="font-size: 26px; max-width: 300px; text-align: right;">Packaging carries the study.</div>
+      </div>
+    </div>
+
+        <div class="eyebrow" style="color: #BF4B2A; margin-bottom: 10px;">Significant issues</div>
+        <p class="body" style="margin-bottom: 14px;">The bottle glass is the single dominant hotspot, followed by apple cultivation and distillation heat. Together these three flows account for roughly three-quarters of the cradle-to-grave footprint, so reduction effort concentrated on glass and distillery energy will deliver the great majority of the achievable saving.</p>
+        <table class="studio-table">
+        <thead><tr><th>Material</th><th style="text-align: right;">GWP (kg CO&#8322;e)</th><th style="text-align: right;">Contribution</th></tr></thead>
+        <tbody>
+          
+            <tr>
+              <td style="font-weight: 500;">Flint glass bottle</td>
+              <td class="num" style="text-align: right;">0.4400</td>
+              <td class="num" style="text-align: right;">46.8%</td>
+            </tr>
+          
+            <tr>
+              <td style="font-weight: 500;">Apples, Normandy</td>
+              <td class="num" style="text-align: right;">0.1600</td>
+              <td class="num" style="text-align: right;">17.0%</td>
+            </tr>
+          
+            <tr>
+              <td style="font-weight: 500;">Natural gas (distillation)</td>
+              <td class="num" style="text-align: right;">0.1100</td>
+              <td class="num" style="text-align: right;">11.7%</td>
+            </tr>
+          
+        </tbody>
+      </table>
+      <p class="body" style="font-size: 10px; margin-top: 8px;">
+        Hotspots restate the most significant ingredients from Section 08 using the same material-production GWP and contribution share, so the two sections reconcile. Inbound transport is itemised separately in Section 08 and is included in the product total.
+      </p>
+        <div class="panel" style="margin-top: 14px; padding: 14px 16px; border-left: 2px solid #BF4B2A;">
+        <span class="eyebrow" style="color: #BF4B2A;">Recycling credits &middot; avoided burden</span>
+        <p class="body" style="font-size: 11px; margin-top: 8px;">
+          End-of-life recycling generates
+          0.0157 kg CO&#8322;e in avoided emissions
+          by displacing virgin material production. Gross disposal emissions are
+          0.0239 kg CO&#8322;e, giving a net EoL impact of
+          0.0082 kg CO&#8322;e.
+          
+        </p>
+      </div>
+
+        <div class="rule" style="margin-top: 22px; padding-top: 20px; display: flex; gap: 48px;">
+          <div>
+            <div class="lead-number" style="font-size: 30px; color: #BF4B2A;">55<span style="font-size: 13px;">%</span></div>
+            <div class="lead-label" style="margin-top: 6px;">Dominant stage · Packaging</div>
+          </div>
+          <div>
+            <div class="lead-number" style="font-size: 30px; color: #BF4B2A;">84<span style="font-size: 13px;">%</span></div>
+            <div class="lead-label" style="margin-top: 6px;">Dominant scope · Scope 3</div>
+          </div>
+        </div>
+
+        <div class="eyebrow" style="color: #BF4B2A; margin: 24px 0 10px;">Key findings</div>
+        <ul class="body" style="font-size: 12px; padding-left: 18px; margin-bottom: 14px;">
+      <li style="margin-bottom: 5px;">The cradle-to-grave footprint is 0.94 kg CO2e per 700ml bottle.</li><li style="margin-bottom: 5px;">Packaging (chiefly glass) is the dominant stage at around 55% of the total.</li><li style="margin-bottom: 5px;">Scope 3 value-chain emissions account for 84% of the footprint.</li><li style="margin-bottom: 5px;">Data quality is good, anchored by primary orchard and distillery data.</li>
+    </ul>
+
+        
+      </div>
+
+      
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #ECEAE3; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(26,27,29,0.3); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(26,27,29,0.3); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; filter: brightness(0);" />
+        </div>
+        <div style="font-weight: 700; font-size: 12px;">15</div>
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+    </div>
+    <div class="page light-page" style="position: relative; overflow: hidden;">
+      <svg viewBox="0 0 100 100" fill="#BF4B2A" style="position:absolute;bottom:-57.5px;right:-57.5px;width:230px;height:230px;opacity:0.06;z-index:0;pointer-events:none;"><path d="M 0 100 A 100 100 0 0 1 100 0 L 100 100 Z"/></svg>
+      <div style="position: relative; z-index: 1;">
+        
+    <div style="margin-bottom: 24px; border-bottom: 1px solid #D9D6CB; padding-bottom: 14px;">
+      <div class="eyebrow" style="color: #BF4B2A;">13 &middot; INTERPRETATION (ISO 14044 §4.5) &middot; CONT.</div>
+      <div class="statement" style="font-size: 26px; margin-top: 8px;">Interpretation (ISO 14044 §4.5).</div>
+    </div>
+
+        <div class="eyebrow" style="color: #BF4B2A; margin-bottom: 10px;">Limitations</div>
+        <ul class="body" style="font-size: 12px; padding-left: 18px; margin-bottom: 14px;">
+      <li style="margin-bottom: 5px;">The metal capsule uses a proxy emission factor pending a supplier-specific dataset.</li><li style="margin-bottom: 5px;">The consumer use phase is excluded owing to high variability.</li>
+    </ul>
+
+        <div class="eyebrow" style="color: #BF4B2A; margin-bottom: 10px;">Recommendations</div>
+        <ul class="body" style="font-size: 12px; padding-left: 18px; margin-bottom: 14px;">
+      <li style="margin-bottom: 5px;">Lightweight the bottle and raise recycled cullet content toward 60%.</li><li style="margin-bottom: 5px;">Transition remaining distillery heat to a renewable or biomethane source.</li><li style="margin-bottom: 5px;">Obtain a supplier-specific dataset for the metal capsule to remove the proxy.</li>
+    </ul>
+      </div>
+
+      
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #ECEAE3; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(26,27,29,0.3); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(26,27,29,0.3); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; filter: brightness(0);" />
+        </div>
+        <div style="font-weight: 700; font-size: 12px;">16</div>
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+    </div>
+
+    <div class="page light-page" style="position: relative; overflow: hidden;">
+      <svg viewBox="0 0 100 100" fill="#BF4B2A" style="position:absolute;bottom:-57.5px;right:-57.5px;width:230px;height:230px;opacity:0.06;z-index:0;pointer-events:none;"><path d="M 0 100 A 100 100 0 0 1 100 0 L 100 100 Z"/></svg>
+      <div style="position: relative; z-index: 1;">
+        
+    <div style="margin-bottom: 28px; border-bottom: 1px solid #D9D6CB; padding-bottom: 22px;">
+      <div class="eyebrow" style="color: #BF4B2A;">14 &middot; UNCERTAINTY &amp; SENSITIVITY · ISO 14044 §4.5.3</div>
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-top: 14px;">
+        <div>
+          <div class="lead-number" style="font-size: 66px; color: #BF4B2A;">±11<span style="font-size: 18px; font-weight: 600; color: #6F6F68; margin-left: 10px;">%</span></div>
+          <div class="lead-label" style="margin-top: 8px;">Propagated uncertainty · 95% confidence interval</div>
+        </div>
+        <div class="statement" style="font-size: 26px; max-width: 300px; text-align: right;">How firm the number is.</div>
+      </div>
+    </div>
+
+        <div class="rule" style="padding-top: 20px; display: flex; gap: 48px;">
+          <div>
+            <div class="lead-number" style="font-size: 30px; color: #BF4B2A;">±11<span style="font-size: 13px;">%</span></div>
+            <div class="lead-label" style="margin-top: 6px;">Propagated uncertainty · 95% CI</div>
+          </div>
+          <div>
+            <div class="lead-number" style="font-size: 30px; color: #BF4B2A;">0.836<span style="font-size: 13px;"> to </span>1.044</div>
+            <div class="lead-label" style="margin-top: 6px;">Result range · kg CO&#8322;e per functional unit</div>
+          </div>
+        </div>
+
+        <div class="eyebrow" style="color: #BF4B2A; margin: 24px 0 10px;">Sensitivity analysis</div>
+        <p class="body" style="margin-bottom: 16px;">One-at-a-time ±20% variation applied to the emission factors of the three largest contributors, with the resulting change in the total footprint recorded as a sensitivity ratio.</p>
+        <table class="studio-table">
+        <thead><tr><th>Material</th><th style="text-align: right;">Contribution</th><th style="text-align: right;">±20% range</th><th style="text-align: right;">Sensitivity</th></tr></thead>
+        <tbody>
+          
+            <tr>
+              <td style="font-weight: 500;">Flint glass bottle</td>
+              <td class="num" style="text-align: right;">46.8%</td>
+              <td class="num" style="text-align: right;">0.852 to 1.028 kg CO&#8322;e</td>
+              <td class="num" style="text-align: right;">0.470 <span class="state state-stale">High</span></td>
+            </tr>
+          
+            <tr>
+              <td style="font-weight: 500;">Apple cultivation</td>
+              <td class="num" style="text-align: right;">17.0%</td>
+              <td class="num" style="text-align: right;">0.908 to 0.972 kg CO&#8322;e</td>
+              <td class="num" style="text-align: right;">0.170</td>
+            </tr>
+          
+            <tr>
+              <td style="font-weight: 500;">Distillation heat</td>
+              <td class="num" style="text-align: right;">11.7%</td>
+              <td class="num" style="text-align: right;">0.918 to 0.962 kg CO&#8322;e</td>
+              <td class="num" style="text-align: right;">0.120</td>
+            </tr>
+          
+        </tbody>
+      </table>
+
+        <div class="panel" style="margin-top: 22px;">
+          <span class="eyebrow" style="color: #BF4B2A;">Conclusion</span>
+          <p class="body" style="margin-top: 8px;">The headline result is robust. Only the glass emission factor is highly sensitive, which reinforces glass lightweighting and higher cullet content as the priority reduction lever.</p>
+        </div>
+
+        <div class="panel" style="margin-top: 16px;">
+          <span class="eyebrow" style="color: #BF4B2A;">Methodology</span>
+          <p class="body" style="font-size: 11.5px; margin-top: 8px;">
+            Uncertainty propagation follows the root-sum-of-squares approach
+            for geometric standard deviation per Frischknecht et al. (2007), using the Pedigree Matrix
+            (Weidema &amp; Wesnæs, 1996) for data quality scoring. Sensitivity analysis applies ±20%
+            variation to emission factors of the top three contributors.
+          </p>
+        </div>
+      </div>
+
+      
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #ECEAE3; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(26,27,29,0.3); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(26,27,29,0.3); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; filter: brightness(0);" />
+        </div>
+        <div style="font-weight: 700; font-size: 12px;">17</div>
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+    </div>
+
+    <div class="page light-page" style="position: relative; overflow: hidden;">
+      <svg viewBox="0 0 100 100" fill="#BF4B2A" style="position:absolute;bottom:-57.5px;right:-57.5px;width:230px;height:230px;opacity:0.06;z-index:0;pointer-events:none;"><path d="M 0 100 A 100 100 0 0 1 100 0 L 100 100 Z"/></svg>
+      <div style="position: relative; z-index: 1;">
+        
+    <div style="margin-bottom: 28px; border-bottom: 1px solid #D9D6CB; padding-bottom: 14px;">
+      <div class="eyebrow" style="color: #BF4B2A;">15 &middot; CRITICAL REVIEW &amp; COMPLIANCE NOTES</div>
+      <div class="statement" style="font-size: 32px; margin-top: 8px;">Critical Review &amp; Compliance Notes.</div>
+    </div>
+
+        <div class="panel" style="margin-bottom: 24px; border-left: 2px solid #BF4B2A;">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+            <span class="eyebrow" style="color: #BF4B2A;">Critical review status</span>
+            <span class="state state-good">internal review completed</span>
+          </div>
+          <p class="body">This study has undergone internal review by the alkatera LCA team and an AI-assisted structured review. It has not yet been subject to an independent third-party critical review. A comparative assertion disclosed to the public would require a panel review per ISO 14044 §6.3; no such assertion is made in this report.</p>
+          <p class="body" style="font-size: 12px; margin-top: 12px;">
+            <span class="lead-label" style="color: #BF4B2A;">Recommendation</span><br />Commission an independent third-party critical review before using this footprint to support any comparative public claim.
+          </p>
+        </div>
+
+        
+          <div class="eyebrow" style="color: #BF4B2A; margin-bottom: 10px;">Zero-impact categories</div>
+          <p class="body" style="font-size: 12px; margin-bottom: 12px;">
+            The following environmental impact categories were assessed but report zero values. Justification per ISO 14044 §4.4.2.2:
+          </p>
+          <table class="studio-table">
+            <thead><tr><th>Category</th><th>Reason</th></tr></thead>
+            <tbody>
+              
+                <tr>
+                  <td style="font-weight: 500; white-space: nowrap;">Ionising radiation</td>
+                  <td>No nuclear-fuel-cycle flows exceed the cut-off threshold within the system boundary.</td>
+                </tr>
+              
+                <tr>
+                  <td style="font-weight: 500; white-space: nowrap;">Direct land-use change (dLUC)</td>
+                  <td>Orchards under continuous cultivation for over 20 years; no conversion emissions apply.</td>
+                </tr>
+              
+                <tr>
+                  <td style="font-weight: 500; white-space: nowrap;">HFC/PFC refrigerants</td>
+                  <td>No refrigerant losses are attributable to the product footprint above the cut-off threshold.</td>
+                </tr>
+              
+            </tbody>
+          </table>
+        
+
+        
+          <div class="eyebrow" style="color: #BF4B2A; margin: 20px 0 12px;">Methodological notes</div>
+          
+    <div class="panel" style="margin-bottom: 10px; padding: 12px 16px;">
+      <p class="body" style="font-size: 12px;">No direct land-use change (dLUC) is attributed to this product: the Normandy orchards have been under continuous perennial cultivation for more than 20 years, so no recent conversion emissions apply per PAS 2050 and the GHG Protocol Land Sector guidance.</p>
+    </div>
+    <div class="panel" style="margin-bottom: 10px; padding: 12px 16px;">
+      <p class="body" style="font-size: 12px;">Inbound transport emissions are embedded within each ingredient line using distance x mode-specific DEFRA 2025 freight factors. Outbound distribution to the UK is reported as a discrete stage and is included in the product total.</p>
+    </div>
+    <div class="panel" style="margin-bottom: 10px; padding: 12px 16px;">
+      <p class="body" style="font-size: 12px;">Scope 1 covers direct distillery combustion, Scope 2 purchased electricity, and Scope 3 all upstream and downstream value-chain emissions including packaging, agriculture, distribution and end-of-life.</p>
+    </div>
+        
+
+        
+          <div class="panel" style="margin-top: 16px; padding: 12px 16px; border-left: 2px solid #BF4B2A;">
+            <span class="lead-label" style="color: #BF4B2A;">Circularity score disclaimer</span>
+            <p class="body" style="font-size: 12px; margin-top: 6px;">The circularity grade blends recycled-content input with expected end-of-life recovery, mass-weighted across all packaging. It is a proprietary indicator intended for directional comparison within a portfolio, not an ISO-standardised impact category.</p>
+          </div>
+        
+      </div>
+
+      
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #ECEAE3; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(26,27,29,0.3); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(26,27,29,0.3); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; filter: brightness(0);" />
+        </div>
+        <div style="font-weight: 700; font-size: 12px;">18</div>
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+    </div>
+
+    <div class="page light-page" style="position: relative; overflow: hidden;">
+      <svg viewBox="0 0 100 100" fill="#BF4B2A" style="position:absolute;bottom:-57.5px;right:-57.5px;width:230px;height:230px;opacity:0.06;z-index:0;pointer-events:none;"><path d="M 0 100 A 100 100 0 0 1 100 0 L 100 100 Z"/></svg>
+      <div style="position: relative; z-index: 1;">
+        
+    <div style="margin-bottom: 28px; border-bottom: 1px solid #D9D6CB; padding-bottom: 14px;">
+      <div class="eyebrow" style="color: #BF4B2A;">15b &middot; AI-ASSISTED INTERNAL REVIEW</div>
+      <div class="statement" style="font-size: 32px; margin-top: 8px;">AI-Assisted Internal Review.</div>
+    </div>
+
+        <div class="panel" style="margin-bottom: 22px; border-left: 2px solid #BF4B2A;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span class="eyebrow" style="color: #BF4B2A;">Overall rating</span>
+            <span class="state state-attention">Pass with qualifications</span>
+          </div>
+          <p class="body">The study conforms to the ISO 14044 and 14067 framework with good data quality. One minor gap remains around the proxy metal-capsule factor. No blocking issues were identified for internal use.</p>
+        </div>
+
+        <div class="eyebrow" style="color: #BF4B2A; margin-bottom: 6px;">Findings by ISO 14044 / 14067 clause</div>
+        
+      <div class="rule" style="padding: 12px 0;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px;">
+          <div style="font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 11px; color: #1A1B1D;">ISO 14044 §4.2 · Goal &amp; scope</div>
+          <span class="state state-good" style="white-space: nowrap;">Conforms</span>
+        </div>
+        <div class="body" style="font-size: 12px;">Goal, functional unit and system boundary are clearly defined and internally consistent.</div>
+        
+      </div>
+    
+      <div class="rule" style="padding: 12px 0;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px;">
+          <div style="font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 11px; color: #1A1B1D;">ISO 14044 §4.2.3.6 · Data quality</div>
+          <span class="state state-attention" style="white-space: nowrap;">Minor gap</span>
+        </div>
+        <div class="body" style="font-size: 12px;">One flow (metal capsule) relies on a proxy factor.</div>
+        <div class="body" style="font-size: 11px; margin-top: 6px;">Impact is under 1% of the total, so the effect on the conclusion is negligible, but a supplier-specific dataset would close the gap.</div>
+      </div>
+    
+      <div class="rule" style="padding: 12px 0;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px;">
+          <div style="font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 11px; color: #1A1B1D;">ISO 14067 §6.4.9 · Biogenic carbon</div>
+          <span class="state state-good" style="white-space: nowrap;">Conforms</span>
+        </div>
+        <div class="body" style="font-size: 12px;">Biogenic and fossil carbon are inventoried and reported separately as required.</div>
+        
+      </div>
+    
+      <div class="rule" style="padding: 12px 0;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px;">
+          <div style="font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 11px; color: #1A1B1D;">ISO 14044 §4.5 · Interpretation</div>
+          <span class="state state-good" style="white-space: nowrap;">Conforms</span>
+        </div>
+        <div class="body" style="font-size: 12px;">Hotspots, sensitivity and conclusions reconcile with the inventory results.</div>
+        
+      </div>
+    
+      <div class="rule" style="padding: 12px 0;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px;">
+          <div style="font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 11px; color: #1A1B1D;">ISO 14044 §6 · Critical review</div>
+          <span class="state state-attention" style="white-space: nowrap;">Minor gap</span>
+        </div>
+        <div class="body" style="font-size: 12px;">No independent third-party review has been performed.</div>
+        <div class="body" style="font-size: 11px; margin-top: 6px;">Required only for public comparative assertions, which this report does not make.</div>
+      </div>
+    
+
+        <div class="panel" style="margin-top: 20px; padding: 14px 16px;">
+          <span class="lead-label" style="color: #BF4B2A;">Reviewer attribution</span>
+          <p class="body" style="font-size: 11px; margin-top: 6px;">This review was generated with AI assistance by the alkatera engine as a structured internal check. It is not a substitute for an independent third-party critical review under ISO 14044 §6.</p>
+          <p class="lead-label" style="margin-top: 8px;">Review date · 14 November 2025</p>
+        </div>
+      </div>
+
+      
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #ECEAE3; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(26,27,29,0.3); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(26,27,29,0.3); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; filter: brightness(0);" />
+        </div>
+        <div style="font-weight: 700; font-size: 12px;">19</div>
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+    </div>
+
+    <div class="page dark-page" style="justify-content: center; text-align: center; position: relative;">
+      <svg viewBox="0 0 100 100" fill="#205E40" style="position:absolute;bottom:-57.5px;right:-57.5px;width:230px;height:230px;opacity:0.06;z-index:0;pointer-events:none;"><circle cx="50" cy="50" r="36" fill="none" stroke="#205E40" stroke-width="22"/></svg>
+      <div style="position: relative; z-index: 1; max-width: 520px; margin: 0 auto;">
+        <div style="margin: 0 auto 36px;">
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 52px; width: auto; object-fit: contain; filter: brightness(0);" />
+        </div>
+        <div class="eyebrow" style="margin-bottom: 16px;">The commitment</div>
+        <h2 class="statement" style="font-size: 40px; margin-bottom: 24px;">Our commitment.</h2>
+        <p class="body" style="font-size: 15px; line-height: 1.75;">Avallen exists to put nature back into the glass. We are working to lightweight our bottle, move to a fully renewable distillery, and hold our orchards to regenerative standards that give back more than they take. This assessment is our baseline; every future bottle is measured against it.</p>
+
+        <div class="rule" style="margin-top: 60px; padding-top: 32px;">
+          <p class="lead-label" style="line-height: 1.8;">
+            Report generated by alka<span style="font-weight: 700;">tera</span><br />
+            6 July 2026
+          </p>
+          <a href="https://alkatera.com" style="display: inline-block; margin-top: 18px; background: #1A1B1D; color: #F2F1EA; font-size: 11px; font-family: 'JetBrains Mono', monospace; font-weight: 700; text-decoration: none; letter-spacing: 0.15em; padding: 10px 22px; border-radius: 999px;">
+            ALKATERA.COM
+          </a>
+        </div>
+      </div>
+
+      
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: #1A1B1D; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(242,241,234,0.5); text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid rgba(242,241,234,0.5); padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          <img src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png" alt="alkatera" style="height: 14px; width: auto; object-fit: contain; " />
+        </div>
+        <div style="font-weight: 700; font-size: 12px;">20</div>
+        <div>ISO 14040/44 &amp; 14067 | 6 July 2026</div>
+      </div>
+    </div>
+    </div>
+</body>
+</html>

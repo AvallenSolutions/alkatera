@@ -11,7 +11,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -23,7 +22,8 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { ClipboardCheck, CheckCircle2, AlertCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
+import { PillButton } from "@/components/studio/pill-button";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 
 interface SendEsgSurveyDialogProps {
@@ -139,10 +139,7 @@ export function SendEsgSurveyDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <ClipboardCheck className="h-5 w-5" />
-            Send ESG Survey
-          </DialogTitle>
+          <DialogTitle>Send ESG survey</DialogTitle>
           <DialogDescription>
             Send the ESG self-assessment to a supplier. We&apos;ll add them to your
             supplier list and email them a link to complete it.
@@ -150,15 +147,11 @@ export function SendEsgSurveyDialog({
         </DialogHeader>
 
         {success ? (
-          <div className="py-8 flex flex-col items-center justify-center gap-4">
-            <CheckCircle2 className="h-12 w-12 text-green-500" />
-            <div className="text-center">
-              <h3 className="font-semibold text-lg">Survey Sent!</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                The supplier has been added to your list and emailed a link to
-                complete the assessment.
-              </p>
-            </div>
+          <div className="py-8">
+            <p className="text-sm text-studio-good">
+              Survey sent. The supplier has been added to your list and emailed a link to
+              complete the assessment.
+            </p>
           </div>
         ) : (
           <Form {...form}>
@@ -259,18 +252,17 @@ export function SendEsgSurveyDialog({
               </div>
 
               <div className="flex justify-end gap-3 pt-4">
-                <Button
+                <PillButton
                   type="button"
                   variant="outline"
                   onClick={handleClose}
                   disabled={isSubmitting}
                 >
                   Cancel
-                </Button>
-                <Button type="submit" loading={isSubmitting}>
-                  {!isSubmitting && <ClipboardCheck className="mr-2 h-4 w-4" />}
-                  {isSubmitting ? "Sending..." : "Send Survey"}
-                </Button>
+                </PillButton>
+                <PillButton type="submit" variant="room" disabled={isSubmitting}>
+                  {isSubmitting ? "Sending…" : "Send survey"}
+                </PillButton>
               </div>
             </form>
           </Form>

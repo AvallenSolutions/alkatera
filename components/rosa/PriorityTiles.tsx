@@ -2,59 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import {
-  CheckCircle2,
-  Inbox,
-  CalendarClock,
-  Package,
-  AlertCircle,
-  ArrowUpRight,
-  X,
-  Sparkles,
-  Target,
-  TrendingDown,
-  TrendingUp,
-  Truck,
-  ShieldCheck,
-  Beaker,
-  FileText,
-  Factory,
-  Leaf,
-  PoundSterling,
-  RefreshCw,
-  type LucideIcon,
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { ArrowUpRight, RefreshCw, X } from 'lucide-react'
 import { useOrganization } from '@/lib/organizationContext'
 import { Skeleton } from '@/components/ui/skeleton'
-import { StateChip } from '@/components/studio/state-chip'
+import { Eyebrow } from '@/components/studio/eyebrow'
+import { FactList, type FactRowItem } from '@/components/studio/fact-list'
 import type { WorkingTone } from '@/components/studio/theme'
 import { useRealtimeRefresh } from '@/lib/rosa/useRealtimeRefresh'
 import { trackRosa } from '@/lib/rosa/track'
 import { RichText } from '@/components/shared/Brand'
-
-/**
- * Map of icon names (as emitted by the curator and validated server-side)
- * to lucide components. Anything not in this map falls back to Sparkles.
- */
-const ICON_MAP: Record<string, LucideIcon> = {
-  Inbox,
-  CalendarClock,
-  Package,
-  AlertCircle,
-  ArrowUpRight,
-  Target,
-  Sparkles,
-  TrendingDown,
-  TrendingUp,
-  Truck,
-  ShieldCheck,
-  Beaker,
-  FileText,
-  Factory,
-  Leaf,
-  PoundSterling,
-}
 
 interface CuratedTile {
   id: string
@@ -249,57 +205,95 @@ export function PriorityTiles({ onOpenQueue }: Props) {
 
   if (loading && tiles.length === 0) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[0, 1, 2].map(i => (
-          <Skeleton key={i} className="h-36 rounded-[6px]" />
-        ))}
-      </div>
+      <section>
+        <Eyebrow className="mb-4 text-room-accent">What needs you today</Eyebrow>
+        <Skeleton className="h-36 rounded-[6px]" />
+      </section>
     )
   }
 
-  if (tiles.length === 0) {
-    return (
-      <div className="rounded-[6px] border border-dashed border-border bg-card p-6 text-center">
-        <p className="text-sm font-medium">You&apos;re all caught up.</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Drop a document or ask Rosa anything below to get started.
-        </p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
-        {data?.source === 'fallback' && (
-          <span className="text-muted-foreground/70">Showing fallback picks</span>
-        )}
+  const header = (
+    <div className="mb-4 flex items-baseline justify-between gap-3">
+      <Eyebrow tone="inherit" className="text-room-accent">
+        What needs you today
+      </Eyebrow>
+      <div className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+        {data?.source === 'fallback' && <span className="opacity-70">Fallback picks</span>}
         <button
           type="button"
           onClick={handleRefresh}
           disabled={refreshing}
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 hover:bg-muted hover:text-foreground transition-colors duration-200 ease-studio disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 uppercase tracking-[0.18em] transition-colors duration-200 ease-studio hover:text-foreground disabled:opacity-50"
           aria-label="Ask Rosa to re-pick"
           title="Ask Rosa to re-pick these"
         >
-          <RefreshCw className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">{refreshing ? 'Re-picking' : 'Re-pick'}</span>
+          <RefreshCw className="h-3 w-3" />
+          {refreshing ? 'Re-picking' : 'Re-pick'}
         </button>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {tiles.map((t, i) => (
-          <PriorityTile
-            key={t.id}
-            tile={t}
-            poster={i === 0}
-            onSnooze={handleSnooze}
-            onOpenQueue={t.kind === 'queue' ? onOpenQueue : undefined}
-          />
-        ))}
-      </div>
-      {data?.readiness && <ReadinessBadge readiness={data.readiness} />}
     </div>
   )
+
+  if (tiles.length === 0) {
+    return (
+      <section>
+        {header}
+        <p className="border-b border-border pb-3 text-sm text-muted-foreground">
+          You&apos;re all caught up. Drop a document or ask Rosa anything below.
+        </p>
+      </section>
+    )
+  }
+
+  const [top, ...rest] = tiles
+  const restItems: FactRowItem[] = rest.map(t => {
+    const chip = TONE_CHIP[t.tone]
+    return {
+      id: t.id,
+      title: <RichText>{t.title}</RichText>,
+      hint: t.hint ? <RichText>{t.hint}</RichText> : undefined,
+      chip: chip ?? undefined,
+      value: t.value || undefined,
+      unit: t.unit,
+      href: t.kind === 'queue' ? undefined : (t.href ?? undefined),
+      onClick:
+        t.kind === 'queue' && onOpenQueue
+          ? () => {
+              trackTileClick(t)
+              onOpenQueue()
+            }
+          : undefined,
+      onNavigate: () => trackTileClick(t),
+      trailing: <SnoozeButton kind={t.kind} onSnooze={handleSnooze} />,
+    }
+  })
+
+  // The readiness note joins the list as one more row, unless a curated
+  // tile already covers the same ground (then it would just be an echo).
+  const readinessRow = readinessAsRow(data?.readiness, tiles)
+
+  return (
+    <section>
+      {header}
+      <PriorityPoster
+        tile={top}
+        onSnooze={handleSnooze}
+        onOpenQueue={top.kind === 'queue' ? onOpenQueue : undefined}
+      />
+      {(restItems.length > 0 || readinessRow) && (
+        <FactList items={readinessRow ? [...restItems, readinessRow] : restItems} className="mt-2" />
+      )}
+    </section>
+  )
+}
+
+function trackTileClick(tile: CuratedTile) {
+  trackRosa('tile.clicked', {
+    tile_id: tile.id,
+    kind: tile.kind,
+    tone: tile.tone,
+    signal_basis: tile.signal_basis,
+  })
 }
 
 /**
@@ -313,42 +307,85 @@ const TONE_CHIP: Record<CuratedTile['tone'], { label: string; tone: WorkingTone 
   info: null,
 }
 
-function PriorityTile({
-  tile,
-  poster,
+function SnoozeButton({
+  kind,
   onSnooze,
-  onOpenQueue,
+  poster = false,
 }: {
-  tile: CuratedTile
-  poster?: boolean
+  kind: string
   onSnooze: (kind: string) => void
-  onOpenQueue?: () => void
+  poster?: boolean
 }) {
-  const Icon: LucideIcon = ICON_MAP[tile.icon] ?? Sparkles
-  const chip = TONE_CHIP[tile.tone]
-
-  const snoozeButton = (
+  return (
     <button
       type="button"
       onClick={e => {
         e.preventDefault()
         e.stopPropagation()
-        onSnooze(tile.kind)
+        onSnooze(kind)
       }}
       aria-label="Snooze for 24 hours"
       title="Snooze for 24 hours"
-      className={cn(
-        'opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-studio rounded-md p-1',
+      className={
         poster
-          ? 'text-studio-cream/70 hover:text-studio-cream'
-          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-      )}
+          ? 'rounded-md p-1 text-studio-cream/70 opacity-0 transition-opacity duration-200 ease-studio hover:text-studio-cream group-hover:opacity-100'
+          : 'shrink-0 rounded-md p-1 text-muted-foreground opacity-0 transition-opacity duration-200 ease-studio hover:text-foreground group-hover:opacity-100'
+      }
     >
       <X className="h-3.5 w-3.5" />
     </button>
   )
+}
 
-  const inner = poster ? (
+/**
+ * Which curated-tile kinds already tell the readiness story? If one is on
+ * the surface, the readiness row would be an echo, so it stays quiet.
+ */
+function readinessAsRow(
+  readiness: ReadinessSummary | undefined,
+  tiles: CuratedTile[],
+): FactRowItem | null {
+  if (!readiness) return null
+  const foundationBroken = readiness.facility_data === 'missing'
+  const recipesBroken =
+    readiness.recipes_status === 'partial' || readiness.recipes_status === 'missing'
+  if (!foundationBroken && !recipesBroken) return null
+
+  const covered = (pattern: RegExp) =>
+    tiles.some(t => pattern.test(t.kind) || pattern.test(t.title.toLowerCase()))
+
+  if (foundationBroken && !covered(/facilit|utility|data.?gap|stale/i)) {
+    return {
+      id: 'readiness-foundation',
+      title: 'Get your facility data flowing.',
+      hint: 'No facility has had a utility, water, or waste entry in the last 60 days. One recent entry unlocks the LCA pipeline.',
+      chip: { tone: 'attention', label: 'Attention' },
+      href: '/company/facilities/',
+    }
+  }
+  if (!foundationBroken && recipesBroken && !covered(/recipe|ingredient|match/i)) {
+    return {
+      id: 'readiness-recipes',
+      title: 'Finish matching product ingredients.',
+      hint: "Some ingredients still need an emission factor. Until they're matched the LCAs stay in draft.",
+      chip: { tone: 'attention', label: 'Attention' },
+      href: '/products',
+    }
+  }
+  return null
+}
+
+/** The surface's one saturated block: the top priority in forest. */
+function PriorityPoster({
+  tile,
+  onSnooze,
+  onOpenQueue,
+}: {
+  tile: CuratedTile
+  onSnooze: (kind: string) => void
+  onOpenQueue?: () => void
+}) {
+  const inner = (
     // The surface's one saturated block: forest, cream text, the number first.
     <div className="group relative h-full overflow-hidden rounded-[6px] bg-studio-forest p-5 sm:p-6 text-studio-cream transition-all duration-200 ease-studio hover:-translate-y-0.5 hover:opacity-[0.96]">
       <div className="flex items-start justify-between mb-4">
@@ -356,7 +393,7 @@ function PriorityTile({
           Top priority
         </span>
         <div className="flex items-center gap-1">
-          {snoozeButton}
+          <SnoozeButton kind={tile.kind} onSnooze={onSnooze} poster />
           {(tile.href || onOpenQueue) && (
             <ArrowUpRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-studio" />
           )}
@@ -384,54 +421,9 @@ function PriorityTile({
         )}
       </div>
     </div>
-  ) : (
-    // Cream panel: hairline, radius 6, the number in ink. Urgency is a word.
-    <div className="group relative h-full rounded-[6px] border border-border bg-card p-5 sm:p-6 transition-all duration-200 ease-studio hover:-translate-y-0.5">
-      <div className="flex items-start justify-between mb-4">
-        {chip ? (
-          <StateChip tone={chip.tone}>{chip.label}</StateChip>
-        ) : (
-          <Icon className="h-4 w-4 text-studio-dim" />
-        )}
-        <div className="flex items-center gap-1">
-          {snoozeButton}
-          {(tile.href || onOpenQueue) && (
-            <ArrowUpRight className="h-4 w-4 text-studio-forest opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-studio" />
-          )}
-        </div>
-      </div>
-      <div>
-        <div className="flex items-baseline gap-2">
-          <span className="font-display text-[2rem] font-bold tabular-nums leading-none text-foreground">
-            {tile.value}
-          </span>
-          {tile.unit && (
-            <span className="font-mono text-xs text-muted-foreground">{tile.unit}</span>
-          )}
-        </div>
-        <p className="mt-2 font-mono text-[9.5px] uppercase tracking-[0.2em] text-studio-dim">
-          <RichText>{tile.title}</RichText>
-        </p>
-        <p className="mt-2 text-xs text-muted-foreground leading-snug line-clamp-2">
-          <RichText>{tile.hint}</RichText>
-        </p>
-        {tile.recommendation && (
-          <p className="mt-3 pt-3 border-t border-border text-xs italic leading-snug text-muted-foreground">
-            Rosa: <RichText>{tile.recommendation}</RichText>
-          </p>
-        )}
-      </div>
-    </div>
   )
 
-  const handleClick = () => {
-    trackRosa('tile.clicked', {
-      tile_id: tile.id,
-      kind: tile.kind,
-      tone: tile.tone,
-      signal_basis: tile.signal_basis,
-    })
-  }
+  const handleClick = () => trackTileClick(tile)
 
   if (onOpenQueue) {
     return (
@@ -454,52 +446,4 @@ function PriorityTile({
     )
   }
   return inner
-}
-
-function ReadinessBadge({ readiness }: { readiness: ReadinessSummary }) {
-  // Only treat the org-level foundation as broken when ALL facilities are
-  // stale (i.e. readiness === 'missing'). When some facilities are fresh
-  // and some are stale, the user is clearly maintaining data; individual
-  // stale facilities show up as their own priority tiles, so an alarming
-  // banner here is redundant and noisy.
-  const foundationBroken = readiness.facility_data === 'missing'
-  const recipesBroken =
-    readiness.recipes_status === 'partial' || readiness.recipes_status === 'missing'
-
-  if (!foundationBroken && !recipesBroken) return null
-
-  const { title, body, cta, href } = foundationBroken
-    ? {
-        title: 'Get your facility data flowing.',
-        body: 'No facility has had a utility, water, or waste entry in the last 60 days. Adding even one recent entry unlocks the LCA pipeline.',
-        cta: 'Open facilities',
-        href: '/company/facilities/',
-      }
-    : {
-        title: 'Finish matching product ingredients.',
-        body: 'Some ingredients still need an emission factor. Until they\'re matched the LCAs stay in draft.',
-        cta: 'Open products',
-        href: '/products',
-      }
-
-  return (
-    <Link
-      href={href}
-      className="group block rounded-[6px] border border-border bg-card px-4 py-3 transition-colors duration-200 ease-studio hover:border-studio-dim/60"
-    >
-      <div className="flex items-start gap-3">
-        <StateChip tone="attention" className="mt-1 shrink-0">
-          Attention
-        </StateChip>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium leading-snug">{title}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">{body}</p>
-        </div>
-        <span className="self-center shrink-0 inline-flex items-center gap-1 text-xs font-medium text-studio-forest">
-          {cta}
-          <ArrowUpRight className="h-3.5 w-3.5" />
-        </span>
-      </div>
-    </Link>
-  )
 }

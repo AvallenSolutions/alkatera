@@ -9,13 +9,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { QRCodeSVG } from 'qrcode.react';
-import { ChevronLeft, Plus, Trash2, Leaf, UtensilsCrossed, Wine, Grape, Globe, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Statement } from '@/components/studio/statement';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { BigNumber } from '@/components/studio/big-number';
+import { PillButton } from '@/components/studio/pill-button';
+import { FactList, type FactRowItem } from '@/components/studio/fact-list';
 import {
   Dialog,
   DialogContent,
@@ -42,10 +44,10 @@ function fmt(n: number, digits = 2): string {
   return n.toLocaleString('en-GB', { maximumFractionDigits: digits });
 }
 
-const KIND_META: Record<MenuItemKind, { label: string; icon: typeof Wine }> = {
-  meal: { label: 'Meal', icon: UtensilsCrossed },
-  made_drink: { label: 'Made drink', icon: Wine },
-  own_product_drink: { label: 'Own wine', icon: Grape },
+const KIND_LABEL: Record<MenuItemKind, string> = {
+  meal: 'Meal',
+  made_drink: 'Made drink',
+  own_product_drink: 'Own wine',
 };
 
 interface Candidate {
@@ -215,177 +217,136 @@ export function MenuEditor({ menuId }: { menuId: string }) {
     }
   };
 
+  const backLink = (
+    <Link
+      href="/hospitality/menus/"
+      className="inline-flex font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground transition-colors hover:text-foreground"
+    >
+      ← Menus
+    </Link>
+  );
+
   if (loading) {
     return (
-      <div className="mx-auto max-w-4xl space-y-4 p-4 sm:p-6">
+      <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
         <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-64 w-full rounded-lg" />
+        <Skeleton className="h-64 w-full rounded-[6px]" />
       </div>
     );
   }
   if (loadError || !menu) {
     return (
-      <div className="mx-auto max-w-4xl space-y-4 p-4 sm:p-6">
-        <Link href="/hospitality/menus/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
-          <ChevronLeft className="mr-1 h-4 w-4" />
-          Menus
-        </Link>
-        <p className="text-sm text-destructive">{loadError || 'Menu not found'}</p>
+      <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
+        {backLink}
+        <p className="text-sm text-studio-stale">{loadError || 'Menu not found'}</p>
       </div>
     );
   }
 
+  const itemRows: FactRowItem[] = menu.items.map((item) => {
+    const hintParts = [
+      KIND_LABEL[item.item_kind],
+      item.item_kind === 'own_product_drink' ? `${fmt(item.serves, 0)} serves/bottle` : null,
+      item.internal_consumption ? 'internal' : null,
+    ].filter(Boolean);
+    return {
+      id: item.id,
+      title: item.product_name,
+      hint: hintParts.join(' · '),
+      value: item.impact ? fmt(item.impact.per_cover_co2e) : undefined,
+      unit: item.impact ? 'KG CO₂E / SERVING' : undefined,
+      chip: item.impact ? undefined : { tone: 'quiet' as const, label: 'Not calculated' },
+      trailing: (
+        <button
+          type="button"
+          aria-label={`Remove ${item.product_name}`}
+          className="rounded px-2 py-1 text-base leading-none text-muted-foreground transition-colors duration-150 hover:text-studio-stale"
+          onClick={() => removeItem(item.id)}
+        >
+          &times;
+        </button>
+      ),
+    };
+  });
+
   return (
-    <div className="mx-auto max-w-4xl space-y-5 p-4 sm:p-6">
-      <Link href="/hospitality/menus/" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
-        <ChevronLeft className="mr-1 h-4 w-4" />
-        Menus
-      </Link>
+    <div className="mx-auto max-w-4xl space-y-8 p-4 sm:p-6">
+      {backLink}
 
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">{menu.name}</h1>
-          {menu.venue_name && <p className="text-sm text-muted-foreground">{menu.venue_name}</p>}
+      <div className="min-w-0">
+        <Statement
+          eyebrow="THE WORKBENCH · MENUS"
+          headline={menu.name.endsWith('.') ? menu.name : `${menu.name}.`}
+        >
+          <BigNumber
+            size="display"
+            value={menu.aggregate.item_count}
+            label={menu.aggregate.item_count === 1 ? 'Item' : 'Items'}
+          />
+          <BigNumber size="display" value={fmt(menu.aggregate.avg_co2e)} label="KG CO₂E AVG / COVER" />
+          <BigNumber size="display" value={fmt(menu.aggregate.total_co2e)} label="KG CO₂E FULL MENU" />
+        </Statement>
+        {menu.venue_name && (
+          <p className="mt-3 text-sm text-muted-foreground">{menu.venue_name}</p>
+        )}
+      </div>
+
+      <section className="border-t border-border pt-5">
+        <div className="mb-2 flex items-center justify-between gap-4">
+          <Eyebrow>Items</Eyebrow>
+          <PillButton variant="room" size="sm" onClick={openAdd}>
+            Add item
+          </PillButton>
         </div>
-        <Button onClick={openAdd}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add item
-        </Button>
-      </div>
+        {menu.items.length === 0 ? (
+          <p className="py-4 text-sm text-muted-foreground">
+            No items yet. Add a meal, a drink, or one of your own wines.
+          </p>
+        ) : (
+          <FactList items={itemRows} />
+        )}
+      </section>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Items</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{menu.aggregate.item_count}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
-            <Leaf className="h-4 w-4 text-primary" />
-            <CardTitle className="text-sm font-medium text-muted-foreground">Average / cover</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{fmt(menu.aggregate.avg_co2e)}</p>
-            <p className="text-xs text-muted-foreground">kg CO₂e</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Full menu total</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{fmt(menu.aggregate.total_co2e)}</p>
-            <p className="text-xs text-muted-foreground">kg CO₂e</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Items</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {menu.items.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              No items yet. Add a meal, a drink, or one of your own wines.
-            </p>
-          ) : (
-            <ul className="divide-y">
-              {menu.items.map((item) => {
-                const Meta = KIND_META[item.item_kind];
-                const Icon = Meta.icon;
-                return (
-                  <li key={item.id} className="flex items-center justify-between gap-3 py-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">{item.product_name}</p>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                          <Badge variant="outline" className="text-[10px]">{Meta.label}</Badge>
-                          {item.item_kind === 'own_product_drink' && (
-                            <span className="text-xs text-muted-foreground">{fmt(item.serves, 0)} serves/bottle</span>
-                          )}
-                          {item.internal_consumption && (
-                            <Badge variant="secondary" className="text-[10px]">internal</Badge>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        {item.impact ? (
-                          <>
-                            <p className="font-semibold">{fmt(item.impact.per_cover_co2e)} kg CO₂e</p>
-                            <p className="text-xs text-muted-foreground">per serving</p>
-                          </>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">Not calculated</p>
-                        )}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive"
-                        onClick={() => removeItem(item.id)}
-                        aria-label="Remove item"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-2 space-y-0">
-          <Globe className="h-5 w-5" />
-          <CardTitle className="text-base">Public menu &amp; QR</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {menu.is_public && publicUrl ? (
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <div className="rounded-lg bg-white p-2">
-                <QRCodeSVG value={publicUrl} size={120} />
-              </div>
-              <div className="min-w-0 flex-1 space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  This menu is live. Print the QR or share the link — guests see each dish&apos;s
-                  carbon footprint.
-                </p>
-                <div className="flex items-center gap-2">
-                  <a href={publicUrl} target="_blank" rel="noreferrer" className="truncate text-sm text-primary underline">
-                    {publicUrl}
-                  </a>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={copyLink} aria-label="Copy link">
-                    <Copy className="h-3.5 w-3.5" />
-                  </Button>
-                  {copied && <span className="text-xs text-muted-foreground">Copied</span>}
-                </div>
-                <Button variant="outline" size="sm" onClick={() => togglePublish(false)} disabled={publishing}>
-                  {publishing ? 'Updating…' : 'Unpublish'}
-                </Button>
-              </div>
+      <section className="border-t border-border pt-5">
+        <Eyebrow className="mb-4">Public menu · QR</Eyebrow>
+        {menu.is_public && publicUrl ? (
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="rounded-[6px] bg-white p-2">
+              <QRCodeSVG value={publicUrl} size={120} />
             </div>
-          ) : (
-            <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1 space-y-2">
               <p className="text-sm text-muted-foreground">
-                Publish this menu to get a public page and QR code with consumer carbon labels.
+                This menu is live. Print the QR or share the link: guests see each dish&apos;s
+                carbon footprint.
               </p>
-              <Button onClick={() => togglePublish(true)} disabled={publishing}>
-                <Globe className="mr-2 h-4 w-4" />
-                {publishing ? 'Publishing…' : 'Publish'}
-              </Button>
+              <div className="flex items-center gap-2">
+                <a href={publicUrl} target="_blank" rel="noreferrer" className="truncate text-sm text-room-accent underline">
+                  {publicUrl}
+                </a>
+                <button
+                  type="button"
+                  onClick={copyLink}
+                  className="shrink-0 rounded px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground transition-colors duration-150 hover:text-foreground"
+                >
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+              <PillButton variant="outline" size="sm" onClick={() => togglePublish(false)} disabled={publishing}>
+                {publishing ? 'Updating…' : 'Unpublish'}
+              </PillButton>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              Publish this menu to get a public page and QR code with consumer carbon labels.
+            </p>
+            <PillButton onClick={() => togglePublish(true)} disabled={publishing}>
+              {publishing ? 'Publishing…' : 'Publish'}
+            </PillButton>
+          </div>
+        )}
+      </section>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="sm:max-w-md">
@@ -420,7 +381,7 @@ export function MenuEditor({ menuId }: { menuId: string }) {
                   {candidates.map((c) => (
                     <SelectItem key={c.id} value={String(c.id)}>
                       {c.name}
-                      {c.per_bottle_co2e != null ? ` — ${fmt(c.per_bottle_co2e)} kg CO₂e/bottle` : ''}
+                      {c.per_bottle_co2e != null ? ` · ${fmt(c.per_bottle_co2e)} kg CO₂e/bottle` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>

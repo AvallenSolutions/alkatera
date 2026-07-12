@@ -8,7 +8,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Leaf, Droplets, Recycle, TreePine, Zap } from 'lucide-react';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { BigNumber } from '@/components/studio/big-number';
+import { StateChip } from '@/components/studio/state-chip';
 
 export type ImpactCategory = 'climate' | 'water' | 'circularity' | 'nature' | 'energy';
 
@@ -28,50 +30,6 @@ interface QuickImpactBarProps {
   className?: string;
   compact?: boolean;
 }
-
-const categoryConfig: Record<ImpactCategory, {
-  icon: typeof Leaf;
-  emoji: string;
-  color: string;
-  bgColor: string;
-  activeColor: string;
-}> = {
-  climate: {
-    icon: Leaf,
-    emoji: '🌍',
-    color: 'text-emerald-600 dark:text-emerald-400',
-    bgColor: 'bg-emerald-100 dark:bg-emerald-900/30',
-    activeColor: 'ring-emerald-500',
-  },
-  water: {
-    icon: Droplets,
-    emoji: '💧',
-    color: 'text-blue-600 dark:text-blue-400',
-    bgColor: 'bg-blue-100 dark:bg-blue-900/30',
-    activeColor: 'ring-blue-500',
-  },
-  circularity: {
-    icon: Recycle,
-    emoji: '♻️',
-    color: 'text-amber-600 dark:text-amber-400',
-    bgColor: 'bg-amber-100 dark:bg-amber-900/30',
-    activeColor: 'ring-amber-500',
-  },
-  nature: {
-    icon: TreePine,
-    emoji: '🌱',
-    color: 'text-green-600 dark:text-green-400',
-    bgColor: 'bg-green-100 dark:bg-green-900/30',
-    activeColor: 'ring-green-500',
-  },
-  energy: {
-    icon: Zap,
-    emoji: '⚡',
-    color: 'text-violet-600 dark:text-violet-400',
-    bgColor: 'bg-violet-100 dark:bg-violet-900/30',
-    activeColor: 'ring-violet-500',
-  },
-};
 
 function formatValue(value: number, unit: string): string {
   if (value == null) return '0';
@@ -96,14 +54,12 @@ export function QuickImpactBar({
 }: QuickImpactBarProps) {
   return (
     <div className={cn(
-      'flex flex-wrap gap-2',
+      'flex flex-wrap gap-x-8 gap-y-4',
       !compact && 'justify-center lg:justify-start',
       className
     )}>
       <TooltipProvider>
         {impacts.map((impact) => {
-          const config = categoryConfig[impact.category];
-          const Icon = config.icon;
           const isActive = activeCategory === impact.category;
 
           return (
@@ -112,44 +68,24 @@ export function QuickImpactBar({
                 <button
                   onClick={() => onCategoryClick?.(impact.category)}
                   className={cn(
-                    'flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200',
-                    'border hover:shadow-md',
-                    isActive
-                      ? `${config.bgColor} border-transparent ring-2 ${config.activeColor}`
-                      : 'bg-card border-border hover:border-muted-foreground/30',
-                    onCategoryClick && 'cursor-pointer',
-                    compact && 'px-2 py-1.5'
+                    'text-left transition-opacity duration-200',
+                    !isActive && activeCategory ? 'opacity-60 hover:opacity-100' : 'hover:opacity-80',
+                    onCategoryClick && 'cursor-pointer'
                   )}
                 >
-                  <div className={cn(
-                    'flex items-center justify-center rounded-lg',
-                    compact ? 'w-6 h-6' : 'w-8 h-8',
-                    config.bgColor
-                  )}>
-                    <Icon className={cn(
-                      config.color,
-                      compact ? 'h-3.5 w-3.5' : 'h-4 w-4'
-                    )} />
-                  </div>
-                  <div className="text-left">
-                    <p className={cn(
-                      'font-semibold tabular-nums',
-                      compact ? 'text-sm' : 'text-base'
-                    )}>
-                      {formatValue(impact.value, impact.unit)}
-                      <span className={cn(
-                        'font-normal text-muted-foreground ml-1',
-                        compact ? 'text-xs' : 'text-sm'
-                      )}>
-                        {impact.unit}
-                      </span>
-                    </p>
-                    {!compact && (
-                      <p className="text-xs text-muted-foreground">
-                        {impact.label}
-                      </p>
-                    )}
-                  </div>
+                  <BigNumber
+                    size="panel"
+                    tone={isActive ? 'room' : 'ink'}
+                    value={
+                      <>
+                        {formatValue(impact.value, impact.unit)}
+                        <span className="ml-1 text-sm font-normal text-studio-dim">
+                          {impact.unit}
+                        </span>
+                      </>
+                    }
+                    label={impact.label.toUpperCase()}
+                  />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="max-w-xs">
@@ -160,7 +96,7 @@ export function QuickImpactBar({
                   </p>
                 )}
                 {onCategoryClick && (
-                  <p className="text-xs text-primary mt-1">
+                  <p className="text-xs text-room-accent mt-1">
                     Click to view details
                   </p>
                 )}
@@ -198,66 +134,47 @@ export function ImpactSummaryCard({
   onClick,
   className,
 }: ImpactSummaryCardProps) {
-  const config = categoryConfig[category];
-  const Icon = config.icon;
-
-  const statusColors = {
-    good: 'border-green-200 dark:border-green-800/50',
-    warning: 'border-amber-200 dark:border-amber-800/50',
-    critical: 'border-red-200 dark:border-red-800/50',
-  };
-
   return (
     <button
       onClick={onClick}
       className={cn(
-        'w-full text-left p-4 rounded-xl border transition-all duration-200',
-        'bg-card hover:shadow-md hover:scale-[1.01]',
-        status ? statusColors[status] : 'border-border',
+        'w-full text-left rounded-[6px] border border-studio-hairline bg-studio-cream p-5',
+        'transition-colors duration-200 hover:border-studio-ink/30',
         onClick && 'cursor-pointer',
         className
       )}
     >
       <div className="flex items-start justify-between mb-3">
-        <div className={cn(
-          'flex items-center justify-center w-10 h-10 rounded-xl',
-          config.bgColor
-        )}>
-          <Icon className={cn('h-5 w-5', config.color)} />
-        </div>
+        <Eyebrow tone="dim">{label}</Eyebrow>
         {status && (
-          <span className={cn(
-            'text-xs font-medium px-2 py-0.5 rounded-full',
-            status === 'good' && 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-            status === 'warning' && 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-            status === 'critical' && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-          )}>
+          <StateChip tone={status === 'good' ? 'good' : status === 'warning' ? 'attention' : 'stale'}>
             {status === 'good' ? 'Good' : status === 'warning' ? 'Monitor' : 'Action'}
-          </span>
+          </StateChip>
         )}
       </div>
 
-      <h3 className="font-medium text-sm text-muted-foreground">{label}</h3>
-      <div className="flex items-baseline gap-1 mt-1">
-        <span className="text-2xl font-bold tabular-nums">
-          {formatValue(value, unit)}
-        </span>
-        <span className="text-sm text-muted-foreground">{unit}</span>
-      </div>
+      <BigNumber
+        size="panel"
+        value={
+          <>
+            {formatValue(value, unit)}
+            <span className="ml-1 text-sm font-normal text-studio-dim">{unit}</span>
+          </>
+        }
+        label={unit.toUpperCase()}
+      />
 
       {description && (
-        <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
+        <p className="text-xs text-studio-dim mt-3 line-clamp-2">
           {description}
         </p>
       )}
 
       {trend !== undefined && trendDirection && trendDirection !== 'stable' && (
-        <div className={cn(
-          'flex items-center gap-1 mt-2 text-xs font-medium',
-          trendDirection === 'down' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-        )}>
-          <span>{trendDirection === 'down' ? '↓' : '↑'} {Math.abs(trend)}%</span>
-          <span className="text-muted-foreground">vs previous</span>
+        <div className="mt-3">
+          <StateChip tone={trendDirection === 'down' ? 'good' : 'stale'}>
+            {Math.abs(trend)}% vs previous
+          </StateChip>
         </div>
       )}
     </button>

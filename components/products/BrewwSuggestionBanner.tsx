@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useOrganization } from '@/lib/organizationContext'
-import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabaseClient'
 import { toast } from 'sonner'
-import { Sparkles, X } from 'lucide-react'
+import { X } from 'lucide-react'
+import { Panel } from '@/components/studio/panel'
+import { PillButton } from '@/components/studio/pill-button'
 
 interface BrewwSuggestionBannerProps {
   productId: string | number
@@ -100,34 +101,33 @@ export function BrewwSuggestionBanner({ productId, productName }: BrewwSuggestio
   if (!suggestion) return null
 
   return (
-    <div className="rounded-[6px] border border-border bg-card p-3 flex items-start gap-3">
-      <Sparkles className="h-4 w-4 text-room-accent mt-0.5 flex-shrink-0" />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm">
+    <Panel className="flex items-start gap-3">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm text-foreground">
           This product looks like your Breww SKU{' '}
           <strong>&ldquo;{suggestion.name}&rdquo;</strong>.
         </p>
-        <p className="text-xs text-muted-foreground mt-0.5">
+        <p className="mt-0.5 text-xs text-muted-foreground">
           Link them so production volumes, recipes and packaging flow automatically.
         </p>
-        <div className="flex items-center gap-2 mt-2">
-          <Button size="sm" onClick={handleLink} disabled={linking} className="h-7 text-xs">
-            Link now
-          </Button>
-          <Button size="sm" variant="ghost" onClick={handleDismiss} className="h-7 text-xs">
+        <div className="mt-3 flex items-center gap-2">
+          <PillButton size="sm" onClick={handleLink} disabled={linking}>
+            {linking ? 'Linking...' : 'Link now'}
+          </PillButton>
+          <PillButton size="sm" variant="ghost" onClick={handleDismiss}>
             Dismiss
-          </Button>
+          </PillButton>
         </div>
       </div>
       <button
         type="button"
         onClick={handleDismiss}
-        className="text-muted-foreground hover:text-foreground"
+        className="text-muted-foreground transition-colors hover:text-foreground"
         aria-label="Dismiss"
       >
         <X className="h-3.5 w-3.5" />
       </button>
-    </div>
+    </Panel>
   )
 }
 

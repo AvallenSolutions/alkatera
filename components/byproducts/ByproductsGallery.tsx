@@ -127,7 +127,7 @@ export function ByproductsGallery() {
       )}
 
       {empty && (
-        <div className="rounded-[6px] border border-dashed border-border bg-card p-10 text-center">
+        <div className="border-t border-studio-hairline px-4 pt-10 pb-6 text-center">
           <p className="text-sm text-muted-foreground">
             No byproducts logged yet. Register a circular destination (animal feed, biogas, recaptured CO₂) and the platform will track it as part of your circularity score.
           </p>

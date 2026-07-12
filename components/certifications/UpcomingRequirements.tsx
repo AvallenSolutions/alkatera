@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { StateChip } from '@/components/studio';
 import { CalendarClock } from 'lucide-react';
 import type { CertificationReadiness } from '@/lib/certifications/scoring';
 
@@ -67,7 +67,7 @@ export function UpcomingRequirements({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
-          <CalendarClock className="h-5 w-5 text-blue-600" />
+          <CalendarClock className="h-5 w-5 text-room-accent" />
           Upcoming Requirements
         </CardTitle>
         <CardDescription>
@@ -84,7 +84,7 @@ export function UpcomingRequirements({
               {reqs.map((r) => (
                 <div
                   key={r.requirementId}
-                  className="flex items-center justify-between rounded-md border p-2 text-sm"
+                  className="flex items-center justify-between rounded-[6px] border p-2 text-sm"
                 >
                   <span>
                     <span className="font-mono text-xs text-muted-foreground">
@@ -92,15 +92,9 @@ export function UpcomingRequirements({
                     </span>{' '}
                     {r.name}
                   </span>
-                  <Badge
-                    className={
-                      onTrack(r.code)
-                        ? 'bg-emerald-100 text-emerald-700 text-xs dark:bg-emerald-900/30 dark:text-emerald-400'
-                        : 'bg-amber-100 text-amber-700 text-xs dark:bg-amber-900/30 dark:text-amber-400'
-                    }
-                  >
+                  <StateChip tone={onTrack(r.code) ? 'good' : 'attention'}>
                     {onTrack(r.code) ? 'On track' : 'Action needed'}
-                  </Badge>
+                  </StateChip>
                 </div>
               ))}
             </div>

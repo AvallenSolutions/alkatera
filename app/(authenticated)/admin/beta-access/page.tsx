@@ -4,9 +4,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useIsAlkateraAdmin } from '@/hooks/usePermissions';
 import { useSubscription } from '@/hooks/useSubscription';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Panel } from '@/components/studio/panel';
+import { Statement } from '@/components/studio/statement';
+import { StateChip } from '@/components/studio/state-chip';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -63,28 +64,28 @@ const BETA_FEATURES = [
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function tierBadgeVariant(tier: string | null): 'default' | 'secondary' | 'outline' {
+function tierChipTone(tier: string | null): 'good' | 'quiet' {
   switch (tier) {
     case 'canopy':
-      return 'default';
+      return 'good';
     case 'blossom':
-      return 'secondary';
+      return 'quiet';
     default:
-      return 'outline';
+      return 'quiet';
   }
 }
 
 function statusColour(status: string | null): string {
   switch (status) {
     case 'active':
-      return 'text-emerald-400';
+      return 'text-studio-good';
     case 'trial':
-      return 'text-blue-400';
+      return 'text-room-accent';
     case 'past_due':
-      return 'text-amber-400';
+      return 'text-studio-attention';
     case 'suspended':
     case 'cancelled':
-      return 'text-red-400';
+      return 'text-studio-stale';
     default:
       return 'text-muted-foreground';
   }
@@ -228,8 +229,8 @@ export default function AdminBetaAccessPage() {
   if (!isAlkateraAdmin) {
     return (
       <div className="container max-w-6xl py-8">
-        <Card>
-          <CardContent className="flex items-center justify-center py-16">
+        <Panel>
+          <div className="flex items-center justify-center py-16">
             <div className="text-center space-y-2">
               <Shield className="h-12 w-12 text-muted-foreground mx-auto" />
               <h2 className="text-xl font-semibold">Admin Access Required</h2>
@@ -237,8 +238,8 @@ export default function AdminBetaAccessPage() {
                 This page is restricted to alka<strong>tera</strong> administrators.
               </p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
       </div>
     );
   }
@@ -249,34 +250,31 @@ export default function AdminBetaAccessPage() {
     <div className="container max-w-6xl py-8 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <FlaskConical className="h-6 w-6 text-neon-lime" />
-          Beta Access Management
-        </h1>
-        <p className="text-muted-foreground mt-1">
+        <Statement eyebrow="THE WIRING · ADMIN" headline="Beta access management." />
+        <p className="mt-2 max-w-2xl text-sm text-studio-dim">
           Grant beta feature access to specific organisations, regardless of their subscription tier.
         </p>
       </div>
 
       {/* Stats */}
       <div className="flex gap-4">
-        <Card className="flex-1">
-          <CardHeader className="pb-2">
-            <CardDescription>Total Organisations</CardDescription>
-            <CardTitle className="text-2xl">{loading ? '—' : organizations.length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card className="flex-1">
-          <CardHeader className="pb-2">
-            <CardDescription>With Beta Access</CardDescription>
-            <CardTitle className="text-2xl text-neon-lime">{loading ? '—' : betaCount}</CardTitle>
-          </CardHeader>
-        </Card>
+        <Panel className="flex-1">
+          <div className="mb-4 space-y-1 pb-2">
+            <p className="text-sm text-studio-dim">Total Organisations</p>
+            <h2 className="font-display text-2xl font-semibold text-foreground">{loading ? '·' : organizations.length}</h2>
+          </div>
+        </Panel>
+        <Panel className="flex-1">
+          <div className="mb-4 space-y-1 pb-2">
+            <p className="text-sm text-studio-dim">With Beta Access</p>
+            <h2 className="font-display text-2xl font-semibold text-room-accent">{loading ? '·' : betaCount}</h2>
+          </div>
+        </Panel>
       </div>
 
       {/* Search */}
-      <Card>
-        <CardContent className="py-4">
+      <Panel>
+        <div className="py-4">
           <div className="flex items-center gap-3">
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -288,13 +286,13 @@ export default function AdminBetaAccessPage() {
               />
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* Product betas */}
       <FeatureToggleTable
         title="Product betas"
-        icon={<FlaskConical className="h-4 w-4 text-neon-lime" />}
+        icon={<FlaskConical className="h-4 w-4 text-room-accent" />}
         features={BETA_FEATURES.map((f) => ({ code: f.code, label: f.label, description: f.description }))}
         organizations={filtered}
         loading={loading}
@@ -303,13 +301,13 @@ export default function AdminBetaAccessPage() {
         onToggle={handleToggle}
       />
 
-      {/* Integration betas — derived from lib/integrations/directory.ts so a
+      {/* Integration betas: derived from lib/integrations/directory.ts so a
           new provider entry automatically gets a column here without touching
           this file. */}
       <FeatureToggleTable
         title="Integration betas"
-        icon={<Plug className="h-4 w-4 text-neon-lime" />}
-        subtitle="Granting an integration flag makes that provider's card visible to the org. For providers without a built connect flow yet, the card stays as 'Coming soon' until we build it — the flag still records the org as queued."
+        icon={<Plug className="h-4 w-4 text-room-accent" />}
+        subtitle="Granting an integration flag makes that provider's card visible to the org. For providers without a built connect flow yet, the card stays as 'Coming soon' until we build it. The flag still records the org as queued."
         features={INTEGRATION_BETA_FEATURES.map((f) => ({ code: f.code, label: f.label, description: f.description }))}
         organizations={filtered}
         loading={loading}
@@ -358,15 +356,15 @@ function FeatureToggleTable({
   onToggle,
 }: FeatureToggleTableProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
+    <Panel>
+      <div className="mb-4 space-y-1">
+        <h2 className="font-display text-base font-semibold text-foreground flex items-center gap-2">
           {icon}
           {title}
-        </CardTitle>
-        {subtitle && <CardDescription>{subtitle}</CardDescription>}
-      </CardHeader>
-      <CardContent>
+        </h2>
+        {subtitle && <p className="text-sm text-studio-dim">{subtitle}</p>}
+      </div>
+      <div>
         {loading ? (
           <div className="space-y-3">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -405,9 +403,9 @@ function FeatureToggleTable({
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={tierBadgeVariant(org.subscription_tier)}>
+                        <StateChip tone={tierChipTone(org.subscription_tier)}>
                           {org.subscription_tier || 'none'}
-                        </Badge>
+                        </StateChip>
                       </TableCell>
                       <TableCell>
                         <span className={`text-sm capitalize ${statusColour(org.subscription_status)}`}>
@@ -436,7 +434,7 @@ function FeatureToggleTable({
             </Table>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }

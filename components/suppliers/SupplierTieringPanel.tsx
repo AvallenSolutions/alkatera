@@ -7,9 +7,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Layers } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { PillButton } from '@/components/studio/pill-button';
 import {
   Select,
   SelectContent,
@@ -79,62 +77,53 @@ export function SupplierTieringPanel({ organizationId }: { organizationId: strin
   if (suggestions === null) return null;
   if (suggestions.length === 0) {
     return (
-      <Card className="border-dashed">
-        <CardContent className="py-6 text-sm text-muted-foreground">
-          Add suppliers (and connect Xero spend) to get tier suggestions.
-        </CardContent>
-      </Card>
+      <p className="text-sm text-muted-foreground">
+        Add suppliers and connect Xero spend to get tier suggestions.
+      </p>
     );
   }
 
   const anyChange = suggestions.some((s) => tierFor(s) !== (s.currentTier ?? 'none'));
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Layers className="h-4 w-4 text-room-accent" />
-          Supplier tiers
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          We suggest your direct, material suppliers (Tier 1) from spend{summary ? `: ${summary.count} suppliers making up ${Math.round(summary.spendSharePct)}% of spend` : ''}.
-          These become the set B Corp measures your survey coverage against. Adjust any below.
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="space-y-1.5">
-          {suggestions.map((s) => {
-            const current = tierFor(s);
-            const isSuggested = (s.suggestedTier ?? 'none') === current && overrides[s.id] === undefined;
-            return (
-              <div key={s.id} className="flex items-center gap-3 rounded-[6px] border border-border px-3 py-2">
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">{s.name}</span>
-                <span className="text-xs tabular-nums text-muted-foreground">{gbp(s.spend)}</span>
-                <Select value={current} onValueChange={(v) => setOverrides((o) => ({ ...o, [s.id]: v as Tier }))}>
-                  <SelectTrigger className="h-8 w-32 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="tier_1">Direct (Tier 1)</SelectItem>
-                    <SelectItem value="tier_2">Tier 2</SelectItem>
-                    <SelectItem value="tier_3">Tier 3</SelectItem>
-                    <SelectItem value="none">Untiered</SelectItem>
-                  </SelectContent>
-                </Select>
-                {isSuggested && s.suggestedTier === 'tier_1' && (
-                  <span className="w-16 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent">Suggested</span>
-                )}
-                {!isSuggested || s.suggestedTier !== 'tier_1' ? <span className="w-16" /> : null}
-              </div>
-            );
-          })}
-        </div>
-        <div className="flex justify-end">
-          <Button onClick={apply} disabled={saving || !anyChange}>
-            {saving ? 'Applying...' : 'Apply tiers'}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    <div>
+      <p className="mb-3 text-sm text-muted-foreground">
+        We suggest your direct, material suppliers (Tier 1) from spend{summary ? `: ${summary.count} suppliers making up ${Math.round(summary.spendSharePct)}% of spend` : ''}.
+        These become the set B Corp measures your survey coverage against. Adjust any below.
+      </p>
+      <ul className="divide-y divide-studio-hairline border-t border-studio-hairline">
+        {suggestions.map((s) => {
+          const current = tierFor(s);
+          const isSuggested = (s.suggestedTier ?? 'none') === current && overrides[s.id] === undefined;
+          return (
+            <li key={s.id} className="flex items-center gap-3 py-3">
+              <span className="min-w-0 flex-1 truncate font-display text-sm font-semibold text-foreground">{s.name}</span>
+              <span className="font-mono text-xs tabular-nums text-muted-foreground">{gbp(s.spend)}</span>
+              <Select value={current} onValueChange={(v) => setOverrides((o) => ({ ...o, [s.id]: v as Tier }))}>
+                <SelectTrigger className="h-8 w-32 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="tier_1">Direct (Tier 1)</SelectItem>
+                  <SelectItem value="tier_2">Tier 2</SelectItem>
+                  <SelectItem value="tier_3">Tier 3</SelectItem>
+                  <SelectItem value="none">Untiered</SelectItem>
+                </SelectContent>
+              </Select>
+              {isSuggested && s.suggestedTier === 'tier_1' ? (
+                <span className="w-16 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent">Suggested</span>
+              ) : (
+                <span className="w-16" />
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <div className="mt-3 flex justify-end">
+        <PillButton variant="ink" onClick={apply} disabled={saving || !anyChange}>
+          {saving ? 'Applying…' : 'Apply tiers'}
+        </PillButton>
+      </div>
+    </div>
   );
 }

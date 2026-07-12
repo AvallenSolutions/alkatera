@@ -20,8 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, Car, Fuel, Zap, Users } from "lucide-react";
+import { StateChip } from "@/components/studio/state-chip";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -65,9 +64,9 @@ const OWNERSHIP_TYPES = [
 ];
 
 const DATA_ENTRY_METHODS = [
-  { value: "distance", label: "Distance (km)", icon: Car },
-  { value: "volume", label: "Fuel Volume (litres)", icon: Fuel },
-  { value: "consumption", label: "Electricity (kWh)", icon: Zap },
+  { value: "distance", label: "Distance (km)" },
+  { value: "volume", label: "Fuel Volume (litres)" },
+  { value: "consumption", label: "Electricity (kWh)" },
 ];
 
 export function FleetActivityEntry({
@@ -234,19 +233,9 @@ export function FleetActivityEntry({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="flex items-center justify-between p-3 rounded-lg bg-muted">
-            <span className="text-sm font-medium">Calculated Scope:</span>
-            <Badge
-              variant={
-                scope === "Scope 1"
-                  ? "secondary"
-                  : scope === "Scope 2"
-                  ? "default"
-                  : "outline"
-              }
-            >
-              {scope}
-            </Badge>
+          <div className="flex items-center justify-between border-y border-border py-3">
+            <span className="text-sm font-medium">Calculated scope</span>
+            <StateChip>{scope}</StateChip>
           </div>
 
           {vehicles.length > 0 && (
@@ -365,27 +354,23 @@ export function FleetActivityEntry({
                   return method.value !== "consumption";
                 }
                 return true;
-              }).map((method) => {
-                const Icon = method.icon;
-                return (
-                  <Button
-                    key={method.value}
-                    type="button"
-                    variant={
-                      formData.data_entry_method === method.value
-                        ? "default"
-                        : "outline"
-                    }
-                    className="h-auto py-3 flex-col gap-1"
-                    onClick={() =>
-                      setFormData({ ...formData, data_entry_method: method.value })
-                    }
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span className="text-xs">{method.label}</span>
-                  </Button>
-                );
-              })}
+              }).map((method) => (
+                <Button
+                  key={method.value}
+                  type="button"
+                  variant={
+                    formData.data_entry_method === method.value
+                      ? "default"
+                      : "outline"
+                  }
+                  className="h-auto py-3"
+                  onClick={() =>
+                    setFormData({ ...formData, data_entry_method: method.value })
+                  }
+                >
+                  <span className="text-xs">{method.label}</span>
+                </Button>
+              ))}
             </div>
           </div>
 
@@ -493,8 +478,7 @@ export function FleetActivityEntry({
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Calculate & Save
+              {loading ? "Calculating" : "Calculate and save"}
             </Button>
           </DialogFooter>
         </form>

@@ -392,7 +392,7 @@ export default function GreenwashGuardianPage() {
               <TabsContent value="document" className="space-y-4 mt-4">
                 <div className="space-y-2">
                   <Label>Upload Document</Label>
-                  <div className="border-2 border-dashed border-border rounded-[6px] p-8 text-center hover:border-studio-brick/50 transition-colors">
+                  <div className="rounded-[6px] border border-studio-hairline bg-studio-cream p-8 text-center hover:border-studio-brick/50 transition-colors">
                     <input
                       type="file"
                       accept=".pdf,.docx,.txt"
@@ -514,9 +514,8 @@ export default function GreenwashGuardianPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="rounded-[6px]">
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <span className="text-xl">🇬🇧</span> UK Legislation
-              </CardTitle>
+              <Eyebrow className="mb-1">UK</Eyebrow>
+              <CardTitle className="text-lg">Legislation</CardTitle>
             </CardHeader>
             <CardContent>
               <ul className="text-sm text-muted-foreground space-y-1">
@@ -528,9 +527,8 @@ export default function GreenwashGuardianPage() {
 
           <Card className="rounded-[6px]">
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <span className="text-xl">🇪🇺</span> EU Legislation
-              </CardTitle>
+              <Eyebrow className="mb-1">EU</Eyebrow>
+              <CardTitle className="text-lg">Legislation</CardTitle>
             </CardHeader>
             <CardContent>
               <ul className="text-sm text-muted-foreground space-y-1">

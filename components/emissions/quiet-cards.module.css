@@ -1,0 +1,44 @@
+/*
+ * Quiet re-cut for the shared Scope 3 category cards.
+ *
+ * The cards in components/reports/ are also mounted by the company
+ * footprint report page, so they cannot be edited directly for this
+ * surface. This wrapper quietens them by CSS instead: icon medallions
+ * and decorative corner blobs disappear, card titles become mono
+ * eyebrows, and badge pills flatten to typographic chips.
+ */
+
+/* Icon medallions (the 10x10 rounded boxes heading each card). */
+.quiet :global(.h-10.w-10) {
+  display: none;
+}
+
+/* Decorative pastel corner blobs. */
+.quiet :global(.absolute.rounded-full) {
+  display: none;
+}
+
+/* Card titles read as mono eyebrows in the room accent. */
+.quiet :global(h3) {
+  font-family: var(--font-data), Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgb(var(--room-accent-rgb, 26 27 29));
+}
+
+/* Badge pills flatten to typographic state chips: no background, no
+   border, small bold mono. The word is enough. */
+.quiet :global(.inline-flex.items-center.rounded-full.border) {
+  background: transparent;
+  border-color: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-family: var(--font-data), Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #6f6f68;
+}

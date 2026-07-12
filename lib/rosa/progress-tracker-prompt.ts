@@ -26,8 +26,8 @@ export const PROGRESS_TRACKER_NEXT_MOVE_HREFS = [
   '/suppliers/',
   '/supplier-portal/esg-assessment',
   '/admin/approvals/',
-  '/reports/sustainability/',
-  '/reports/transition-plan/',
+  '/reports/sustainability',
+  '/reports/sustainability?tab=transition-plan',
   '/agent/',
   '/rosa/',
 ] as const

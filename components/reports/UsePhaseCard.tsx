@@ -1,8 +1,8 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Zap, Info } from "lucide-react";
+import { StateChip } from "@/components/studio";
 import Link from "next/link";
 
 interface UsePhaseCardProps {
@@ -31,11 +31,11 @@ export function UsePhaseCard({
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
-                <Zap className="h-5 w-5 text-slate-400 dark:text-slate-500" />
+              <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                <Zap className="h-5 w-5 text-studio-dim" />
               </div>
               <div>
-                <CardTitle className="text-lg text-slate-500 dark:text-slate-400">
+                <CardTitle className="text-lg text-studio-dim">
                   Use of Products
                 </CardTitle>
                 <CardDescription>Category 11: Customer use phase</CardDescription>
@@ -44,7 +44,7 @@ export function UsePhaseCard({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-700">
+          <div className="p-3 rounded-lg bg-secondary border border-dashed border-studio-hairline">
             <div className="flex items-start gap-2">
               <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
               <p className="text-xs text-muted-foreground">
@@ -63,21 +63,19 @@ export function UsePhaseCard({
   }
 
   return (
-    <Card className="border-green-200 dark:border-green-900">
+    <Card className="border-studio-hairline">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-              <Zap className="h-5 w-5 text-green-600 dark:text-green-400" />
+            <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+              <Zap className="h-5 w-5 text-room-accent" />
             </div>
             <div>
               <CardTitle className="text-lg">Use of Products</CardTitle>
               <CardDescription>Category 11: Customer use phase</CardDescription>
             </div>
           </div>
-          <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 text-xs">
-            Tier 1
-          </Badge>
+          <StateChip tone="good">Tier 1</StateChip>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">

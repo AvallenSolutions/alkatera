@@ -1,12 +1,17 @@
 'use client'
 
+/**
+ * Upgrade opportunities, cut quiet. The page supplies the section eyebrow;
+ * this renders the duplicate and unclassified notices, then the upgrade
+ * prompts as hairline rows. The old duplicate "Data Quality Score" card is
+ * gone: the page's single quality meter says it once.
+ */
+
 import { useState, useEffect, useCallback } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Progress } from '@/components/ui/progress'
-import { Loader2, TrendingUp } from 'lucide-react'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
 import { getUncertainty } from '@/lib/xero/spend-factors'
+import { Eyebrow } from '@/components/studio/eyebrow'
 import { UpgradePromptCard } from './UpgradePromptCard'
 import { EnergyUpgradeForm } from './EnergyUpgradeForm'
 import { TravelUpgradeForm } from './TravelUpgradeForm'
@@ -126,47 +131,24 @@ export function ActionCentre() {
   }, [fetchData])
 
   if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
-    )
+    return <div className="h-24 animate-pulse rounded-[6px] bg-studio-cream" aria-hidden="true" />
   }
 
   if (!hasConnection) {
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-          <TrendingUp className="h-12 w-12 text-slate-300 dark:text-slate-700 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Xero Connection</h3>
-          <p className="text-sm text-muted-foreground">
-            Connect your Xero account in Settings &gt; Integrations to start importing financial data.
-          </p>
-        </CardContent>
-      </Card>
+      <p className="text-sm text-muted-foreground">
+        Connect your Xero account in Settings &gt; Integrations to start importing financial data.
+      </p>
     )
   }
 
   if (categories.length === 0) {
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-          <TrendingUp className="h-12 w-12 text-slate-300 dark:text-slate-700 mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Transactions Synced</h3>
-          <p className="text-sm text-muted-foreground">
-            Sync your Xero data from Settings &gt; Integrations, then map your accounts to emission categories.
-          </p>
-        </CardContent>
-      </Card>
+      <p className="text-sm text-muted-foreground">
+        No transactions synced yet. Sync your Xero data, then map your accounts to emission categories.
+      </p>
     )
   }
-
-  // Calculate overall data quality
-  const totalTransactions = categories.reduce((sum, c) => sum + c.transaction_count, 0)
-  const totalUpgraded = categories.reduce((sum, c) => sum + c.upgraded_count, 0)
-  const qualityPercent = totalTransactions > 0 ? Math.round((totalUpgraded / totalTransactions) * 100) : 0
 
   const pendingCategories = categories.filter(c => c.pending_count > 0)
   const upgradedCategories = categories.filter(c => c.pending_count === 0 && c.upgraded_count > 0)
@@ -203,40 +185,17 @@ export function ActionCentre() {
 
   return (
     <div className="space-y-6">
-      {/* Duplicate detection banner */}
+      {/* Duplicate detection notice */}
       <DuplicateWarningBanner onDismissed={fetchData} />
 
-      {/* Data quality score */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            Data Quality Score
-          </CardTitle>
-          <CardDescription>
-            {qualityPercent}% of your classified transactions have been upgraded to activity-based data.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Progress value={qualityPercent} className="h-3" />
-          <div className="flex justify-between text-xs text-muted-foreground mt-2">
-            <span>{totalUpgraded} upgraded</span>
-            <span>{totalTransactions - totalUpgraded} remaining</span>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Unclassified transactions alert */}
+      {/* Unclassified transactions notice */}
       {currentOrganization && (
         <UnclassifiedAlertBanner organizationId={currentOrganization.id} />
       )}
 
-      {/* Pending upgrades */}
+      {/* Pending upgrades: the section eyebrow above says it; just the rows. */}
       {pendingCategories.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            Upgrade Opportunities
-          </h3>
+        <div>
           {pendingCategories.map(category => (
             <UpgradePromptCard
               key={category.emission_category}
@@ -256,12 +215,16 @@ export function ActionCentre() {
         </div>
       )}
 
+      {pendingCategories.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          Nothing waiting. Every upgradeable category has been dealt with.
+        </p>
+      )}
+
       {/* Already upgraded */}
       {upgradedCategories.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            Upgraded
-          </h3>
+        <div>
+          <Eyebrow tone="dim" className="mb-1">UPGRADED</Eyebrow>
           {upgradedCategories.map(category => (
             <UpgradePromptCard
               key={category.emission_category}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -32,6 +33,14 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error: authError } = await adminClient.auth.getUser(token);
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // The service-role client bypasses RLS, so verify the caller belongs to (or
+    // advises) a legitimate organisation before returning privileged supplier
+    // data. resolveAccessibleOrg honours read-only advisor access grants.
+    const organizationId = await resolveAccessibleOrg(adminClient as any, user);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation' }, { status: 403 });
     }
 
     const body = await request.json();

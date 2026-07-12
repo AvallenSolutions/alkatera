@@ -3,8 +3,15 @@
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import type { MaterialityTopic } from '@/lib/materiality/topic-library'
-import { CATEGORY_COLOURS, getTopicMaterialityScore } from '@/lib/materiality/topic-library'
+import { getTopicMaterialityScore } from '@/lib/materiality/topic-library'
 import { ChevronUp, ChevronDown, Star } from 'lucide-react'
+
+// Short mono tag per ESG category — replaces the old inline CATEGORY_COLOURS dot.
+const CATEGORY_TAG: Record<MaterialityTopic['category'], string> = {
+  environmental: 'ENV',
+  social: 'SOC',
+  governance: 'GOV',
+}
 
 interface PriorityConfirmationProps {
   /** All material topics (status === 'material') with scores set */
@@ -70,7 +77,6 @@ export function PriorityConfirmation({ materialTopics, priorityOrder, onChange }
         <div className="space-y-2">
           {orderedTopics.map((topic, index) => {
             const score = getTopicMaterialityScore(topic)
-            const colour = CATEGORY_COLOURS[topic.category]
             const isExpanded = expanded === topic.id
 
             return (
@@ -78,14 +84,14 @@ export function PriorityConfirmation({ materialTopics, priorityOrder, onChange }
                 key={topic.id}
                 className={cn(
                   'rounded-[6px] border bg-card transition-all',
-                  index < 5 ? 'border-[#2B46C0]/40' : 'border-border',
+                  index < 5 ? 'border-room-accent/40' : 'border-studio-hairline',
                 )}
               >
                 <div className="flex items-center gap-3 p-3">
                   {/* Rank badge */}
                   <div className={cn(
                     'w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0',
-                    index < 3 ? 'bg-[#2B46C0] text-[#F2F1EA]' : 'bg-muted text-muted-foreground',
+                    index < 3 ? 'bg-room text-room-on' : 'bg-muted text-muted-foreground',
                   )}>
                     {index + 1}
                   </div>
@@ -93,7 +99,7 @@ export function PriorityConfirmation({ materialTopics, priorityOrder, onChange }
                   {/* Topic info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: colour }} />
+                      <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-studio-dim flex-shrink-0">{CATEGORY_TAG[topic.category]}</span>
                       <span className="text-sm font-medium truncate">{topic.name}</span>
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5">
@@ -127,7 +133,7 @@ export function PriorityConfirmation({ materialTopics, priorityOrder, onChange }
                     </button>
                     <button
                       onClick={() => removeFromPriority(topic.id)}
-                      className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-[#BE123C]"
+                      className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-studio-stale"
                       title="Remove from priority list"
                     >
                       ×
@@ -158,12 +164,12 @@ export function PriorityConfirmation({ materialTopics, priorityOrder, onChange }
           </h4>
           <div className="space-y-1.5">
             {remainingTopics.map(topic => (
-              <div key={topic.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-border bg-muted/30">
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: CATEGORY_COLOURS[topic.category] }} />
+              <div key={topic.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-studio-hairline bg-muted/30">
+                <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-studio-dim flex-shrink-0">{CATEGORY_TAG[topic.category]}</span>
                 <span className="text-sm text-muted-foreground flex-1">{topic.name}</span>
                 <button
                   onClick={() => addToPriority(topic.id)}
-                  className="text-xs text-muted-foreground hover:text-[#2B46C0] flex items-center gap-1"
+                  className="text-xs text-muted-foreground hover:text-room-accent flex items-center gap-1"
                 >
                   <Star className="w-3 h-3" />
                   Add to priority

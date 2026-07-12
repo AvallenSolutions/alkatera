@@ -1,29 +1,25 @@
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+/**
+ * The orchard impact overview, re-cut for the studio: a hairline
+ * figures row instead of icon stat cards, cream hairline panels with
+ * dim mono eyebrows instead of icon-headed cards, and studio inks on
+ * the source bar. All figures and their maths are unchanged.
+ */
+
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import {
-  TreePine,
-  Droplets,
-  Wheat,
-  Info,
-  Fuel,
-  Bug,
-  Sprout,
-  FlaskConical,
-  Zap,
-  AlertTriangle,
-  Truck,
-} from 'lucide-react';
 import { ORCHARD_PESTICIDE_TYPE_LABELS } from '@/lib/orchard-utils';
 import type { OrchardImpactResult, OrchardGrowingProfile } from '@/lib/types/orchard';
+import { Panel } from '@/components/studio/panel';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { BigNumber } from '@/components/studio/big-number';
 import { StateChip } from '@/components/studio/state-chip';
+import { STUDIO } from '@/components/studio/theme';
 
 interface OrchardImpactOverviewProps {
   impacts: OrchardImpactResult | null;
@@ -67,13 +63,10 @@ function fmtSci(n: number): string {
 export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOverviewProps) {
   if (!impacts || !profile) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <TreePine className="h-10 w-10 text-muted-foreground/40 mb-3" />
-        <p className="text-muted-foreground">
-          No growing profile data available for this harvest.
-        </p>
-        <p className="text-sm text-muted-foreground/70 mt-1">
-          Complete the growing questionnaire to see environmental impacts.
+      <div className="pt-2">
+        <p className="text-sm text-muted-foreground">
+          No growing data for this harvest yet. Complete the growing questionnaire to see its
+          environmental impact.
         </p>
       </div>
     );
@@ -95,167 +88,114 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
   const totalForBar = fertAndN2o + fuelEmissions + irrigationEmissions + pesticideEmissions + transportEmissions;
 
   const segments = [
-    { label: 'Fertiliser & N₂O', value: fertAndN2o, colour: '#f59e0b' },
-    { label: 'Fuel', value: fuelEmissions, colour: '#ef4444' },
-    { label: 'Irrigation', value: irrigationEmissions, colour: '#3b82f6' },
-    { label: 'Pesticides', value: pesticideEmissions, colour: '#8b5cf6' },
-    { label: 'Transport', value: transportEmissions, colour: '#14b8a6' },
+    { label: 'Fertiliser & N₂O', value: fertAndN2o, colour: STUDIO.ochre },
+    { label: 'Fuel', value: fuelEmissions, colour: STUDIO.brick },
+    { label: 'Irrigation', value: irrigationEmissions, colour: STUDIO.cobalt },
+    { label: 'Pesticides', value: pesticideEmissions, colour: STUDIO.plum },
+    { label: 'Transport', value: transportEmissions, colour: STUDIO.teal },
   ].filter((s) => s.value > 0);
 
   return (
     <div className="space-y-6">
-      {/* Headline metric cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <MetricCard
-          label="Emissions/ha"
-          value={fmt(emissionsPerHa)}
-          unit="kg CO₂e"
-          icon={<TreePine className="h-5 w-5 text-studio-good" />}
-          bgClass="bg-secondary"
-        />
-        <MetricCard
-          label="Water/ha"
-          value={fmt(waterPerHa)}
-          unit="m³"
-          icon={<Droplets className="h-5 w-5 text-studio-dim" />}
-          bgClass="bg-secondary"
-        />
-        <MetricCard
-          label="Removals/ha"
-          value={fmt(removalsPerHa)}
-          unit="kg CO₂e"
-          icon={<TreePine className="h-5 w-5 text-studio-forest" />}
-          bgClass="bg-secondary"
-        />
-        <MetricCard
-          label="Yield"
-          value={fmt(yieldPerHa, 1)}
-          unit="t/ha"
-          icon={<Wheat className="h-5 w-5 text-studio-attention" />}
-          bgClass="bg-secondary"
-        />
+      {/* The figures row: the harvest on one hairline. */}
+      <div className="flex flex-wrap gap-x-12 gap-y-5 border-y border-studio-hairline py-5">
+        <BigNumber label="Emissions / ha · kg CO₂e" value={fmt(emissionsPerHa)} />
+        <BigNumber label="Water / ha · m³" value={fmt(waterPerHa)} />
+        <BigNumber label="Removals / ha · kg CO₂e" value={fmt(removalsPerHa)} />
+        <BigNumber label="Yield · t/ha" value={fmt(yieldPerHa, 1)} />
       </div>
 
       {/* Emission source breakdown bar */}
       {totalForBar > 0 && (
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-semibold">Emission Sources</h4>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <Info className="h-4 w-4 text-muted-foreground" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="max-w-xs text-xs">
-                      Breakdown of orchard emissions by source. Fertiliser includes both
-                      production (Scope 3) and field N₂O emissions (FLAG).
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <div className="h-6 rounded-full overflow-hidden flex">
-              {segments.map((seg) => {
-                const pct = (seg.value / totalForBar) * 100;
-                return (
-                  <TooltipProvider key={seg.label}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div
-                          className="h-full transition-all"
-                          style={{
-                            width: `${pct}%`,
-                            backgroundColor: seg.colour,
-                            minWidth: pct > 0 ? '4px' : '0',
-                          }}
-                        />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-xs">
-                          {seg.label}: {fmt(seg.value)} kg CO₂e ({pct.toFixed(0)}%)
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                );
-              })}
-            </div>
-            <div className="flex flex-wrap gap-4 mt-3">
-              {segments.map((seg) => (
-                <div key={seg.label} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <div
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: seg.colour }}
-                  />
-                  {seg.label}: {fmt(seg.value)} kg
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <Panel>
+          <Eyebrow tone="dim">EMISSION SOURCES</Eyebrow>
+          <div className="mt-3 flex h-5 overflow-hidden rounded-[3px]">
+            {segments.map((seg) => {
+              const pct = (seg.value / totalForBar) * 100;
+              return (
+                <TooltipProvider key={seg.label}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div
+                        className="h-full transition-all"
+                        style={{
+                          width: `${pct}%`,
+                          backgroundColor: seg.colour,
+                          minWidth: pct > 0 ? '4px' : '0',
+                        }}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">
+                        {seg.label}: {fmt(seg.value)} kg CO₂e ({pct.toFixed(0)}%)
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              );
+            })}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-4">
+            {segments.map((seg) => (
+              <div key={seg.label} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <div
+                  className="h-2 w-2 rounded-[2px]"
+                  style={{ backgroundColor: seg.colour }}
+                />
+                {seg.label}: {fmt(seg.value)} kg
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Fertiliser includes both production (Scope 3) and field N₂O emissions (FLAG).
+          </p>
+        </Panel>
       )}
 
-      {/* Detailed breakdown cards (2 columns) */}
+      {/* Detailed breakdown panels (2 columns) */}
       <div className="grid md:grid-cols-2 gap-4">
 
         {/* FLAG N2O Breakdown */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <FlaskConical className="h-4 w-4 text-studio-attention" />
-              FLAG Emissions (N₂O + dLUC)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
+        <Panel>
+          <Eyebrow tone="dim" className="mb-3">FLAG EMISSIONS (N₂O + DLUC)</Eyebrow>
+          <div className="space-y-2">
             <DetailRow label="Direct N₂O (fertiliser)" value={`${fmt(impacts.flag_emissions.n2o_direct_co2e)} kg CO₂e`} />
             <DetailRow label="Indirect N₂O (volatilisation + leaching)" value={`${fmt(impacts.flag_emissions.n2o_indirect_co2e)} kg CO₂e`} />
             <DetailRow label="Crop residue N₂O (tree prunings)" value={`${fmt(impacts.flag_emissions.n2o_crop_residue_co2e)} kg CO₂e`} />
             {impacts.flag_emissions.luc_co2e > 0 && (
               <DetailRow label="Land use change (dLUC)" value={`${fmt(impacts.flag_emissions.luc_co2e)} kg CO₂e`} />
             )}
-            <div className="border-t pt-2 mt-2">
+            <div className="border-t border-studio-hairline pt-2 mt-2">
               <DetailRow label="Total FLAG emissions" value={`${fmt(impacts.flag_emissions.total_flag_co2e)} kg CO₂e`} bold />
             </div>
             <DetailRow label="Actual N₂O mass" value={`${impacts.n2o_kg.toFixed(3)} kg`} muted />
             <DetailRow label="Land occupation" value={`${fmt(impacts.flag_emissions.land_use_m2)} m²`} muted />
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
 
         {/* Non-FLAG Emissions */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Zap className="h-4 w-4 text-studio-dim" />
-              Energy & Industrial Emissions
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
+        <Panel>
+          <Eyebrow tone="dim" className="mb-3">ENERGY & INDUSTRIAL EMISSIONS</Eyebrow>
+          <div className="space-y-2">
             <DetailRow label="Fertiliser production" value={`${fmt(impacts.non_flag_emissions.fertiliser_production_co2e)} kg CO₂e`} />
             <DetailRow label="Machinery fuel" value={`${fmt(impacts.non_flag_emissions.machinery_fuel_co2e)} kg CO₂e`} />
             <DetailRow label="Irrigation energy" value={`${fmt(impacts.non_flag_emissions.irrigation_energy_co2e)} kg CO₂e`} />
             <DetailRow label="Pesticide production" value={`${fmt(impacts.non_flag_emissions.pesticide_production_co2e)} kg CO₂e`} />
             <DetailRow label="Transport to facility" value={`${fmt(impacts.non_flag_emissions.transport_co2e)} kg CO₂e`} />
-            <div className="border-t pt-2 mt-2">
+            <div className="border-t border-studio-hairline pt-2 mt-2">
               <DetailRow label="Total non-FLAG emissions" value={`${fmt(impacts.non_flag_emissions.total_non_flag_co2e)} kg CO₂e`} bold />
             </div>
             <DetailRow label="Fossil CO₂" value={`${impacts.co2_fossil_kg.toFixed(1)} kg`} muted />
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
 
         {/* Water & Scarcity */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Droplets className="h-4 w-4 text-studio-dim" />
-              Water Impact
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
+        <Panel>
+          <Eyebrow tone="dim" className="mb-3">WATER IMPACT</Eyebrow>
+          <div className="space-y-2">
             <DetailRow label="Blue water consumption" value={`${fmt(impacts.water_m3)} m³`} />
             <DetailRow label="Per hectare" value={`${fmt(waterPerHa)} m³/ha`} muted />
-            <div className="border-t pt-2 mt-2">
+            <div className="border-t border-studio-hairline pt-2 mt-2">
               <DetailRow label="AWARE scarcity-weighted" value={`${fmt(impacts.water_scarcity_m3_eq)} m³ eq`} bold />
               <DetailRow label="Per hectare (scarcity-weighted)" value={`${fmt(scarcityPerHa)} m³ eq/ha`} muted />
             </div>
@@ -270,18 +210,13 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
             {!profile.is_irrigated && (
               <p className="text-xs text-muted-foreground italic">Rainfed orchard (no irrigation)</p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
 
         {/* Ecotoxicity & Environmental Quality */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Bug className="h-4 w-4 text-studio-dim" />
-              Ecotoxicity & Environmental Quality
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
+        <Panel>
+          <Eyebrow tone="dim" className="mb-3">ECOTOXICITY & ENVIRONMENTAL QUALITY</Eyebrow>
+          <div className="space-y-2">
             <DetailRow label="Freshwater ecotoxicity" value={`${fmt(impacts.freshwater_ecotoxicity)} CTUe`} />
             <DetailRow label="Terrestrial ecotoxicity" value={`${fmt(impacts.terrestrial_ecotoxicity)} CTUe`} />
             <DetailRow label="Human toxicity (non-carc.)" value={`${fmtSci(impacts.human_toxicity_non_carcinogenic)} CTUh`} />
@@ -303,21 +238,16 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
                 ({profile.herbicide_applications_per_year} applications/yr)
               </p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
 
         {/* Soil Carbon & Removals */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <TreePine className="h-4 w-4 text-studio-forest" />
-              Soil Carbon & Removals (FLAG)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
+        <Panel>
+          <Eyebrow tone="dim" className="mb-3">SOIL CARBON & REMOVALS (FLAG)</Eyebrow>
+          <div className="space-y-2">
             <DetailRow label="Total soil carbon removals" value={`${fmt(impacts.total_removals)} kg CO₂e`} bold />
             <DetailRow label="Per hectare" value={`${fmt(removalsPerHa)} kg CO₂e/ha`} muted />
-            <div className="border-t pt-2 mt-2">
+            <div className="border-t border-studio-hairline pt-2 mt-2">
               <DetailRow label="Soil management" value={SOIL_LABELS[profile.soil_management] || profile.soil_management} />
               <DetailRow
                 label="Methodology"
@@ -328,29 +258,21 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
               )}
             </div>
             {impacts.flag_removals.removals_warning && (
-              <div className="flex items-start gap-2 mt-2 p-2 rounded-md bg-secondary border border-border">
-                <AlertTriangle className="h-3.5 w-3.5 text-studio-attention shrink-0 mt-0.5" />
-                <p className="text-xs text-studio-attention">
-                  {impacts.flag_removals.removals_warning}
-                </p>
-              </div>
+              <p className="mt-2 text-xs text-studio-attention">
+                {impacts.flag_removals.removals_warning}
+              </p>
             )}
             <p className="text-xs text-muted-foreground mt-2">
               Removals are reported separately from emissions per SBTi FLAG Guidance v1.2 and the GHG Protocol Land Sector and Removals Standard V1.0. They are never netted against the emissions total.
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
 
         {/* TNFD Location & Nature */}
         {(profile.ecosystem_type || profile.in_biodiversity_sensitive_area || profile.water_stress_index) && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <TreePine className="h-4 w-4 text-studio-forest" />
-                Location & Nature (TNFD)
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
+          <Panel>
+            <Eyebrow tone="dim" className="mb-3">LOCATION & NATURE (TNFD)</Eyebrow>
+            <div className="space-y-2">
               {profile.ecosystem_type && (
                 <DetailRow label="Ecosystem type" value={profile.ecosystem_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} />
               )}
@@ -362,28 +284,21 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
                 <DetailRow label="Designation" value={profile.sensitive_area_details} muted />
               )}
               {profile.in_biodiversity_sensitive_area && (
-                <div className="rounded-md border border-border bg-secondary p-2 mt-1">
-                  <p className="text-xs text-studio-attention">
-                    Enhanced TNFD and CSRD ESRS E4 disclosure required for operations in or adjacent to sensitive areas.
-                  </p>
-                </div>
+                <p className="mt-1 text-xs text-studio-attention">
+                  Enhanced TNFD and CSRD ESRS E4 disclosure required for operations in or adjacent to sensitive areas.
+                </p>
               )}
               {profile.water_stress_index && (
                 <DetailRow label="Water stress" value={profile.water_stress_index.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} />
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
         )}
 
         {/* Growing Profile Summary */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Sprout className="h-4 w-4 text-studio-forest" />
-              Growing Profile Inputs
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
+        <Panel>
+          <Eyebrow tone="dim" className="mb-3">GROWING PROFILE INPUTS</Eyebrow>
+          <div className="space-y-2">
             <DetailRow label="Area" value={`${fmt(profile.area_ha, 2)} ha`} />
             <DetailRow label="Fruit yield" value={`${fmt(profile.fruit_yield_tonnes, 1)} t (${fmt(yieldPerHa, 1)} t/ha)`} />
             <DetailRow label="Fertiliser" value={FERTILISER_LABELS[profile.fertiliser_type] || profile.fertiliser_type} />
@@ -393,51 +308,37 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
                 <DetailRow label="Nitrogen content" value={`${profile.fertiliser_n_content_percent}%`} muted />
               </>
             )}
-            <div className="border-t pt-2 mt-2">
+            <div className="border-t border-studio-hairline pt-2 mt-2">
               <DetailRow label="Diesel" value={`${fmt(profile.diesel_litres_per_year)} L/yr (${fmt(profile.diesel_litres_per_year / areaHa)} L/ha)`} />
               <DetailRow label="Petrol" value={`${fmt(profile.petrol_litres_per_year)} L/yr (${fmt(profile.petrol_litres_per_year / areaHa)} L/ha)`} />
             </div>
             {profile.is_irrigated && (
-              <div className="border-t pt-2 mt-2">
+              <div className="border-t border-studio-hairline pt-2 mt-2">
                 <DetailRow label="Irrigation" value={`${fmt(profile.water_m3_per_ha)} m³/ha`} />
                 <DetailRow label="Energy source" value={profile.irrigation_energy_source.replace(/_/g, ' ')} muted />
               </div>
             )}
             {profile.transport_distance_km != null && profile.transport_distance_km > 0 && (
-              <div className="border-t pt-2 mt-2">
+              <div className="border-t border-studio-hairline pt-2 mt-2">
                 <DetailRow label="Transport distance" value={`${fmt(profile.transport_distance_km)} km`} />
                 <DetailRow label="Transport mode" value={profile.transport_mode === 'rail' ? 'Rail' : 'Road (HGV)'} muted />
               </div>
             )}
             <DetailRow label="Pruning residue returned" value={profile.pruning_residue_returned ? 'Yes' : 'No'} muted />
-          </CardContent>
-        </Card>
+          </div>
+        </Panel>
       </div>
 
       {/* Normalised per-kg metrics */}
-      <Card>
-        <CardContent className="pt-4 pb-4">
-          <h4 className="text-sm font-semibold mb-3">Per-Kilogram Metrics (farm gate)</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-            <div>
-              <p className="text-lg font-bold">{impacts.total_emissions_per_kg.toFixed(3)}</p>
-              <p className="text-xs text-muted-foreground">kg CO₂e/kg fruit</p>
-            </div>
-            <div>
-              <p className="text-lg font-bold text-studio-forest">{impacts.removals_per_kg.toFixed(3)}</p>
-              <p className="text-xs text-muted-foreground">kg CO₂e removed/kg</p>
-            </div>
-            <div>
-              <p className="text-lg font-bold">{(impacts.water_m3 / (profile.fruit_yield_tonnes * 1000)).toFixed(3)}</p>
-              <p className="text-xs text-muted-foreground">m³ water/kg fruit</p>
-            </div>
-            <div>
-              <p className="text-lg font-bold">{(impacts.freshwater_ecotoxicity / (profile.fruit_yield_tonnes * 1000)).toFixed(1)}</p>
-              <p className="text-xs text-muted-foreground">CTUe/kg fruit</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <Panel>
+        <Eyebrow tone="dim">PER KILOGRAM (FARM GATE)</Eyebrow>
+        <div className="mt-4 flex flex-wrap gap-x-12 gap-y-5">
+          <BigNumber label="kg CO₂e / kg fruit" value={impacts.total_emissions_per_kg.toFixed(3)} />
+          <BigNumber label="kg CO₂e removed / kg" value={impacts.removals_per_kg.toFixed(3)} />
+          <BigNumber label="m³ water / kg fruit" value={(impacts.water_m3 / (profile.fruit_yield_tonnes * 1000)).toFixed(3)} />
+          <BigNumber label="CTUe / kg fruit" value={(impacts.freshwater_ecotoxicity / (profile.fruit_yield_tonnes * 1000)).toFixed(1)} />
+        </div>
+      </Panel>
 
       {/* Data quality and methodology */}
       <div className="flex items-center gap-3 flex-wrap">
@@ -451,10 +352,9 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger>
-              <Badge variant="outline" className="cursor-help">
-                <Info className="h-3 w-3 mr-1" />
+              <span className="cursor-help font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground underline decoration-dotted underline-offset-4">
                 Methodology
-              </Badge>
+              </span>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="max-w-md">
               <p className="text-xs whitespace-pre-wrap">{impacts.methodology_notes}</p>
@@ -467,35 +367,6 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
 }
 
 // Sub-components
-
-function MetricCard({
-  label,
-  value,
-  unit,
-  icon,
-  bgClass,
-}: {
-  label: string;
-  value: string;
-  unit: string;
-  icon: React.ReactNode;
-  bgClass: string;
-}) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-3">
-          <div className={`rounded-lg p-2 ${bgClass}`}>{icon}</div>
-          <div>
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="text-xl font-bold">{value}</p>
-            <p className="text-xs text-muted-foreground">{unit}</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 function DetailRow({
   label,

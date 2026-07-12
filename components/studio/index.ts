@@ -18,6 +18,8 @@ export { PosterBlock } from './poster-block';
 export { Mark } from './mark';
 export { StateChip } from './state-chip';
 export { FactRow } from './fact-row';
+export { FactList } from './fact-list';
+export type { FactRowItem } from './fact-list';
 export { StageBar } from './stage-bar';
 export type { StageSegment } from './stage-bar';
 export { PillButton } from './pill-button';

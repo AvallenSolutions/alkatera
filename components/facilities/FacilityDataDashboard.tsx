@@ -12,7 +12,6 @@
  */
 
 import { useMemo, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -31,7 +30,8 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import { TrendingDown, TrendingUp, Minus, LayoutGrid, BarChart3 } from 'lucide-react';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { BigNumber } from '@/components/studio/big-number';
 import { UTILITY_TYPES, WATER_CATEGORIES, WASTE_CATEGORIES } from '@/lib/constants/utility-types';
 
 interface UtilityEntryLike {
@@ -307,42 +307,28 @@ export function FacilityDataDashboard({
 
   if (allSeries.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <LayoutGrid className="h-5 w-5" />
-            Data Overview
-          </CardTitle>
-          <CardDescription>Last 12 months of utility, water and waste data at a glance</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            <p>No data recorded yet</p>
-            <p className="text-sm mt-1">Upload a utility bill or add entries in the Data Entry tab to see your coverage here</p>
-          </div>
-        </CardContent>
-      </Card>
+      <section>
+        <Eyebrow className="mb-1">Data coverage</Eyebrow>
+        <p className="py-4 text-sm text-studio-dim">
+          No data recorded yet. Upload a bill or add entries in the data entry tab to see coverage here.
+        </p>
+      </section>
     );
   }
 
   const groups: SeriesData['group'][] = ['Energy & Fuel', 'Water', 'Waste'];
-  const TrendIcon = stats?.trend.direction === 'up' ? TrendingUp : stats?.trend.direction === 'down' ? TrendingDown : Minus;
-  const trendColour = stats?.trend.direction === 'down' ? 'text-studio-good' : stats?.trend.direction === 'up' ? 'text-studio-attention' : 'text-muted-foreground';
+  const trendTone =
+    stats?.trend.direction === 'down' ? 'good' : stats?.trend.direction === 'up' ? 'attention' : 'ink';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       {/* Coverage grid */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <LayoutGrid className="h-5 w-5" />
-            Data Coverage
-          </CardTitle>
-          <CardDescription>
-            Last 12 months of recorded data. Amber cells are months with no data, so you can see exactly where the gaps are.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <section>
+        <Eyebrow className="mb-1">Data coverage</Eyebrow>
+        <p className="mb-4 max-w-3xl text-xs text-muted-foreground">
+          Last 12 months of recorded data. Amber cells are months with no data, so you can see exactly where the gaps are.
+        </p>
+        <div>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-xs">
               <thead>
@@ -363,7 +349,7 @@ export function FacilityDataDashboard({
                   if (groupSeries.length === 0) return null;
                   return [
                     <tr key={`${group}-header`}>
-                      <td colSpan={months.length + 2} className="pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      <td colSpan={months.length + 2} className="pt-4 pb-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
                         {group}
                       </td>
                     </tr>,
@@ -375,7 +361,7 @@ export function FacilityDataDashboard({
                             <button
                               type="button"
                               onClick={() => setSelectedKey(s.key)}
-                              className={`text-left hover:text-primary transition-colors ${selected?.key === s.key ? 'text-primary font-medium' : ''}`}
+                              className={`text-left transition-colors hover:text-room-accent ${selected?.key === s.key ? 'font-medium text-room-accent' : ''}`}
                               title="Show in trend chart"
                             >
                               {s.label}
@@ -464,66 +450,59 @@ export function FacilityDataDashboard({
               <span>Before tracking started</span>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       {/* Trend chart */}
       {selected && stats && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  12-Month Trend
-                </CardTitle>
-                <CardDescription>Monthly consumption with multi-month bills spread across the months they cover</CardDescription>
-              </div>
-              <Select value={selected.key} onValueChange={setSelectedKey}>
-                <SelectTrigger className="w-[260px]">
-                  <SelectValue placeholder="Select data series" />
-                </SelectTrigger>
-                <SelectContent>
-                  {groups.map(group => {
-                    const groupSeries = allSeries.filter(s => s.group === group);
-                    if (groupSeries.length === 0) return null;
-                    return groupSeries.map(s => (
-                      <SelectItem key={s.key} value={s.key}>
-                        {group}: {s.label}
-                      </SelectItem>
-                    ));
-                  })}
-                </SelectContent>
-              </Select>
+        <section className="border-t border-border pt-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <Eyebrow className="mb-1">The 12-month trend</Eyebrow>
+              <p className="text-xs text-muted-foreground">
+                Monthly consumption, with multi-month bills spread across the months they cover.
+              </p>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-              <div>
-                <p className="text-xs text-muted-foreground">Total (12 months)</p>
-                <p className="text-lg font-semibold tabular-nums">
-                  {stats.total.toLocaleString('en-GB', { maximumFractionDigits: 0 })} <span className="text-xs font-normal text-muted-foreground">{selected.unit}</span>
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Monthly average</p>
-                <p className="text-lg font-semibold tabular-nums">
-                  {stats.average.toLocaleString('en-GB', { maximumFractionDigits: 0 })} <span className="text-xs font-normal text-muted-foreground">{selected.unit}</span>
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Trend (last 3 months)</p>
-                <p className={`text-lg font-semibold flex items-center gap-1 ${trendColour}`}>
-                  <TrendIcon className="h-4 w-4" />
-                  {stats.trend.percentage > 0 ? `${stats.trend.percentage.toFixed(1)}%` : 'Stable'}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Months with data</p>
-                <p className="text-lg font-semibold tabular-nums">
-                  {stats.coveredCount}<span className="text-xs font-normal text-muted-foreground">/{stats.trackedCount || 12}</span>
-                </p>
-              </div>
+            <Select value={selected.key} onValueChange={setSelectedKey}>
+              <SelectTrigger className="w-[260px]">
+                <SelectValue placeholder="Select data series" />
+              </SelectTrigger>
+              <SelectContent>
+                {groups.map(group => {
+                  const groupSeries = allSeries.filter(s => s.group === group);
+                  if (groupSeries.length === 0) return null;
+                  return groupSeries.map(s => (
+                    <SelectItem key={s.key} value={s.key}>
+                      {group}: {s.label}
+                    </SelectItem>
+                  ));
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <div className="my-6 flex flex-wrap gap-x-12 gap-y-6 border-y border-border py-4">
+              <BigNumber
+                value={stats.total.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+                label={`12-month total · ${selected.unit || 'units'}`}
+              />
+              <BigNumber
+                value={stats.average.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+                label={`Monthly average · ${selected.unit || 'units'}`}
+              />
+              <BigNumber
+                value={
+                  stats.trend.percentage > 0
+                    ? `${stats.trend.direction === 'up' ? '+' : '-'}${stats.trend.percentage.toFixed(1)}%`
+                    : 'Stable'
+                }
+                tone={trendTone}
+                label="Trend · last 3 months"
+              />
+              <BigNumber
+                value={`${stats.coveredCount}/${stats.trackedCount || 12}`}
+                label="Months with data"
+              />
             </div>
 
             <ResponsiveContainer width="100%" height={280}>
@@ -586,8 +565,8 @@ export function FacilityDataDashboard({
                 Some entries use a different unit and are excluded from the totals above (they still count towards coverage).
               </p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       )}
     </div>
   );

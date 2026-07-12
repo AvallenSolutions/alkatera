@@ -1,27 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/page-loader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Leaf,
-  Box,
-  Info,
-  Plus,
-  Sparkles,
-  Upload,
-  Wine,
-  Copy,
-  BookmarkPlus,
-  Wand2,
-  ShieldQuestion,
-} from "lucide-react";
 import { useOrganization } from "@/lib/organizationContext";
 import { toast } from "sonner";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { StateChip } from "@/components/studio/state-chip";
+import { PillButton } from "@/components/studio/pill-button";
 import { IngredientFormCard } from "@/components/products/IngredientFormCard";
 import { PackagingFormCard } from "@/components/products/PackagingFormCard";
 import { BOMImportFlow } from "@/components/products/BOMImportFlow";
@@ -56,6 +43,13 @@ import type { IngredientFormData } from "@/components/products/IngredientFormCar
 import type { PackagingFormData } from "@/components/products/PackagingFormCard";
 import type { MaturationFormData } from "@/components/products/MaturationProfileCard";
 import { unitSizeToMl } from "@/lib/constants/material-units";
+
+/** Quiet mono tab trigger: uppercase, tracked, 3px underline when active. */
+const MONO_TAB =
+  "relative -mb-px rounded-none border-b-[3px] border-transparent bg-transparent px-0 pb-2.5 pt-1 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim shadow-none transition-colors data-[state=active]:border-room-accent data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none";
+
+const MONO_TAB_LIST =
+  "h-auto w-full justify-start gap-6 overflow-x-auto rounded-none border-b border-border bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 
 interface RecipeEditorPanelProps {
   productId: string;
@@ -432,19 +426,13 @@ export function RecipeEditorPanel({
 
       {compact && (
         <div className="flex items-center justify-between gap-2 pb-2">
-          <Badge variant={totalItems > 0 ? "default" : "secondary"} className="bg-green-600">
-            {totalItems} {totalItems === 1 ? 'Item' : 'Items'}
-          </Badge>
+          <StateChip tone={totalItems > 0 ? "good" : "quiet"}>
+            {totalItems} {totalItems === 1 ? 'item' : 'items'}
+          </StateChip>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowBOMImport(true)}
-              className="bg-green-600 hover:bg-green-700 text-white border-green-600"
-            >
-              <Upload className="h-3 w-3 mr-1" />
+            <PillButton variant="outline" size="sm" onClick={() => setShowBOMImport(true)}>
               Import BOM
-            </Button>
+            </PillButton>
           </div>
         </div>
       )}
@@ -461,39 +449,28 @@ export function RecipeEditorPanel({
         }
         onValueChange={setActiveTab}
       >
-        <TabsList className={showMaturationTab ? "grid w-full grid-cols-3" : "grid w-full grid-cols-2"}>
-          <TabsTrigger value="ingredients" className="flex items-center gap-2">
-            <Leaf className="h-4 w-4 pointer-events-none" />
-            <span>Ingredients ({ingredientCount})</span>
+        <TabsList className={MONO_TAB_LIST}>
+          <TabsTrigger value="ingredients" className={MONO_TAB}>
+            Ingredients ({ingredientCount})
           </TabsTrigger>
-          <TabsTrigger value="packaging" className="flex items-center gap-2">
-            <Box className="h-4 w-4 pointer-events-none" />
-            <span>Packaging ({packagingCount})</span>
+          <TabsTrigger value="packaging" className={MONO_TAB}>
+            Packaging ({packagingCount})
           </TabsTrigger>
           {showMaturationTab && (
-            <TabsTrigger value="maturation" className="flex items-center gap-2">
-              <Wine className="h-4 w-4 pointer-events-none" />
-              <span>Maturation</span>
-              {hasMaturationProfile && <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">1</Badge>}
+            <TabsTrigger value="maturation" className={MONO_TAB}>
+              Maturation{hasMaturationProfile ? " (1)" : ""}
             </TabsTrigger>
           )}
         </TabsList>
 
 
         <TabsContent value="ingredients" className="space-y-4">
-          <Card className={compact ? "" : "border-l-4 border-l-green-500"}>
+          <Card>
             <CardHeader className={compact ? "py-3 px-4" : undefined}>
-              <div className="flex items-start gap-3">
-                <div className={`${compact ? 'h-8 w-8' : 'h-10 w-10'} rounded-lg bg-green-500 flex items-center justify-center flex-shrink-0`}>
-                  <Leaf className={`${compact ? 'h-4 w-4' : 'h-5 w-5'} text-white`} />
-                </div>
-                <div className="flex-1">
-                  <CardTitle className={compact ? "text-base" : undefined}>Recipe & Ingredients</CardTitle>
-                  <CardDescription>
-                    Build your product recipe with environmental impact data
-                  </CardDescription>
-                </div>
-              </div>
+              <Eyebrow>Recipe &amp; ingredients</Eyebrow>
+              <CardDescription className="mt-1.5">
+                Build your product recipe with environmental impact data
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <RecipeModePicker
@@ -531,77 +508,69 @@ export function RecipeEditorPanel({
               />
 
               {ingredientForms.filter(f => f.match_status === 'auto_matched').length > 0 && (
-                <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 py-2">
-                  <ShieldQuestion className="h-4 w-4 text-amber-600" />
-                  <AlertDescription className="text-xs text-amber-800 dark:text-amber-300">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[6px] border border-studio-attention/40 bg-card px-4 py-3 text-xs">
+                  <StateChip tone="attention">Check matches</StateChip>
+                  <span className="flex-1 min-w-[12rem] text-foreground">
                     {ingredientForms.filter(f => f.match_status === 'auto_matched').length} item{ingredientForms.filter(f => f.match_status === 'auto_matched').length > 1 ? 's were' : ' was'} matched
                     automatically and {ingredientForms.filter(f => f.match_status === 'auto_matched').length > 1 ? 'are' : 'is'} already used in calculations.
-                    Please check each one and click &quot;Looks right&quot; to confirm.
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="ml-2 h-6 px-2 text-[11px] border-amber-400 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40"
-                      onClick={() => setShowReviewMatches(true)}
-                    >
-                      Review all
-                    </Button>
-                  </AlertDescription>
-                </Alert>
+                    Please check each one and confirm it looks right.
+                  </span>
+                  <PillButton
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowReviewMatches(true)}
+                  >
+                    Review all
+                  </PillButton>
+                </div>
               )}
 
               {duplicateIngredients.length > 0 && (
-                <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 py-2">
-                  <Info className="h-4 w-4 text-amber-600" />
-                  <AlertDescription className="text-xs text-amber-800 dark:text-amber-300">
+                <div className="flex items-center gap-3 rounded-[6px] border border-studio-attention/40 bg-card px-4 py-3 text-xs">
+                  <StateChip tone="attention">Duplicate</StateChip>
+                  <span className="text-foreground">
                     {duplicateIngredients.join(', ')} appear{duplicateIngredients.length === 1 ? 's' : ''} more than once.
                     If that&apos;s not deliberate, remove the duplicate so it isn&apos;t counted twice.
-                  </AlertDescription>
-                </Alert>
+                  </span>
+                </div>
               )}
 
               {recipeMassWarning && recipeScaleMode === 'per_unit' && (
-                <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 py-2">
-                  <Info className="h-4 w-4 text-amber-600" />
-                  <AlertDescription className="text-xs text-amber-800 dark:text-amber-300">
-                    {recipeMassWarning}
-                  </AlertDescription>
-                </Alert>
+                <div className="flex items-center gap-3 rounded-[6px] border border-studio-attention/40 bg-card px-4 py-3 text-xs">
+                  <StateChip tone="attention">Check total</StateChip>
+                  <span className="text-foreground">{recipeMassWarning}</span>
+                </div>
               )}
 
               {/* Guided ingredient starter: editing a plausible recipe beats
                   authoring from a blank tab. Prominent when empty. */}
               {ingredientForms.every(f => !f.name && !f.amount) ? (
-                <Card className="p-5 border-dashed bg-muted/30">
+                <div className="rounded-[6px] border border-dashed border-border bg-card p-5">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                     <div className="flex-1">
-                      <h4 className="font-medium flex items-center gap-2">
-                        <Wand2 className="h-4 w-4 text-primary" />
-                        Start from a typical recipe
-                      </h4>
-                      <p className="text-sm text-muted-foreground mt-1">
+                      <Eyebrow tone="dim">Start from a typical recipe</Eyebrow>
+                      <p className="text-sm text-muted-foreground mt-1.5">
                         We add the usual ingredients for your drink style with matching
                         emission factors. You just adjust the amounts.
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      <Button type="button" onClick={() => setShowRecipeStarter(true)}>
-                        <Wand2 className="h-4 w-4 mr-2" />
+                      <PillButton type="button" variant="outline" onClick={() => setShowRecipeStarter(true)}>
                         Pick a style
-                      </Button>
+                      </PillButton>
                     </div>
                   </div>
-                </Card>
+                </div>
               ) : (
-                <Button
+                <PillButton
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   onClick={() => setShowRecipeStarter(true)}
                 >
-                  <Wand2 className="h-4 w-4 mr-2" />
                   Add from a typical recipe
-                </Button>
+                </PillButton>
               )}
 
               <IngredientComposer
@@ -662,24 +631,25 @@ export function RecipeEditorPanel({
                 onStepChange={setTourStep}
               />
 
-              <div className="flex items-center gap-2 pt-4 border-t">
-                <Button
+              <div className="flex items-center gap-3 pt-4 border-t border-border">
+                <PillButton
                   type="button"
+                  variant="room"
                   onClick={handleSaveIngredients}
                   disabled={saving}
                   className="flex-1"
                   data-tour-anchor="save"
                 >
-                  {saving ? 'Saving...' : 'Save Ingredients'}
-                </Button>
-                <Button type="button" variant="outline" onClick={fetchProductData} disabled={saving}>
+                  {saving ? 'Saving…' : 'Save ingredients'}
+                </PillButton>
+                <PillButton type="button" variant="ghost" onClick={fetchProductData} disabled={saving}>
                   Cancel
-                </Button>
+                </PillButton>
                 {autoSaving && (
-                  <span className="text-xs text-muted-foreground animate-pulse">Autosaving...</span>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">Autosaving…</span>
                 )}
                 {!autoSaving && lastSavedAt && (
-                  <span className="text-xs text-muted-foreground">All changes saved</span>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">All changes saved</span>
                 )}
               </div>
             </CardContent>
@@ -687,19 +657,12 @@ export function RecipeEditorPanel({
         </TabsContent>
 
         <TabsContent value="packaging" className="space-y-4">
-          <Card className={compact ? "" : "border-l-4 border-l-green-500"}>
+          <Card>
             <CardHeader className={compact ? "py-3 px-4" : undefined}>
-              <div className="flex items-start gap-3">
-                <div className={`${compact ? 'h-8 w-8' : 'h-10 w-10'} rounded-lg bg-green-500 flex items-center justify-center flex-shrink-0`}>
-                  <Box className={`${compact ? 'h-4 w-4' : 'h-5 w-5'} text-white`} />
-                </div>
-                <div className="flex-1">
-                  <CardTitle className={compact ? "text-base" : undefined}>Packaging Materials</CardTitle>
-                  <CardDescription>
-                    Define your packaging materials with environmental impact data
-                  </CardDescription>
-                </div>
-              </div>
+              <Eyebrow>Packaging materials</Eyebrow>
+              <CardDescription className="mt-1.5">
+                Define your packaging materials with environmental impact data
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <RecipeToolbar
@@ -724,59 +687,53 @@ export function RecipeEditorPanel({
                   the product has no packaging yet, available as a quiet button
                   otherwise. */}
               {packagingCount === 0 ? (
-                <Card className="p-5 border-dashed bg-muted/30">
+                <div className="rounded-[6px] border border-dashed border-border bg-card p-5">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                     <div className="flex-1">
-                      <h4 className="font-medium flex items-center gap-2">
-                        <Wand2 className="h-4 w-4 text-primary" />
-                        Set up packaging step by step
-                      </h4>
-                      <p className="text-sm text-muted-foreground mt-1">
+                      <Eyebrow tone="dim">Set up packaging step by step</Eyebrow>
+                      <p className="text-sm text-muted-foreground mt-1.5">
                         Answer a few questions like &quot;can or bottle?&quot; and &quot;what does it weigh?&quot;
                         and we will build the list with matching emission factors for you.
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      <Button type="button" onClick={() => setShowPackagingWizard(true)}>
-                        <Wand2 className="h-4 w-4 mr-2" />
+                      <PillButton type="button" variant="outline" onClick={() => setShowPackagingWizard(true)}>
                         Guided setup
-                      </Button>
-                      <Button type="button" variant="outline" onClick={addPackaging}>
+                      </PillButton>
+                      <PillButton type="button" variant="ghost" onClick={addPackaging}>
                         Add manually
-                      </Button>
+                      </PillButton>
                     </div>
                   </div>
-                </Card>
+                </div>
               ) : (
-                <Button
+                <PillButton
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   onClick={() => setShowPackagingWizard(true)}
                 >
-                  <Wand2 className="h-4 w-4 mr-2" />
                   Add packaging with guided setup
-                </Button>
+                </PillButton>
               )}
 
               {packagingForms.filter(f => f.match_status === 'auto_matched').length > 0 && (
-                <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 py-2">
-                  <ShieldQuestion className="h-4 w-4 text-amber-600" />
-                  <AlertDescription className="text-xs text-amber-800 dark:text-amber-300">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[6px] border border-studio-attention/40 bg-card px-4 py-3 text-xs">
+                  <StateChip tone="attention">Check matches</StateChip>
+                  <span className="flex-1 min-w-[12rem] text-foreground">
                     {packagingForms.filter(f => f.match_status === 'auto_matched').length} item{packagingForms.filter(f => f.match_status === 'auto_matched').length > 1 ? 's were' : ' was'} matched
                     automatically and {packagingForms.filter(f => f.match_status === 'auto_matched').length > 1 ? 'are' : 'is'} already used in calculations.
-                    Please check each one and click &quot;Looks right&quot; to confirm.
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="ml-2 h-6 px-2 text-[11px] border-amber-400 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40"
-                      onClick={() => setShowReviewMatches(true)}
-                    >
-                      Review all
-                    </Button>
-                  </AlertDescription>
-                </Alert>
+                    Please check each one and confirm it looks right.
+                  </span>
+                  <PillButton
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowReviewMatches(true)}
+                  >
+                    Review all
+                  </PillButton>
+                </div>
               )}
 
               {showPackagingChecklist && (
@@ -811,23 +768,24 @@ export function RecipeEditorPanel({
                 ))}
               </div>
 
-              <div className="flex items-center gap-2 pt-4 border-t">
-                <Button
+              <div className="flex items-center gap-3 pt-4 border-t border-border">
+                <PillButton
                   type="button"
+                  variant="room"
                   onClick={handleSavePackaging}
                   disabled={saving}
                   className="flex-1"
                 >
-                  {saving ? 'Saving...' : 'Save Packaging'}
-                </Button>
-                <Button type="button" variant="outline" onClick={fetchProductData} disabled={saving}>
+                  {saving ? 'Saving…' : 'Save packaging'}
+                </PillButton>
+                <PillButton type="button" variant="ghost" onClick={fetchProductData} disabled={saving}>
                   Cancel
-                </Button>
+                </PillButton>
                 {autoSaving && (
-                  <span className="text-xs text-muted-foreground animate-pulse">Autosaving...</span>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">Autosaving…</span>
                 )}
                 {!autoSaving && lastSavedAt && (
-                  <span className="text-xs text-muted-foreground">All changes saved</span>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">All changes saved</span>
                 )}
               </div>
             </CardContent>

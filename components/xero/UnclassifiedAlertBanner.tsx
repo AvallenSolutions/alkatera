@@ -1,11 +1,15 @@
 'use client'
 
+/**
+ * The unclassified-transactions notice as a quiet hairline row with an
+ * attention-tone chip and mono actions, not an amber banner. Same query
+ * and dismissal behaviour as before.
+ */
+
 import { useState, useEffect, useRef } from 'react'
-import { AlertTriangle, X, Settings, Sparkles } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { supabase } from '@/lib/supabaseClient'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabaseClient'
+import { StateChip } from '@/components/studio/state-chip'
 
 interface UnclassifiedAlertBannerProps {
   organizationId: string
@@ -62,54 +66,40 @@ export function UnclassifiedAlertBanner({ organizationId }: UnclassifiedAlertBan
   }
 
   return (
-    <div className="rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-4">
-      <div className="flex items-start gap-2">
-        <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-100">
-              {count} {count === 1 ? 'transaction needs' : 'transactions need'} classification
-            </h4>
-            <Badge variant="outline" className="text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700 text-xs">
-              Unclassified
-            </Badge>
-          </div>
-          <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
-            These transactions couldn&apos;t be automatically classified. Map your Xero accounts or use AI classification to categorise them.
-          </p>
-          <div className="flex items-center gap-2 mt-3">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs"
-              asChild
-            >
-              <Link href="/settings?tab=integrations">
-                <Settings className="h-3 w-3 mr-1" />
-                Map Accounts
-              </Link>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs"
-              asChild
-            >
-              <a href="#ai-classification">
-                <Sparkles className="h-3 w-3 mr-1" />
-                Classify with AI
-              </a>
-            </Button>
-          </div>
+    <div className="border-b border-studio-hairline py-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
+        <div className="flex min-w-0 items-baseline gap-2">
+          <span className="font-display text-sm font-semibold text-foreground">
+            {count} {count === 1 ? 'transaction needs' : 'transactions need'} classification
+          </span>
+          <StateChip tone="attention">UNCLASSIFIED</StateChip>
         </div>
-        <button
-          onClick={handleDismiss}
-          className="shrink-0 rounded-md p-1 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors"
-          aria-label="Dismiss"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        <div className="flex shrink-0 items-baseline gap-4">
+          <Link
+            href="/settings?tab=integrations"
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent transition-opacity hover:opacity-70"
+          >
+            Map accounts
+          </Link>
+          <a
+            href="#ai-classification"
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent transition-opacity hover:opacity-70"
+          >
+            Classify with AI
+          </a>
+          <button
+            onClick={handleDismiss}
+            className="font-mono text-xs text-studio-dim transition-colors hover:text-foreground"
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        </div>
       </div>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        These transactions couldn&apos;t be automatically classified. Map your Xero accounts or use
+        AI classification to categorise them.
+      </p>
     </div>
   )
 }

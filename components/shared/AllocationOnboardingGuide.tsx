@@ -1,25 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Progress } from "@/components/ui/progress";
-import {
-  AlertCircle,
-  Building2,
-  Calendar,
-  CheckCircle2,
-  ChevronRight,
-  Factory,
-  Link as LinkIcon,
-  Package,
-  PlayCircle,
-  X,
-} from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { Panel } from "@/components/studio/panel";
+import { PillButton } from "@/components/studio/pill-button";
+import { StateChip } from "@/components/studio/state-chip";
 
 interface AllocationOnboardingGuideProps {
   organizationId: string;
@@ -31,7 +19,6 @@ interface OnboardingStep {
   title: string;
   description: string;
   completed: boolean;
-  icon: any;
   action: {
     label: string;
     href: string;
@@ -95,61 +82,56 @@ export function AllocationOnboardingGuide({
       const onboardingSteps: OnboardingStep[] = [
         {
           id: "facilities",
-          title: "Add Your Facilities",
+          title: "Add your facilities",
           description:
-            "Start by adding the facilities where you manufacture your products (owned sites or contract manufacturers)",
+            "Start with the sites where your products are made, owned or contract manufactured",
           completed: hasFacilities,
-          icon: Building2,
           action: {
-            label: "Add Facilities",
+            label: "Add facilities",
             href: "/company/facilities",
           },
         },
         {
           id: "products",
-          title: "Create Products",
+          title: "Create products",
           description:
-            "Add the products you manufacture with their ingredients and packaging specifications",
+            "Add the products you make, with their ingredients and packaging",
           completed: hasProducts,
-          icon: Package,
           action: {
-            label: "Add Products",
+            label: "Add products",
             href: "/products/new",
           },
         },
         {
           id: "assignments",
-          title: "Link Facilities & Products",
+          title: "Link facilities and products",
           description:
-            "Define which products are manufactured at which facilities using the allocation matrix",
+            "Set which products are made at which facilities in the matrix",
           completed: hasAssignments,
-          icon: LinkIcon,
           action: {
-            label: "Set Up Assignments",
+            label: "Set up assignments",
             href: "/company/facilities",
           },
         },
         {
           id: "reporting",
-          title: "Set Up Reporting Periods",
+          title: "Set up reporting periods",
           description:
-            "Define reporting periods for each facility and log their emissions, water, and waste data",
+            "Define reporting periods for each facility and log emissions, water and waste",
           completed: hasProduction,
-          icon: Calendar,
           action: {
-            label: "Configure Periods",
+            label: "Configure periods",
             href: "/company/facilities",
           },
         },
         {
           id: "allocations",
-          title: "Allocate Emissions",
+          title: "Allocate emissions",
           description:
-            "Allocate facility emissions to products based on production volumes and attribution ratios",
+            "Share facility emissions across products by production volume",
           completed: hasAllocations,
-          icon: Factory,
           action: {
-            label: "Start Allocating",
+            label: "Start allocating",
             href: "/company/facilities",
           },
         },
@@ -165,218 +147,100 @@ export function AllocationOnboardingGuide({
 
   const completedSteps = steps.filter((s) => s.completed).length;
   const totalSteps = steps.length;
-  const progress = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
   const isComplete = completedSteps === totalSteps;
 
   if (loading) {
     return null;
   }
 
-  if (isComplete && !expanded) {
+  // Nothing to say once the setup is done.
+  if (isComplete) {
     return null;
   }
 
   if (!expanded) {
     return (
-      <Card className="bg-gradient-to-r from-lime-500/10 to-green-500/10 border-lime-500/30">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <PlayCircle className="h-5 w-5 text-lime-400" />
-              <div>
-                <p className="text-sm font-medium text-white">Allocation Setup</p>
-                <p className="text-xs text-slate-400">
-                  {completedSteps}/{totalSteps} steps complete
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setExpanded(true)}
-              className="text-lime-400"
-            >
-              Show Guide
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-between border-y border-studio-hairline py-3">
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+          Allocation setup · {completedSteps} of {totalSteps} steps
+        </span>
+        <PillButton variant="ghost" size="sm" onClick={() => setExpanded(true)}>
+          Show the steps
+        </PillButton>
+      </div>
     );
   }
 
   return (
-    <Card className="bg-gradient-to-br from-lime-500/5 via-green-500/5 to-lime-500/5 border-lime-500/30">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-white flex items-center gap-2">
-              <PlayCircle className="h-5 w-5 text-lime-400" />
-              {isComplete
-                ? "Setup Complete!"
-                : "Get Started with Production Allocation"}
-            </CardTitle>
-            <CardDescription>
-              {isComplete
-                ? "You've completed all setup steps. You're ready to track and allocate emissions!"
-                : "Follow these steps to set up your production allocation workflow"}
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            {!isComplete && (
-              <Badge className="bg-lime-500/20 text-lime-300 border-lime-500/50">
-                {completedSteps}/{totalSteps} Complete
-              </Badge>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setExpanded(false);
-                onDismiss?.();
-              }}
-              className="text-slate-400 hover:text-white"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+    <Panel>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <Eyebrow>GETTING SET UP · {completedSteps} OF {totalSteps} STEPS</Eyebrow>
+          <p className="mt-1.5 text-sm text-studio-dim">
+            Five steps stand between here and allocated emissions.
+          </p>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Progress Bar */}
-        {!isComplete && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-400">Overall Progress</span>
-              <span className="font-medium text-white">{Math.round(progress)}%</span>
-            </div>
-            <Progress value={progress} className="h-2" />
-          </div>
-        )}
+        <PillButton
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setExpanded(false);
+            onDismiss?.();
+          }}
+        >
+          Hide
+        </PillButton>
+      </div>
 
-        {isComplete ? (
-          <Alert className="bg-green-500/10 border-green-500/20">
-            <CheckCircle2 className="h-4 w-4 text-green-400" />
-            <AlertDescription className="text-green-200">
-              <div className="space-y-2">
-                <p className="font-medium">You&apos;re all set!</p>
-                <p className="text-sm">
-                  Your allocation workflow is configured. You can now:
-                </p>
-                <ul className="text-sm space-y-1 ml-4 mt-2">
-                  <li>• View allocation status in the matrix</li>
-                  <li>• Track emissions flow in the Sankey diagram</li>
-                  <li>• Monitor data quality and temporal alignment</li>
-                  <li>• Generate allocation reports</li>
-                </ul>
-              </div>
-            </AlertDescription>
-          </Alert>
-        ) : (
-          <div className="space-y-3">
-            {steps.map((step, index) => {
-              const StepIcon = step.icon;
-              const isNextStep = !step.completed && steps.slice(0, index).every((s) => s.completed);
+      <ul className="mt-4 divide-y divide-studio-hairline">
+        {steps.map((step, index) => {
+          const isNextStep = !step.completed && steps.slice(0, index).every((s) => s.completed);
 
-              return (
-                <div
-                  key={step.id}
-                  className={`
-                    p-4 rounded-lg border transition-all
-                    ${
-                      step.completed
-                        ? "bg-green-500/5 border-green-500/30"
-                        : isNextStep
-                        ? "bg-lime-500/10 border-lime-500/50 shadow-lg"
-                        : "bg-slate-800/30 border-slate-700"
-                    }
-                  `}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3 flex-1">
-                      <div
-                        className={`
-                        h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0
-                        ${
-                          step.completed
-                            ? "bg-green-500/20"
-                            : isNextStep
-                            ? "bg-lime-500/20"
-                            : "bg-slate-700/50"
-                        }
-                      `}
-                      >
-                        {step.completed ? (
-                          <CheckCircle2 className="h-5 w-5 text-green-400" />
-                        ) : (
-                          <StepIcon
-                            className={`h-5 w-5 ${
-                              isNextStep ? "text-lime-400" : "text-slate-400"
-                            }`}
-                          />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4
-                            className={`font-medium ${
-                              step.completed
-                                ? "text-green-300"
-                                : isNextStep
-                                ? "text-lime-300"
-                                : "text-white"
-                            }`}
-                          >
-                            {step.title}
-                          </h4>
-                          {isNextStep && (
-                            <Badge className="bg-lime-500/20 text-lime-300 text-xs">
-                              Next
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-slate-400">{step.description}</p>
-                      </div>
-                    </div>
-                    {!step.completed && (
-                      <Button
-                        variant={isNextStep ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => router.push(step.action.href)}
-                        className={
-                          isNextStep
-                            ? "bg-lime-500 hover:bg-lime-600 text-black"
-                            : "border-slate-600 text-slate-300"
-                        }
-                      >
-                        {step.action.label}
-                        <ChevronRight className="ml-2 h-4 w-4" />
-                      </Button>
+          return (
+            <li key={step.id} className="flex items-center gap-4 py-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline gap-3">
+                  <span
+                    className={cn(
+                      "font-display text-sm font-semibold",
+                      step.completed ? "text-studio-dim line-through" : "text-foreground"
                     )}
-                  </div>
+                  >
+                    {step.title}
+                  </span>
+                  {step.completed ? (
+                    <StateChip tone="good">Done</StateChip>
+                  ) : isNextStep ? (
+                    <StateChip tone="attention">Next</StateChip>
+                  ) : null}
                 </div>
-              );
-            })}
-          </div>
-        )}
+                <p className="mt-0.5 text-xs text-studio-dim">{step.description}</p>
+              </div>
+              {!step.completed && (
+                <PillButton
+                  variant={isNextStep ? "ink" : "ghost"}
+                  size="sm"
+                  onClick={() => router.push(step.action.href)}
+                >
+                  {step.action.label}
+                </PillButton>
+              )}
+            </li>
+          );
+        })}
+      </ul>
 
-        {/* Help Text */}
-        {!isComplete && (
-          <Alert className="bg-blue-500/10 border-blue-500/20">
-            <AlertCircle className="h-4 w-4 text-blue-400" />
-            <AlertDescription className="text-blue-200 text-sm">
-              Need help? Check out our{" "}
-              <button
-                onClick={() => router.push("/knowledge-bank")}
-                className="underline hover:text-blue-100"
-              >
-                Knowledge Bank
-              </button>{" "}
-              for detailed guides and best practices.
-            </AlertDescription>
-          </Alert>
-        )}
-      </CardContent>
-    </Card>
+      <p className="mt-4 text-xs text-studio-dim">
+        Stuck? The{" "}
+        <button
+          type="button"
+          onClick={() => router.push("/knowledge-bank")}
+          className="underline underline-offset-2 hover:text-foreground"
+        >
+          knowledge bank
+        </button>{" "}
+        has step-by-step guides.
+      </p>
+    </Panel>
   );
 }

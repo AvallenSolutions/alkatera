@@ -13,7 +13,7 @@ export function ActionItemsWidget() {
       priority: 'high' as const,
       status: 'pending' as const,
       dueDate: 'This week',
-      href: '/operations',
+      href: '/company/facilities',
     },
     {
       id: 2,

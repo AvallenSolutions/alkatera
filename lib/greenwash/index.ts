@@ -6,6 +6,7 @@ import type {
   CreateAssessmentInput,
   InputType,
 } from '../types/greenwash';
+import type { WorkingTone } from '@/components/studio/theme';
 
 // ============================================================================
 // Fetch Assessments (via API route)
@@ -125,7 +126,7 @@ export async function triggerAnalysis(
       await supabase
         .from('greenwash_assessments')
         .update({
-          status: 'error',
+          status: 'failed',
           error_message: err instanceof Error ? err.message : 'Analysis request failed',
           updated_at: new Date().toISOString(),
         })
@@ -275,16 +276,21 @@ export async function fetchSocialMediaContent(url: string): Promise<string> {
 // Helper Functions
 // ============================================================================
 
-export function getRiskLevelColor(level: string): string {
+/**
+ * The one risk-to-working-tone mapping for the guardian.
+ * low is good, medium wants attention, high reads stale (the taxonomy in
+ * lib/types/greenwash.ts). Anything unknown stays quiet.
+ */
+export function riskTone(level: string | null): WorkingTone {
   switch (level) {
     case 'high':
-      return 'red';
+      return 'stale';
     case 'medium':
-      return 'amber';
+      return 'attention';
     case 'low':
-      return 'green';
+      return 'good';
     default:
-      return 'gray';
+      return 'quiet';
   }
 }
 

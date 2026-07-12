@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Eyebrow, Panel } from '@/components/studio'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
@@ -61,33 +61,31 @@ export function DataPrivacySettings() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Your data</CardTitle>
-          <CardDescription>
+      <Panel className="space-y-4">
+        <div className="space-y-1">
+          <Eyebrow tone="dim">Your data</Eyebrow>
+          <p className="text-sm text-studio-dim">
             Download a copy of the personal data we hold about you (your right of access).
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button variant="outline" onClick={handleExport} disabled={exporting}>
-            <Download className="mr-2 h-4 w-4" />
-            {exporting ? 'Preparing your data' : 'Download my data'}
-          </Button>
-        </CardContent>
-      </Card>
+          </p>
+        </div>
+        <Button variant="outline" onClick={handleExport} disabled={exporting}>
+          <Download className="mr-2 h-4 w-4" />
+          {exporting ? 'Preparing your data' : 'Download my data'}
+        </Button>
+      </Panel>
 
-      <Card className="border-studio-stale/30">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-studio-stale">
-            <AlertTriangle className="h-5 w-5" />
-            Delete my account
-          </CardTitle>
-          <CardDescription>
+      <Panel className="space-y-4 border-studio-stale/30">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-studio-stale" />
+            <Eyebrow tone="inherit" className="text-studio-stale">Delete my account</Eyebrow>
+          </div>
+          <p className="text-sm text-studio-dim">
             Permanently delete your account and personal data. Your organisation&apos;s records are
             retained. This cannot be undone.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div>
           {!confirmOpen ? (
             <Button
               variant="outline"
@@ -127,8 +125,8 @@ export function DataPrivacySettings() {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     </div>
   )
 }

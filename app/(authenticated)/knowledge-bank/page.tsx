@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Plus, Star, TrendingUp, Clock } from 'lucide-react'
+import { Plus, Star, Clock } from 'lucide-react'
 import { Eyebrow } from '@/components/studio/eyebrow'
 import { BigNumber } from '@/components/studio/big-number'
+import { Panel } from '@/components/studio/panel'
+import { FactRow } from '@/components/studio/fact-row'
 import {
   useKnowledgeBankCategories,
   useKnowledgeBankItems,
@@ -81,7 +81,7 @@ export default function KnowledgeBankPage() {
     <div className="space-y-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <Eyebrow className="mb-3">THE EVIDENCE · KNOWLEDGE</Eyebrow>
+          <Eyebrow className="mb-3">THE LIBRARY · KNOWLEDGE</Eyebrow>
           <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
             The knowledge.
           </h1>
@@ -98,18 +98,14 @@ export default function KnowledgeBankPage() {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-1 rounded-[6px]">
-          <CardHeader>
-            <CardTitle className="text-lg">Quick Stats</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-8">
-              <BigNumber value={items.length} label="TOTAL RESOURCES" />
-              <BigNumber value={categories.length} label="CATEGORIES" />
-              <BigNumber value={favoriteItems.length} label="FAVOURITES" />
-            </div>
-          </CardContent>
-        </Card>
+        <div className="lg:col-span-1">
+          <Eyebrow tone="dim" className="mb-4">QUICK STATS</Eyebrow>
+          <div className="flex flex-wrap gap-8">
+            <BigNumber value={items.length} label="TOTAL RESOURCES" />
+            <BigNumber value={categories.length} label="CATEGORIES" />
+            <BigNumber value={favoriteItems.length} label="FAVOURITES" />
+          </div>
+        </div>
 
         <div className="lg:col-span-2 space-y-6">
           <RecentActivity
@@ -133,20 +129,9 @@ export default function KnowledgeBankPage() {
       <div>
         <Eyebrow tone="dim" className="mb-4">BROWSE BY CATEGORY</Eyebrow>
         {categoriesLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" aria-busy="true">
             {[...Array(6)].map((_, i) => (
-              <Card key={i} className="rounded-[6px]">
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-4">
-                    <Skeleton className="h-14 w-14 rounded-[6px]" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-5 w-full" />
-                      <Skeleton className="h-4 w-3/4" />
-                      <Skeleton className="h-6 w-12" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <div key={i} className="h-32 animate-pulse rounded-[6px] bg-studio-hairline/40" />
             ))}
           </div>
         ) : (
@@ -166,28 +151,19 @@ export default function KnowledgeBankPage() {
           />
 
           {itemsLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" aria-busy="true">
               {[...Array(6)].map((_, i) => (
-                <Card key={i} className="rounded-[6px]">
-                  <CardContent className="p-6 space-y-4">
-                    <Skeleton className="h-12 w-12 rounded-[6px]" />
-                    <Skeleton className="h-5 w-full" />
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-4 w-1/2" />
-                  </CardContent>
-                </Card>
+                <div key={i} className="h-44 animate-pulse rounded-[6px] bg-studio-hairline/40" />
               ))}
             </div>
           ) : filteredItems.length === 0 ? (
-            <Card className="rounded-[6px]">
-              <CardContent className="py-12 text-center">
-                <p className="text-muted-foreground">
-                  {searchQuery || categoryFilter || contentTypeFilter
-                    ? 'No resources found matching your criteria'
-                    : 'No resources available yet'}
-                </p>
-              </CardContent>
-            </Card>
+            <Panel>
+              <p className="py-8 text-center text-sm text-studio-dim">
+                {searchQuery || categoryFilter || contentTypeFilter
+                  ? 'No resources found matching your criteria.'
+                  : 'No resources available yet.'}
+              </p>
+            </Panel>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredItems.map((item) => (
@@ -196,6 +172,16 @@ export default function KnowledgeBankPage() {
             </div>
           )}
         </div>
+      </div>
+
+      <div>
+        <Eyebrow tone="dim" className="mb-1">ALSO IN THE LIBRARY</Eyebrow>
+        <FactRow
+          subject="The wiki"
+          detail="plain-language sustainability reference"
+          meta="OPEN →"
+          href="/wiki/"
+        />
       </div>
     </div>
   )

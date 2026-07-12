@@ -1,6 +1,5 @@
 'use client';
 
-import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, Circle, ChevronRight } from 'lucide-react';
 
 interface ProgressionModel {
@@ -45,7 +44,7 @@ export function YearProgressionStepper({
             {index > 0 && (
               <ChevronRight
                 className={`h-4 w-4 mx-1 shrink-0 ${
-                  isActive ? 'text-emerald-500' : 'text-muted-foreground/40'
+                  isActive ? 'text-studio-good' : 'text-muted-foreground/40'
                 }`}
               />
             )}
@@ -56,9 +55,9 @@ export function YearProgressionStepper({
                 ${isSelected
                   ? 'border-primary bg-primary/5'
                   : isCurrent
-                    ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/10'
+                    ? 'border-studio-attention bg-studio-cream'
                     : isActive
-                      ? 'border-emerald-500/50 bg-emerald-50 dark:bg-emerald-900/10'
+                      ? 'border-studio-good/50 bg-studio-cream'
                       : 'border-muted bg-muted/30'
                 }
                 ${onYearSelect ? 'cursor-pointer hover:border-primary/70' : 'cursor-default'}
@@ -66,18 +65,18 @@ export function YearProgressionStepper({
             >
               <div className="flex items-center gap-1.5">
                 {allPassed ? (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  <CheckCircle2 className="h-4 w-4 text-studio-good" />
                 ) : isActive ? (
-                  <Circle className="h-4 w-4 text-amber-500 fill-amber-500/20" />
+                  <Circle className="h-4 w-4 text-studio-attention fill-studio-attention/20" />
                 ) : (
                   <Circle className="h-4 w-4 text-muted-foreground/40" />
                 )}
                 <span
                   className={`text-sm font-semibold ${
                     isCurrent
-                      ? 'text-amber-700 dark:text-amber-400'
+                      ? 'text-studio-attention'
                       : isActive
-                        ? 'text-emerald-700 dark:text-emerald-400'
+                        ? 'text-studio-good'
                         : 'text-muted-foreground'
                   }`}
                 >
@@ -88,12 +87,13 @@ export function YearProgressionStepper({
                 {label.replace(/^Year \d+ — /, '')}
               </span>
               {counts.total > 0 && (
-                <Badge
-                  variant={allPassed ? 'default' : 'secondary'}
-                  className={`text-xs ${allPassed ? 'bg-emerald-600' : ''}`}
+                <span
+                  className={`font-mono text-[10px] font-bold uppercase tracking-[0.18em] tabular-nums ${
+                    allPassed ? 'text-studio-good' : 'text-muted-foreground'
+                  }`}
                 >
                   {counts.passed}/{counts.total} passed
-                </Badge>
+                </span>
               )}
             </button>
           </div>

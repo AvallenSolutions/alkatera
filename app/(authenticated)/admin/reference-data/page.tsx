@@ -11,11 +11,12 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Database, Play, RefreshCw, CheckCircle2, ExternalLink } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Statement } from '@/components/studio/statement';
+import { Panel } from '@/components/studio/panel';
+import { StateChip } from '@/components/studio/state-chip';
+import { PillButton } from '@/components/studio/pill-button';
 import { useToast } from '@/hooks/use-toast';
 
 interface LoaderStatus {
@@ -104,78 +105,71 @@ export default function ReferenceDataPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
-      <div className="flex items-center gap-3">
-        <Database className="h-7 w-7" />
-        <div>
-          <h1 className="text-2xl font-semibold">Reference data</h1>
-          <p className="text-sm text-muted-foreground">
-            Load official public emission-factor datasets into the versioned factor library.
-            Once a set is loaded, corporate emissions use its factors in preference to the
-            built-in defaults, with full provenance and version history.
-          </p>
-        </div>
+      <div>
+        <Statement eyebrow="THE WIRING · ADMIN" headline="Reference data." />
+        <p className="mt-2 max-w-2xl text-sm text-studio-dim">
+          Load official public emission-factor datasets into the versioned factor library.
+          Once a set is loaded, corporate emissions use its factors in preference to the
+          built-in defaults, with full provenance and version history.
+        </p>
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p className="text-sm text-studio-stale">{error}</p>}
 
       <div className="flex justify-end">
-        <Button variant="ghost" size="sm" onClick={refresh} disabled={loading}>
-          <RefreshCw className="mr-2 h-4 w-4" />
+        <PillButton variant="ghost" size="sm" onClick={refresh} disabled={loading}>
           Refresh
-        </Button>
+        </PillButton>
       </div>
 
       {!loaders ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">Loading…</p>
       ) : loaders.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No loaders registered.</p>
+        <p className="text-sm text-studio-dim">No loaders registered.</p>
       ) : (
         <div className="space-y-4">
           {loaders.map((l) => (
-            <Card key={l.key}>
-              <CardHeader className="flex flex-row items-start justify-between space-y-0 gap-3">
+            <Panel key={l.key}>
+              <div className="mb-4 flex flex-row items-start justify-between gap-3">
                 <div className="space-y-1">
-                  <CardTitle className="text-base">{l.label}</CardTitle>
-                  <p className="text-sm text-muted-foreground">{l.description}</p>
+                  <h2 className="font-display text-base font-semibold text-foreground">{l.label}</h2>
+                  <p className="text-sm text-studio-dim">{l.description}</p>
                 </div>
                 {l.isCurrent ? (
-                  <Badge variant="secondary" className="gap-1 whitespace-nowrap">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Current
-                  </Badge>
+                  <StateChip tone="good">Current</StateChip>
                 ) : l.loaded ? (
-                  <Badge variant="outline" className="whitespace-nowrap">Superseded</Badge>
+                  <StateChip tone="stale">Superseded</StateChip>
                 ) : (
-                  <Badge variant="outline" className="whitespace-nowrap">Not loaded</Badge>
+                  <StateChip tone="quiet">Not loaded</StateChip>
                 )}
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
+              </div>
+              <div className="space-y-4">
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-studio-dim">
                   <span>Version <span className="font-medium text-foreground">{l.version}</span></span>
                   <span>Licence <span className="font-medium text-foreground">{l.licence}</span></span>
-                  <span>Factors <span className="font-medium text-foreground">{l.factorCount}</span></span>
+                  <span>Factors <span className="font-medium tabular-nums text-foreground">{l.factorCount}</span></span>
                   {l.sourceUrl && (
                     <a
                       href={l.sourceUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-primary hover:underline"
+                      className="inline-flex items-center gap-1 text-foreground underline decoration-studio-hairline underline-offset-4 hover:decoration-studio-ink"
                     >
                       Source <ExternalLink className="h-3.5 w-3.5" />
                     </a>
                   )}
                 </div>
-                <Button onClick={() => run(l.key)} disabled={running === l.key}>
-                  <Play className="mr-2 h-4 w-4" />
+                <PillButton onClick={() => run(l.key)} disabled={running === l.key}>
                   {running === l.key ? 'Starting…' : l.loaded ? 'Reload latest' : 'Load latest'}
-                </Button>
-              </CardContent>
-            </Card>
+                </PillButton>
+              </div>
+            </Panel>
           ))}
         </div>
       )}
 
-      <p className="text-xs text-muted-foreground">
-        Loads run in the background and are safe to repeat — a release refreshes in place, and
+      <p className="text-xs text-studio-dim">
+        Loads run in the background and are safe to repeat: a release refreshes in place, and
         loading a newer version supersedes the prior one while retaining it for historical
         recompute.
       </p>

@@ -1,10 +1,16 @@
 'use client'
 
+/**
+ * The duplicate-data notice as quiet hairline rows with an attention-tone
+ * chip, not an amber banner. Detection, acknowledge and dismiss behaviour
+ * are unchanged.
+ */
+
 import { useState, useEffect } from 'react'
-import { AlertTriangle, X, Check, Eye } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
+import { StateChip } from '@/components/studio/state-chip'
+import { PillButton } from '@/components/studio/pill-button'
 import {
   detectOverlaps,
   acknowledgeOverlap,
@@ -63,54 +69,47 @@ export function DuplicateWarningBanner({ onDismissed }: DuplicateWarningBannerPr
   if (isLoading || visibleOverlaps.length === 0) return null
 
   return (
-    <div className="rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-3">
-      <div className="flex items-start gap-2">
-        <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-        <div className="flex-1 min-w-0">
-          <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-100">
-            Potential duplicate data detected
-          </h4>
-          <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
-            Some Xero spend categories overlap with data you have already entered. Review below to avoid double-counting.
-          </p>
-        </div>
+    <div className="border-b border-studio-hairline pb-3">
+      <div className="flex items-baseline gap-2 py-2">
+        <span className="font-display text-sm font-semibold text-foreground">
+          Potential duplicate data detected
+        </span>
+        <StateChip tone="attention">CHECK BEFORE COUNTING</StateChip>
       </div>
+      <p className="text-xs text-muted-foreground">
+        Some Xero spend categories overlap with data you have already entered. Review below to
+        avoid double-counting.
+      </p>
 
-      <div className="space-y-2">
+      <div className="mt-2">
         {visibleOverlaps.map(overlap => (
           <div
             key={overlap.category}
-            className="flex items-start justify-between gap-3 p-2.5 rounded-md bg-white dark:bg-slate-900/50 border border-amber-200 dark:border-amber-800"
+            className="flex items-start justify-between gap-3 border-t border-studio-hairline py-2.5"
           >
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-slate-900 dark:text-slate-100">
-                {overlap.message}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Xero spend: {new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0 }).format(overlap.xeroSpend)}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-foreground">{overlap.message}</p>
+              <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.15em] text-studio-dim">
+                XERO SPEND · {new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0 }).format(overlap.xeroSpend)}
               </p>
             </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <Button
-                variant="outline"
+            <div className="flex shrink-0 items-center gap-1.5">
+              <PillButton
+                variant="ghost"
                 size="sm"
-                className="h-7 text-xs"
                 onClick={() => handleAcknowledge(overlap.category)}
                 title="Keep both - I have checked and there is no overlap"
               >
-                <Eye className="h-3 w-3 mr-1" />
                 Keep both
-              </Button>
-              <Button
+              </PillButton>
+              <PillButton
                 variant="outline"
                 size="sm"
-                className="h-7 text-xs text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"
                 onClick={() => handleDismiss(overlap.category)}
                 title="Keep your utility/manual data and dismiss the Xero spend transactions for this category"
               >
-                <X className="h-3 w-3 mr-1" />
                 Use utility data only
-              </Button>
+              </PillButton>
             </div>
           </div>
         ))}

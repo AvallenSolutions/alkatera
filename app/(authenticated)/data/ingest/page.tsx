@@ -5,7 +5,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -15,13 +14,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Statement } from '@/components/studio/statement';
+import { Panel } from '@/components/studio/panel';
+import { PillButton } from '@/components/studio/pill-button';
 import { supabase } from '@/lib/supabaseClient';
 
 const activityDataSchema = z.object({
@@ -89,7 +84,7 @@ export default function IngestActivityDataPage() {
         throw new Error(result.error || 'Failed to submit activity data');
       }
 
-      toast.success('Activity data submitted successfully');
+      toast.success('Activity data submitted');
       reset();
     } catch (error) {
       console.error('Error submitting activity data:', error);
@@ -102,100 +97,99 @@ export default function IngestActivityDataPage() {
   };
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-2xl">
-      <Card>
-        <CardHeader>
-          <CardTitle>Ingest Activity Data</CardTitle>
-          <CardDescription>
-            Submit activity data for emissions calculations across Scope 1, 2, and 3
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <div className="mx-auto max-w-2xl space-y-8">
+      <Statement eyebrow="THE WORKBENCH · INGEST" headline="One figure, straight in." />
+
+      <p className="text-sm text-studio-dim">
+        Record a single activity figure against Scope 1, 2 or 3. For invoices,
+        spreadsheets and meter data, drop the file on Rosa instead.
+      </p>
+
+      <Panel>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="name">Activity name</Label>
+            <Input
+              id="name"
+              placeholder="e.g. Monthly electricity consumption"
+              {...register('name')}
+            />
+            {errors.name && (
+              <p className="text-sm text-studio-stale">{errors.name.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="category">Scope</Label>
+            <Select
+              value={category}
+              onValueChange={(value) =>
+                setValue('category', value as 'Scope 1' | 'Scope 2' | 'Scope 3', {
+                  shouldValidate: true,
+                })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select emissions scope" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Scope 1">Scope 1</SelectItem>
+                <SelectItem value="Scope 2">Scope 2</SelectItem>
+                <SelectItem value="Scope 3">Scope 3</SelectItem>
+              </SelectContent>
+            </Select>
+            {errors.category && (
+              <p className="text-sm text-studio-stale">{errors.category.message}</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Activity Name</Label>
+              <Label htmlFor="quantity">Quantity</Label>
               <Input
-                id="name"
-                placeholder="e.g., Monthly Electricity Consumption"
-                {...register('name')}
+                id="quantity"
+                type="number"
+                step="0.01"
+                placeholder="e.g. 1500"
+                {...register('quantity')}
               />
-              {errors.name && (
-                <p className="text-sm text-red-600">{errors.name.message}</p>
+              {errors.quantity && (
+                <p className="text-sm text-studio-stale">{errors.quantity.message}</p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
-              <Select
-                value={category}
-                onValueChange={(value) =>
-                  setValue('category', value as 'Scope 1' | 'Scope 2' | 'Scope 3', {
-                    shouldValidate: true,
-                  })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select emissions scope" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Scope 1">Scope 1</SelectItem>
-                  <SelectItem value="Scope 2">Scope 2</SelectItem>
-                  <SelectItem value="Scope 3">Scope 3</SelectItem>
-                </SelectContent>
-              </Select>
-              {errors.category && (
-                <p className="text-sm text-red-600">{errors.category.message}</p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="quantity">Quantity</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  step="0.01"
-                  placeholder="e.g., 1500"
-                  {...register('quantity')}
-                />
-                {errors.quantity && (
-                  <p className="text-sm text-red-600">{errors.quantity.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="unit">Unit</Label>
-                <Input
-                  id="unit"
-                  placeholder="e.g., kWh, litres, kg"
-                  {...register('unit')}
-                />
-                {errors.unit && (
-                  <p className="text-sm text-red-600">{errors.unit.message}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="activity_date">Activity Date</Label>
+              <Label htmlFor="unit">Unit</Label>
               <Input
-                id="activity_date"
-                type="date"
-                {...register('activity_date')}
+                id="unit"
+                placeholder="e.g. kWh, litres, kg"
+                {...register('unit')}
               />
-              {errors.activity_date && (
-                <p className="text-sm text-red-600">
-                  {errors.activity_date.message}
-                </p>
+              {errors.unit && (
+                <p className="text-sm text-studio-stale">{errors.unit.message}</p>
               )}
             </div>
+          </div>
 
-            <Button type="submit" disabled={isSubmitting} className="w-full">
-              {isSubmitting ? 'Submitting...' : 'Submit Activity Data'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+          <div className="space-y-2">
+            <Label htmlFor="activity_date">Activity date</Label>
+            <Input
+              id="activity_date"
+              type="date"
+              {...register('activity_date')}
+            />
+            {errors.activity_date && (
+              <p className="text-sm text-studio-stale">
+                {errors.activity_date.message}
+              </p>
+            )}
+          </div>
+
+          <PillButton type="submit" disabled={isSubmitting} className="w-full">
+            {isSubmitting ? 'Submitting…' : 'Submit activity data'}
+          </PillButton>
+        </form>
+      </Panel>
     </div>
   );
 }

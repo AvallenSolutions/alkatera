@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useOrganization } from '@/lib/organizationContext'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
+import { Statement } from '@/components/studio'
 import { StateChip } from '@/components/studio/state-chip'
 import { ArrowLeft, Package, Layers, Truck, Building2, Receipt } from 'lucide-react'
 
@@ -103,13 +104,14 @@ export default function UnleashedSettingsPage() {
         <Button size="icon" variant="ghost" onClick={() => router.push('/settings/integrations')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
-          <h1 className="text-xl font-semibold">Unleashed</h1>
-          <p className="text-xs text-muted-foreground">
-            Synced data from your Unleashed account. Use the connection card on the integrations page to sync.
-          </p>
-        </div>
         <StateChip tone="quiet" className="ml-auto">Beta</StateChip>
+      </div>
+
+      <div className="space-y-3">
+        <Statement eyebrow="THE WIRING · INTEGRATIONS" headline="Unleashed." />
+        <p className="text-sm text-studio-dim">
+          Synced data from your Unleashed account. Use the connection card on the integrations page to sync.
+        </p>
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
@@ -122,8 +124,10 @@ export default function UnleashedSettingsPage() {
         </TabsList>
 
         {loading && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
-            Loading...
+          <div className="flex items-center justify-center py-6">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+              Loading
+            </span>
           </div>
         )}
 
@@ -132,11 +136,11 @@ export default function UnleashedSettingsPage() {
             empty="No products synced yet."
             rows={products}
             columns={[
-              { header: 'Code', cell: (r) => r.product_code ?? '—' },
-              { header: 'Description', cell: (r) => r.product_description ?? '—' },
-              { header: 'Group', cell: (r) => r.product_group ?? '—' },
-              { header: 'Brand', cell: (r) => r.brand ?? '—' },
-              { header: 'UoM', cell: (r) => r.unit_of_measure ?? '—' },
+              { header: 'Code', cell: (r) => r.product_code ?? '·' },
+              { header: 'Description', cell: (r) => r.product_description ?? '·' },
+              { header: 'Group', cell: (r) => r.product_group ?? '·' },
+              { header: 'Brand', cell: (r) => r.brand ?? '·' },
+              { header: 'UoM', cell: (r) => r.unit_of_measure ?? '·' },
               { header: 'Type', cell: (r) => r.is_assembled_product ? 'Assembly' : 'Component' },
             ]}
           />
@@ -147,8 +151,8 @@ export default function UnleashedSettingsPage() {
             empty="No Bills of Materials synced yet."
             rows={bom}
             columns={[
-              { header: 'Assembly', cell: (r) => `${r.assembly_code ?? '—'} ${r.assembly_description ? `· ${r.assembly_description}` : ''}` },
-              { header: 'Component', cell: (r) => `${r.component_code ?? '—'} ${r.component_description ? `· ${r.component_description}` : ''}` },
+              { header: 'Assembly', cell: (r) => `${r.assembly_code ?? '·'} ${r.assembly_description ? `· ${r.assembly_description}` : ''}` },
+              { header: 'Component', cell: (r) => `${r.component_code ?? '·'} ${r.component_description ? `· ${r.component_description}` : ''}` },
               { header: 'Qty', cell: (r) => `${r.quantity} ${r.unit_of_measure ?? ''}`.trim() },
             ]}
           />
@@ -159,10 +163,10 @@ export default function UnleashedSettingsPage() {
             empty="No suppliers synced yet."
             rows={suppliers}
             columns={[
-              { header: 'Code', cell: (r) => r.supplier_code ?? '—' },
+              { header: 'Code', cell: (r) => r.supplier_code ?? '·' },
               { header: 'Name', cell: (r) => r.supplier_name },
-              { header: 'Country', cell: (r) => r.country ?? '—' },
-              { header: 'Currency', cell: (r) => r.currency ?? '—' },
+              { header: 'Country', cell: (r) => r.country ?? '·' },
+              { header: 'Currency', cell: (r) => r.currency ?? '·' },
             ]}
           />
         </TabsContent>
@@ -172,10 +176,10 @@ export default function UnleashedSettingsPage() {
             empty="No warehouses synced yet."
             rows={warehouses}
             columns={[
-              { header: 'Code', cell: (r) => r.warehouse_code ?? '—' },
+              { header: 'Code', cell: (r) => r.warehouse_code ?? '·' },
               { header: 'Name', cell: (r) => `${r.warehouse_name}${r.is_default ? ' · default' : ''}` },
-              { header: 'City', cell: (r) => r.city ?? '—' },
-              { header: 'Country', cell: (r) => r.country ?? '—' },
+              { header: 'City', cell: (r) => r.city ?? '·' },
+              { header: 'Country', cell: (r) => r.country ?? '·' },
             ]}
           />
         </TabsContent>
@@ -185,12 +189,12 @@ export default function UnleashedSettingsPage() {
             empty="No purchase orders in the last 12 months."
             rows={poLines}
             columns={[
-              { header: 'Order', cell: (r) => r.order_number ?? '—' },
-              { header: 'Date', cell: (r) => r.order_date ?? '—' },
-              { header: 'Supplier', cell: (r) => r.supplier_name ?? '—' },
-              { header: 'Product', cell: (r) => `${r.product_code ?? '—'} ${r.product_description ? `· ${r.product_description}` : ''}` },
-              { header: 'Qty', cell: (r) => r.quantity ?? '—' },
-              { header: 'Total', cell: (r) => r.line_total != null ? `${r.line_total.toLocaleString()} ${r.supplier_currency ?? ''}`.trim() : '—' },
+              { header: 'Order', cell: (r) => r.order_number ?? '·' },
+              { header: 'Date', cell: (r) => r.order_date ?? '·' },
+              { header: 'Supplier', cell: (r) => r.supplier_name ?? '·' },
+              { header: 'Product', cell: (r) => `${r.product_code ?? '·'} ${r.product_description ? `· ${r.product_description}` : ''}` },
+              { header: 'Qty', cell: (r) => r.quantity ?? '·' },
+              { header: 'Total', cell: (r) => r.line_total != null ? `${r.line_total.toLocaleString()} ${r.supplier_currency ?? ''}`.trim() : '·' },
             ]}
           />
         </TabsContent>

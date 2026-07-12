@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { PillButton } from "@/components/studio/pill-button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,10 +8,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Plus,
   Copy,
   Upload,
-  MoreHorizontal,
   BookmarkPlus,
   ListChecks,
 } from "lucide-react";
@@ -44,17 +42,15 @@ export function RecipeToolbar({
   // can't do anything yet (save an empty template) don't render at all.
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Button onClick={onAdd} size="sm">
-        <Plus className="h-3.5 w-3.5 mr-1" />
+      <PillButton onClick={onAdd} size="sm">
         {primaryAddLabel}
-      </Button>
+      </PillButton>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm">
+          <PillButton variant="outline" size="sm">
             More
-            <MoreHorizontal className="h-3.5 w-3.5 ml-1" />
-          </Button>
+          </PillButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
           <DropdownMenuItem onClick={onApplyTemplate}>

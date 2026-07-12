@@ -41,7 +41,7 @@ export function TargetSetter({ targets, baselineEmissionsTco2e, onChange }: Targ
   return (
     <div className="space-y-4">
       {targets.length === 0 && (
-        <p className="text-sm text-muted-foreground text-center py-6 border border-dashed border-border rounded-lg">
+        <p className="py-6 text-sm text-studio-dim">
           No targets set. Add a reduction target to get started.
         </p>
       )}
@@ -132,7 +132,7 @@ export function TargetSetter({ targets, baselineEmissionsTco2e, onChange }: Targ
               <button
                 type="button"
                 onClick={() => remove(target.id)}
-                className="text-muted-foreground hover:text-red-400 transition-colors mt-1 flex-shrink-0"
+                className="text-muted-foreground hover:text-studio-stale transition-colors mt-1 flex-shrink-0"
                 aria-label="Remove target"
               >
                 <Trash2 className="w-4 h-4" />
@@ -156,7 +156,7 @@ export function TargetSetter({ targets, baselineEmissionsTco2e, onChange }: Targ
                   />
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  {target.reductionPct}% reduction — {target.reductionPct >= 50 ? 'SBTi-compatible trajectory' : 'Below SBTi 1.5°C minimum (50%)'}
+                  {target.reductionPct}% reduction, {target.reductionPct >= 50 ? 'SBTi-compatible trajectory' : 'Below SBTi 1.5°C minimum (50%)'}
                 </div>
               </div>
             )}
@@ -174,7 +174,7 @@ export function TargetSetter({ targets, baselineEmissionsTco2e, onChange }: Targ
         )
       })}
 
-      <Button type="button" variant="outline" size="sm" onClick={add} className="w-full border-dashed">
+      <Button type="button" variant="outline" size="sm" onClick={add} className="w-full">
         <Plus className="w-4 h-4 mr-2" />
         Add Reduction Target
       </Button>

@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,16 +12,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Save, ArrowLeft, Image as ImageIcon, AlertCircle, Info, Package, Layers, FileUp, PenLine, FileSpreadsheet } from "lucide-react";
+import { ArrowRight, Info } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
 import { toast } from "sonner";
 import Link from "next/link";
-import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_GROUPS, getCategoriesByGroup } from "@/lib/product-categories";
+import { cn } from "@/lib/utils";
+import { PRODUCT_CATEGORY_GROUPS, getCategoriesByGroup } from "@/lib/product-categories";
 import { useProductLimit } from "@/hooks/useSubscription";
 import { LimitReachedBanner, UpgradePromptModal } from "@/components/subscription";
 import { MultipackProductSelector, SelectedComponent } from "@/components/products/MultipackProductSelector";
@@ -31,6 +28,10 @@ import { createCompleteMultipack } from "@/lib/multipacks";
 import { BOMImportFlow } from "@/components/products/BOMImportFlow";
 import type { IngredientFormData } from "@/components/products/IngredientFormCard";
 import type { PackagingFormData } from "@/components/products/PackagingFormCard";
+import { Statement } from "@/components/studio/statement";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { StateChip } from "@/components/studio/state-chip";
+import { PillButton } from "@/components/studio/pill-button";
 
 interface ProductFormData {
   name: string;
@@ -77,13 +78,9 @@ export default function NewProductLCAPage() {
     currentCount,
     maxCount,
     isUnlimited,
-    percentage,
     checkLimit,
     isLoading: limitLoading
   } = useProductLimit();
-
-  const isAtLimit = !isUnlimited && maxCount !== null && maxCount !== undefined && currentCount >= maxCount;
-  const isNearLimit = !isUnlimited && maxCount !== null && maxCount !== undefined && percentage >= 80;
 
   const [formData, setFormData] = useState<ProductFormData>({
     name: "",
@@ -436,21 +433,48 @@ export default function NewProductLCAPage() {
 
   if (!currentOrganization) {
     return (
-      <div className="container mx-auto p-6">
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Please select an organisation to create a product.
-          </AlertDescription>
-        </Alert>
+      <div className="mx-auto max-w-4xl py-8">
+        <p className="text-sm text-muted-foreground">
+          Please select an organisation to create a product.
+        </p>
       </div>
     );
   }
 
+  const limitBanner =
+    !limitLoading && !isUnlimited && maxCount !== null && maxCount !== undefined ? (
+      <LimitReachedBanner
+        type="products"
+        current={currentCount}
+        max={maxCount}
+        onUpgrade={() => setShowUpgradeModal(true)}
+      />
+    ) : null;
+
+  // The phase-1 chooser: quiet selectable rows, no icon medallions.
+  const chooserRows: { title: string; hint: string; onSelect: () => void; href?: string }[] = [
+    {
+      title: "Create from scratch",
+      hint: "Enter details, ingredients and packaging by hand",
+      onSelect: () => handleCreationMethodSelect("manual"),
+    },
+    {
+      title: "Import a bill of materials",
+      hint: "Upload a PDF or CSV, we extract ingredients and packaging",
+      onSelect: () => handleCreationMethodSelect("import"),
+    },
+    {
+      title: "Bulk import from a spreadsheet",
+      hint: "Add many products at once with our Excel template",
+      onSelect: () => router.push("/products/import"),
+      href: "/products/import",
+    },
+  ];
+
   // Show creation method selector if not yet chosen
   if (creationMethod === null) {
     return (
-      <div className="container mx-auto p-6 max-w-4xl space-y-6">
+      <div className="mx-auto max-w-4xl space-y-10">
         <UpgradePromptModal
           open={showUpgradeModal}
           onOpenChange={setShowUpgradeModal}
@@ -471,399 +495,288 @@ export default function NewProductLCAPage() {
           />
         )}
 
-        <div className="flex items-center gap-4">
-          <Link href="/products">
-            <Button variant="outline" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
+        <div className="space-y-4">
+          <Link
+            href="/products"
+            className="inline-flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            The products
           </Link>
-          <div>
-            <h1 className="text-3xl font-bold">Create New Product</h1>
-            <p className="text-muted-foreground mt-1">
-              Choose how you want to create your product
-            </p>
+          <Statement eyebrow="THE CELLAR · NEW PRODUCT" headline="A new product." />
+        </div>
+
+        {limitBanner}
+
+        <section className="space-y-3 border-t border-studio-hairline pt-6">
+          <Eyebrow>HOW WOULD YOU LIKE TO START</Eyebrow>
+          <div className="divide-y divide-border">
+            {chooserRows.map((r) => (
+              <button
+                key={r.title}
+                type="button"
+                onClick={r.onSelect}
+                className="group flex w-full items-center justify-between gap-4 py-4 text-left"
+              >
+                <div className="min-w-0">
+                  <div className="font-display text-[15px] font-semibold text-foreground">{r.title}</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">{r.hint}</div>
+                </div>
+                <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150 ease-studio group-hover:translate-x-0.5 group-hover:text-room-accent" />
+              </button>
+            ))}
           </div>
-        </div>
-
-        {!limitLoading && !isUnlimited && maxCount !== null && maxCount !== undefined && (
-          <LimitReachedBanner
-            type="products"
-            current={currentCount}
-            max={maxCount}
-            onUpgrade={() => setShowUpgradeModal(true)}
-          />
-        )}
-
-        <div className="grid md:grid-cols-3 gap-6 pt-4">
-          <Card
-            className="cursor-pointer hover:border-primary hover:shadow-md transition-all"
-            onClick={() => handleCreationMethodSelect("manual")}
-          >
-            <CardHeader className="text-center pb-2">
-              <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                <PenLine className="h-8 w-8 text-primary" />
-              </div>
-              <CardTitle>Create from Scratch</CardTitle>
-              <CardDescription>
-                Manually enter product details, ingredients, and packaging
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="text-center">
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>Enter product information step by step</li>
-                <li>Add ingredients and packaging manually</li>
-                <li>Full control over all details</li>
-              </ul>
-              <Button className="mt-4 w-full" variant="outline">
-                Start from Scratch
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card
-            className="cursor-pointer hover:border-primary hover:shadow-md transition-all"
-            onClick={() => handleCreationMethodSelect("import")}
-          >
-            <CardHeader className="text-center pb-2">
-              <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                <FileUp className="h-8 w-8 text-primary" />
-              </div>
-              <CardTitle>Import from Bill of Materials</CardTitle>
-              <CardDescription>
-                Upload a PDF or CSV to automatically extract ingredients and packaging
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="text-center">
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>Upload PDF or CSV bill of materials</li>
-                <li>Automatically extract ingredients</li>
-                <li>Review and edit before saving</li>
-              </ul>
-              <Button className="mt-4 w-full" variant="outline">
-                Import BOM
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card
-            className="cursor-pointer hover:border-primary hover:shadow-md transition-all"
-            onClick={() => router.push("/products/import")}
-          >
-            <CardHeader className="text-center pb-2">
-              <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                <FileSpreadsheet className="h-8 w-8 text-primary" />
-              </div>
-              <CardTitle>Bulk Import from Spreadsheet</CardTitle>
-              <CardDescription>
-                Import multiple products with ingredients, packaging, and EPR data from Excel
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="text-center">
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>Download and fill in the Excel template</li>
-                <li>Import multiple products at once</li>
-                <li>Auto-match to emission factor databases</li>
-              </ul>
-              <Button className="mt-4 w-full" variant="outline">
-                Bulk Import
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+        </section>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-10">
       <UpgradePromptModal
         open={showUpgradeModal}
         onOpenChange={setShowUpgradeModal}
         limitType="products"
       />
 
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="icon" onClick={() => setCreationMethod(null)}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold">Create New Product</h1>
-          <p className="text-muted-foreground mt-1">
-            Define your product details and functional unit
-          </p>
-        </div>
+      <div className="space-y-4">
+        <button
+          type="button"
+          onClick={() => setCreationMethod(null)}
+          className="inline-flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground"
+        >
+          Change method
+        </button>
+        <Statement eyebrow="THE CELLAR · NEW PRODUCT" headline="A new product." />
       </div>
 
-      {!limitLoading && !isUnlimited && maxCount !== null && maxCount !== undefined && (
-        <LimitReachedBanner
-          type="products"
-          current={currentCount}
-          max={maxCount}
-          onUpgrade={() => setShowUpgradeModal(true)}
-        />
-      )}
+      {limitBanner}
 
-      {/* Show imported materials summary */}
+      {/* Imported materials summary */}
       {(importedIngredients.length > 0 || importedPackaging.length > 0) && (
-        <Alert className="border-green-200 bg-green-50">
-          <FileUp className="h-4 w-4 text-green-600" />
-          <AlertDescription className="text-green-800">
-            <strong>BOM Import Ready:</strong> {importedIngredients.length} ingredient{importedIngredients.length !== 1 ? "s" : ""} and {importedPackaging.length} packaging item{importedPackaging.length !== 1 ? "s" : ""} will be added when you create this product.
-          </AlertDescription>
-        </Alert>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[6px] border border-studio-hairline bg-studio-cream px-4 py-3">
+          <StateChip tone="attention">BOM ready</StateChip>
+          <p className="text-sm text-muted-foreground">
+            {importedIngredients.length} ingredient{importedIngredients.length !== 1 ? "s" : ""} and{" "}
+            {importedPackaging.length} packaging item{importedPackaging.length !== 1 ? "s" : ""} will be added when you create this product.
+          </p>
+        </div>
       )}
 
-      {/* Product Type Toggle */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Product Type</CardTitle>
-          <CardDescription>
-            Choose whether to create a single product or a multipack containing multiple products
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ToggleGroup
-            type="single"
-            value={productType}
-            onValueChange={(value) => {
-              if (value) setProductType(value as "single" | "multipack");
-            }}
-            className="justify-start"
+      {/* Product Type */}
+      <section className="space-y-4 border-t border-studio-hairline pt-6">
+        <Eyebrow>PRODUCT TYPE</Eyebrow>
+        <div className="flex items-center gap-6">
+          {(["single", "multipack"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setProductType(t)}
+              className={cn(
+                "relative py-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] transition-opacity duration-150 ease-studio",
+                productType === t ? "opacity-100" : "opacity-60 hover:opacity-100",
+              )}
+            >
+              {t === "single" ? "Single product" : "Multipack"}
+              {productType === t && (
+                <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] bg-room-accent" />
+              )}
+            </button>
+          ))}
+        </div>
+        {productType === "multipack" && (
+          <p className="text-sm text-muted-foreground">
+            A multipack combines multiple existing products (e.g. a case of 24 beers, a gift pack with assorted items).
+          </p>
+        )}
+      </section>
+
+      {/* Information */}
+      <section className="space-y-6 border-t border-studio-hairline pt-6">
+        <Eyebrow>{productType === "multipack" ? "MULTIPACK INFORMATION" : "PRODUCT INFORMATION"}</Eyebrow>
+
+        <div className="space-y-2">
+          <Label htmlFor="name">Product name *</Label>
+          <Input
+            id="name"
+            placeholder="e.g., Organic Orange Juice 500ml"
+            value={formData.name}
+            onChange={(e) => handleInputChange("name", e.target.value)}
+            disabled={isSubmitting || isSavingDraft}
+            aria-invalid={!!fieldErrors.name}
+          />
+          {fieldErrors.name && (
+            <p className="text-sm font-medium text-destructive">{fieldErrors.name}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="sku">SKU</Label>
+          <Input
+            id="sku"
+            placeholder="e.g., OOJ-500ML-001"
+            value={formData.sku}
+            onChange={(e) => handleInputChange("sku", e.target.value)}
+            disabled={isSubmitting || isSavingDraft}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="description">Product description</Label>
+          <Textarea
+            id="description"
+            placeholder="Provide a detailed description of the product, including key ingredients, materials, or characteristics..."
+            value={formData.product_description}
+            onChange={(e) => handleInputChange("product_description", e.target.value)}
+            disabled={isSubmitting || isSavingDraft}
+            rows={4}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="product_category">Product category *</Label>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p>Used to match with industry average emission factors when specific facility data is unavailable</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          <Select
+            value={formData.product_category}
+            onValueChange={(value) => handleInputChange("product_category", value)}
+            disabled={isSubmitting || isSavingDraft}
           >
-            <ToggleGroupItem
-              value="single"
-              aria-label="Single Product"
-              className="flex items-center gap-2 px-6 py-3 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-            >
-              <Package className="h-4 w-4" />
-              Single Product
-            </ToggleGroupItem>
-            <ToggleGroupItem
-              value="multipack"
-              aria-label="Multipack"
-              className="flex items-center gap-2 px-6 py-3 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-            >
-              <Layers className="h-4 w-4" />
-              Multipack
-            </ToggleGroupItem>
-          </ToggleGroup>
-          {productType === "multipack" && (
-            <p className="text-sm text-muted-foreground mt-3">
-              A multipack combines multiple existing products (e.g., a case of 24 beers, a gift pack with assorted items).
+            <SelectTrigger id="product_category">
+              <SelectValue placeholder="Select product category" />
+            </SelectTrigger>
+            <SelectContent>
+              {PRODUCT_CATEGORY_GROUPS.map((group) => (
+                <div key={group}>
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                    {group}
+                  </div>
+                  {getCategoriesByGroup(group).map((category) => (
+                    <SelectItem key={category.label} value={category.value}>
+                      <div>
+                        <div className="font-medium">{category.label}</div>
+                        {category.description && (
+                          <div className="text-xs text-muted-foreground">{category.description}</div>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </div>
+              ))}
+            </SelectContent>
+          </Select>
+          {fieldErrors.product_category ? (
+            <p className="text-sm font-medium text-destructive">{fieldErrors.product_category}</p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Select the category that best describes your product
             </p>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{productType === "multipack" ? "Multipack" : "Product"} Information</CardTitle>
-          <CardDescription>
-            Basic details about the product you&apos;re assessing
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="name">Product Name *</Label>
-            <Input
-              id="name"
-              placeholder="e.g., Organic Orange Juice 500ml"
-              value={formData.name}
-              onChange={(e) => handleInputChange("name", e.target.value)}
-              disabled={isSubmitting || isSavingDraft}
-              aria-invalid={!!fieldErrors.name}
-            />
-            {fieldErrors.name && (
-              <p className="text-sm font-medium text-destructive">{fieldErrors.name}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="sku">SKU</Label>
-            <Input
-              id="sku"
-              placeholder="e.g., OOJ-500ML-001"
-              value={formData.sku}
-              onChange={(e) => handleInputChange("sku", e.target.value)}
-              disabled={isSubmitting || isSavingDraft}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Product Description</Label>
-            <Textarea
-              id="description"
-              placeholder="Provide a detailed description of the product, including key ingredients, materials, or characteristics..."
-              value={formData.product_description}
-              onChange={(e) => handleInputChange("product_description", e.target.value)}
-              disabled={isSubmitting || isSavingDraft}
-              rows={4}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="product_category">Product Category *</Label>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p>Used to match with industry average emission factors when specific facility data is unavailable</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            <Select
-              value={formData.product_category}
-              onValueChange={(value) => handleInputChange("product_category", value)}
-              disabled={isSubmitting || isSavingDraft}
-            >
-              <SelectTrigger id="product_category">
-                <SelectValue placeholder="Select product category" />
-              </SelectTrigger>
-              <SelectContent>
-                {PRODUCT_CATEGORY_GROUPS.map((group) => (
-                  <div key={group}>
-                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-                      {group}
-                    </div>
-                    {getCategoriesByGroup(group).map((category) => (
-                      <SelectItem key={category.label} value={category.value}>
-                        <div>
-                          <div className="font-medium">{category.label}</div>
-                          {category.description && (
-                            <div className="text-xs text-muted-foreground">{category.description}</div>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </div>
-                ))}
-              </SelectContent>
-            </Select>
-            {fieldErrors.product_category ? (
-              <p className="text-sm font-medium text-destructive">{fieldErrors.product_category}</p>
+        <div className="space-y-2">
+          <Label>Product image</Label>
+          <div className="rounded-[6px] border border-studio-hairline p-6">
+            {uploadedImageUrl ? (
+              <div className="space-y-4">
+                <img
+                  src={uploadedImageUrl}
+                  alt="Product preview"
+                  className="mx-auto max-w-xs rounded-[4px]"
+                />
+                <PillButton
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => {
+                    setUploadedImageUrl(null);
+                    setImageFile(null);
+                  }}
+                  disabled={isSubmitting || isSavingDraft}
+                >
+                  Remove image
+                </PillButton>
+              </div>
             ) : (
-              <p className="text-xs text-muted-foreground">
-                Select the category that best describes your product
-              </p>
+              <div className="space-y-1 text-center">
+                <Label htmlFor="image-upload" className="cursor-pointer text-room-accent hover:underline">
+                  Click to upload an image
+                </Label>
+                <Input
+                  id="image-upload"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageSelect}
+                  disabled={isSubmitting || isSavingDraft}
+                />
+                <p className="text-xs text-muted-foreground">PNG, JPG up to 10MB</p>
+              </div>
             )}
           </div>
-
-          <div className="space-y-2">
-            <Label>Product Image</Label>
-            <div className="border-2 border-dashed rounded-lg p-6">
-              {uploadedImageUrl ? (
-                <div className="space-y-4">
-                  <img
-                    src={uploadedImageUrl}
-                    alt="Product preview"
-                    className="max-w-xs mx-auto rounded-lg"
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => {
-                      setUploadedImageUrl(null);
-                      setImageFile(null);
-                    }}
-                    disabled={isSubmitting || isSavingDraft}
-                  >
-                    Remove Image
-                  </Button>
-                </div>
-              ) : (
-                <div className="text-center space-y-4">
-                  <div className="flex justify-center">
-                    <ImageIcon className="h-12 w-12 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <Label
-                      htmlFor="image-upload"
-                      className="cursor-pointer text-primary hover:underline"
-                    >
-                      Click to upload an image
-                    </Label>
-                    <Input
-                      id="image-upload"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleImageSelect}
-                      disabled={isSubmitting || isSavingDraft}
-                    />
-                    <p className="text-xs text-muted-foreground mt-2">
-                      PNG, JPG up to 10MB
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       {/* Unit Size - Only for single products */}
       {productType === "single" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Unit Size</CardTitle>
-            <CardDescription>
-              Define the size and unit of measurement for your product
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="unit_size_value">Size *</Label>
-                <Input
-                  id="unit_size_value"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="500"
-                  value={formData.unit_size_value}
-                  onChange={(e) => handleInputChange("unit_size_value", e.target.value)}
-                  disabled={isSubmitting || isSavingDraft}
-                  aria-invalid={!!fieldErrors.unit_size_value}
-                />
-                {fieldErrors.unit_size_value && (
-                  <p className="text-sm font-medium text-destructive">{fieldErrors.unit_size_value}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="unit_size_unit">Unit *</Label>
-                <Select
-                  value={formData.unit_size_unit}
-                  onValueChange={(value) => handleInputChange("unit_size_unit", value)}
-                  disabled={isSubmitting || isSavingDraft}
-                >
-                  <SelectTrigger id="unit_size_unit">
-                    <SelectValue placeholder="Select unit" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {UNIT_OPTIONS.map((unit) => (
-                      <SelectItem key={unit.value} value={unit.value}>
-                        {unit.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {fieldErrors.unit_size_unit && (
-                  <p className="text-sm font-medium text-destructive">{fieldErrors.unit_size_unit}</p>
-                )}
-              </div>
+        <section className="space-y-6 border-t border-studio-hairline pt-6">
+          <Eyebrow>UNIT SIZE</Eyebrow>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="unit_size_value">Size *</Label>
+              <Input
+                id="unit_size_value"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="500"
+                value={formData.unit_size_value}
+                onChange={(e) => handleInputChange("unit_size_value", e.target.value)}
+                disabled={isSubmitting || isSavingDraft}
+                aria-invalid={!!fieldErrors.unit_size_value}
+              />
+              {fieldErrors.unit_size_value && (
+                <p className="text-sm font-medium text-destructive">{fieldErrors.unit_size_value}</p>
+              )}
             </div>
 
-            <p className="text-xs text-muted-foreground">
-              Example: 500 ml for a beverage bottle, 250 g for a snack pack
-            </p>
-          </CardContent>
-        </Card>
+            <div className="space-y-2">
+              <Label htmlFor="unit_size_unit">Unit *</Label>
+              <Select
+                value={formData.unit_size_unit}
+                onValueChange={(value) => handleInputChange("unit_size_unit", value)}
+                disabled={isSubmitting || isSavingDraft}
+              >
+                <SelectTrigger id="unit_size_unit">
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  {UNIT_OPTIONS.map((unit) => (
+                    <SelectItem key={unit.value} value={unit.value}>
+                      {unit.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {fieldErrors.unit_size_unit && (
+                <p className="text-sm font-medium text-destructive">{fieldErrors.unit_size_unit}</p>
+              )}
+            </div>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Example: 500 ml for a beverage bottle, 250 g for a snack pack
+          </p>
+        </section>
       )}
 
       {/* Multipack Components - Only for multipacks */}
@@ -884,45 +797,32 @@ export default function NewProductLCAPage() {
         </>
       )}
 
-      <div className="flex items-center justify-between pt-6 border-t">
-        <Link href="/products">
-          <Button variant="outline" disabled={isSubmitting || isSavingDraft}>
-            Cancel
-          </Button>
-        </Link>
+      <div className="flex items-center justify-between border-t border-studio-hairline pt-6">
+        <PillButton variant="ghost" href="/products">
+          Cancel
+        </PillButton>
         <div className="flex items-center gap-3">
           {/* Save Draft - only for single products */}
           {productType === "single" && (
-            <Button
+            <PillButton
               variant="outline"
               onClick={handleSaveDraft}
-              loading={isSavingDraft}
               disabled={isSubmitting || isSavingDraft || isUploading}
             >
-              {!isSavingDraft && <Save className="mr-2 h-4 w-4" />}
-              {isSavingDraft ? "Saving Draft..." : "Save Draft"}
-            </Button>
+              {isSavingDraft ? "Saving draft…" : "Save draft"}
+            </PillButton>
           )}
-          <Button
+          <PillButton
+            variant="room"
             onClick={handleSubmit}
-            size="lg"
-            loading={isSubmitting}
             disabled={isSubmitting || isSavingDraft || isUploading}
           >
-            {isSubmitting ? (
-              "Creating..."
-            ) : productType === "multipack" ? (
-              <>
-                <Layers className="mr-2 h-5 w-5" />
-                Create Multipack
-              </>
-            ) : (
-              <>
-                <Save className="mr-2 h-5 w-5" />
-                Create Product
-              </>
-            )}
-          </Button>
+            {isSubmitting
+              ? "Creating…"
+              : productType === "multipack"
+                ? "Create multipack"
+                : "Create product"}
+          </PillButton>
         </div>
       </div>
     </div>

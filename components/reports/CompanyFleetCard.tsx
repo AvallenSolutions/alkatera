@@ -27,14 +27,14 @@ export function CompanyFleetCard({ totalCO2e = 0, year, isNotApplicable, onToggl
   return (
     <>
       <Card
-        className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:border-blue-400 dark:hover:border-blue-600 group"
+        className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:border-room-accent group"
         onClick={() => setIsOpen(true)}
       >
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 group-hover:bg-blue-200 dark:group-hover:bg-blue-900/50 transition-colors">
-                <Car className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <div className="p-2 rounded-lg bg-secondary transition-colors">
+                <Car className="h-5 w-5 text-room-accent" />
               </div>
               <div>
                 <CardTitle className="text-base">Company Fleet & Vehicles</CardTitle>
@@ -57,13 +57,13 @@ export function CompanyFleetCard({ totalCO2e = 0, year, isNotApplicable, onToggl
         <CardContent className={isNotApplicable ? 'opacity-40 pointer-events-none' : undefined}>
           <div className="space-y-2">
             <div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              <div className="text-2xl font-bold text-foreground">
                 {totalCO2e.toFixed(3)} tCO₂e
               </div>
               <p className="text-xs text-muted-foreground mt-1">Vehicle journey emissions</p>
             </div>
 
-            <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
+            <div className="pt-2 border-t border-studio-hairline">
               <p className="text-xs text-muted-foreground">
                 Track ICE vehicles (Scope 1) and electric vehicles (Scope 2)
               </p>
@@ -90,17 +90,17 @@ export function CompanyFleetCard({ totalCO2e = 0, year, isNotApplicable, onToggl
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="bg-secondary p-4 rounded-lg border border-studio-hairline">
               <div className="flex gap-2 mb-2">
-                <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="h-4 w-4 text-studio-dim flex-shrink-0 mt-0.5" />
                 <div className="space-y-2">
-                  <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                  <p className="text-sm font-semibold text-foreground">
                     Smart Scope Routing
                   </p>
-                  <p className="text-xs text-blue-800 dark:text-blue-200">
+                  <p className="text-xs text-muted-foreground">
                     Vehicle emissions are automatically routed to the correct scope based on propulsion type:
                   </p>
-                  <div className="space-y-1 ml-4 text-xs text-blue-800 dark:text-blue-200">
+                  <div className="space-y-1 ml-4 text-xs text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary" className="text-xs">Scope 1</Badge>
                       <span>ICE vehicles (Diesel, Petrol) - Direct combustion emissions</span>
@@ -118,19 +118,19 @@ export function CompanyFleetCard({ totalCO2e = 0, year, isNotApplicable, onToggl
               <h4 className="font-semibold text-sm">What you can do:</h4>
               <ul className="space-y-2 text-sm">
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
+                  <span className="text-studio-good mt-0.5">✓</span>
                   <span>Register vehicles with propulsion type classification</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
+                  <span className="text-studio-good mt-0.5">✓</span>
                   <span>Log journeys with automatic emission calculations</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
+                  <span className="text-studio-good mt-0.5">✓</span>
                   <span>View emissions split by Scope 1 and Scope 2</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-green-600 dark:text-green-400 mt-0.5">✓</span>
+                  <span className="text-studio-good mt-0.5">✓</span>
                   <span>Full audit trail using DEFRA 2025 emission factors</span>
                 </li>
               </ul>

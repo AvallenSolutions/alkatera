@@ -7,8 +7,9 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Activity, ExternalLink } from 'lucide-react';
+import { StateChip } from '@/components/studio';
+import type { WorkingTone } from '@/components/studio/theme';
 import type { PlatformHealthEntry } from '@/lib/certifications/scoring';
 
 interface PlatformHealthPanelProps {
@@ -17,22 +18,11 @@ interface PlatformHealthPanelProps {
 
 const STATUS_BADGE: Record<
   PlatformHealthEntry['status'],
-  { label: string; className: string }
+  { label: string; tone: WorkingTone }
 > = {
-  complete: {
-    label: 'Complete',
-    className:
-      'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-  },
-  partial: {
-    label: 'Partial',
-    className:
-      'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  },
-  missing: {
-    label: 'No data',
-    className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  },
+  complete: { label: 'Complete', tone: 'good' },
+  partial: { label: 'Partial', tone: 'attention' },
+  missing: { label: 'No data', tone: 'stale' },
 };
 
 export function PlatformHealthPanel({ entries }: PlatformHealthPanelProps) {
@@ -45,7 +35,7 @@ export function PlatformHealthPanel({ entries }: PlatformHealthPanelProps) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
-          <Activity className="h-5 w-5 text-blue-600" />
+          <Activity className="h-5 w-5 text-room-accent" />
           Platform Health
         </CardTitle>
         <CardDescription>
@@ -59,14 +49,12 @@ export function PlatformHealthPanel({ entries }: PlatformHealthPanelProps) {
           return (
             <div
               key={e.module}
-              className="flex items-start justify-between gap-3 rounded-lg border p-3"
+              className="flex items-start justify-between gap-3 rounded-[6px] border p-3"
             >
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-sm">{e.moduleLabel}</span>
-                  <Badge className={`text-xs ${badge.className}`}>
-                    {badge.label}
-                  </Badge>
+                  <span className="font-display text-sm font-semibold">{e.moduleLabel}</span>
+                  <StateChip tone={badge.tone}>{badge.label}</StateChip>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {e.note ??
@@ -78,7 +66,7 @@ export function PlatformHealthPanel({ entries }: PlatformHealthPanelProps) {
                       <a
                         key={link.url}
                         href={link.url}
-                        className="text-xs text-blue-600 hover:underline"
+                        className="text-xs text-room-accent hover:underline"
                       >
                         {link.label} →
                       </a>
@@ -88,7 +76,7 @@ export function PlatformHealthPanel({ entries }: PlatformHealthPanelProps) {
               </div>
               <a
                 href={e.moduleLink}
-                className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-blue-600 hover:underline"
+                className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-room-accent hover:underline"
               >
                 Open
                 <ExternalLink className="h-3.5 w-3.5" />

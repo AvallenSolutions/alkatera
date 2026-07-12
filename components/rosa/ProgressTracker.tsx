@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { ArrowUpRight, RefreshCw, Settings2 } from 'lucide-react'
+import { ArrowUpRight } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { BigNumber } from '@/components/studio/big-number'
 import { Eyebrow } from '@/components/studio/eyebrow'
+import { PillButton } from '@/components/studio/pill-button'
 import { StateChip } from '@/components/studio/state-chip'
 import { STUDIO } from '@/components/studio/theme'
 import { useOrganization } from '@/lib/organizationContext'
@@ -175,8 +176,8 @@ export function ProgressTracker() {
     )
   }
 
-  // No tracker chosen yet → setup state
-  if (data?.status === 'no_tracker' || showSetup) {
+  // Explicitly changing (or first choosing) the tracker opens the picker.
+  if (showSetup) {
     return (
       <ProgressTrackerSetup
         onPicked={async () => {
@@ -188,8 +189,23 @@ export function ProgressTracker() {
           setLoading(true)
           await load({ fresh: true })
         }}
-        onCancel={data?.status === 'ready' ? () => setShowSetup(false) : undefined}
+        onCancel={() => setShowSetup(false)}
       />
+    )
+  }
+
+  // No tracker chosen yet: one quiet line and a ghost pill, not a card of
+  // empty-state buttons. The picker is one click away.
+  if (data?.status === 'no_tracker') {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
+        <p className="text-sm text-muted-foreground">
+          Pick one number to watch and Rosa will tell you what its trend means.
+        </p>
+        <PillButton variant="ghost" size="sm" onClick={() => setShowSetup(true)}>
+          Track a number
+        </PillButton>
+      </div>
     )
   }
 
@@ -249,25 +265,26 @@ function ProgressTrackerCard({
             ) : null}
           </p>
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
+        <div className="flex flex-shrink-0 items-center gap-3 font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
           <button
             type="button"
             onClick={onRefresh}
             disabled={refreshing}
             aria-label="Ask Rosa to re-read"
             title="Ask Rosa to re-read"
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-200 ease-studio disabled:opacity-50"
+            className="uppercase tracking-[0.18em] transition-colors duration-200 ease-studio hover:text-foreground disabled:opacity-50"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
+            {refreshing ? 'Re-reading' : 'Re-read'}
           </button>
+          <span aria-hidden="true">·</span>
           <button
             type="button"
             onClick={onChangeTracker}
             aria-label="Change what you track"
             title="Change what you track"
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-200 ease-studio"
+            className="uppercase tracking-[0.18em] transition-colors duration-200 ease-studio hover:text-foreground"
           >
-            <Settings2 className="h-3.5 w-3.5" />
+            Change
           </button>
         </div>
       </div>

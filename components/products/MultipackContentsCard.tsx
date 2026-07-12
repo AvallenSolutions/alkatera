@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Package, Layers, Edit, Box, ArrowRight } from "lucide-react";
+import { Package, ArrowRight } from "lucide-react";
+import { Panel } from "@/components/studio/panel";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { BigNumber } from "@/components/studio/big-number";
+import { StateChip } from "@/components/studio/state-chip";
+import { PillButton } from "@/components/studio/pill-button";
 import { fetchMultipackComponents, fetchMultipackSecondaryPackaging } from "@/lib/multipacks";
 import type { MultipackComponent, MultipackSecondaryPackaging } from "@/lib/types/products";
 import Link from "next/link";
@@ -46,167 +47,139 @@ export function MultipackContentsCard({ productId, productName, onEdit }: Multip
 
   if (isLoading) {
     return (
-      <Card className="backdrop-blur-xl bg-card dark:bg-white/5 border border-border dark:border-white/10 animate-pulse">
-        <CardHeader>
-          <div className="h-6 w-48 bg-muted dark:bg-white/10 rounded" />
-          <div className="h-4 w-32 bg-muted dark:bg-white/10 rounded mt-2" />
-        </CardHeader>
-        <CardContent>
+      <Panel>
+        <div className="animate-pulse space-y-4">
+          <div className="h-5 w-48 rounded bg-studio-hairline/50" />
+          <div className="h-4 w-32 rounded bg-studio-hairline/50" />
           <div className="space-y-3">
-            <div className="h-16 bg-muted dark:bg-white/10 rounded" />
-            <div className="h-16 bg-muted dark:bg-white/10 rounded" />
+            <div className="h-14 rounded bg-studio-hairline/50" />
+            <div className="h-14 rounded bg-studio-hairline/50" />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   return (
-    <Card className="backdrop-blur-xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-indigo-500/20 flex items-center justify-center">
-              <Layers className="h-5 w-5 text-indigo-400" />
-            </div>
-            <div>
-              <CardTitle className="text-foreground flex items-center gap-2">
-                Multipack Contents
-                <Badge className="bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border-indigo-500/30">
-                  {totalUnits} units
-                </Badge>
-              </CardTitle>
-              <CardDescription className="text-muted-foreground">
-                {components.length} product{components.length !== 1 ? "s" : ""} in this multipack
-              </CardDescription>
-            </div>
-          </div>
+    <Panel>
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="font-display text-sm font-semibold text-foreground">Multipack contents</h3>
+          <p className="mt-0.5 text-xs text-studio-dim">
+            {components.length} product{components.length !== 1 ? "s" : ""} in this multipack
+          </p>
+        </div>
+        <div className="flex items-center gap-5">
+          <BigNumber size="panel" value={totalUnits} label="UNITS" />
           {onEdit && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onEdit}
-              className="text-indigo-400 hover:text-indigo-300"
-            >
-              <Edit className="h-4 w-4 mr-1" />
+            <PillButton variant="ghost" size="sm" onClick={onEdit}>
               Edit
-            </Button>
+            </PillButton>
           )}
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Component Products */}
-        <div className="space-y-2">
-          {components.map((component) => (
-            <Link
-              key={component.id}
-              href={`/products/${component.component_product_id}`}
-            >
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/40 dark:bg-white/5 border border-border dark:border-white/10 hover:bg-muted/60 dark:hover:bg-white/10 transition-colors cursor-pointer group">
-                {component.component_product?.product_image_url ? (
-                  <img
-                    src={component.component_product.product_image_url}
-                    alt={component.component_product.name}
-                    className="w-12 h-12 rounded object-cover"
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded bg-muted dark:bg-slate-800 flex items-center justify-center">
-                    <Package className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-foreground truncate">
-                      {component.component_product?.name || "Unknown Product"}
-                    </span>
-                    {component.component_product?.is_multipack && (
-                      <Badge variant="secondary" className="text-xs bg-purple-500/20 text-purple-700 dark:text-purple-300">
-                        <Layers className="h-3 w-3 mr-1" />
-                        Multipack
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {component.component_product?.sku && (
-                      <span>SKU: {component.component_product.sku}</span>
-                    )}
-                    {component.component_product?.unit_size_value &&
-                      component.component_product?.unit_size_unit && (
-                        <span className="ml-2">
-                          {component.component_product.unit_size_value}{" "}
-                          {component.component_product.unit_size_unit}
-                        </span>
-                      )}
-                  </div>
+      </div>
+
+      {/* Component Products */}
+      <div className="mt-5">
+        {components.map((component) => (
+          <Link
+            key={component.id}
+            href={`/products/${component.component_product_id}`}
+            className="block"
+          >
+            <div className="flex items-center gap-3 py-3 border-b border-studio-hairline last:border-b-0 group">
+              {component.component_product?.product_image_url ? (
+                <img
+                  src={component.component_product.product_image_url}
+                  alt={component.component_product.name}
+                  className="w-12 h-12 rounded object-cover"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded bg-studio-hairline/40 flex items-center justify-center">
+                  <Package className="h-6 w-6 text-studio-dim" />
                 </div>
+              )}
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <Badge className="bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border-indigo-500/30">
-                    x{component.quantity}
-                  </Badge>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <span className="font-display font-semibold text-foreground truncate">
+                    {component.component_product?.name || "Unknown Product"}
+                  </span>
+                  {component.component_product?.is_multipack && (
+                    <StateChip tone="quiet">Multipack</StateChip>
+                  )}
+                </div>
+                <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-studio-dim">
+                  {component.component_product?.sku && (
+                    <span>SKU {component.component_product.sku}</span>
+                  )}
+                  {component.component_product?.unit_size_value &&
+                    component.component_product?.unit_size_unit && (
+                      <span className="ml-2">
+                        {component.component_product.unit_size_value}{" "}
+                        {component.component_product.unit_size_unit}
+                      </span>
+                    )}
                 </div>
               </div>
-            </Link>
-          ))}
-        </div>
-
-        {/* Secondary Packaging */}
-        {packaging.length > 0 && (
-          <div className="pt-3 border-t border-border dark:border-white/10">
-            <div className="flex items-center gap-2 mb-3">
-              <Box className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Secondary Packaging</span>
-              <span className="text-xs text-muted-foreground">({totalPackagingWeight}g total)</span>
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-xs font-bold tabular-nums text-foreground">
+                  x{component.quantity}
+                </span>
+                <ArrowRight className="h-4 w-4 text-studio-dim opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {packaging.map((pkg) => (
-                <Badge
-                  key={pkg.id}
-                  variant="outline"
-                  className="bg-muted/40 dark:bg-white/5 text-foreground border-border dark:border-slate-700"
-                >
-                  {pkg.material_name} ({pkg.weight_grams}g)
-                  {pkg.is_recyclable && (
-                    <span className="ml-1 text-green-600 dark:text-green-400">♻</span>
-                  )}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
+          </Link>
+        ))}
+      </div>
 
-        {/* Aggregated Certifications */}
-        {components.some(
-          (c) =>
-            c.component_product?.certifications &&
-            c.component_product.certifications.length > 0
-        ) && (
-          <div className="pt-3 border-t border-border dark:border-white/10">
-            <span className="text-sm text-muted-foreground block mb-2">
-              Certifications from components
+      {/* Secondary Packaging */}
+      {packaging.length > 0 && (
+        <div className="mt-5 pt-4 border-t border-studio-hairline">
+          <div className="flex items-center gap-3 mb-3">
+            <Eyebrow tone="dim">Secondary packaging</Eyebrow>
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-studio-dim">
+              {totalPackagingWeight}g total
             </span>
-            <div className="flex flex-wrap gap-2">
-              {Array.from(
-                new Set(
-                  components.flatMap(
-                    (c) =>
-                      c.component_product?.certifications?.map(
-                        (cert) => cert.name
-                      ) || []
-                  )
-                )
-              ).map((certName) => (
-                <Badge
-                  key={certName}
-                  className="bg-green-500/20 text-green-700 dark:text-green-300 border-green-500/30"
-                >
-                  {certName}
-                </Badge>
-              ))}
-            </div>
           </div>
-        )}
-      </CardContent>
-    </Card>
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
+            {packaging.map((pkg) => (
+              <span key={pkg.id} className="inline-flex items-center gap-2">
+                <StateChip tone="quiet">
+                  {pkg.material_name} ({pkg.weight_grams}g)
+                </StateChip>
+                {pkg.is_recyclable && <StateChip tone="good">Recyclable</StateChip>}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Aggregated Certifications */}
+      {components.some(
+        (c) =>
+          c.component_product?.certifications &&
+          c.component_product.certifications.length > 0
+      ) && (
+        <div className="mt-5 pt-4 border-t border-studio-hairline">
+          <Eyebrow tone="dim" className="mb-2">Certifications from components</Eyebrow>
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
+            {Array.from(
+              new Set(
+                components.flatMap(
+                  (c) =>
+                    c.component_product?.certifications?.map(
+                      (cert) => cert.name
+                    ) || []
+                )
+              )
+            ).map((certName) => (
+              <StateChip key={certName} tone="good">
+                {certName}
+              </StateChip>
+            ))}
+          </div>
+        </div>
+      )}
+    </Panel>
   );
 }

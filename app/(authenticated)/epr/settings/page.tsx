@@ -2,14 +2,16 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useOrganization } from '@/lib/organizationContext'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Eyebrow } from '@/components/studio/eyebrow'
+import { Panel } from '@/components/studio/panel'
+import { Statement } from '@/components/studio/statement'
 import { StateChip } from '@/components/studio/state-chip'
+import { obligationStatusTone } from '@/lib/epr/status-tones'
 import { Switch } from '@/components/ui/switch'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
@@ -172,18 +174,9 @@ const EMPTY_CONTACT: HMRCContactFormState = { first_name: '', last_name: '', pho
 // Helpers
 // -------------------------------------------------------------------
 
-function getObligationBadge(size: ObligationSize) {
-  switch (size) {
-    case 'large':
-      return <StateChip tone="stale">Large Producer</StateChip>
-    case 'small':
-      return <StateChip tone="attention">Small Producer</StateChip>
-    case 'below':
-      return <StateChip tone="good">Below Threshold</StateChip>
-    case 'pending':
-    default:
-      return <StateChip tone="quiet">Pending</StateChip>
-  }
+function obligationChip(size: ObligationSize) {
+  const { label, tone } = obligationStatusTone(size)
+  return <StateChip tone={tone}>{label}</StateChip>
 }
 
 function formatTonnage(kg: number | null): string {
@@ -648,16 +641,14 @@ export default function EprSettingsPage() {
           <Skeleton className="h-5 w-96" />
         </div>
         {Array.from({ length: 4 }).map((_, i) => (
-          <Card key={i}>
-            <CardHeader>
+          <Panel key={i} className="space-y-4">
+            <div className="space-y-2">
               <Skeleton className="h-6 w-48" />
               <Skeleton className="h-4 w-72" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </CardContent>
-          </Card>
+            </div>
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </Panel>
         ))}
       </div>
     )
@@ -671,12 +662,7 @@ export default function EprSettingsPage() {
     <div className="space-y-6">
       {/* Page header */}
       <div className="min-w-0">
-        <Eyebrow tone="inherit" className="mb-3 text-room-accent">
-          THE EVIDENCE · EPR · SETTINGS
-        </Eyebrow>
-        <h1 className="font-display text-[clamp(2rem,4vw,3.25rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
-          EPR settings.
-        </h1>
+        <Statement eyebrow="THE WIRING · EPR · SETTINGS" headline="EPR settings." />
         <p className="text-sm text-muted-foreground mt-3">
           Configure your organisation&apos;s Extended Producer Responsibility parameters
         </p>
@@ -685,17 +671,18 @@ export default function EprSettingsPage() {
       {/* ---------------------------------------------------------------- */}
       {/* 1. Registration Details */}
       {/* ---------------------------------------------------------------- */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Panel className="space-y-4">
+        <div>
+          <Eyebrow tone="dim" className="mb-2">1. REGISTRATION</Eyebrow>
+          <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
             <Building2 className="h-5 w-5" />
             Registration Details
-          </CardTitle>
-          <CardDescription>
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
             Your RPD registration identifiers for EPR reporting
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </p>
+        </div>
+        <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="rpd-org-id">RPD Organisation ID</Label>
@@ -719,23 +706,24 @@ export default function EprSettingsPage() {
               />
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* ---------------------------------------------------------------- */}
       {/* 2. Obligation Thresholds */}
       {/* ---------------------------------------------------------------- */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Panel className="space-y-4">
+        <div>
+          <Eyebrow tone="dim" className="mb-2">2. OBLIGATION THRESHOLDS</Eyebrow>
+          <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
             <Scale className="h-5 w-5" />
             Obligation Thresholds
-          </CardTitle>
-          <CardDescription>
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
             Your annual turnover determines your EPR obligation size
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </p>
+        </div>
+        <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             {/* Annual turnover */}
             <div className="space-y-2">
@@ -784,26 +772,27 @@ export default function EprSettingsPage() {
             {isLoadingObligation ? (
               <Skeleton className="h-6 w-28" />
             ) : (
-              getObligationBadge(obligation.obligation_size)
+              obligationChip(obligation.obligation_size)
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* ---------------------------------------------------------------- */}
       {/* 3. Defaults */}
       {/* ---------------------------------------------------------------- */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Panel className="space-y-4">
+        <div>
+          <Eyebrow tone="dim" className="mb-2">3. DEFAULTS</Eyebrow>
+          <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
             <Settings2 className="h-5 w-5" />
             Defaults
-          </CardTitle>
-          <CardDescription>
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
             Default values applied to new packaging items
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </p>
+        </div>
+        <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             {/* Default packaging activity */}
             <div className="space-y-2">
@@ -847,23 +836,24 @@ export default function EprSettingsPage() {
               </Select>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* ---------------------------------------------------------------- */}
       {/* 4. Nation-of-Sale Distribution */}
       {/* ---------------------------------------------------------------- */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Panel className="space-y-4">
+        <div>
+          <Eyebrow tone="dim" className="mb-2">4. NATION OF SALE</Eyebrow>
+          <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
             <Globe className="h-5 w-5" />
             Nation-of-Sale Distribution
-          </CardTitle>
-          <CardDescription>
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
             Specify the percentage of sales in each UK nation. Percentages must sum to 100%.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </p>
+        </div>
+        <div className="space-y-4">
           {/* Method badge + auto-estimate button */}
           <div className="flex flex-wrap items-center gap-3">
             <StateChip
@@ -955,23 +945,24 @@ export default function EprSettingsPage() {
               </span>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* ---------------------------------------------------------------- */}
       {/* 5. DRS Configuration */}
       {/* ---------------------------------------------------------------- */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Panel className="space-y-4">
+        <div>
+          <Eyebrow tone="dim" className="mb-2">5. DRS CONFIGURATION</Eyebrow>
+          <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
             <Recycle className="h-5 w-5" />
             DRS Configuration
-          </CardTitle>
-          <CardDescription>
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
             Deposit Return Scheme settings for eligible packaging
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div>
           <div className="flex items-start gap-4">
             <Switch
               id="drs-exclusions"
@@ -989,8 +980,8 @@ export default function EprSettingsPage() {
               </p>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* ---------------------------------------------------------------- */}
       {/* 6. Save button (existing EPR settings) */}
@@ -1025,16 +1016,14 @@ Saving...
       {hmrc.loading ? (
         <div className="space-y-6">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i}>
-              <CardHeader>
+            <Panel key={i} className="space-y-4">
+              <div className="space-y-2">
                 <Skeleton className="h-6 w-48" />
                 <Skeleton className="h-4 w-72" />
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </CardContent>
-            </Card>
+              </div>
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </Panel>
           ))}
         </div>
       ) : (
@@ -1042,17 +1031,18 @@ Saving...
           {/* ---------------------------------------------------------------- */}
           {/* HMRC 1. Company Details */}
           {/* ---------------------------------------------------------------- */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <Panel className="space-y-4">
+            <div>
+              <Eyebrow tone="dim" className="mb-2">HMRC 1. COMPANY DETAILS</Eyebrow>
+              <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
                 <Building2 className="h-5 w-5" />
                 HMRC Company Details
-              </CardTitle>
-              <CardDescription>
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
                 Companies House registration and organisation classification for HMRC
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              </p>
+            </div>
+            <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="hmrc-ch-number">Companies House Number</Label>
@@ -1143,7 +1133,7 @@ Saving...
                     return (
                       <div
                         key={key}
-                        className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+                        className="flex flex-col gap-2 rounded-[6px] border border-studio-hairline p-3 sm:flex-row sm:items-center sm:justify-between"
                       >
                         <div className="space-y-0.5">
                           <p className="text-sm font-medium">{activity.label}</p>
@@ -1187,30 +1177,31 @@ Saving...
                   )}
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
 
           {/* ---------------------------------------------------------------- */}
           {/* HMRC 2. Addresses */}
           {/* ---------------------------------------------------------------- */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <Panel className="space-y-4">
+            <div>
+              <Eyebrow tone="dim" className="mb-2">HMRC 2. ADDRESSES</Eyebrow>
+              <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
                 <MapPin className="h-5 w-5" />
                 HMRC Addresses
-              </CardTitle>
-              <CardDescription>
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
                 Up to four addresses required for HMRC registration. Non-registered addresses can copy from the registered address.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              </p>
+            </div>
+            <div className="space-y-4">
               {ALL_ADDRESS_TYPES.map((type) => {
                 const isExpanded = expandedAddresses[type]
                 const isCopied =
                   type !== 'registered' && hmrcSameAsRegistered[type as Exclude<HMRCAddressType, 'registered'>]
 
                 return (
-                  <div key={type} className="rounded-lg border">
+                  <div key={type} className="rounded-[6px] border border-studio-hairline">
                     <button
                       type="button"
                       className="flex w-full items-center justify-between px-4 py-3 text-left"
@@ -1339,28 +1330,29 @@ Saving...
                   )}
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
 
           {/* ---------------------------------------------------------------- */}
           {/* HMRC 3. Contacts */}
           {/* ---------------------------------------------------------------- */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <Panel className="space-y-4">
+            <div>
+              <Eyebrow tone="dim" className="mb-2">HMRC 3. CONTACTS</Eyebrow>
+              <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
                 <Users className="h-5 w-5" />
                 HMRC Contacts
-              </CardTitle>
-              <CardDescription>
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
                 Named contacts for your HMRC EPR registration
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              </p>
+            </div>
+            <div className="space-y-4">
               {ALL_CONTACT_TYPES.map((type) => {
                 const isExpanded = expandedContacts[type]
 
                 return (
-                  <div key={type} className="rounded-lg border">
+                  <div key={type} className="rounded-[6px] border border-studio-hairline">
                     <button
                       type="button"
                       className="flex w-full items-center justify-between px-4 py-3 text-left"
@@ -1453,23 +1445,24 @@ Saving...
                   )}
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
 
           {/* ---------------------------------------------------------------- */}
           {/* HMRC 4. Brands */}
           {/* ---------------------------------------------------------------- */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <Panel className="space-y-4">
+            <div>
+              <Eyebrow tone="dim" className="mb-2">HMRC 4. BRANDS</Eyebrow>
+              <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
                 <Tag className="h-5 w-5" />
                 HMRC Brands
-              </CardTitle>
-              <CardDescription>
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
                 Brand names associated with your packaged products for HMRC Template 2
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              </p>
+            </div>
+            <div className="space-y-4">
               {hmrcBrands.length === 0 && (
                 <p className="text-sm text-muted-foreground italic">
                   No brands added yet. Click the button below to add your first brand.
@@ -1554,24 +1547,25 @@ Saving...
                   )}
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
 
           {/* ---------------------------------------------------------------- */}
           {/* HMRC 5. Partners (only for PAR org type) */}
           {/* ---------------------------------------------------------------- */}
           {hmrcOrg.organisation_type_code === 'PAR' && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+            <Panel className="space-y-4">
+              <div>
+                <Eyebrow tone="dim" className="mb-2">HMRC 5. PARTNERS</Eyebrow>
+                <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
                   <UserPlus className="h-5 w-5" />
                   HMRC Partners
-                </CardTitle>
-                <CardDescription>
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
                   Partner details for HMRC Template 3. Only required for partnership organisations.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+                </p>
+              </div>
+              <div className="space-y-4">
                 {hmrcPartners.length === 0 && (
                   <p className="text-sm text-muted-foreground italic">
                     No partners added yet. Click the button below to add a partner.
@@ -1678,8 +1672,8 @@ Saving...
                     )}
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </Panel>
           )}
         </>
       )}

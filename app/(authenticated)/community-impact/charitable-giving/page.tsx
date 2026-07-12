@@ -3,19 +3,20 @@
 import { useState, useEffect } from 'react';
 import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Gift, PlusCircle, Trash2, Calendar } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { format } from 'date-fns';
-import Link from 'next/link';
 import { toast } from 'sonner';
+
+import { PillButton } from '@/components/studio/pill-button';
+import { StateChip } from '@/components/studio/state-chip';
+import { TopicHeader, HubSkeleton, Section } from '@/components/social';
 
 interface Donation {
   id: string;
@@ -160,35 +161,26 @@ function CharitableGivingPageContent() {
     if (donation.donation_amount) return `£${donation.donation_amount.toLocaleString()}`;
     if (donation.estimated_value) return `£${donation.estimated_value.toLocaleString()} (est.)`;
     if (donation.hours_donated) return `${donation.hours_donated} hours`;
-    return '—';
+    return '·';
   };
 
+  if (loading) {
+    return <HubSkeleton />;
+  }
+
   return (
-    <div className="space-y-6 animate-fade-in-up">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <Link href="/community-impact" className="text-muted-foreground hover:text-foreground">
-              Community & Impact
-            </Link>
-            <span className="text-muted-foreground">/</span>
-            <span className="font-medium">Charitable Giving</span>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2 mt-2">
-            <Gift className="h-6 w-6 text-pink-600" />
-            Charitable Giving
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Track donations, contributions, and charitable activities
-          </p>
-        </div>
+    <div className="space-y-8 animate-fade-in-up">
+      <TopicHeader
+        eyebrow={<>THE WIRING &middot; COMMUNITY IMPACT</>}
+        headline={<>Charitable giving.</>}
+        description="Track donations, contributions, and charitable activities."
+        backHref="/community-impact"
+        backLabel="Community impact"
+      >
+        <PillButton size="sm" onClick={() => setOpen(true)}>
+          Log donation
+        </PillButton>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <PlusCircle className="h-4 w-4 mr-2" />
-              Log Donation
-            </Button>
-          </DialogTrigger>
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Log Donation</DialogTitle>
@@ -346,93 +338,78 @@ function CharitableGivingPageContent() {
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? 'Saving...' : 'Log Donation'}
+                  {isSubmitting ? 'Saving…' : 'Log Donation'}
                 </Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+      </TopicHeader>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Donations History</CardTitle>
-          <CardDescription>All charitable donations and contributions</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-muted-foreground text-center py-8">Loading donations...</p>
-          ) : donations.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">
-              No donations logged yet. Click &quot;Log Donation&quot; to get started.
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Donation</TableHead>
-                  <TableHead>Recipient</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Value</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Beneficiaries</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {donations.map((donation) => (
-                  <TableRow key={donation.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{donation.donation_name}</p>
-                        {donation.description && (
-                          <p className="text-sm text-muted-foreground">{donation.description}</p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p>{donation.recipient_name}</p>
-                        {donation.recipient_cause && (
-                          <Badge variant="secondary" className="text-xs capitalize mt-1">
-                            {donation.recipient_cause}
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="capitalize">
-                        {donation.donation_type.replace('_', ' ')}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{getDonationValue(donation)}</TableCell>
-                    <TableCell>
-                      {donation.donation_date ? (
-                        <div className="flex items-center gap-1 text-sm">
-                          <Calendar className="h-3 w-3" />
-                          {format(new Date(donation.donation_date), 'dd MMM yyyy')}
-                        </div>
-                      ) : (
-                        '—'
+      <Section label="DONATIONS" blurb="All charitable donations and contributions.">
+        {donations.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No donations logged yet. Use &quot;Log donation&quot; to get started.
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Donation</TableHead>
+                <TableHead>Recipient</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Value</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Beneficiaries</TableHead>
+                <TableHead className="w-[50px]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {donations.map((donation) => (
+                <TableRow key={donation.id}>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{donation.donation_name}</p>
+                      {donation.description && (
+                        <p className="text-sm text-muted-foreground">{donation.description}</p>
                       )}
-                    </TableCell>
-                    <TableCell>{donation.beneficiaries_count?.toLocaleString() || '—'}</TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(donation.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <p>{donation.recipient_name}</p>
+                      {donation.recipient_cause && (
+                        <div className="mt-1">
+                          <StateChip tone="quiet">{donation.recipient_cause}</StateChip>
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <StateChip tone="quiet">{donation.donation_type.replace('_', ' ')}</StateChip>
+                  </TableCell>
+                  <TableCell>{getDonationValue(donation)}</TableCell>
+                  <TableCell>
+                    {donation.donation_date
+                      ? format(new Date(donation.donation_date), 'dd MMM yyyy')
+                      : '·'}
+                  </TableCell>
+                  <TableCell>{donation.beneficiaries_count?.toLocaleString() || '·'}</TableCell>
+                  <TableCell>
+                    <PillButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(donation.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </PillButton>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Section>
     </div>
   );
 }

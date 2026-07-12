@@ -1,12 +1,12 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
-import { CalendarClock, Package, Inbox, ArrowRight, AlertCircle } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Eyebrow } from '@/components/studio/eyebrow'
+import { FactList } from '@/components/studio/fact-list'
+import type { WorkingTone } from '@/components/studio/theme'
 import { COMPLIANCE_DEADLINES, expandDeadlines } from '@/lib/pulse/regulatory-deadlines'
 import { useRealtimeRefresh } from '@/lib/rosa/useRealtimeRefresh'
 
@@ -148,22 +148,19 @@ export function ForwardTimeline() {
 
   if (stalledLcas === null && oldQueueCount === null) {
     return (
-      <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6">
-        <Skeleton className="h-4 w-40 mb-4" />
-        <Skeleton className="h-16 w-full mb-2" />
-        <Skeleton className="h-16 w-full" />
+      <div>
+        <Eyebrow className="mb-3 text-room-accent">The next 14 days</Eyebrow>
+        <Skeleton className="h-12 w-full" />
       </div>
     )
   }
 
+  // A clear horizon is one quiet line, not a panel.
   if (events.length === 0) {
     return (
-      <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6">
-        <h2 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-          <CalendarClock className="h-4 w-4 text-studio-forest" />
-          The next 14 days
-        </h2>
-        <p className="text-sm text-muted-foreground">
+      <div>
+        <Eyebrow className="mb-3 text-room-accent">The next 14 days</Eyebrow>
+        <p className="border-b border-border pb-3 text-sm text-muted-foreground">
           Clear horizon. Nothing time-sensitive in the next two weeks.
         </p>
       </div>
@@ -171,83 +168,19 @@ export function ForwardTimeline() {
   }
 
   return (
-    <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6">
-      <h2 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2">
-        <CalendarClock className="h-4 w-4 text-studio-forest" />
-        The next 14 days
-      </h2>
-      <ol className="relative border-l border-border/60 ml-2 space-y-4">
-        {events.map(e => (
-          <TimelineRow key={e.id} event={e} />
-        ))}
-      </ol>
+    <div>
+      <Eyebrow className="mb-3 text-room-accent">The next 14 days</Eyebrow>
+      <FactList
+        items={events.map(e => ({
+          id: e.id,
+          title: e.title,
+          hint: e.hint,
+          chip: STATUS_CHIP[e.status],
+          meta: e.whenLabel,
+          href: e.href,
+        }))}
+      />
     </div>
-  )
-}
-
-function TimelineRow({ event }: { event: TimelineEvent }) {
-  const Icon =
-    event.kind === 'deadline' ? CalendarClock :
-    event.kind === 'queue' ? Inbox :
-    event.kind === 'lca' ? Package :
-    AlertCircle
-  const tone = STATUS_TONE[event.status]
-
-  const inner = (
-    <div className="group">
-      <div className="flex items-start gap-3">
-        <div
-          className={cn(
-            'flex-shrink-0 -ml-[1.625rem] mt-0.5 rounded-full border-2 p-1 bg-card',
-            tone.dot,
-          )}
-        >
-          <Icon className={cn('h-3 w-3', tone.icon)} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground tabular-nums">
-              {event.whenLabel}
-            </span>
-            <StatusPill status={event.status} />
-          </div>
-          <p className="mt-1 text-sm font-medium leading-snug">{event.title}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{event.hint}</p>
-        </div>
-        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-foreground transition-colors flex-shrink-0 mt-1.5" />
-      </div>
-    </div>
-  )
-
-  return (
-    <li>
-      {event.href ? (
-        <Link href={event.href} className="block hover:bg-muted/30 -mx-2 px-2 py-1 rounded-lg transition-colors">
-          {inner}
-        </Link>
-      ) : (
-        inner
-      )}
-    </li>
-  )
-}
-
-function StatusPill({ status }: { status: EventStatus }) {
-  const tone = STATUS_TONE[status]
-  const label =
-    status === 'on_track' ? 'On track' :
-    status === 'at_risk' ? 'At risk' :
-    status === 'overdue' ? 'Overdue' :
-    'Stalled'
-  return (
-    <span
-      className={cn(
-        'font-mono text-[10px] font-bold uppercase tracking-[0.18em]',
-        tone.pill,
-      )}
-    >
-      {label}
-    </span>
   )
 }
 
@@ -259,28 +192,10 @@ function relativeWhen(daysAway: number, dueDate: string): string {
   return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
-const STATUS_TONE: Record<
-  EventStatus,
-  { dot: string; icon: string; pill: string }
-> = {
-  on_track: {
-    dot: 'border-studio-good/60',
-    icon: 'text-studio-good',
-    pill: 'text-studio-good',
-  },
-  at_risk: {
-    dot: 'border-studio-attention/60',
-    icon: 'text-studio-attention',
-    pill: 'text-studio-attention',
-  },
-  overdue: {
-    dot: 'border-studio-stale/60',
-    icon: 'text-studio-stale',
-    pill: 'text-studio-stale',
-  },
-  blocked: {
-    dot: 'border-studio-hold/60',
-    icon: 'text-studio-hold',
-    pill: 'text-studio-hold',
-  },
+/** Status is a word in a working tone; on-track events carry no chip. */
+const STATUS_CHIP: Record<EventStatus, { tone: WorkingTone; label: string } | undefined> = {
+  on_track: undefined,
+  at_risk: { tone: 'attention', label: 'At risk' },
+  overdue: { tone: 'stale', label: 'Overdue' },
+  blocked: { tone: 'hold', label: 'Stalled' },
 }

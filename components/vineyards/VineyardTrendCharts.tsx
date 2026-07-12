@@ -1,7 +1,11 @@
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, Droplets, TreePine, Flame, Bug, Wheat, FlaskConical, Fuel } from 'lucide-react';
+/**
+ * Vineyard trends, re-cut for the studio: cream hairline panels with
+ * dim mono labels, studio inks for the series, a cream tooltip, no
+ * icon titles and no gradients. The data series are unchanged.
+ */
+
 import {
   AreaChart,
   Area,
@@ -17,24 +21,26 @@ import {
   Legend,
 } from 'recharts';
 import type { VintageImpactSummary } from '@/lib/types/viticulture';
+import { Panel } from '@/components/studio/panel';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { STUDIO } from '@/components/studio/theme';
 
-// Colour palette
+// Studio inks for the series
 const COLOURS = {
-  primary: '#2B46C0',
-  green: '#205E40',
-  blue: '#3b82f6',
-  amber: '#f59e0b',
-  red: '#ef4444',
-  purple: '#8b5cf6',
-  pink: '#ec4899',
-  teal: '#14b8a6',
+  primary: STUDIO.cobalt,
+  green: STUDIO.forest,
+  blue: STUDIO.teal,
+  amber: STUDIO.ochre,
+  red: STUDIO.brick,
+  purple: STUDIO.plum,
+  teal: STUDIO.dim,
 } as const;
 
 interface VineyardTrendChartsProps {
   vintageImpacts: VintageImpactSummary[];
 }
 
-// Custom tooltip for dark theme
+// Cream studio tooltip
 function ChartTooltip({
   active,
   payload,
@@ -49,16 +55,18 @@ function ChartTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="rounded-lg border bg-background p-3 shadow-md">
-      <p className="text-sm font-semibold mb-2">Vintage {label}</p>
+    <div className="rounded-[6px] border border-studio-hairline bg-studio-cream p-3 text-studio-ink">
+      <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+        Vintage {label}
+      </p>
       {payload.map((item) => (
-        <div key={item.dataKey} className="flex items-center gap-2 text-sm">
+        <div key={item.dataKey} className="flex items-center gap-2 text-xs">
           <div
-            className="h-2.5 w-2.5 rounded-full"
+            className="h-2 w-2 rounded-[2px]"
             style={{ backgroundColor: item.color }}
           />
-          <span className="text-muted-foreground">{item.name}:</span>
-          <span className="font-medium">
+          <span className="text-studio-dim">{item.name}:</span>
+          <span className="font-medium tabular-nums">
             {typeof item.value === 'number' && item.value < 0.01 && item.value > 0
               ? item.value.toExponential(2)
               : item.value.toLocaleString('en-GB', { maximumFractionDigits: 1 })}
@@ -73,13 +81,9 @@ function ChartTooltip({
 export function VineyardTrendCharts({ vintageImpacts }: VineyardTrendChartsProps) {
   if (vintageImpacts.length < 2) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <TrendingUp className="h-10 w-10 text-muted-foreground/40 mb-3" />
-        <p className="text-muted-foreground">
-          Add more vintages to see trends
-        </p>
-        <p className="text-sm text-muted-foreground/70 mt-1">
-          At least two vintages are needed to display trend charts.
+      <div className="pt-2">
+        <p className="text-sm text-muted-foreground">
+          At least two vintages are needed to draw trends. Add another vintage to see the picture.
         </p>
       </div>
     );
@@ -148,38 +152,23 @@ export function VineyardTrendCharts({ vintageImpacts }: VineyardTrendChartsProps
     emissions_per_tonne: v.emissions_per_ha / (v.yield_tonnes_per_ha || 1),
   }));
 
-  const fuelData = vintageImpacts.map((v) => {
-    const area = v.impacts.flag_emissions.land_use_m2 / 10000 || 1;
-    return {
-      vintage_year: v.vintage_year,
-      Diesel: v.impacts.non_flag_emissions.machinery_fuel_co2e > 0
-        ? (v.impacts.non_flag_emissions.machinery_fuel_co2e * 0.95) / area / 2.54 // approximate litres back from CO2e
-        : 0,
-      // We don't have raw litres in the impact result, so show the emission intensity instead
-      'Fuel CO₂e/ha': v.impacts.non_flag_emissions.machinery_fuel_co2e / area,
-    };
-  });
-
   const axisProps = {
-    tick: { fontSize: 12 },
+    tick: { fontSize: 10, fill: STUDIO.dim },
     tickLine: false,
     axisLine: false,
   } as const;
 
+  const legendStyle = { fontSize: '11px', color: STUDIO.dim, paddingTop: '8px' } as const;
+
   return (
-    <div className="grid gap-6 md:grid-cols-2">
+    <div className="grid gap-4 md:grid-cols-2">
       {/* 1. Emissions per hectare */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Flame className="h-4 w-4 text-muted-foreground" />
-            Total Emissions per Hectare
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Panel>
+        <Eyebrow tone="dim">EMISSIONS PER HECTARE</Eyebrow>
+        <div className="mt-3">
           <ResponsiveContainer width="100%" height={250}>
             <LineChart data={emissionsData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+              <CartesianGrid strokeDasharray="3 3" stroke={STUDIO.hairline} />
               <XAxis dataKey="vintage_year" {...axisProps} />
               <YAxis
                 {...axisProps}
@@ -198,21 +187,16 @@ export function VineyardTrendCharts({ vintageImpacts }: VineyardTrendChartsProps
               />
             </LineChart>
           </ResponsiveContainer>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* 2. Emissions by source (stacked area) */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            Emissions by Source (per ha)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Panel>
+        <Eyebrow tone="dim">EMISSIONS BY SOURCE · PER HA</Eyebrow>
+        <div className="mt-3">
           <ResponsiveContainer width="100%" height={250}>
             <AreaChart data={sourceData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+              <CartesianGrid strokeDasharray="3 3" stroke={STUDIO.hairline} />
               <XAxis dataKey="vintage_year" {...axisProps} />
               <YAxis
                 {...axisProps}
@@ -220,28 +204,23 @@ export function VineyardTrendCharts({ vintageImpacts }: VineyardTrendChartsProps
                 tickFormatter={(v: number) => v.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
               />
               <Tooltip content={<ChartTooltip unit="kg CO₂e/ha" />} />
-              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={legendStyle} />
               <Area type="monotone" dataKey="Fertiliser & N₂O" stackId="1" stroke={COLOURS.amber} fill={COLOURS.amber} fillOpacity={0.6} />
               <Area type="monotone" dataKey="Fuel" stackId="1" stroke={COLOURS.red} fill={COLOURS.red} fillOpacity={0.6} />
               <Area type="monotone" dataKey="Irrigation" stackId="1" stroke={COLOURS.blue} fill={COLOURS.blue} fillOpacity={0.6} />
               <Area type="monotone" dataKey="Pesticides" stackId="1" stroke={COLOURS.purple} fill={COLOURS.purple} fillOpacity={0.6} />
             </AreaChart>
           </ResponsiveContainer>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* 3. N2O breakdown (FLAG emissions detail) */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <FlaskConical className="h-4 w-4 text-muted-foreground" />
-            N{'₂'}O Emissions Breakdown (per ha)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Panel>
+        <Eyebrow tone="dim">N₂O BREAKDOWN · PER HA</Eyebrow>
+        <div className="mt-3">
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={n2oBreakdownData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+              <CartesianGrid strokeDasharray="3 3" stroke={STUDIO.hairline} />
               <XAxis dataKey="vintage_year" {...axisProps} />
               <YAxis
                 {...axisProps}
@@ -249,33 +228,22 @@ export function VineyardTrendCharts({ vintageImpacts }: VineyardTrendChartsProps
                 tickFormatter={(v: number) => v.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
               />
               <Tooltip content={<ChartTooltip unit="kg CO₂e/ha" />} />
-              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={legendStyle} />
               <Bar dataKey="Direct (fertiliser)" stackId="1" fill={COLOURS.amber} radius={[0, 0, 0, 0]} maxBarSize={40} />
               <Bar dataKey="Indirect (vol. + leach.)" stackId="1" fill={COLOURS.red} radius={[0, 0, 0, 0]} maxBarSize={40} />
-              <Bar dataKey="Crop residue (prunings)" stackId="1" fill={COLOURS.teal} radius={[4, 4, 0, 0]} maxBarSize={40} />
+              <Bar dataKey="Crop residue (prunings)" stackId="1" fill={COLOURS.teal} radius={[2, 2, 0, 0]} maxBarSize={40} />
             </BarChart>
           </ResponsiveContainer>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* 4. Water consumption + scarcity */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Droplets className="h-4 w-4 text-muted-foreground" />
-            Water Consumption (per ha)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Panel>
+        <Eyebrow tone="dim">WATER CONSUMPTION · PER HA</Eyebrow>
+        <div className="mt-3">
           <ResponsiveContainer width="100%" height={250}>
             <AreaChart data={waterData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-              <defs>
-                <linearGradient id="gradWater" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={COLOURS.blue} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={COLOURS.blue} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+              <CartesianGrid strokeDasharray="3 3" stroke={STUDIO.hairline} />
               <XAxis dataKey="vintage_year" {...axisProps} />
               <YAxis
                 {...axisProps}
@@ -283,26 +251,21 @@ export function VineyardTrendCharts({ vintageImpacts }: VineyardTrendChartsProps
                 tickFormatter={(v: number) => v.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
               />
               <Tooltip content={<ChartTooltip unit="m³/ha" />} />
-              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-              <Area type="monotone" dataKey="water_per_ha" name="Volume" stroke={COLOURS.blue} fill="url(#gradWater)" strokeWidth={2} dot={{ r: 3, fill: COLOURS.blue }} />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={legendStyle} />
+              <Area type="monotone" dataKey="water_per_ha" name="Volume" stroke={COLOURS.blue} fill={COLOURS.blue} fillOpacity={0.15} strokeWidth={2} dot={{ r: 3, fill: COLOURS.blue }} />
               <Line type="monotone" dataKey="scarcity_weighted" name="Scarcity-weighted (AWARE)" stroke={COLOURS.blue} strokeWidth={1.5} strokeDasharray="5 5" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* 5. Soil carbon removals */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <TreePine className="h-4 w-4 text-muted-foreground" />
-            Soil Carbon Removals (per ha)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Panel>
+        <Eyebrow tone="dim">SOIL CARBON REMOVALS · PER HA</Eyebrow>
+        <div className="mt-3">
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={removalsData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+              <CartesianGrid strokeDasharray="3 3" stroke={STUDIO.hairline} />
               <XAxis dataKey="vintage_year" {...axisProps} />
               <YAxis
                 {...axisProps}
@@ -310,24 +273,19 @@ export function VineyardTrendCharts({ vintageImpacts }: VineyardTrendChartsProps
                 tickFormatter={(v: number) => v.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
               />
               <Tooltip content={<ChartTooltip unit="kg CO₂e/ha" />} />
-              <Bar dataKey="removals_per_ha" name="Removals" fill={COLOURS.green} radius={[4, 4, 0, 0]} maxBarSize={48} />
+              <Bar dataKey="removals_per_ha" name="Removals" fill={COLOURS.green} radius={[2, 2, 0, 0]} maxBarSize={48} />
             </BarChart>
           </ResponsiveContainer>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* 6. Ecotoxicity trends */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Bug className="h-4 w-4 text-muted-foreground" />
-            Ecotoxicity (per ha)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Panel>
+        <Eyebrow tone="dim">ECOTOXICITY · PER HA</Eyebrow>
+        <div className="mt-3">
           <ResponsiveContainer width="100%" height={250}>
             <LineChart data={ecotoxData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+              <CartesianGrid strokeDasharray="3 3" stroke={STUDIO.hairline} />
               <XAxis dataKey="vintage_year" {...axisProps} />
               <YAxis
                 {...axisProps}
@@ -335,26 +293,21 @@ export function VineyardTrendCharts({ vintageImpacts }: VineyardTrendChartsProps
                 tickFormatter={(v: number) => v.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
               />
               <Tooltip content={<ChartTooltip unit="CTUe/ha" />} />
-              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={legendStyle} />
               <Line type="monotone" dataKey="Freshwater ecotox" stroke={COLOURS.blue} strokeWidth={2} dot={{ r: 3, fill: COLOURS.blue }} />
               <Line type="monotone" dataKey="Terrestrial ecotox" stroke={COLOURS.teal} strokeWidth={2} dot={{ r: 3, fill: COLOURS.teal }} />
             </LineChart>
           </ResponsiveContainer>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* 7. Freshwater eutrophication */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Droplets className="h-4 w-4 text-studio-dim" />
-            Freshwater Eutrophication (per ha)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Panel>
+        <Eyebrow tone="dim">FRESHWATER EUTROPHICATION · PER HA</Eyebrow>
+        <div className="mt-3">
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={eutrophData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+              <CartesianGrid strokeDasharray="3 3" stroke={STUDIO.hairline} />
               <XAxis dataKey="vintage_year" {...axisProps} />
               <YAxis
                 {...axisProps}
@@ -362,24 +315,19 @@ export function VineyardTrendCharts({ vintageImpacts }: VineyardTrendChartsProps
                 tickFormatter={(v: number) => v < 0.001 ? v.toExponential(1) : v.toFixed(3)}
               />
               <Tooltip content={<ChartTooltip unit="kg P eq/ha" />} />
-              <Bar dataKey="Freshwater eutroph." name="Eutrophication" fill={COLOURS.purple} radius={[4, 4, 0, 0]} maxBarSize={48} />
+              <Bar dataKey="Freshwater eutroph." name="Eutrophication" fill={COLOURS.purple} radius={[2, 2, 0, 0]} maxBarSize={48} />
             </BarChart>
           </ResponsiveContainer>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {/* 8. Yield and emission intensity */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Wheat className="h-4 w-4 text-muted-foreground" />
-            Yield and Emission Intensity
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Panel>
+        <Eyebrow tone="dim">YIELD & EMISSION INTENSITY</Eyebrow>
+        <div className="mt-3">
           <ResponsiveContainer width="100%" height={250}>
             <LineChart data={yieldData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+              <CartesianGrid strokeDasharray="3 3" stroke={STUDIO.hairline} />
               <XAxis dataKey="vintage_year" {...axisProps} />
               <YAxis
                 yAxisId="left"
@@ -395,13 +343,13 @@ export function VineyardTrendCharts({ vintageImpacts }: VineyardTrendChartsProps
                 tickFormatter={(v: number) => v.toFixed(0)}
               />
               <Tooltip content={<ChartTooltip />} />
-              <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+              <Legend iconType="circle" iconSize={8} wrapperStyle={legendStyle} />
               <Line yAxisId="left" type="monotone" dataKey="yield_per_ha" name="Yield (t/ha)" stroke={COLOURS.amber} strokeWidth={2} dot={{ r: 4, fill: COLOURS.amber }} />
               <Line yAxisId="right" type="monotone" dataKey="emissions_per_tonne" name="kg CO₂e/t grapes" stroke={COLOURS.red} strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3, fill: COLOURS.red }} />
             </LineChart>
           </ResponsiveContainer>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     </div>
   );
 }

@@ -7,13 +7,13 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Trash2, Recycle, Apple, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Statement } from '@/components/studio/statement';
+import { BigNumber } from '@/components/studio/big-number';
+import { PillButton } from '@/components/studio/pill-button';
 import {
   Dialog,
   DialogContent,
@@ -150,100 +150,69 @@ export function WasteManager() {
   const totalCo2e = rows.reduce((s, r) => s + r.co2e, 0);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <h2 className="text-lg font-semibold">Waste</h2>
-          <p className="text-sm text-muted-foreground">
-            Log food waste and dry waste sent off site, with how it&apos;s treated. This feeds your footprint.
-          </p>
-        </div>
-        <Button onClick={openAdd}>
-          <Plus className="mr-2 h-4 w-4" />
-          Log waste
-        </Button>
+    <div className="space-y-8">
+      <div className="min-w-0">
+        <Statement eyebrow="THE WORKBENCH · WASTE" headline="The waste.">
+          <BigNumber size="display" value={fmt(totalCo2e, 0)} label="KG CO₂E" />
+          <PillButton variant="room" onClick={openAdd}>
+            Log waste
+          </PillButton>
+        </Statement>
+        <p className="mt-3 max-w-xl text-sm text-muted-foreground">
+          Log food waste and dry waste sent off site, with how it&apos;s treated. This feeds your footprint.
+        </p>
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p className="text-sm text-studio-stale">{error}</p>}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
-            <Apple className="h-4 w-4 text-primary" />
-            <CardTitle className="text-xs font-medium text-muted-foreground">Food waste</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{fmt(foodKg, 0)} kg</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
-            <Package className="h-4 w-4 text-primary" />
-            <CardTitle className="text-xs font-medium text-muted-foreground">Dry waste</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{fmt(dryKg, 0)} kg</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
-            <Recycle className="h-4 w-4 text-primary" />
-            <CardTitle className="text-xs font-medium text-muted-foreground">Diverted</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{fmt(diversion, 0)}%</p>
-            <p className="text-[10px] text-muted-foreground">from disposal</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
-            <Trash2 className="h-4 w-4 text-primary" />
-            <CardTitle className="text-xs font-medium text-muted-foreground">Waste CO₂e</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{fmt(totalCo2e, 0)} kg</p>
-          </CardContent>
-        </Card>
+      <div className="flex flex-wrap items-end gap-x-12 gap-y-4 border-y border-border py-4">
+        <BigNumber value={fmt(foodKg, 0)} label="KG FOOD WASTE" />
+        <BigNumber value={fmt(dryKg, 0)} label="KG DRY WASTE" />
+        <BigNumber value={`${fmt(diversion, 0)}%`} label="DIVERTED FROM DISPOSAL" />
       </div>
 
       {loading ? (
-        <Skeleton className="h-40 w-full rounded-lg" />
+        <Skeleton className="h-40 w-full rounded-[6px]" />
       ) : rows.length === 0 ? (
-        <div className="rounded-lg border border-dashed py-12 text-center">
-          <p className="font-medium">No waste logged yet</p>
-          <p className="mt-1 text-sm text-muted-foreground">Log food and dry waste by period to track diversion and emissions.</p>
+        <div>
+          <p className="text-sm text-muted-foreground">
+            No waste logged yet. Log food and dry waste by period to track diversion and emissions.
+          </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border">
+        <div>
           <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="p-2 font-medium">Stream</th>
-                <th className="p-2 font-medium">Treatment</th>
-                <th className="p-2 font-medium">Venue</th>
-                <th className="p-2 font-medium">Period</th>
-                <th className="p-2 text-right font-medium">Weight</th>
-                <th className="p-2 text-right font-medium">CO₂e</th>
+            <thead>
+              <tr className="border-b border-border text-left font-mono text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
+                <th className="py-2 pr-2 font-bold">Stream</th>
+                <th className="p-2 font-bold">Treatment</th>
+                <th className="p-2 font-bold">Venue</th>
+                <th className="p-2 font-bold">Period</th>
+                <th className="p-2 text-right font-bold">Weight</th>
+                <th className="p-2 text-right font-bold">CO₂e</th>
                 <th className="p-2" />
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="border-t">
-                  <td className="p-2">
-                    <Badge variant={r.waste_stream === 'food' ? 'secondary' : 'outline'} className="capitalize">
-                      {r.waste_stream}
-                    </Badge>
+                <tr key={r.id} className="border-b border-border">
+                  <td className="py-2 pr-2 font-mono text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
+                    {r.waste_stream}
                   </td>
                   <td className="p-2">{TREATMENT_LABELS[r.treatment_method]}</td>
-                  <td className="p-2 text-muted-foreground">{r.venue_name ?? '—'}</td>
-                  <td className="p-2 text-muted-foreground">{r.period_start} → {r.period_end}</td>
-                  <td className="p-2 text-right">{fmt(r.mass_kg, 0)} kg</td>
-                  <td className="p-2 text-right font-medium">{fmt(r.co2e, 1)} kg</td>
+                  <td className="p-2 text-muted-foreground">{r.venue_name ?? '–'}</td>
+                  <td className="p-2 font-mono text-xs text-muted-foreground">{r.period_start} → {r.period_end}</td>
+                  <td className="p-2 text-right tabular-nums">{fmt(r.mass_kg, 0)} kg</td>
+                  <td className="p-2 text-right font-semibold tabular-nums">{fmt(r.co2e, 1)} kg</td>
                   <td className="p-2 text-right">
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => remove(r.id)} aria-label="Remove">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <button
+                      type="button"
+                      aria-label="Remove waste row"
+                      className="rounded px-2 py-1 text-base leading-none text-muted-foreground transition-colors duration-150 hover:text-studio-stale"
+                      onClick={() => remove(r.id)}
+                    >
+                      &times;
+                    </button>
                   </td>
                 </tr>
               ))}

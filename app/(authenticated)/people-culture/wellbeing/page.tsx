@@ -3,24 +3,15 @@
 import { useState } from 'react';
 import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Heart,
-  PlusCircle,
-  RefreshCw,
-  ArrowLeft,
-  Gift,
-  MessageSquare,
-  X,
-} from 'lucide-react';
-import Link from 'next/link';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { PlusCircle, X } from 'lucide-react';
 
+import { PillButton } from '@/components/studio/pill-button';
+import { TopicHeader, HubSkeleton, ComplianceNote } from '@/components/social';
 import { WellbeingDashboard } from '@/components/people-culture/WellbeingDashboard';
 import { useWellbeingMetrics } from '@/hooks/data/useWellbeingMetrics';
 
@@ -91,13 +82,11 @@ function AddBenefitDialog({ onSuccess }: { onSuccess: () => void }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Gift className="h-4 w-4 mr-2" />
-          Add Benefit
-        </Button>
-      </DialogTrigger>
+    <>
+      <PillButton size="sm" onClick={() => setOpen(true)}>
+        Add benefit
+      </PillButton>
+      <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Add Employee Benefit</DialogTitle>
@@ -200,12 +189,13 @@ function AddBenefitDialog({ onSuccess }: { onSuccess: () => void }) {
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Adding...' : 'Add Benefit'}
+              {isSubmitting ? 'Adding…' : 'Add Benefit'}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+    </>
   );
 }
 
@@ -318,13 +308,11 @@ function CreateSurveyDialog({ onSuccess }: { onSuccess: () => void }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={(newOpen) => { setOpen(newOpen); if (!newOpen) resetForm(); }}>
-      <DialogTrigger asChild>
-        <Button variant="outline">
-          <MessageSquare className="h-4 w-4 mr-2" />
-          Record Survey
-        </Button>
-      </DialogTrigger>
+    <>
+      <PillButton variant="outline" size="sm" onClick={() => setOpen(true)}>
+        Record survey
+      </PillButton>
+      <Dialog open={open} onOpenChange={(newOpen) => { setOpen(newOpen); if (!newOpen) resetForm(); }}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Record Survey Results</DialogTitle>
@@ -449,7 +437,7 @@ function CreateSurveyDialog({ onSuccess }: { onSuccess: () => void }) {
                   <div className="h-10 flex items-center px-3 rounded-md border bg-muted text-sm text-muted-foreground">
                     {calculatedResponseRate !== null
                       ? `${calculatedResponseRate.toFixed(1)}%`
-                      : '\u2014'}
+                      : '\u00b7'}
                   </div>
                 </div>
               </div>
@@ -530,12 +518,13 @@ function CreateSurveyDialog({ onSuccess }: { onSuccess: () => void }) {
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : hasResults ? 'Save Survey Results' : 'Create Survey'}
+              {isSubmitting ? 'Saving…' : hasResults ? 'Save Survey Results' : 'Create Survey'}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+    </>
   );
 }
 
@@ -551,64 +540,32 @@ function WellbeingPageContent() {
   const { metrics, loading, refetch } = useWellbeingMetrics();
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-8 w-8" />
-          <Skeleton className="h-8 w-48" />
-        </div>
-        <div className="grid grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-28" />
-          ))}
-        </div>
-        <Skeleton className="h-96" />
-      </div>
-    );
+    return <HubSkeleton />;
   }
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/people-culture">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-              <Heart className="h-6 w-6 text-pink-600" />
-              Employee Wellbeing
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Benefits, surveys, and employee engagement
-            </p>
-          </div>
-        </div>
+    <div className="space-y-8 animate-fade-in-up">
+      <TopicHeader
+        eyebrow={<>THE WIRING &middot; PEOPLE &amp; CULTURE</>}
+        headline={<>Wellbeing.</>}
+        description="Benefits, surveys, and employee engagement."
+        backHref="/people-culture"
+        backLabel="People & culture"
+      >
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <PillButton variant="outline" size="sm" onClick={() => refetch()}>
             Refresh
-          </Button>
+          </PillButton>
           <CreateSurveyDialog onSuccess={refetch} />
           <AddBenefitDialog onSuccess={refetch} />
         </div>
-      </div>
+      </TopicHeader>
 
-      {/* Info Card */}
-      <Card className="bg-pink-50 dark:bg-pink-950/20 border-pink-200 dark:border-pink-800">
-        <CardContent className="p-4">
-          <p className="text-sm text-pink-800 dark:text-pink-200">
-            <strong>About Wellbeing:</strong> Track employee benefits and conduct feedback surveys to
-            measure engagement and satisfaction. High employee wellbeing correlates with retention
-            and productivity.
-          </p>
-        </CardContent>
-      </Card>
+      <ComplianceNote label="ABOUT WELLBEING">
+        Track employee benefits and conduct feedback surveys to measure engagement and satisfaction.
+        High employee wellbeing correlates with retention and productivity.
+      </ComplianceNote>
 
-      {/* Dashboard */}
       <WellbeingDashboard metrics={metrics} isLoading={loading} />
     </div>
   );

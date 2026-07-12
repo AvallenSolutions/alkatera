@@ -35,9 +35,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Badge } from '@/components/ui/badge';
 import { StateChip } from '@/components/studio/state-chip';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Eyebrow, Panel } from '@/components/studio';
 import {
   Briefcase,
   UserPlus,
@@ -263,7 +262,7 @@ export function AdvisorManagement() {
     }
   };
 
-  const accessBadge = (level: AdvisorAccessLevel) =>
+  const accessChip = (level: AdvisorAccessLevel) =>
     level === 'read_only' ? (
       <StateChip tone="quiet">Read only</StateChip>
     ) : (
@@ -295,7 +294,7 @@ export function AdvisorManagement() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusChip = (status: string) => {
     switch (status) {
       case 'pending':
         return <StateChip tone="attention">Pending</StateChip>;
@@ -327,16 +326,13 @@ export function AdvisorManagement() {
   const pendingInvitations = invitations.filter((i) => i.status === 'pending');
 
   return (
-    <Card className="mt-8">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
+    <Panel className="mt-8 space-y-6">
+      <div className="flex flex-row items-center justify-between gap-4">
         <div className="space-y-1">
-          <CardTitle className="text-2xl font-semibold flex items-center gap-2">
-            <Briefcase className="h-6 w-6" />
-            Sustainability Advisors
-          </CardTitle>
-          <CardDescription>
+          <Eyebrow tone="dim">Sustainability advisors</Eyebrow>
+          <p className="text-sm text-studio-dim">
             Manage external advisors who have access to your organisation
-          </CardDescription>
+          </p>
         </div>
         {isAdmin && (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -445,8 +441,8 @@ export function AdvisorManagement() {
             </DialogContent>
           </Dialog>
         )}
-      </CardHeader>
-      <CardContent>
+      </div>
+      <div>
         {isLoading ? (
           <div className="flex items-center justify-center h-48">
             <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
@@ -510,16 +506,19 @@ export function AdvisorManagement() {
                           </TableCell>
                           <TableCell>{advisor.company_name || '-'}</TableCell>
                           <TableCell>
-                            <div className="flex flex-wrap gap-1">
+                            <div className="flex flex-wrap gap-x-2 gap-y-1">
                               {advisor.expertise_areas?.slice(0, 2).map((area) => (
-                                <Badge key={area} variant="secondary" className="text-xs">
+                                <span
+                                  key={area}
+                                  className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-studio-dim"
+                                >
                                   {area}
-                                </Badge>
+                                </span>
                               ))}
                               {(advisor.expertise_areas?.length || 0) > 2 && (
-                                <Badge variant="outline" className="text-xs">
+                                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-studio-dim">
                                   +{(advisor.expertise_areas?.length || 0) - 2}
-                                </Badge>
+                                </span>
                               )}
                             </div>
                           </TableCell>
@@ -540,7 +539,7 @@ export function AdvisorManagement() {
                                 <option value="read_only">Read only</option>
                               </select>
                             ) : (
-                              accessBadge(advisor.access_level)
+                              accessChip(advisor.access_level)
                             )}
                           </TableCell>
                           <TableCell>
@@ -589,8 +588,8 @@ export function AdvisorManagement() {
                           <TableCell className="font-medium">
                             {invitation.advisor_email}
                           </TableCell>
-                          <TableCell>{accessBadge(invitation.access_level)}</TableCell>
-                          <TableCell>{getStatusBadge(invitation.status)}</TableCell>
+                          <TableCell>{accessChip(invitation.access_level)}</TableCell>
+                          <TableCell>{getStatusChip(invitation.status)}</TableCell>
                           <TableCell>
                             {new Date(invitation.invited_at).toLocaleDateString()}
                           </TableCell>
@@ -646,7 +645,7 @@ export function AdvisorManagement() {
             )}
           </Tabs>
         )}
-      </CardContent>
+      </div>
 
       <AlertDialog open={!!advisorToRevoke} onOpenChange={() => setAdvisorToRevoke(null)}>
         <AlertDialogContent>
@@ -670,6 +669,6 @@ export function AdvisorManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card>
+    </Panel>
   );
 }

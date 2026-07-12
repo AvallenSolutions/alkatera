@@ -11,9 +11,9 @@ export function IntegrationsSettings({ showHeader = true }: IntegrationsSettings
     <div className="space-y-6">
       {showHeader && (
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Integrations</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Connect the tools you already use so alka<strong>tera</strong> picks up data automatically — no re-typing.
+          <h2 className="font-display text-2xl font-bold tracking-[-0.02em]">Integrations.</h2>
+          <p className="text-sm text-studio-dim mt-1">
+            Connect the tools you already use so alka<strong>tera</strong> picks up data automatically, with no re-typing.
           </p>
         </div>
       )}

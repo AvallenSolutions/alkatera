@@ -41,6 +41,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { StateChip } from '@/components/studio';
 
 interface Scope3Breakdown {
   products: number;
@@ -120,7 +121,7 @@ export function FootprintSummaryDashboard({
         value: scope1Emissions,
         scope: 1,
         icon: Factory,
-        color: 'bg-orange-500',
+        color: 'bg-foreground',
         dataQuality: operationsEmissions > 0 ? 'complete' : 'missing',
       });
     }
@@ -131,7 +132,7 @@ export function FootprintSummaryDashboard({
         value: scope2Emissions,
         scope: 2,
         icon: Factory,
-        color: 'bg-blue-500',
+        color: 'bg-studio-dim',
         dataQuality: operationsEmissions > 0 ? 'complete' : 'missing',
       });
     }
@@ -144,7 +145,7 @@ export function FootprintSummaryDashboard({
           scope: 3,
           category: 'Cat 1',
           icon: Package,
-          color: 'bg-emerald-500',
+          color: 'bg-studio-brick',
           dataQuality: 'complete',
         });
       }
@@ -155,7 +156,7 @@ export function FootprintSummaryDashboard({
           scope: 3,
           category: 'Cat 2',
           icon: DollarSign,
-          color: 'bg-teal-500',
+          color: 'bg-studio-brick',
           dataQuality: 'partial',
         });
       }
@@ -166,7 +167,7 @@ export function FootprintSummaryDashboard({
           scope: 3,
           category: 'Cat 5',
           icon: Trash2,
-          color: 'bg-amber-500',
+          color: 'bg-studio-brick',
           dataQuality: 'partial',
         });
       }
@@ -177,7 +178,7 @@ export function FootprintSummaryDashboard({
           scope: 3,
           category: 'Cat 6',
           icon: Plane,
-          color: 'bg-sky-500',
+          color: 'bg-studio-brick',
           dataQuality: 'complete',
         });
       }
@@ -188,7 +189,7 @@ export function FootprintSummaryDashboard({
           scope: 3,
           category: 'Cat 7',
           icon: Users,
-          color: 'bg-indigo-500',
+          color: 'bg-studio-brick',
           dataQuality: 'partial',
         });
       }
@@ -199,7 +200,7 @@ export function FootprintSummaryDashboard({
           scope: 3,
           category: 'Cat 9',
           icon: Truck,
-          color: 'bg-fuchsia-500',
+          color: 'bg-studio-brick',
           dataQuality: 'partial',
         });
       }
@@ -209,7 +210,7 @@ export function FootprintSummaryDashboard({
           value: scope3Breakdown.purchased_services,
           scope: 3,
           icon: DollarSign,
-          color: 'bg-rose-500',
+          color: 'bg-studio-brick',
           dataQuality: 'partial',
         });
       }
@@ -219,7 +220,7 @@ export function FootprintSummaryDashboard({
           value: scope3Breakdown.marketing_materials,
           scope: 3,
           icon: Package,
-          color: 'bg-pink-500',
+          color: 'bg-studio-brick',
           dataQuality: 'partial',
         });
       }
@@ -231,7 +232,7 @@ export function FootprintSummaryDashboard({
           scope: 3,
           category: 'Cat 4',
           icon: ArrowUpFromLine,
-          color: 'bg-violet-500',
+          color: 'bg-studio-brick',
           dataQuality: 'partial',
         });
       }
@@ -242,7 +243,7 @@ export function FootprintSummaryDashboard({
           scope: 3,
           category: 'Cat 9',
           icon: ArrowDownToLine,
-          color: 'bg-purple-500',
+          color: 'bg-studio-brick',
           dataQuality: 'partial',
         });
       }
@@ -253,7 +254,7 @@ export function FootprintSummaryDashboard({
           scope: 3,
           category: 'Cat 11',
           icon: Zap,
-          color: 'bg-yellow-500',
+          color: 'bg-studio-brick',
           dataQuality: 'partial',
         });
       }
@@ -263,7 +264,7 @@ export function FootprintSummaryDashboard({
         value: scope3Emissions,
         scope: 3,
         icon: Package,
-        color: 'bg-green-500',
+        color: 'bg-studio-brick',
         dataQuality: 'partial',
       });
     }
@@ -292,18 +293,18 @@ export function FootprintSummaryDashboard({
   }, [operationsEmissions, fleetEmissions, scope3Breakdown]);
 
   const getDataQualityBadge = (quality: string) => {
-    const config: Record<string, { label: string; className: string; icon: typeof CheckCircle2 }> = {
-      complete: { label: 'Complete', className: 'bg-green-100 text-green-800 border-green-300', icon: CheckCircle2 },
-      partial: { label: 'Partial', className: 'bg-amber-100 text-amber-800 border-amber-300', icon: AlertCircle },
-      missing: { label: 'Missing', className: 'bg-red-100 text-red-800 border-red-300', icon: AlertCircle },
+    const config: Record<string, { label: string; tone: 'good' | 'attention' | 'stale'; icon: typeof CheckCircle2 }> = {
+      complete: { label: 'Complete', tone: 'good', icon: CheckCircle2 },
+      partial: { label: 'Partial', tone: 'attention', icon: AlertCircle },
+      missing: { label: 'Missing', tone: 'stale', icon: AlertCircle },
     };
     const conf = config[quality] || config.partial;
     const Icon = conf.icon;
     return (
-      <Badge variant="outline" className={cn('text-xs gap-1', conf.className)}>
-        <Icon className="h-3 w-3" />
+      <StateChip tone={conf.tone} className="inline-flex items-center gap-1">
+        <Icon className="h-3 w-3 text-current" />
         {conf.label}
-      </Badge>
+      </StateChip>
     );
   };
 
@@ -313,13 +314,13 @@ export function FootprintSummaryDashboard({
 
   return (
     <div className="space-y-6">
-      <Card className="border-2 border-slate-200 dark:border-slate-700 overflow-hidden">
-        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-b border-slate-200 dark:border-slate-700">
+      <Card className="border-studio-hairline overflow-hidden">
+        <div className="bg-studio-cream border-b border-studio-hairline">
           <CardHeader>
             <div className="flex items-start justify-between">
               <div>
-                <CardTitle className="text-2xl flex items-center gap-2 text-slate-900 dark:text-slate-100">
-                  <BarChart3 className="h-6 w-6 text-emerald-600" />
+                <CardTitle className="text-2xl flex items-center gap-2 text-foreground">
+                  <BarChart3 className="h-6 w-6 text-room-accent" />
                   {year} Emissions Summary
                 </CardTitle>
                 <CardDescription className="mt-1">
@@ -327,7 +328,7 @@ export function FootprintSummaryDashboard({
                 </CardDescription>
               </div>
               <div className="text-right">
-                <div className="text-4xl font-bold text-slate-900 dark:text-slate-100">
+                <div className="text-4xl font-bold tabular-nums text-foreground">
                   {formatEmissions(totalEmissions)} CO₂e
                 </div>
                 <div className="flex items-center justify-end gap-2 mt-1 text-sm text-muted-foreground">
@@ -349,52 +350,52 @@ export function FootprintSummaryDashboard({
 
         <CardContent className="pt-6">
           <div className="grid md:grid-cols-3 gap-4 mb-6">
-            <div className="p-4 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800">
+            <div className="p-4 rounded-lg bg-studio-cream border border-studio-hairline">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-orange-800 dark:text-orange-200">Scope 1</span>
-                <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300">
+                <span className="font-mono text-[9.5px] uppercase tracking-[0.2em] text-muted-foreground">Scope 1</span>
+                <span className="text-xs tabular-nums text-muted-foreground">
                   {formatPercentage(scope1Emissions, totalEmissions)}
-                </Badge>
+                </span>
               </div>
-              <div className="text-2xl font-bold text-orange-900 dark:text-orange-100">
+              <div className="text-2xl font-bold tabular-nums text-foreground">
                 {formatEmissions(scope1Emissions)}
               </div>
-              <p className="text-xs text-orange-700 dark:text-orange-300 mt-1">Direct emissions</p>
+              <p className="text-xs text-muted-foreground mt-1">Direct emissions</p>
             </div>
 
-            <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+            <div className="p-4 rounded-lg bg-studio-cream border border-studio-hairline">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Scope 2</span>
-                <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
+                <span className="font-mono text-[9.5px] uppercase tracking-[0.2em] text-muted-foreground">Scope 2</span>
+                <span className="text-xs tabular-nums text-muted-foreground">
                   {formatPercentage(scope2Emissions, totalEmissions)}
-                </Badge>
+                </span>
               </div>
-              <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+              <div className="text-2xl font-bold tabular-nums text-foreground">
                 {formatEmissions(scope2Emissions)}
               </div>
-              <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">Purchased energy</p>
+              <p className="text-xs text-muted-foreground mt-1">Purchased energy</p>
             </div>
 
-            <div className="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
+            <div className="p-4 rounded-lg bg-studio-cream border border-studio-hairline">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Scope 3</span>
-                <Badge variant="outline" className="bg-emerald-100 text-emerald-800 border-emerald-300">
+                <span className="font-mono text-[9.5px] uppercase tracking-[0.2em] text-muted-foreground">Scope 3</span>
+                <span className="text-xs tabular-nums text-muted-foreground">
                   {formatPercentage(scope3Emissions, totalEmissions)}
-                </Badge>
+                </span>
               </div>
-              <div className="text-2xl font-bold text-emerald-900 dark:text-emerald-100">
+              <div className="text-2xl font-bold tabular-nums text-foreground">
                 {formatEmissions(scope3Emissions)}
               </div>
-              <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">Value chain</p>
+              <p className="text-xs text-muted-foreground mt-1">Value chain</p>
             </div>
           </div>
 
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Emissions by Category</span>
+              <span className="text-sm font-medium text-foreground">Emissions by Category</span>
               <span className="text-xs text-muted-foreground">{categories.length} categories with data</span>
             </div>
-            <div className="flex h-6 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
+            <div className="flex h-6 rounded-lg overflow-hidden border border-studio-hairline bg-secondary">
               {categories.map((cat, idx) => {
                 const width = totalEmissions > 0 ? (cat.value / totalEmissions) * 100 : 0;
                 if (width < 0.5) return null;
@@ -415,14 +416,14 @@ export function FootprintSummaryDashboard({
               const percentage = totalEmissions > 0 ? (cat.value / totalEmissions) * 100 : 0;
               const Icon = cat.icon;
               return (
-                <div key={idx} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                <div key={idx} className="flex items-center gap-3 p-2 rounded-lg hover:bg-secondary">
                   <div className={cn('w-2 h-8 rounded', cat.color)} />
                   <Icon className="h-4 w-4 text-muted-foreground" />
-                  <span className="flex-1 text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
+                  <span className="flex-1 text-sm font-medium text-foreground truncate">
                     {cat.name}
                   </span>
                   {getDataQualityBadge(cat.dataQuality)}
-                  <span className="text-sm font-mono text-slate-700 dark:text-slate-300 w-24 text-right">
+                  <span className="text-sm font-mono tabular-nums text-foreground w-24 text-right">
                     {formatEmissions(cat.value)}
                   </span>
                   <Badge variant="secondary" className="w-14 justify-center text-xs">
@@ -444,39 +445,39 @@ export function FootprintSummaryDashboard({
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+              <CheckCircle2 className="h-5 w-5 text-studio-dim" />
               Data Completeness
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Overall Score</span>
-              <span className="text-2xl font-bold text-slate-900 dark:text-slate-100">{dataCompletenessScore}%</span>
+              <span className="text-2xl font-bold tabular-nums text-foreground">{dataCompletenessScore}%</span>
             </div>
             <Progress value={dataCompletenessScore} className="h-3" />
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div className="flex items-center gap-2">
-                <div className={cn('w-2 h-2 rounded-full', operationsEmissions > 0 ? 'bg-green-500' : 'bg-slate-300')} />
+                <div className={cn('w-2 h-2 rounded-full', operationsEmissions > 0 ? 'bg-studio-good' : 'bg-studio-hairline')} />
                 <span className={operationsEmissions > 0 ? '' : 'text-muted-foreground'}>Operations</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className={cn('w-2 h-2 rounded-full', fleetEmissions > 0 ? 'bg-green-500' : 'bg-slate-300')} />
+                <div className={cn('w-2 h-2 rounded-full', fleetEmissions > 0 ? 'bg-studio-good' : 'bg-studio-hairline')} />
                 <span className={fleetEmissions > 0 ? '' : 'text-muted-foreground'}>Fleet</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className={cn('w-2 h-2 rounded-full', (scope3Breakdown?.products || 0) > 0 ? 'bg-green-500' : 'bg-slate-300')} />
+                <div className={cn('w-2 h-2 rounded-full', (scope3Breakdown?.products || 0) > 0 ? 'bg-studio-good' : 'bg-studio-hairline')} />
                 <span className={(scope3Breakdown?.products || 0) > 0 ? '' : 'text-muted-foreground'}>Products</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className={cn('w-2 h-2 rounded-full', (scope3Breakdown?.business_travel || 0) > 0 ? 'bg-green-500' : 'bg-slate-300')} />
+                <div className={cn('w-2 h-2 rounded-full', (scope3Breakdown?.business_travel || 0) > 0 ? 'bg-studio-good' : 'bg-studio-hairline')} />
                 <span className={(scope3Breakdown?.business_travel || 0) > 0 ? '' : 'text-muted-foreground'}>Travel</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className={cn('w-2 h-2 rounded-full', (scope3Breakdown?.employee_commuting || 0) > 0 ? 'bg-green-500' : 'bg-slate-300')} />
+                <div className={cn('w-2 h-2 rounded-full', (scope3Breakdown?.employee_commuting || 0) > 0 ? 'bg-studio-good' : 'bg-studio-hairline')} />
                 <span className={(scope3Breakdown?.employee_commuting || 0) > 0 ? '' : 'text-muted-foreground'}>Commuting</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className={cn('w-2 h-2 rounded-full', (scope3Breakdown?.operational_waste || 0) > 0 ? 'bg-green-500' : 'bg-slate-300')} />
+                <div className={cn('w-2 h-2 rounded-full', (scope3Breakdown?.operational_waste || 0) > 0 ? 'bg-studio-good' : 'bg-studio-hairline')} />
                 <span className={(scope3Breakdown?.operational_waste || 0) > 0 ? '' : 'text-muted-foreground'}>Waste</span>
               </div>
             </div>
@@ -486,24 +487,24 @@ export function FootprintSummaryDashboard({
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <Info className="h-5 w-5 text-blue-600" />
+              <Info className="h-5 w-5 text-studio-dim" />
               Methodology
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center justify-between p-2 rounded bg-slate-50 dark:bg-slate-800">
+            <div className="flex items-center justify-between p-2 rounded bg-secondary">
               <span className="text-sm">Standard</span>
-              <Badge variant="outline" className="border-green-500 text-green-700">GHG Protocol</Badge>
+              <Badge variant="secondary">GHG Protocol</Badge>
             </div>
-            <div className="flex items-center justify-between p-2 rounded bg-slate-50 dark:bg-slate-800">
+            <div className="flex items-center justify-between p-2 rounded bg-secondary">
               <span className="text-sm">Scope 1 & 2</span>
               <span className="text-sm text-muted-foreground">Activity-based</span>
             </div>
-            <div className="flex items-center justify-between p-2 rounded bg-slate-50 dark:bg-slate-800">
+            <div className="flex items-center justify-between p-2 rounded bg-secondary">
               <span className="text-sm">Scope 3 Categories</span>
               <span className="text-sm text-muted-foreground">Hybrid (activity + spend)</span>
             </div>
-            <div className="flex items-center justify-between p-2 rounded bg-slate-50 dark:bg-slate-800">
+            <div className="flex items-center justify-between p-2 rounded bg-secondary">
               <span className="text-sm">Emission Factors</span>
               <span className="text-sm text-muted-foreground">DEFRA 2025</span>
             </div>
@@ -520,10 +521,10 @@ export function FootprintSummaryDashboard({
       <Collapsible open={verificationOpen} onOpenChange={setVerificationOpen}>
         <Card>
           <CollapsibleTrigger asChild>
-            <CardHeader className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+            <CardHeader className="cursor-pointer hover:bg-secondary transition-colors">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-slate-600" />
+                  <BarChart3 className="h-5 w-5 text-studio-dim" />
                   Calculation Verification
                 </CardTitle>
                 {verificationOpen ? (
@@ -539,7 +540,7 @@ export function FootprintSummaryDashboard({
               <div className="border rounded-lg overflow-hidden">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-slate-50 dark:bg-slate-800">
+                    <TableRow className="bg-secondary">
                       <TableHead>Scope / Category</TableHead>
                       <TableHead>Data Source</TableHead>
                       <TableHead>Calculation Method</TableHead>
@@ -561,7 +562,7 @@ export function FootprintSummaryDashboard({
                     </TableRow>
                     {scope3Breakdown && (
                       <>
-                        <TableRow className="bg-emerald-50/50 dark:bg-emerald-950/10">
+                        <TableRow className="bg-secondary">
                           <TableCell className="font-medium" colSpan={3}>Scope 3: Value Chain</TableCell>
                           <TableCell className="text-right font-mono font-semibold">{scope3Emissions.toFixed(2)}</TableCell>
                         </TableRow>
@@ -615,7 +616,7 @@ export function FootprintSummaryDashboard({
                         )}
                       </>
                     )}
-                    <TableRow className="bg-slate-100 dark:bg-slate-800 font-semibold">
+                    <TableRow className="bg-secondary font-semibold">
                       <TableCell>Total</TableCell>
                       <TableCell></TableCell>
                       <TableCell></TableCell>

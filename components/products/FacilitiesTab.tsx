@@ -1,9 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -17,22 +14,15 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  AlertCircle,
-  Building2,
-  Check,
-  Factory,
-  Loader2,
-  MapPin,
-  Package,
-  Plus,
-  Trash2,
-  Users,
-} from "lucide-react";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { BigNumber } from "@/components/studio/big-number";
+import { StateChip } from "@/components/studio/state-chip";
+import { PillButton } from "@/components/studio/pill-button";
 import { toast } from "sonner";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 
@@ -76,6 +66,10 @@ const VOLUME_UNITS = [
   { value: "bottles", label: "Bottles" },
   { value: "cases", label: "Cases" },
 ];
+
+/** Small mono field label, studio idiom. */
+const FIELD_LABEL =
+  "font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim";
 
 /** Map product unit_size_unit to a sensible production unit default */
 function defaultProductionUnit(unitSizeUnit: string | null): string {
@@ -418,264 +412,218 @@ export function FacilitiesTab({
 
   const hasProductionVolume = annualProductionVolume != null && annualProductionVolume > 0;
   const displayUnit = annualProductionUnit || unitInput;
+  const allocationBalanced = Math.abs(totalAllocation - 100) <= 0.5;
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-lime-400" />
+      <div className="py-12">
+        <p className="animate-pulse text-sm text-studio-dim">Loading facilities...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Manufacturing Facilities</h3>
-          <p className="text-sm text-muted-foreground">
-            Where is this product manufactured?
-          </p>
-        </div>
-        <Button onClick={handleAddFacilities} className="bg-lime-500 hover:bg-lime-600 text-black">
-          <Plus className="mr-2 h-4 w-4" />
-          {assignments.length > 0 ? "Edit Facilities" : "Add Facility"}
-        </Button>
-      </div>
-
-      {/* Empty State */}
+    <div className="space-y-10">
       {assignments.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Factory className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <h4 className="text-lg font-medium mb-2">No Facilities Assigned</h4>
-            <p className="text-sm text-muted-foreground mb-4">
-              Link the facilities where this product is manufactured
-            </p>
-            <Button onClick={handleAddFacilities} variant="outline">
-              <Plus className="mr-2 h-4 w-4" />
-              Add First Facility
-            </Button>
-          </CardContent>
-        </Card>
+        /* Empty state: one dim line, one pill */
+        <section className="border-t border-border pt-5">
+          <Eyebrow className="mb-1">Manufacturing</Eyebrow>
+          <p className="mb-4 max-w-xl text-sm text-studio-dim">
+            No facilities assigned yet. Link the facilities where this product is made so its
+            footprint can be allocated across them.
+          </p>
+          <PillButton variant="room" size="sm" onClick={handleAddFacilities}>
+            Add a facility
+          </PillButton>
+        </section>
       ) : (
         <>
-          {/* Annual Production Card */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-lime-500/20 flex items-center justify-center">
-                    <Package className="h-5 w-5 text-lime-500" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base">Annual Production</CardTitle>
-                    <CardDescription>
-                      How many units of this product do you produce per year?
-                    </CardDescription>
-                  </div>
+          {/* Annual production */}
+          <section className="border-t border-border pt-5">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <Eyebrow className="mb-1">Annual production</Eyebrow>
+                <p className="text-sm text-muted-foreground">
+                  How many units of this product do you make each year?
+                </p>
+              </div>
+              {hasProductionVolume && !editingProduction && (
+                <PillButton variant="ghost" size="sm" onClick={() => setEditingProduction(true)}>
+                  Edit
+                </PillButton>
+              )}
+            </div>
+
+            {!hasProductionVolume || editingProduction ? (
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="flex-1 space-y-1.5">
+                  <Label className={FIELD_LABEL}>Volume</Label>
+                  <Input
+                    type="number"
+                    value={volumeInput}
+                    onChange={(e) => setVolumeInput(e.target.value)}
+                    placeholder="e.g. 10000"
+                    min={0}
+                  />
                 </div>
-                {hasProductionVolume && !editingProduction && (
-                  <Button
+                <div className="w-40 space-y-1.5">
+                  <Label className={FIELD_LABEL}>Unit</Label>
+                  <Select value={unitInput} onValueChange={setUnitInput}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {VOLUME_UNITS.map((unit) => (
+                        <SelectItem key={unit.value} value={unit.value}>
+                          {unit.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <PillButton onClick={handleSaveProduction} disabled={saving || !volumeInput}>
+                  {saving ? "Saving..." : "Save"}
+                </PillButton>
+                {editingProduction && (
+                  <PillButton
                     variant="ghost"
-                    size="sm"
-                    onClick={() => setEditingProduction(true)}
+                    onClick={() => {
+                      setEditingProduction(false);
+                      setVolumeInput(annualProductionVolume?.toString() || "");
+                      setUnitInput(annualProductionUnit || defaultProductionUnit(unitSizeUnit));
+                    }}
                   >
-                    Edit
-                  </Button>
+                    Cancel
+                  </PillButton>
                 )}
               </div>
-            </CardHeader>
-            <CardContent>
-              {!hasProductionVolume || editingProduction ? (
-                <div className="flex items-end gap-3">
-                  <div className="flex-1 space-y-1.5">
-                    <Label className="text-sm text-muted-foreground">Volume</Label>
-                    <Input
-                      type="number"
-                      value={volumeInput}
-                      onChange={(e) => setVolumeInput(e.target.value)}
-                      placeholder="e.g. 10000"
-                      min={0}
-                    />
-                  </div>
-                  <div className="w-40 space-y-1.5">
-                    <Label className="text-sm text-muted-foreground">Unit</Label>
-                    <Select value={unitInput} onValueChange={setUnitInput}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {VOLUME_UNITS.map((unit) => (
-                          <SelectItem key={unit.value} value={unit.value}>
-                            {unit.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button
-                    onClick={handleSaveProduction}
-                    disabled={saving || !volumeInput}
-                    className="bg-lime-500 hover:bg-lime-600 text-black"
-                  >
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-                  </Button>
-                  {editingProduction && (
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        setEditingProduction(false);
-                        setVolumeInput(annualProductionVolume?.toString() || "");
-                        setUnitInput(annualProductionUnit || defaultProductionUnit(unitSizeUnit));
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl font-bold text-lime-500">
-                    {annualProductionVolume!.toLocaleString()}
-                  </span>
-                  <span className="text-lg text-muted-foreground">{displayUnit} / year</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+            ) : (
+              <BigNumber
+                value={annualProductionVolume!.toLocaleString("en-GB")}
+                label={`${displayUnit} per year`}
+              />
+            )}
+          </section>
 
-          {/* Facility List */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Linked Facilities</CardTitle>
-              <CardDescription>
-                {assignments.length === 1
-                  ? "This product is manufactured at one facility"
-                  : `Split production across ${assignments.length} facilities`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          {/* Linked facilities */}
+          <section className="border-t border-border pt-5">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <Eyebrow className="mb-1">Linked facilities</Eyebrow>
+                <p className="text-sm text-muted-foreground">
+                  {assignments.length === 1
+                    ? "Made at one facility."
+                    : `Split across ${assignments.length} facilities.`}
+                </p>
+              </div>
+              <PillButton variant="room" size="sm" onClick={handleAddFacilities}>
+                Edit facilities
+              </PillButton>
+            </div>
+
+            <div className="divide-y divide-border">
               {assignments.map((assignment) => {
                 const pct = allocations[assignment.facility_id] ?? assignment.allocation_percentage;
                 const computedVolume = hasProductionVolume
                   ? Math.round((annualProductionVolume! * pct) / 100)
                   : null;
+                const owned = assignment.facility.operational_control === "owned";
 
                 return (
-                  <div
-                    key={assignment.id}
-                    className="p-4 rounded-lg border bg-card"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        {assignment.facility.operational_control === "owned" ? (
-                          <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-                            <Building2 className="h-5 w-5 text-blue-400" />
-                          </div>
-                        ) : (
-                          <div className="h-10 w-10 rounded-full bg-amber-500/20 flex items-center justify-center">
-                            <Users className="h-5 w-5 text-amber-400" />
-                          </div>
-                        )}
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium">{assignment.facility.name}</p>
-                            <Badge variant="outline" className="text-xs">
-                              {assignment.facility.operational_control === "owned" ? "Owned" : "Third Party"}
-                            </Badge>
-                            {assignment.is_primary_facility && (
-                              <Badge className="bg-lime-500/20 text-lime-700 dark:text-lime-300 text-xs">Primary</Badge>
-                            )}
-                          </div>
-                          {assignment.facility.address_city && (
-                            <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
-                              <MapPin className="h-3 w-3" />
-                              {assignment.facility.address_city}, {assignment.facility.address_country}
-                            </p>
+                  <div key={assignment.id} className="py-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <span className="font-display text-sm font-semibold text-foreground">
+                            {assignment.facility.name}
+                          </span>
+                          <StateChip tone={owned ? "good" : "quiet"}>
+                            {owned ? "Owned" : "Third party"}
+                          </StateChip>
+                          {assignment.is_primary_facility && (
+                            <StateChip tone="quiet">Primary</StateChip>
                           )}
                         </div>
+                        {assignment.facility.address_city && (
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {assignment.facility.address_city}, {assignment.facility.address_country}
+                          </p>
+                        )}
                       </div>
-                      <Button
+                      <PillButton
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleRemoveFacility(assignment.id, assignment.facility_id)}
-                        className="text-muted-foreground hover:text-destructive"
+                        className="text-studio-stale hover:text-studio-stale"
+                        onClick={() =>
+                          handleRemoveFacility(assignment.id, assignment.facility_id)
+                        }
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                        Remove
+                      </PillButton>
                     </div>
 
                     {/* Allocation & computed volume */}
-                    <div className="mt-3 flex items-center gap-4">
+                    <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
                       {assignments.length > 1 ? (
                         <div className="flex items-center gap-2">
-                          <Label className="text-sm text-muted-foreground whitespace-nowrap">Allocation</Label>
+                          <Label className={`${FIELD_LABEL} whitespace-nowrap`}>Allocation</Label>
                           <Input
                             type="number"
                             value={pct}
-                            onChange={(e) => handleAllocationChange(assignment.facility_id, e.target.value)}
-                            className="w-20 text-right"
+                            onChange={(e) =>
+                              handleAllocationChange(assignment.facility_id, e.target.value)
+                            }
+                            className="w-20 text-right tabular-nums"
                             min={0}
                             max={100}
                           />
                           <span className="text-sm text-muted-foreground">%</span>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary">100%</Badge>
-                        </div>
+                        <StateChip tone="quiet">100% allocation</StateChip>
                       )}
 
                       {computedVolume != null && (
-                        <p className="text-sm text-muted-foreground">
-                          {computedVolume.toLocaleString()} {displayUnit} / year
-                        </p>
+                        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+                          {computedVolume.toLocaleString("en-GB")} {displayUnit} / year
+                        </span>
                       )}
 
-                      {/* LCA results badge */}
+                      {/* Latest LCA result */}
                       {assignment.lca_allocation && (
-                        <Badge
-                          variant="outline"
-                          className="ml-auto text-xs border-lime-500/30 text-lime-700 dark:text-lime-300"
-                        >
-                          <Check className="h-3 w-3 mr-1" />
-                          Latest LCA: {assignment.lca_allocation.allocated_emissions.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg CO₂e
-                        </Badge>
+                        <span className="ml-auto font-display text-sm font-bold tabular-nums text-foreground">
+                          {assignment.lca_allocation.allocated_emissions.toLocaleString(undefined, {
+                            maximumFractionDigits: 0,
+                          })}
+                          <span className="ml-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                            kg CO₂e latest LCA
+                          </span>
+                        </span>
                       )}
                     </div>
                   </div>
                 );
               })}
+            </div>
 
-              {/* Allocation validation & save */}
-              {assignments.length > 1 && (
-                <div className="flex items-center justify-between pt-2 border-t">
-                  <div className="flex items-center gap-2">
-                    {Math.abs(totalAllocation - 100) > 0.5 ? (
-                      <Badge variant="destructive" className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30">
-                        <AlertCircle className="h-3 w-3 mr-1" />
-                        Total: {totalAllocation.toFixed(0)}% — must equal 100%
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary" className="bg-lime-500/20 text-lime-700 dark:text-lime-300">
-                        <Check className="h-3 w-3 mr-1" />
-                        Total: 100%
-                      </Badge>
-                    )}
-                  </div>
-                  <Button
-                    onClick={handleSaveAllocations}
-                    disabled={saving || Math.abs(totalAllocation - 100) > 0.5}
-                    size="sm"
-                    className="bg-lime-500 hover:bg-lime-600 text-black"
-                  >
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Allocation"}
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+            {/* Allocation validation & save */}
+            {assignments.length > 1 && (
+              <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+                <StateChip tone={allocationBalanced ? "good" : "attention"}>
+                  {allocationBalanced
+                    ? "Total 100%"
+                    : `Total ${totalAllocation.toFixed(0)}%, must equal 100%`}
+                </StateChip>
+                <PillButton
+                  onClick={handleSaveAllocations}
+                  disabled={saving || !allocationBalanced}
+                  size="sm"
+                >
+                  {saving ? "Saving..." : "Save allocation"}
+                </PillButton>
+              </div>
+            )}
+          </section>
         </>
       )}
 
@@ -683,80 +631,68 @@ export function FacilitiesTab({
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Select Facilities</DialogTitle>
+            <DialogTitle>Select facilities</DialogTitle>
             <DialogDescription>
               Choose which facilities manufacture this product.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4 max-h-96 overflow-y-auto">
+          <div className="max-h-96 space-y-3 overflow-y-auto py-4">
             {facilities.length === 0 ? (
-              <div className="text-center py-8">
-                <Factory className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  No facilities found. Add facilities in Company &gt; Facilities first.
-                </p>
-              </div>
+              <p className="py-8 text-center text-sm text-studio-dim">
+                No facilities found. Add facilities in Company &gt; Facilities first.
+              </p>
             ) : (
-              facilities.map((facility) => (
-                <div
-                  key={facility.id}
-                  className={`flex items-center gap-4 p-4 rounded-lg border cursor-pointer transition-all ${
-                    selectedFacilityIds.includes(facility.id)
-                      ? "bg-lime-500/10 border-lime-500/50"
-                      : "border-border hover:border-muted-foreground/30"
-                  }`}
-                  onClick={() => handleToggleFacility(facility.id)}
-                >
-                  <Checkbox
-                    checked={selectedFacilityIds.includes(facility.id)}
-                    onCheckedChange={() => handleToggleFacility(facility.id)}
-                  />
-                  <div className="flex items-center gap-3 flex-1">
-                    {facility.operational_control === "owned" ? (
-                      <Building2 className="h-5 w-5 text-blue-400" />
-                    ) : (
-                      <Users className="h-5 w-5 text-amber-400" />
-                    )}
-                    <div>
-                      <p className="font-medium">{facility.name}</p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              facilities.map((facility) => {
+                const selected = selectedFacilityIds.includes(facility.id);
+                const owned = facility.operational_control === "owned";
+                return (
+                  <div
+                    key={facility.id}
+                    className={`flex cursor-pointer items-center gap-4 rounded-[6px] border p-4 transition-colors duration-200 ease-studio ${
+                      selected
+                        ? "border-room-accent bg-room-accent/5"
+                        : "border-border hover:border-studio-dim/50"
+                    }`}
+                    onClick={() => handleToggleFacility(facility.id)}
+                  >
+                    <Checkbox
+                      checked={selected}
+                      onCheckedChange={() => handleToggleFacility(facility.id)}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-display text-sm font-semibold text-foreground">
+                        {facility.name}
+                      </p>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                         {facility.address_city && (
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3" />
+                          <span className="text-xs text-muted-foreground">
                             {facility.address_city}
                           </span>
                         )}
-                        <Badge variant="outline" className="text-xs">
-                          {facility.operational_control === "owned" ? "Owned" : "Third Party"}
-                        </Badge>
+                        <StateChip tone={owned ? "good" : "quiet"}>
+                          {owned ? "Owned" : "Third party"}
+                        </StateChip>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button variant="ghost" onClick={() => setDialogOpen(false)} disabled={saving}>
+          <DialogFooter>
+            <PillButton variant="ghost" onClick={() => setDialogOpen(false)} disabled={saving}>
               Cancel
-            </Button>
-            <Button
+            </PillButton>
+            <PillButton
+              variant="room"
               onClick={handleSaveAssignments}
               disabled={saving || facilities.length === 0}
-              className="bg-lime-500 hover:bg-lime-600 text-black"
             >
-              {saving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>Save ({selectedFacilityIds.length} selected)</>
-              )}
-            </Button>
-          </div>
+              {saving ? "Saving..." : `Save (${selectedFacilityIds.length} selected)`}
+            </PillButton>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

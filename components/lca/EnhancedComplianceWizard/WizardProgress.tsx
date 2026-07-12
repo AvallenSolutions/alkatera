@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { Check, Clock, AlertCircle } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -63,35 +62,21 @@ export function getWizardSteps(systemBoundary: string, showGuide: boolean = fals
 export const WIZARD_STEPS = getWizardSteps('cradle-to-gate');
 
 // ============================================================================
-// PROGRESS TIMER
+// QUIET MONO STEP RAIL
 // ============================================================================
 
-interface ProgressTimerProps {
-  estimatedMinutes: number;
-}
-
-function ProgressTimer({ estimatedMinutes }: ProgressTimerProps) {
-  return (
-    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-      <Clock className="h-4 w-4" />
-      <span>
-        ~{estimatedMinutes} {estimatedMinutes === 1 ? 'minute' : 'minutes'} remaining
-      </span>
-    </div>
-  );
-}
-
-// ============================================================================
-// STEP INDICATOR
-// ============================================================================
-
-interface StepIndicatorProps {
+interface StepLabelProps {
   step: WizardStep;
   status: 'completed' | 'current' | 'upcoming';
   onClick?: () => void;
 }
 
-function StepIndicator({ step, status, onClick }: StepIndicatorProps) {
+/**
+ * One step as a quiet mono label. Current takes the room accent with an
+ * underline; done steps dim; upcoming steps dimmer and disabled. No circles,
+ * no connectors, no icons.
+ */
+function StepLabel({ step, status, onClick }: StepLabelProps) {
   const isClickable = status === 'completed' || status === 'current';
 
   return (
@@ -99,60 +84,15 @@ function StepIndicator({ step, status, onClick }: StepIndicatorProps) {
       onClick={onClick}
       disabled={!isClickable}
       className={cn(
-        'group flex flex-col items-center gap-1.5 transition-all',
-        isClickable && 'cursor-pointer hover:opacity-80',
-        !isClickable && 'cursor-default'
+        'shrink-0 font-mono text-[10px] font-bold uppercase tracking-[0.18em] transition-colors duration-150 ease-studio',
+        status === 'current' &&
+          'text-room-accent underline decoration-room-accent decoration-2 underline-offset-4',
+        status === 'completed' && 'text-studio-dim hover:text-foreground',
+        status === 'upcoming' && 'cursor-default text-studio-dim/45',
       )}
     >
-      {/* Circle indicator */}
-      <div
-        className={cn(
-          'flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all',
-          status === 'completed' && 'border-primary bg-primary text-primary-foreground',
-          status === 'current' && 'border-primary bg-background text-primary',
-          status === 'upcoming' && 'border-muted-foreground/30 bg-muted text-muted-foreground'
-        )}
-      >
-        {status === 'completed' ? (
-          <Check className="h-5 w-5" />
-        ) : (
-          <span className="text-sm font-medium">{step.number}</span>
-        )}
-      </div>
-
-      {/* Label */}
-      <span
-        className={cn(
-          'text-xs font-medium transition-colors',
-          status === 'current' && 'text-primary',
-          status === 'completed' && 'text-foreground',
-          status === 'upcoming' && 'text-muted-foreground'
-        )}
-      >
-        {step.shortTitle}
-      </span>
+      {step.shortTitle}
     </button>
-  );
-}
-
-// ============================================================================
-// CONNECTOR LINE
-// ============================================================================
-
-interface ConnectorLineProps {
-  completed: boolean;
-}
-
-function ConnectorLine({ completed }: ConnectorLineProps) {
-  return (
-    <div className="flex-1 px-2">
-      <div
-        className={cn(
-          'h-0.5 w-full transition-colors',
-          completed ? 'bg-primary' : 'bg-muted-foreground/30'
-        )}
-      />
-    </div>
   );
 }
 
@@ -165,7 +105,7 @@ interface WizardProgressProps {
 }
 
 export function WizardProgress({ className }: WizardProgressProps) {
-  const { progress, goToStep, formData, showGuide } = useWizardContext();
+  const { progress, goToStep, formData, showGuide, totalSteps } = useWizardContext();
 
   // Dynamic steps based on boundary (includes guide step when shown)
   const steps = React.useMemo(
@@ -182,14 +122,20 @@ export function WizardProgress({ className }: WizardProgressProps) {
   const currentStepInfo = steps.find((s) => s.number === progress.currentStep);
 
   return (
-    <div className={cn('space-y-4', className)}>
-      {/* Progress bar with steps */}
+    <div className={cn('space-y-3', className)}>
+      {/* The mono position line: STEP N OF M · NAME */}
+      <div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-room-accent">
+        Step {progress.currentStep} of {totalSteps}
+        {currentStepInfo ? <span className="text-studio-dim"> · {currentStepInfo.title}</span> : null}
+      </div>
+
+      {/* Quiet mono step rail: current accented + underlined, done dim, upcoming dimmer */}
       <TooltipProvider delayDuration={300}>
-        <div className="flex items-center justify-between">
-          {steps.map((step, index) => {
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {steps.map((step) => {
             const status = getStepStatus(step.number);
-            const indicator = (
-              <StepIndicator
+            const label = (
+              <StepLabel
                 step={step}
                 status={status}
                 onClick={() => {
@@ -200,103 +146,43 @@ export function WizardProgress({ className }: WizardProgressProps) {
               />
             );
 
-            return (
-              <React.Fragment key={step.id}>
-                {status === 'upcoming' ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div>{indicator}</div>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-xs">
-                      Complete Step {progress.currentStep} first
-                    </TooltipContent>
-                  </Tooltip>
-                ) : status === 'completed' ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div>{indicator}</div>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-xs">
-                      Jump to {step.title}
-                    </TooltipContent>
-                  </Tooltip>
-                ) : (
-                  indicator
-                )}
-                {index < steps.length - 1 && (
-                  <ConnectorLine
-                    completed={progress.completedSteps.includes(step.number)}
-                  />
-                )}
-              </React.Fragment>
-            );
+            if (status === 'upcoming') {
+              return (
+                <Tooltip key={step.id}>
+                  <TooltipTrigger asChild>
+                    <span>{label}</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="font-mono text-[10px] uppercase tracking-[0.15em]">
+                    Complete step {progress.currentStep} first
+                  </TooltipContent>
+                </Tooltip>
+              );
+            }
+
+            if (status === 'completed') {
+              return (
+                <Tooltip key={step.id}>
+                  <TooltipTrigger asChild>
+                    <span>{label}</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="font-mono text-[10px] uppercase tracking-[0.15em]">
+                    Jump to {step.title}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            }
+
+            return <React.Fragment key={step.id}>{label}</React.Fragment>;
           })}
         </div>
       </TooltipProvider>
 
-      {/* Current step info + time estimate */}
-      <div className="flex items-center justify-between border-t pt-4">
-        <div>
-          <h2 className="text-lg font-semibold">
-            Step {progress.currentStep}: {currentStepInfo?.title}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {currentStepInfo?.description}
-          </p>
-        </div>
-        <ProgressTimer estimatedMinutes={progress.estimatedTimeRemaining} />
-      </div>
-
-      {/* Auto-save indicator */}
-      <AutoSaveIndicator />
+      {/* Quiet supporting line for the current step */}
+      {currentStepInfo?.description ? (
+        <p className="text-sm text-studio-dim">{currentStepInfo.description}</p>
+      ) : null}
     </div>
   );
-}
-
-// ============================================================================
-// AUTO-SAVE INDICATOR
-// ============================================================================
-
-function AutoSaveIndicator() {
-  const { saving, progress, error } = useWizardContext();
-
-  if (error) {
-    return (
-      <div className="flex items-center gap-2 text-sm text-destructive">
-        <AlertCircle className="h-4 w-4" />
-        <span>Error saving progress</span>
-      </div>
-    );
-  }
-
-  if (saving) {
-    return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-        <span>Saving...</span>
-      </div>
-    );
-  }
-
-  if (progress.lastSavedAt) {
-    return (
-      <div className="text-sm text-muted-foreground">
-        Last saved: {formatTime(progress.lastSavedAt)}
-      </div>
-    );
-  }
-
-  return null;
-}
-
-function formatTime(date: Date): string {
-  const now = new Date();
-  const diffSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-  if (diffSeconds < 10) return 'just now';
-  if (diffSeconds < 60) return `${diffSeconds}s ago`;
-  if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)}m ago`;
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 // ============================================================================
@@ -308,21 +194,25 @@ interface CompactProgressProps {
 }
 
 export function CompactProgress({ className }: CompactProgressProps) {
-  const { progress, totalSteps } = useWizardContext();
+  const { progress, totalSteps, formData, showGuide } = useWizardContext();
+  const steps = React.useMemo(
+    () => getWizardSteps(formData.systemBoundary || 'cradle-to-gate', showGuide),
+    [formData.systemBoundary, showGuide]
+  );
+  const currentStepInfo = steps.find((s) => s.number === progress.currentStep);
   const completedCount = progress.completedSteps.length;
   const percentage = Math.round((completedCount / totalSteps) * 100);
 
   return (
     <div className={cn('space-y-2', className)}>
-      <div className="flex items-center justify-between text-sm">
-        <span className="font-medium">
-          Step {progress.currentStep} of {totalSteps}
-        </span>
-        <span className="text-muted-foreground">{percentage}% complete</span>
+      <div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-room-accent">
+        Step {progress.currentStep} of {totalSteps}
+        {currentStepInfo ? <span className="text-studio-dim"> · {currentStepInfo.title}</span> : null}
       </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+      {/* One hairline progress line, no spinner, no percentage chrome */}
+      <div className="h-px w-full bg-studio-hairline">
         <div
-          className="h-full bg-primary transition-all duration-300"
+          className="h-px bg-room-accent transition-all duration-300 ease-studio"
           style={{ width: `${percentage}%` }}
         />
       </div>

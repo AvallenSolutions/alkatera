@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
   TableBody,
@@ -11,7 +10,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { AlertCircle, ChevronDown, ChevronRight } from 'lucide-react'
-import { Eyebrow } from '@/components/studio/eyebrow'
+import { Statement } from '@/components/studio/statement'
+import { Panel } from '@/components/studio/panel'
 import { StateChip } from '@/components/studio/state-chip'
 import { useIsAlkateraAdmin } from '@/hooks/usePermissions'
 import { format } from 'date-fns'
@@ -76,14 +76,14 @@ export default function IngestLearningPage() {
   if (adminLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">Loading…</p>
       </div>
     )
   }
 
   if (!isAdmin) {
     return (
-      <div className="flex items-center gap-2 justify-center py-20 text-sm text-muted-foreground">
+      <div className="flex items-center justify-center gap-2 py-20 text-sm text-studio-dim">
         <AlertCircle className="h-4 w-4" /> Admin access required.
       </div>
     )
@@ -95,11 +95,8 @@ export default function IngestLearningPage() {
   return (
     <div className="space-y-6 p-6">
       <div>
-        <Eyebrow tone="dim" className="mb-3">THE WIRING · ADMIN</Eyebrow>
-        <h1 className="font-display text-3xl font-bold tracking-[-0.035em] text-foreground">
-          Smart Upload learning.
-        </h1>
-        <p className="text-sm text-muted-foreground mt-2">
+        <Statement eyebrow="THE WIRING · ADMIN" headline="Smart Upload learning." />
+        <p className="mt-2 max-w-2xl text-sm text-studio-dim">
           What the classifier extracted vs what users saved. Edit rate falling over time means the
           learning loop is working.
         </p>
@@ -107,22 +104,22 @@ export default function IngestLearningPage() {
 
       {loading ? (
         <div className="flex items-center justify-center py-16">
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">Loading…</p>
         </div>
       ) : error ? (
-        <div className="flex items-center gap-2 py-16 justify-center text-sm text-muted-foreground">
+        <div className="flex items-center justify-center gap-2 py-16 text-sm text-studio-dim">
           <AlertCircle className="h-4 w-4" /> {error}
         </div>
       ) : (
         <>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Accuracy by document type</CardTitle>
-              <CardDescription>Confirmed uploads in the last 90 days. &quot;Edited&quot; = the user changed at least one field before saving.</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <Panel>
+            <div className="mb-4 space-y-1">
+              <h2 className="font-display text-base font-semibold text-foreground">Accuracy by document type</h2>
+              <p className="text-sm text-studio-dim">Confirmed uploads in the last 90 days. &quot;Edited&quot; = the user changed at least one field before saving.</p>
+            </div>
+            <div>
               {perType.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No confirmed uploads yet.</p>
+                <p className="text-sm text-studio-dim">No confirmed uploads yet.</p>
               ) : (
                 <Table>
                   <TableHeader>
@@ -149,17 +146,17 @@ export default function IngestLearningPage() {
                   </TableBody>
                 </Table>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Learned document profiles</CardTitle>
-              <CardDescription>Supplier memory injected into the classifier prompt, most-seen first.</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <Panel>
+            <div className="mb-4 space-y-1">
+              <h2 className="font-display text-base font-semibold text-foreground">Learned document profiles</h2>
+              <p className="text-sm text-studio-dim">Supplier memory injected into the classifier prompt, most-seen first.</p>
+            </div>
+            <div>
               {topSuppliers.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No profiles learned yet.</p>
+                <p className="text-sm text-studio-dim">No profiles learned yet.</p>
               ) : (
                 <Table>
                   <TableHeader>
@@ -176,29 +173,29 @@ export default function IngestLearningPage() {
                       <TableRow key={`${s.supplier_key}-${s.result_type}-${i}`}>
                         <TableCell className="font-medium">{s.supplier_key}</TableCell>
                         <TableCell className="font-mono text-xs">{s.result_type}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{s.organization_name || '—'}</TableCell>
+                        <TableCell className="text-xs text-studio-dim">{s.organization_name || '·'}</TableCell>
                         <TableCell className="text-right">{s.times_seen}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground max-w-[280px] truncate">
+                        <TableCell className="max-w-[280px] truncate text-xs text-studio-dim">
                           {Object.entries(s.hints || {})
                             .map(([k, v]) => `${k}: ${v}`)
-                            .join(' · ') || '—'}
+                            .join(' · ') || '·'}
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Recent confirmations</CardTitle>
-              <CardDescription>Latest 50 saves, with the user&apos;s corrections. Click a row to see the diff.</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <Panel>
+            <div className="mb-4 space-y-1">
+              <h2 className="font-display text-base font-semibold text-foreground">Recent confirmations</h2>
+              <p className="text-sm text-studio-dim">Latest 50 saves, with the user&apos;s corrections. Click a row to see the diff.</p>
+            </div>
+            <div>
               {recent.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nothing yet.</p>
+                <p className="text-sm text-studio-dim">Nothing yet.</p>
               ) : (
                 <Table>
                   <TableHeader>
@@ -226,20 +223,20 @@ export default function IngestLearningPage() {
                               <ChevronRight className="h-3.5 w-3.5" />
                             )}
                           </TableCell>
-                          <TableCell className="text-xs whitespace-nowrap">
+                          <TableCell className="whitespace-nowrap text-xs">
                             {format(new Date(f.created_at), 'd MMM HH:mm')}
                           </TableCell>
                           <TableCell className="font-mono text-xs">{f.result_type}</TableCell>
-                          <TableCell className="text-xs">{f.supplier_key || '—'}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{f.organization_name || '—'}</TableCell>
+                          <TableCell className="text-xs">{f.supplier_key || '·'}</TableCell>
+                          <TableCell className="text-xs text-studio-dim">{f.organization_name || '·'}</TableCell>
                           <TableCell className="text-right">
                             <StateChip tone={diffCount(f) > 0 ? 'attention' : 'quiet'}>{diffCount(f)}</StateChip>
                           </TableCell>
                         </TableRow>
                         {expanded === f.id && (
                           <TableRow key={`${f.id}-diff`}>
-                            <TableCell colSpan={6} className="bg-muted/30">
-                              <pre className="text-[11px] whitespace-pre-wrap max-h-64 overflow-y-auto p-2">
+                            <TableCell colSpan={6} className="bg-studio-paper/60">
+                              <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap p-2 text-[11px]">
                                 {JSON.stringify({ field_diff: f.field_diff, context: f.context }, null, 2)}
                               </pre>
                             </TableCell>
@@ -250,8 +247,8 @@ export default function IngestLearningPage() {
                   </TableBody>
                 </Table>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
         </>
       )}
     </div>

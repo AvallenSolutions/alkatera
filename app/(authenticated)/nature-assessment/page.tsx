@@ -1,14 +1,9 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import {
   Select,
@@ -17,8 +12,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { AlertCircle, ChevronLeft, ChevronRight, Save, CheckCircle2 } from 'lucide-react'
 import { Eyebrow } from '@/components/studio/eyebrow'
+import { Panel } from '@/components/studio/panel'
+import { PillButton } from '@/components/studio/pill-button'
+import { BigNumber } from '@/components/studio/big-number'
 import { toast } from 'sonner'
 import { useOrganization } from '@/lib/organizationContext'
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client'
@@ -124,12 +121,6 @@ function sectionStatus(section: number, form: NatureForm, locate: LocateSummary 
     return 'empty'
   }
   return 'empty'
-}
-
-function overallProgress(form: NatureForm, locate: LocateSummary | null): number {
-  const statuses = [0, 1, 2, 3].map(s => sectionStatus(s, form, locate))
-  const score = statuses.reduce((acc, s) => acc + (s === 'complete' ? 1 : s === 'partial' ? 0.5 : 0), 0)
-  return Math.round((score / 4) * 100)
 }
 
 function statusColour(s: 'complete' | 'partial' | 'empty') {
@@ -302,7 +293,9 @@ export default function NatureAssessmentPage() {
   const back = () => setCurrentSection(s => Math.max(s - 1, 0))
 
   /* ---- render helpers ---- */
-  const progress = overallProgress(form, locateSummary)
+  const completeSections = [0, 1, 2, 3].filter(
+    s => sectionStatus(s, form, locateSummary) === 'complete',
+  ).length
 
   if (!hasFeature('viticulture_beta') && !hasFeature('orchard_beta') && !hasFeature('arable_beta')) {
     return <FeatureGate feature="orchard_beta" />
@@ -320,7 +313,7 @@ export default function NatureAssessmentPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <Eyebrow className="mb-3">THE MEASURES · NATURE</Eyebrow>
+        <Eyebrow className="mb-3">THE CELLAR · NATURE</Eyebrow>
         <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
           Nature impact assessment.
         </h1>
@@ -329,7 +322,7 @@ export default function NatureAssessmentPage() {
         </p>
       </div>
 
-      {/* LEAP phase tabs */}
+      {/* LEAP sections, quiet mono tabs (autosave fires on section change) */}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         {SECTIONS.map((label, idx) => {
           const status = sectionStatus(idx, form, locateSummary)
@@ -346,28 +339,23 @@ export default function NatureAssessmentPage() {
         })}
       </div>
 
-      {/* Progress bar */}
-      <div className="space-y-1">
-        <div className="flex justify-between text-xs text-muted-foreground">
-          <span>Overall completion</span>
-          <span>{progress}%</span>
-        </div>
-        <Progress value={progress} className="h-2" />
+      {/* Completion, as a mono line */}
+      <div className="border-t border-studio-hairline pt-4 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+        {completeSections} of 4 sections complete
       </div>
-
-      <Separator />
 
       {/* Section 0: Locate */}
       {currentSection === 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">Locate: Nature Interface</h2>
-          <p className="text-sm text-muted-foreground">
-            Summary of your vineyard and orchard sites and their proximity to biodiversity-sensitive areas.
-          </p>
+        <div className="space-y-5">
+          <div>
+            <Eyebrow tone="dim" className="mb-2">Locate: nature interface</Eyebrow>
+            <p className="text-sm text-muted-foreground">
+              Your vineyard and orchard sites, and how close they sit to biodiversity-sensitive areas.
+            </p>
+          </div>
 
           {locateSummary && locateSummary.totalSites === 0 && (
-            <div className="rounded-[6px] border border-border bg-card p-3 flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-studio-attention mt-0.5 shrink-0" />
+            <div className="rounded-[6px] border border-studio-hairline bg-studio-cream p-4">
               <p className="text-xs text-muted-foreground">
                 No vineyard or orchard sites found. Add sites in your growing profiles to populate TNFD Locate data.
               </p>
@@ -376,68 +364,44 @@ export default function NatureAssessmentPage() {
 
           {locateSummary && locateSummary.totalSites > 0 && (
             <>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs font-medium text-muted-foreground">Total Sites</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-bold">{locateSummary.totalSites}</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs font-medium text-muted-foreground">Ecosystem Type Set</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-bold">
-                      {locateSummary.withEcosystem}
-                      <span className="text-sm font-normal text-muted-foreground"> / {locateSummary.totalSites}</span>
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs font-medium text-muted-foreground">Biodiversity-Sensitive</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-2xl font-bold">{locateSummary.sensitiveSites.length}</p>
-                    {locateSummary.sensitiveSites.length > 0 && (
-                      <ul className="mt-1 text-xs text-muted-foreground">
-                        {locateSummary.sensitiveSites.map(name => (
-                          <li key={name}>- {name}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </CardContent>
-                </Card>
+              <div className="flex flex-wrap items-end gap-x-12 gap-y-4 border-t border-studio-hairline pt-5">
+                <BigNumber size="display" value={locateSummary.totalSites} label="Sites" />
+                <BigNumber
+                  size="display"
+                  value={`${locateSummary.withEcosystem} / ${locateSummary.totalSites}`}
+                  label="Ecosystem type set"
+                />
+                <BigNumber
+                  size="display"
+                  value={locateSummary.sensitiveSites.length}
+                  label="Biodiversity-sensitive"
+                />
               </div>
 
-              {/* Water stress distribution */}
+              {locateSummary.sensitiveSites.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Sensitive sites: {locateSummary.sensitiveSites.join(', ')}
+                </p>
+              )}
+
+              {/* Water stress distribution, as a plain fact line */}
               {Object.keys(locateSummary.waterStress).length > 0 && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-xs font-medium text-muted-foreground">Water Stress Distribution</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-wrap gap-2">
-                      {Object.entries(locateSummary.waterStress).map(([level, count]) => (
-                        <Badge key={level} variant="outline" className="text-xs">
-                          {level}: {count}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                <div>
+                  <p className="mb-1.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-studio-dim">
+                    Water stress
+                  </p>
+                  <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                    {Object.entries(locateSummary.waterStress)
+                      .map(([level, count]) => `${level} ${count}`)
+                      .join('  ·  ')}
+                  </p>
+                </div>
               )}
 
               {locateSummary.withEcosystem < locateSummary.totalSites && (
-                <div className="rounded-[6px] border border-border bg-card p-3 flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 text-studio-attention mt-0.5 shrink-0" />
+                <div className="rounded-[6px] border border-studio-hairline bg-studio-cream p-4">
                   <p className="text-xs text-muted-foreground">
-                    Complete location data in your vineyard/orchard profiles to improve your TNFD Locate disclosure.
+                    Complete location data in your vineyard and orchard profiles to improve your TNFD Locate disclosure.
                   </p>
                 </div>
               )}
@@ -448,22 +412,24 @@ export default function NatureAssessmentPage() {
 
       {/* Section 1: Evaluate - Dependencies */}
       {currentSection === 1 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">Evaluate: Dependencies on Nature</h2>
-          <p className="text-sm text-muted-foreground">
-            Rate your operational dependency on key ecosystem services.
-          </p>
+        <div className="space-y-5">
+          <div>
+            <Eyebrow tone="dim" className="mb-2">Evaluate: dependencies on nature</Eyebrow>
+            <p className="text-sm text-muted-foreground">
+              Rate how much your operation depends on each ecosystem service.
+            </p>
+          </div>
 
           {[
             { key: 'water' as const, label: 'Water', helper: 'How dependent is your production on freshwater availability?' },
             { key: 'pollination' as const, label: 'Pollination', helper: 'How dependent are your crops on insect pollination services?' },
-            { key: 'soil_health' as const, label: 'Soil Health', helper: 'How dependent are your operations on healthy soil microbiome and structure?' },
+            { key: 'soil_health' as const, label: 'Soil health', helper: 'How dependent are your operations on healthy soil microbiome and structure?' },
           ].map(({ key, label, helper }) => (
-            <Card key={key}>
-              <CardContent className="pt-4 space-y-3">
+            <Panel key={key}>
+              <div className="space-y-3">
                 <div className="grid gap-3">
                   <div>
-                    <Label className="text-xs">{label} Dependency</Label>
+                    <Label className="text-xs">{label} dependency</Label>
                     <p className="text-xs text-muted-foreground mb-1">{helper}</p>
                     <Select
                       value={form[`${key}_dependency`]}
@@ -491,22 +457,24 @@ export default function NatureAssessmentPage() {
                     />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </Panel>
           ))}
         </div>
       )}
 
       {/* Section 2: Evaluate - Impacts */}
       {currentSection === 2 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">Evaluate: Impacts on Nature</h2>
-          <p className="text-sm text-muted-foreground">
-            Quantify your organisation's direct impacts on natural systems.
-          </p>
+        <div className="space-y-5">
+          <div>
+            <Eyebrow tone="dim" className="mb-2">Evaluate: impacts on nature</Eyebrow>
+            <p className="text-sm text-muted-foreground">
+              Quantify your direct impacts on natural systems.
+            </p>
+          </div>
 
-          <Card>
-            <CardContent className="pt-4">
+          <Panel>
+            <div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <Label className="text-xs">Total land under management (ha)</Label>
@@ -599,21 +567,23 @@ export default function NatureAssessmentPage() {
                   />
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
         </div>
       )}
 
       {/* Section 3: Assess and Prepare */}
       {currentSection === 3 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">Assess & Prepare</h2>
-          <p className="text-sm text-muted-foreground">
-            Evaluate nature-related risks and set forward-looking targets.
-          </p>
+        <div className="space-y-5">
+          <div>
+            <Eyebrow tone="dim" className="mb-2">Assess and prepare</Eyebrow>
+            <p className="text-sm text-muted-foreground">
+              Weigh up nature-related risks and set forward-looking targets.
+            </p>
+          </div>
 
-          <Card>
-            <CardContent className="pt-4 space-y-4">
+          <Panel>
+            <div className="space-y-4">
               <div>
                 <Label className="text-xs">Nature risk materiality</Label>
                 <Select
@@ -660,7 +630,7 @@ export default function NatureAssessmentPage() {
                 />
               </div>
 
-              <Separator />
+              <div className="border-t border-studio-hairline" />
 
               <div className="flex items-center gap-3">
                 <Switch
@@ -707,51 +677,48 @@ export default function NatureAssessmentPage() {
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
         </div>
       )}
 
       {/* Navigation */}
-      <div className="flex items-center justify-between pt-2">
-        <Button
-          variant="outline"
+      <div className="flex items-center justify-between border-t border-studio-hairline pt-5">
+        <PillButton
+          variant="ghost"
           size="sm"
           disabled={currentSection === 0}
           onClick={back}
         >
-          <ChevronLeft className="h-4 w-4 mr-1" />
           Back
-        </Button>
+        </PillButton>
 
         <div className="flex items-center gap-2">
           {currentSection === 3 && (
             <>
-              <Button
+              <PillButton
                 variant="outline"
                 size="sm"
                 disabled={saving}
                 onClick={() => save('draft')}
               >
-                <Save className="h-4 w-4 mr-1" />
-                {saving ? 'Saving…' : 'Save Draft'}
-              </Button>
-              <Button
+                {saving ? 'Saving…' : 'Save draft'}
+              </PillButton>
+              <PillButton
+                variant="room"
                 size="sm"
                 disabled={saving}
                 onClick={() => save('complete')}
               >
-                <CheckCircle2 className="h-4 w-4 mr-1" />
-                Mark Complete
-              </Button>
+                Mark complete
+              </PillButton>
             </>
           )}
 
           {currentSection < 3 && (
-            <Button size="sm" onClick={next}>
+            <PillButton size="sm" onClick={next}>
               Next
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
+            </PillButton>
           )}
         </div>
       </div>

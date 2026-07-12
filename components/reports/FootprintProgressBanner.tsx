@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -12,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { StateChip } from '@/components/studio';
 import { CategoryStatus } from '@/lib/calculations/footprint-completeness';
 
 interface FootprintProgressBannerProps {
@@ -55,15 +55,15 @@ export function FootprintProgressBanner({
   const trackableCategories = categories.filter(c => !c.isComingSoon);
 
   return (
-    <Card className="border border-slate-200 dark:border-slate-700 bg-gradient-to-r from-slate-50 to-white dark:from-slate-900/50 dark:to-slate-900">
+    <Card className="border-studio-hairline bg-studio-cream">
       <CardContent className="py-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 space-y-3">
             {/* Header row */}
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-emerald-500" />
-                <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                <Sparkles className="h-4 w-4 text-room-accent" />
+                <span className="text-sm font-medium text-foreground">
                   {completedCount} of {totalCount} categories tracked
                 </span>
               </div>
@@ -73,28 +73,33 @@ export function FootprintProgressBanner({
               <span className="text-xs text-muted-foreground">{score}%</span>
             </div>
 
-            {/* Category pills */}
-            <div className="flex flex-wrap gap-1.5">
-              {trackableCategories.map((cat) => (
-                <Badge
-                  key={cat.key}
-                  variant="outline"
-                  className={cn(
-                    'text-[11px] font-normal cursor-default transition-colors',
-                    cat.isNotApplicable
-                      ? 'bg-slate-50 text-slate-400 border-slate-200 line-through dark:bg-slate-800/50 dark:text-slate-500 dark:border-slate-700'
-                      : cat.hasData
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800'
-                        : cat.isAutoCalculated
-                          ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800'
-                          : 'bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700',
-                  )}
-                >
-                  {cat.hasData && !cat.isNotApplicable && <CheckCircle2 className="h-3 w-3 mr-0.5" />}
-                  {cat.shortLabel}
-                  {cat.isNotApplicable && <span className="ml-0.5 not-italic text-[10px]">N/A</span>}
-                </Badge>
-              ))}
+            {/* Category chips */}
+            <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+              {trackableCategories.map((cat) => {
+                const tone = cat.isNotApplicable
+                  ? 'quiet'
+                  : cat.hasData
+                    ? 'good'
+                    : cat.isAutoCalculated
+                      ? 'attention'
+                      : 'quiet';
+                return (
+                  <StateChip
+                    key={cat.key}
+                    tone={tone}
+                    className={cn(
+                      'inline-flex items-center cursor-default',
+                      cat.isNotApplicable && 'line-through',
+                    )}
+                  >
+                    {cat.hasData && !cat.isNotApplicable && (
+                      <CheckCircle2 className="h-3 w-3 mr-0.5 text-current" />
+                    )}
+                    {cat.shortLabel}
+                    {cat.isNotApplicable && <span className="ml-0.5 not-italic">N/A</span>}
+                  </StateChip>
+                );
+              })}
             </div>
 
             {/* Next action prompt */}
@@ -104,7 +109,7 @@ export function FootprintProgressBanner({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 px-2"
+                  className="h-6 text-xs text-room-accent px-2"
                   onClick={() => onScrollToCategory?.(firstIncompleteCategory.key)}
                 >
                   Add {firstIncompleteCategory.label}

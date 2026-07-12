@@ -5,22 +5,22 @@ import dynamic from 'next/dynamic';
 import { useRosaPageContext } from "@/lib/rosa/RosaContextProvider";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { SmartUploadButton } from "@/components/layouts/SmartUploadButton";
+import { UniversalDropzone } from "@/components/layouts/UniversalDropzone";
 import { Eyebrow } from "@/components/studio/eyebrow";
 import { BigNumber } from "@/components/studio/big-number";
+import { StateChip } from "@/components/studio/state-chip";
+import { PillButton } from "@/components/studio/pill-button";
 import { FlagThresholdBanner } from '@/components/flag/FlagThresholdBanner';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageLoader } from "@/components/ui/page-loader";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 // Round 4 (auto-research): import wizard is a modal (open-gated), so defer it.
 const WebsiteImportFlow = dynamic(() => import("@/components/products/WebsiteImportFlow").then((m) => m.WebsiteImportFlow), { ssr: false });
-import { Plus, Package, AlertCircle, Trash2, MoreVertical, Search, Leaf, ArrowRight, Globe, Copy, Sparkles, Loader2 } from "lucide-react";
+import { Trash2, MoreVertical, Search, Copy } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { duplicateProduct } from "@/lib/products";
 import { useRouter } from "next/navigation";
-import { boundaryFromDbEnum, getBoundaryLabel, SYSTEM_BOUNDARIES } from "@/lib/system-boundaries";
+import { boundaryFromDbEnum, getBoundaryLabel } from "@/lib/system-boundaries";
 import { useOrganization } from "@/lib/organizationContext";
 import { useSubscription } from "@/hooks/useSubscription";
 import {
@@ -40,7 +40,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { DataQualityIndicator } from "@/components/ui/data-quality-indicator";
 // Round 4 (auto-research): recharts matrix only renders under the 'portfolio' view.
 const ProductPortfolioMatrix = dynamic(() => import("@/components/products/ProductPortfolioMatrix").then((m) => m.ProductPortfolioMatrix), { ssr: false });
 import { buildPortfolioPoints, sumFacilityVolume, type PortfolioResult } from "@/lib/products/portfolio";
@@ -66,6 +65,8 @@ interface Product {
   product_carbon_footprints: ProductCarbonFootprint[];
   /** Impact-weighted data quality score (0-100) from the latest completed PCF. */
   dqi_score: number | null;
+  /** Per-unit climate footprint (kg CO2e) from the latest completed PCF. */
+  footprint_per_unit: number | null;
   created_at: string;
 }
 
@@ -80,10 +81,10 @@ export default function ProductsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [bringInOpen, setBringInOpen] = useState(false);
   const [portfolio, setPortfolio] = useState<PortfolioResult | null>(null);
   const [view, setView] = useState<'list' | 'portfolio'>('list');
   const [matchCount, setMatchCount] = useState(0);
-  const [findingMatches, setFindingMatches] = useState(false);
 
   useEffect(() => {
     if (currentOrganization?.id) {
@@ -196,6 +197,7 @@ export default function ProductsPage() {
           ? [{ system_boundary: pcfBoundaryMap.get(String(p.id))! }]
           : [],
         dqi_score: dqiMap.get(String(p.id)) ?? null,
+        footprint_per_unit: perUnitMap.get(String(p.id)) ?? null,
       }));
       setProducts(productsWithMeta);
 
@@ -236,41 +238,6 @@ export default function ProductsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentOrganization?.id]);
 
-  const findSupplierMatches = async () => {
-    if (!currentOrganization?.id) return;
-    setFindingMatches(true);
-    try {
-      const res = await fetch('/api/products/ingredient-matches/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ organization_id: currentOrganization.id }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (res.ok) {
-        await loadMatchCount();
-        if ((body.created ?? 0) > 0) {
-          router.push('/products/supplier-matches');
-        } else {
-          toast.success('No new supplier matches found. Connect more suppliers or add supplier products.');
-        }
-      } else {
-        toast.error(body.error ?? 'Could not look for matches');
-      }
-    } catch {
-      toast.error('Could not look for matches');
-    } finally {
-      setFindingMatches(false);
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
   const formatFunctionalUnit = (product: Product) => {
     // Prefer the structured unit_size fields (updated by the edit form)
     if (product.unit_size_value && product.unit_size_unit) {
@@ -299,22 +266,15 @@ export default function ProductsPage() {
     return pcfBoundary || product.system_boundary || "cradle_to_gate";
   };
 
-  const getBoundaryBadge = (boundary: string) => {
+  const boundaryLabel = (boundary: string) => {
     // Normalise both DB enum format (underscores) and PCF format (hyphens)
     const normalised = boundary.includes("_") ? boundaryFromDbEnum(boundary) : boundary;
-    const label = getBoundaryLabel(normalised);
-    const isFullLifecycle = normalised === "cradle-to-consumer" || normalised === "cradle-to-grave";
-    return (
-      <span
-        className={cn(
-          'font-mono text-[10px] font-bold uppercase tracking-[0.18em]',
-          isFullLifecycle ? 'text-studio-good' : 'text-studio-attention',
-        )}
-      >
-        {label}
-      </span>
-    );
+    return getBoundaryLabel(normalised);
   };
+
+  /** Format a per-unit footprint figure for the card number. */
+  const formatFootprint = (value: number) =>
+    value.toLocaleString("en-GB", { maximumFractionDigits: 2 });
 
   const handleDeleteClick = (product: Product, e: React.MouseEvent) => {
     e.preventDefault();
@@ -382,54 +342,77 @@ export default function ProductsPage() {
     return <PageLoader message="Loading products..." />;
   }
 
+  const addProduct = isReadOnly ? (
+    <PillButton variant="room" href="/complete-subscription">
+      Subscribe to add
+    </PillButton>
+  ) : (
+    <PillButton variant="room" href="/products/new">
+      Add product
+    </PillButton>
+  );
+
+  // A quiet menu row inside the "Bring products in" popover.
+  const rowClasses =
+    "block w-full rounded-[4px] px-3 py-2 text-left transition-colors duration-150 ease-studio hover:bg-studio-ink/5";
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-x-12 gap-y-6">
         <div className="min-w-0">
-          <Eyebrow className="mb-3">THE MEASURES · PRODUCTS</Eyebrow>
+          <Eyebrow className="mb-3">THE CELLAR · PRODUCTS</Eyebrow>
           <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
             The products.
           </h1>
           <p className="mt-3 max-w-xl text-sm text-muted-foreground">
-            Create and manage your products here
+            Everything you make, and the footprint behind it.
           </p>
         </div>
         <div className="flex shrink-0 items-end gap-8 pb-1">
           <BigNumber size="display" value={products.length} label="Products" />
           <div className="flex items-center gap-2">
-            <SmartUploadButton />
-            {products.length > 0 && (
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={findSupplierMatches}
-                disabled={findingMatches}
-              >
-                {findingMatches ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                Find supplier matches
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => setImportDialogOpen(true)}
-            >
-              <Globe className="h-4 w-4" />
-              Import from Website
-            </Button>
-            {isReadOnly ? (
-              <Button className="gap-2 bg-primary text-primary-foreground" onClick={() => router.push('/complete-subscription')}>
-                <Plus className="h-4 w-4" />
-                Subscribe to add
-              </Button>
-            ) : (
-              <Link href="/products/new">
-                <Button className="gap-2 bg-primary text-primary-foreground">
-                  <Plus className="h-4 w-4" />
-                  Add New Product
-                </Button>
-              </Link>
-            )}
+            <Popover open={bringInOpen} onOpenChange={setBringInOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-studio-ink/25 bg-transparent px-4 text-sm font-medium text-foreground transition-colors duration-200 ease-studio hover:border-studio-ink/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  Bring products in
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-72 p-1">
+                <UniversalDropzone
+                  trigger={
+                    <button type="button" className={rowClasses} onClick={() => setBringInOpen(false)}>
+                      <span className="block text-sm font-medium text-foreground">Smart upload</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Drop a file in, we read it for you
+                      </span>
+                    </button>
+                  }
+                />
+                <button
+                  type="button"
+                  className={rowClasses}
+                  onClick={() => {
+                    setImportDialogOpen(true);
+                    setBringInOpen(false);
+                  }}
+                >
+                  <span className="block text-sm font-medium text-foreground">Import from a website</span>
+                  <span className="block text-xs text-muted-foreground">
+                    We read your product pages
+                  </span>
+                </button>
+                <Link href="/products/import" className={rowClasses} onClick={() => setBringInOpen(false)}>
+                  <span className="block text-sm font-medium text-foreground">From a spreadsheet</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Bulk upload with our template
+                  </span>
+                </Link>
+              </PopoverContent>
+            </Popover>
+            {addProduct}
           </div>
         </div>
       </header>
@@ -437,14 +420,15 @@ export default function ProductsPage() {
       {matchCount > 0 && (
         <Link
           href="/products/supplier-matches"
-          className="flex items-center gap-2 rounded-[6px] border border-border bg-card px-4 py-2.5 text-sm transition-colors duration-150 ease-studio hover:border-room-accent"
+          className="flex items-center gap-3 rounded-[6px] border border-studio-hairline bg-studio-cream px-4 py-2.5 text-sm transition-colors duration-150 ease-studio hover:border-room-accent"
         >
-          <Sparkles className="h-4 w-4 shrink-0 text-room-accent" />
           <span className="flex-1">
             {matchCount} supplier {matchCount === 1 ? 'match' : 'matches'} to review. Linking adds real
             supplier data to your footprints.
           </span>
-          <span className="text-xs text-muted-foreground">Review →</span>
+          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent">
+            Review →
+          </span>
         </Link>
       )}
 
@@ -460,27 +444,23 @@ export default function ProductsPage() {
               className="pl-10"
             />
           </div>
-          <div className="flex rounded-md border border-border/60 p-0.5">
-            <button
-              type="button"
-              onClick={() => setView('list')}
-              className={cn(
-                'rounded px-3 py-1.5 text-xs font-medium transition-colors',
-                view === 'list' ? 'bg-secondary text-foreground' : 'text-muted-foreground',
-              )}
-            >
-              List
-            </button>
-            <button
-              type="button"
-              onClick={() => setView('portfolio')}
-              className={cn(
-                'rounded px-3 py-1.5 text-xs font-medium transition-colors',
-                view === 'portfolio' ? 'bg-secondary text-foreground' : 'text-muted-foreground',
-              )}
-            >
-              Portfolio
-            </button>
+          <div className="flex items-center gap-5">
+            {(['list', 'portfolio'] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setView(v)}
+                className={cn(
+                  'relative py-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] transition-opacity duration-150 ease-studio',
+                  view === v ? 'opacity-100' : 'opacity-60 hover:opacity-100',
+                )}
+              >
+                {v}
+                {view === v && (
+                  <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] bg-room-accent" />
+                )}
+              </button>
+            ))}
           </div>
         </div>
       )}
@@ -492,132 +472,107 @@ export default function ProductsPage() {
       )}
 
       {products.length === 0 ? (
-        <Card className="border-2 border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <div className="h-14 w-14 rounded-full bg-secondary flex items-center justify-center mb-4">
-              <Leaf className="h-7 w-7 text-room-accent" />
-            </div>
-            <h3 className="font-display text-xl font-semibold mb-2">Build your product portfolio.</h3>
-            <p className="text-muted-foreground text-center max-w-md mb-6">
-              Products are at the heart of your sustainability story. Import from your website or create one manually.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center gap-3">
-              <Button
-                size="lg"
-                className="gap-2"
-                onClick={() => setImportDialogOpen(true)}
-              >
-                <Globe className="h-4 w-4" />
-                Import from Website
-              </Button>
-              <Button asChild size="lg" variant="outline" className="gap-2">
-                <Link href="/products/new">
-                  <Plus className="h-4 w-4" />
-                  Add Manually
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="space-y-4 py-6">
+          <p className="max-w-md text-sm text-muted-foreground">
+            No products yet. Add your first one, or bring a batch in from a website or spreadsheet.
+          </p>
+          {addProduct}
+        </div>
       ) : view !== 'list' ? null : filteredProducts.length === 0 ? (
-        <Card>
-          <CardContent className="pt-6">
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                No products match your search. Try adjusting your search terms.
-              </AlertDescription>
-            </Alert>
-          </CardContent>
-        </Card>
+        <p className="text-sm text-muted-foreground">
+          No products match &ldquo;{searchQuery}&rdquo;. Try a different search.
+        </p>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProducts.map((product) => (
-            <Card key={product.id} className="h-full hover:shadow-lg transition-shadow relative group">
-              <div className="absolute top-4 right-4 z-10">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-slate-800 shadow-sm"
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={(e) => handleDuplicateClick(product, e)}
-                      disabled={duplicatingId === product.id}
-                    >
-                      {duplicatingId === product.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Copy className="h-4 w-4 mr-2" />}
-                      {duplicatingId === product.id ? 'Duplicating...' : 'Duplicate Product'}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-red-600 focus:text-red-600"
-                      onClick={(e) => handleDeleteClick(product, e)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete Product
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredProducts.map((product) => {
+            const hasFootprint = product.footprint_per_unit != null;
+            const hasPcf = (product.product_carbon_footprints || []).length > 0;
+            const status: { tone: 'good' | 'attention' | 'quiet'; label: string } = hasFootprint
+              ? { tone: 'good', label: 'LCA complete' }
+              : hasPcf
+                ? { tone: 'attention', label: 'In progress' }
+                : { tone: 'quiet', label: 'No LCA yet' };
+            return (
+              <div key={product.id} className="group relative">
+                <div className="absolute right-3 top-3 z-10 opacity-0 transition-opacity group-hover:opacity-100">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 border border-studio-hairline bg-studio-cream"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={(e) => handleDuplicateClick(product, e)}
+                        disabled={duplicatingId === product.id}
+                      >
+                        <Copy className="h-4 w-4 mr-2" />
+                        {duplicatingId === product.id ? 'Duplicating…' : 'Duplicate product'}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-studio-stale focus:text-studio-stale"
+                        onClick={(e) => handleDeleteClick(product, e)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete product
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
 
-              <Link href={`/products/${product.id}`}>
-                <CardHeader>
+                <Link
+                  href={`/products/${product.id}`}
+                  className="block rounded-[6px] border border-studio-hairline bg-studio-cream p-4 transition-colors duration-150 ease-studio hover:border-room-accent"
+                >
                   {product.product_image_url ? (
-                    <div className="mb-4 aspect-video rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                    <div className="mb-4 flex aspect-video items-center justify-center overflow-hidden rounded-[4px] bg-studio-paper">
                       <img
                         src={product.product_image_url}
                         alt={product.name}
-                        className="max-w-full max-h-full object-contain"
+                        className="max-h-full max-w-full object-contain"
                       />
                     </div>
                   ) : (
-                    <div className="mb-4 aspect-video rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                      <Package className="h-12 w-12 text-muted-foreground" />
+                    <div className="mb-4 flex aspect-video items-center justify-center rounded-[4px] border border-studio-hairline bg-studio-paper">
+                      <span className="font-display text-3xl font-bold text-muted-foreground/40">
+                        {product.name.charAt(0).toUpperCase()}
+                      </span>
                     </div>
                   )}
-                  <div className="space-y-1">
-                    <CardTitle className="line-clamp-2">{product.name}</CardTitle>
-                    <CardDescription className="line-clamp-2">
-                      {product.product_description || "No description provided"}
-                    </CardDescription>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Functional Unit:</span>
-                    <span className="font-medium">{formatFunctionalUnit(product)}</span>
-                  </div>
 
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">System Boundary:</span>
-                    {getBoundaryBadge(getEffectiveBoundary(product))}
-                  </div>
+                  <h3 className="line-clamp-2 font-display text-[15px] font-semibold text-foreground">
+                    {product.name}
+                  </h3>
+                  <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                    {formatFunctionalUnit(product)}
+                  </p>
 
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Data Quality:</span>
-                    {product.dqi_score !== null ? (
-                      <DataQualityIndicator
-                        variant="minimal"
-                        confidenceScore={Math.round(product.dqi_score)}
-                        dataQualityGrade={product.dqi_score >= 80 ? 'HIGH' : product.dqi_score >= 50 ? 'MEDIUM' : 'LOW'}
-                        methodology="Weighted across all materials in the latest calculation"
+                  <div className="mt-4">
+                    {hasFootprint ? (
+                      <BigNumber
+                        size="panel"
+                        value={formatFootprint(product.footprint_per_unit!)}
+                        label="kg CO₂e / unit"
                       />
                     ) : (
-                      <span className="text-sm text-muted-foreground">—</span>
+                      <p className="text-sm text-muted-foreground">Footprint not calculated yet.</p>
                     )}
                   </div>
 
-                  <div className="text-xs text-muted-foreground pt-2 border-t">
-                    Created {formatDate(product.created_at)}
+                  <div className="mt-4 flex items-center justify-between border-t border-studio-hairline pt-3">
+                    <StateChip tone={status.tone}>{status.label}</StateChip>
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                      {boundaryLabel(getEffectiveBoundary(product))}
+                    </span>
                   </div>
-                </CardContent>
-              </Link>
-            </Card>
-          ))}
+                </Link>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -637,7 +592,7 @@ export default function ProductsPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Product</AlertDialogTitle>
+            <AlertDialogTitle>Delete product</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete &quot;{productToDelete?.name}&quot;? This action cannot be undone and will remove all associated data including materials, LCA results, and calculations.
             </AlertDialogDescription>
@@ -647,10 +602,9 @@ export default function ProductsPage() {
             <AlertDialogAction
               onClick={handleDeleteConfirm}
               disabled={isDeleting}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-studio-stale text-studio-cream hover:bg-studio-stale/90"
             >
-              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isDeleting ? "Deleting..." : "Delete Product"}
+              {isDeleting ? "Deleting…" : "Delete product"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

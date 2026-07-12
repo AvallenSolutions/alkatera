@@ -101,10 +101,10 @@ export function JourneySelectionDialog({
                 type="button"
                 disabled={submitting}
                 onClick={handleNew}
-                className="w-full rounded-lg border p-4 text-left transition-colors hover:border-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 disabled:opacity-60"
+                className="w-full rounded-[6px] border p-4 text-left transition-colors hover:border-studio-good/60 hover:bg-studio-cream disabled:opacity-60"
               >
                 <div className="flex items-center gap-2 font-medium">
-                  <Sparkles className="h-5 w-5 text-emerald-600" />
+                  <Sparkles className="h-5 w-5 text-studio-good" />
                   Certifying for the first time
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -117,10 +117,10 @@ export function JourneySelectionDialog({
                 type="button"
                 disabled={submitting}
                 onClick={() => setStep('recert')}
-                className="w-full rounded-lg border p-4 text-left transition-colors hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 disabled:opacity-60"
+                className="w-full rounded-[6px] border p-4 text-left transition-colors hover:border-room-accent/60 hover:bg-studio-cream disabled:opacity-60"
               >
                 <div className="flex items-center gap-2 font-medium">
-                  <RefreshCw className="h-5 w-5 text-blue-600" />
+                  <RefreshCw className="h-5 w-5 text-room-accent" />
                   Recertifying as an existing B Corp
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">

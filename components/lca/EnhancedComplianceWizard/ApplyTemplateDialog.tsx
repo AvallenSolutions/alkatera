@@ -25,8 +25,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+import { PillButton } from '@/components/studio/pill-button';
 import {
   Dialog,
   DialogContent,
@@ -35,8 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertTriangle, Loader2, Star } from 'lucide-react';
+import { Star } from 'lucide-react';
 import { useWizardContext } from './WizardContext';
 import type { LcaReportTemplate } from '@/types/lca-templates';
 
@@ -141,24 +139,25 @@ export function ApplyTemplateDialog({
         </DialogHeader>
 
         {loading && (
-          <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            Loading templates...
-          </div>
+          <p className="py-8 text-center text-sm text-studio-dim">
+            Loading templates
+          </p>
         )}
 
         {!loading && error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+          <p className="text-sm text-foreground">
+            <span className="mr-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-stale">
+              Error
+            </span>
+            {error}
+          </p>
         )}
 
         {!loading && !error && templates.length === 0 && (
-          <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+          <p className="border-y border-studio-hairline py-6 text-center text-sm text-studio-dim">
             No templates yet. Use &ldquo;Save as template&rdquo; on a finished
             wizard to create one your whole organisation can reuse.
-          </div>
+          </p>
         )}
 
         {!loading && !error && templates.length > 0 && (
@@ -173,10 +172,10 @@ export function ApplyTemplateDialog({
                 <label
                   key={tpl.id}
                   htmlFor={`tpl-${tpl.id}`}
-                  className={`flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors ${
+                  className={`flex cursor-pointer items-start gap-3 rounded-[6px] border p-3 transition-colors duration-150 ease-studio ${
                     isSelected
-                      ? 'border-primary bg-primary/5'
-                      : 'hover:bg-accent/40'
+                      ? 'border-room-accent bg-studio-cream'
+                      : 'border-studio-hairline hover:border-studio-ink/40'
                   }`}
                 >
                   <input
@@ -186,23 +185,23 @@ export function ApplyTemplateDialog({
                     value={tpl.id}
                     checked={isSelected}
                     onChange={() => setSelectedId(tpl.id)}
-                    className="mt-1"
+                    className="mt-1 accent-room-accent"
                   />
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium truncate">{tpl.name}</span>
+                      <span className="truncate font-display font-semibold text-foreground">{tpl.name}</span>
                       {tpl.is_org_default && (
                         <span
-                          className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400"
+                          className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-attention"
                           title="Organisation default"
                         >
                           <Star className="h-3 w-3 fill-current" />
-                          default
+                          Default
                         </span>
                       )}
                     </div>
                     {tpl.description && (
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                      <p className="mt-1 line-clamp-2 text-xs text-studio-dim">
                         {tpl.description}
                       </p>
                     )}
@@ -214,28 +213,22 @@ export function ApplyTemplateDialog({
         )}
 
         <DialogFooter>
-          <Button
+          <PillButton
             type="button"
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={applying}
           >
             Cancel
-          </Button>
-          <Button
+          </PillButton>
+          <PillButton
             type="button"
+            variant="room"
             onClick={handleApply}
             disabled={!selectedId || applying || loading}
           >
-            {applying ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Applying...
-              </>
-            ) : (
-              'Apply template'
-            )}
-          </Button>
+            {applying ? 'Applying' : 'Apply template'}
+          </PillButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

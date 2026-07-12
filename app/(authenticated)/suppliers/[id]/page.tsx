@@ -1,45 +1,96 @@
 "use client";
 
+/**
+ * One supplier, in the studio grammar: a statement header with the ESG
+ * score standing right, the old badge zoo collapsed to a typographic
+ * state-chip row, and the three internal tabs (overview, products, ESG)
+ * re-cut as mono-eyebrow sections down one paper. Data hook, the
+ * contact_email spine and the SendEsgSurveyDialog contract are unchanged.
+ */
+
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useRosaPageContext } from "@/lib/rosa/RosaContextProvider";
 import Link from "next/link";
-import Image from "next/image";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getProfileCompleteness } from "@/lib/suppliers/profile-completeness";
 import { PageLoader } from "@/components/ui/page-loader";
-import {
-  ArrowLeft,
-  Building2,
-  Mail,
-  MapPin,
-  Package,
-  FileText,
-  Globe,
-  TrendingUp,
-  ExternalLink,
-  ShieldCheck,
-  Shield,
-  Clock,
-  Info,
-  User,
-  Leaf,
-  Droplets,
-  Trash2,
-  Mountain,
-  CheckCircle2,
-  Phone,
-  Link2,
-  ClipboardCheck,
-} from "lucide-react";
+import { Statement } from "@/components/studio/statement";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { BigNumber } from "@/components/studio/big-number";
+import { StateChip } from "@/components/studio/state-chip";
+import { FactRow } from "@/components/studio/fact-row";
+import { PillButton } from "@/components/studio/pill-button";
+import type { WorkingTone } from "@/components/studio/theme";
+import { getProfileCompleteness } from "@/lib/suppliers/profile-completeness";
 import { useOrganizationSupplierDetail } from "@/hooks/data/useOrganizationSupplierDetail";
-import { Progress } from "@/components/ui/progress";
 import { ESG_SECTIONS, getQuestionsBySection, type EsgResponse } from "@/lib/supplier-esg/questions";
 import { getRatingLabel } from "@/lib/supplier-esg/scoring";
 import { SendEsgSurveyDialog } from "@/components/suppliers/SendEsgSurveyDialog";
+
+/** Quiet mono back-link to the list page. */
+function BackLink() {
+  return (
+    <Link
+      href="/suppliers"
+      className="inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground transition-colors duration-150 hover:text-foreground"
+    >
+      &larr; The suppliers
+    </Link>
+  );
+}
+
+/** A quiet section: mono eyebrow over a hairline rule, then the work. */
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-5">
+      <div className="border-b border-studio-hairline pb-2">
+        <Eyebrow>{label}</Eyebrow>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** A quiet hairline bar with a room-accent fill. Opacity carries nothing here; the width is the score. */
+function ScoreBar({ label, value }: { label: string; value: number }) {
+  const pct = Math.max(0, Math.min(100, value));
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-baseline justify-between gap-4">
+        <span className="text-sm text-foreground">{label}</span>
+        <span className="font-mono text-xs tabular-nums text-studio-dim">{value}%</span>
+      </div>
+      <div className="h-1 w-full overflow-hidden rounded-full bg-studio-hairline">
+        <div className="h-full rounded-full bg-room" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+const ratingTone = (rating: string | null): "good" | "attention" | "stale" | "ink" => {
+  switch (rating) {
+    case "leader":
+      return "good";
+    case "progressing":
+      return "attention";
+    case "needs_improvement":
+      return "stale";
+    default:
+      return "ink";
+  }
+};
+
+const ANSWER_TONE: Record<string, WorkingTone> = {
+  yes: "good",
+  partial: "attention",
+  no: "stale",
+  na: "quiet",
+};
+const ANSWER_LABEL: Record<string, string> = {
+  yes: "Yes",
+  partial: "Partial",
+  no: "No",
+  na: "N/A",
+};
 
 export default function SupplierDetailPage() {
   const params = useParams();
@@ -56,17 +107,18 @@ export default function SupplierDetailPage() {
     error,
   } = useOrganizationSupplierDetail(orgSupplierId);
 
-  const [activeTab, setActiveTab] = useState("overview");
   const [esgSurveyOpen, setEsgSurveyOpen] = useState(false);
 
   // Tell Rosa about this supplier so questions like "should we follow up?",
   // "what data are we still waiting on?", or "how does this supplier
-  // compare?" can be answered with the supplier in context.
+  // compare?" can be answered with the supplier in context. The tabs are
+  // now stacked sections on one paper, so we feed a lightweight
+  // active_section instead of the old active_tab.
   const rosaSlice = useMemo(() => {
-    if (!supplierProfile) return null
+    if (!supplierProfile) return null;
     return {
-      id: 'supplier-detail',
-      label: `Supplier: ${(supplierProfile as any).name || 'unknown'}`,
+      id: "supplier-detail",
+      label: `Supplier: ${(supplierProfile as any).name || "unknown"}`,
       priority: 9,
       data: {
         supplier_id: resolvedSupplierId ?? orgSupplierId,
@@ -77,11 +129,11 @@ export default function SupplierDetailPage() {
         annual_spend: (brandRelationship as any)?.annual_spend ?? null,
         product_count: Array.isArray(products) ? products.length : 0,
         has_esg_assessment: !!esgAssessment,
-        active_tab: activeTab,
+        active_section: "overview",
       },
-    }
-  }, [supplierProfile, brandRelationship, products, esgAssessment, orgSupplierId, resolvedSupplierId, activeTab])
-  useRosaPageContext(rosaSlice)
+    };
+  }, [supplierProfile, brandRelationship, products, esgAssessment, orgSupplierId, resolvedSupplierId]);
+  useRosaPageContext(rosaSlice);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "Not set";
@@ -98,18 +150,18 @@ export default function SupplierDetailPage() {
     return `${currencySymbol}${amount.toLocaleString()}`;
   };
 
-  const getEngagementBadge = (status: string | null) => {
+  const getEngagementChip = (status: string | null): { tone: WorkingTone; label: string } => {
     switch (status) {
       case "data_provided":
-        return <Badge className="bg-green-600">Data Provided</Badge>;
+        return { tone: "good", label: "Data provided" };
       case "active":
-        return <Badge className="bg-blue-600">Active</Badge>;
+        return { tone: "good", label: "Active" };
       case "invited":
-        return <Badge className="bg-amber-600 text-white">Invited</Badge>;
+        return { tone: "attention", label: "Invited" };
       case "inactive":
-        return <Badge variant="secondary">Inactive</Badge>;
+        return { tone: "quiet", label: "Inactive" };
       default:
-        return <Badge variant="outline">No Engagement</Badge>;
+        return { tone: "quiet", label: "No engagement" };
     }
   };
 
@@ -129,666 +181,352 @@ export default function SupplierDetailPage() {
   if (error || !supplierProfile) {
     return (
       <div className="space-y-6">
-        <Link href="/suppliers">
-          <Button variant="ghost" size="sm" className="gap-2 mb-2">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Suppliers
-          </Button>
-        </Link>
-        <Card>
-          <CardContent className="py-12">
-            <div className="text-center">
-              <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Supplier Not Found</h3>
-              <p className="text-muted-foreground">
-                {error || "This supplier could not be found in your organisation."}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <BackLink />
+        <p className="text-sm text-muted-foreground">
+          {error || "This supplier could not be found in your organisation."}
+        </p>
       </div>
     );
   }
 
+  const name: string = (supplierProfile as any).name || "Supplier";
+  const headline = name.endsWith(".") ? name : `${name}.`;
+
+  const location = [supplierProfile.city, supplierProfile.country]
+    .filter(Boolean)
+    .join(", ") || supplierProfile.address || null;
+  const factParts = [supplierProfile.industry_sector, location].filter(Boolean) as string[];
+
+  const websiteHref = supplierProfile.website
+    ? supplierProfile.website.startsWith("http")
+      ? supplierProfile.website
+      : `https://${supplierProfile.website}`
+    : null;
+
+  const hasScore = !!esgAssessment && esgAssessment.score_total != null;
+  const engagement = getEngagementChip(brandRelationship?.engagement_status ?? null);
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="space-y-2">
-        <Link href="/suppliers">
-          <Button variant="ghost" size="sm" className="gap-2 mb-2">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Suppliers
-          </Button>
-        </Link>
-        <div className="flex items-center gap-4">
-          {/* Logo or fallback icon */}
-          <div className="relative h-16 w-16 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden flex-shrink-0">
-            {supplierProfile.logo_url ? (
-              <Image
-                src={supplierProfile.logo_url}
-                alt={`${supplierProfile.name} logo`}
-                fill
-                className="object-contain p-1"
-              />
-            ) : (
-              <Building2 className="h-8 w-8 text-muted-foreground" />
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-3xl font-bold truncate">{supplierProfile.name}</h1>
-              {supplierProfile.is_verified && (
-                <Badge className="text-xs bg-blue-500/20 text-blue-400 border-blue-500/30 flex-shrink-0">
-                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                  Verified Supplier
-                </Badge>
-              )}
-              {esgAssessment?.is_verified && (
-                <Badge className="text-xs bg-emerald-500/20 text-emerald-400 border-emerald-500/30 flex-shrink-0">
-                  <ShieldCheck className="h-3 w-3 mr-1" />
-                  ESG {esgAssessment.score_total ?? "N/A"} ({getRatingLabel(esgAssessment.score_rating! as any)})
-                </Badge>
-              )}
-              {esgAssessment && esgAssessment.submitted && !esgAssessment.is_verified && (
-                <Badge className="text-xs bg-slate-500/20 text-slate-400 border-slate-500/30 flex-shrink-0">
-                  <Clock className="h-3 w-3 mr-1" />
-                  ESG Assessment Pending
-                </Badge>
-              )}
-            </div>
-            <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">
-              {supplierProfile.industry_sector && (
-                <span className="flex items-center gap-1">
-                  <TrendingUp className="h-3.5 w-3.5" />
-                  {supplierProfile.industry_sector}
-                </span>
-              )}
-              {(supplierProfile.address || supplierProfile.city || supplierProfile.country) && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-3.5 w-3.5" />
-                  {[supplierProfile.city, supplierProfile.country].filter(Boolean).join(", ") || supplierProfile.address}
-                </span>
-              )}
-              {supplierProfile.website && (
-                <a
-                  href={supplierProfile.website.startsWith("http") ? supplierProfile.website : `https://${supplierProfile.website}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                >
-                  <Globe className="h-3.5 w-3.5" />
-                  {supplierProfile.website.replace(/^https?:\/\//, "")}
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              )}
-            </div>
-          </div>
+    <div className="space-y-10">
+      <div className="min-w-0 space-y-4">
+        <BackLink />
+
+        <Statement eyebrow="THE NETWORK · SUPPLIER" headline={headline}>
+          {hasScore && (
+            <BigNumber
+              size="display"
+              value={esgAssessment!.score_total}
+              label={getRatingLabel(esgAssessment!.score_rating! as any)}
+              tone={ratingTone(esgAssessment!.score_rating ?? null)}
+            />
+          )}
+        </Statement>
+
+        {/* State-chip meta row: the old badge zoo, said typographically. */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          {supplierProfile.is_verified && <StateChip tone="good">Verified</StateChip>}
+          {esgAssessment && esgAssessment.submitted && !esgAssessment.is_verified && (
+            <StateChip tone="attention">ESG pending</StateChip>
+          )}
+          {!resolvedSupplierId && <StateChip tone="attention">Not yet joined</StateChip>}
+          {factParts.length > 0 && (
+            <span className="font-mono text-[11px] uppercase tracking-[0.15em] text-studio-dim">
+              {factParts.join(" · ")}
+            </span>
+          )}
+          {websiteHref && (
+            <a
+              href={websiteHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-[11px] uppercase tracking-[0.15em] text-room-accent transition-opacity hover:opacity-70"
+            >
+              {supplierProfile.website!.replace(/^https?:\/\//, "")} ↗
+            </a>
+          )}
         </div>
+
+        {!resolvedSupplierId && (
+          <p className="max-w-xl text-sm text-studio-attention">
+            This supplier has not yet joined the platform. Product and ESG data appear here once they
+            accept the invitation and add their information.
+          </p>
+        )}
       </div>
 
-      {/* Not yet joined banner */}
-      {!resolvedSupplierId && (
-        <div className="flex items-center gap-3 p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900">
-          <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-          <div>
-            <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-              This supplier has not yet joined the platform
-            </p>
-            <p className="text-xs text-blue-700 dark:text-blue-300 mt-0.5">
-              Product and ESG data will appear here once they accept the invitation and add their information.
-            </p>
-          </div>
-        </div>
-      )}
+      {/* ── THE COMPANY ── */}
+      <Section label="THE COMPANY">
+        {supplierProfile.description && (
+          <p className="max-w-2xl whitespace-pre-wrap text-sm text-muted-foreground">
+            {supplierProfile.description}
+          </p>
+        )}
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="products">
-            Products ({products.length})
-          </TabsTrigger>
-          <TabsTrigger value="esg">ESG</TabsTrigger>
-        </TabsList>
-
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* Company Details */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between gap-2">
-                  <span>Company Details</span>
-                  <span className="text-xs font-normal text-muted-foreground">
-                    Profile {getProfileCompleteness(supplierProfile as any).percent}% complete
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {supplierProfile.description && (
-                  <div className="flex items-start gap-3">
-                    <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">About</p>
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{supplierProfile.description}</p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-start gap-3">
-                  <TrendingUp className="h-5 w-5 text-muted-foreground mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Industry Sector</p>
-                    <p className="text-sm text-muted-foreground">
-                      {supplierProfile.industry_sector || "Not specified"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Location</p>
-                    {supplierProfile.address || supplierProfile.city || supplierProfile.country ? (
-                      <p className="text-sm text-muted-foreground">
-                        {[
-                          supplierProfile.address,
-                          supplierProfile.city,
-                          supplierProfile.country,
-                        ].filter(Boolean).join(", ")}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Not specified</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Globe className="h-5 w-5 text-muted-foreground mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Website</p>
-                    {supplierProfile.website ? (
-                      <a
-                        href={supplierProfile.website.startsWith("http") ? supplierProfile.website : `https://${supplierProfile.website}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
-                      >
-                        {supplierProfile.website}
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Not provided</p>
-                    )}
-                  </div>
-                </div>
-
-                {supplierProfile.catalogue_url && (
-                  <div className="flex items-start gap-3">
-                    <Link2 className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Product Catalogue</p>
-                      <a
-                        href={supplierProfile.catalogue_url.startsWith("http") ? supplierProfile.catalogue_url : `https://${supplierProfile.catalogue_url}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
-                      >
-                        View catalogue
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Contact Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Contact Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Email</p>
-                    {supplierProfile.contact_email ? (
-                      <a
-                        href={`mailto:${supplierProfile.contact_email}`}
-                        className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                      >
-                        {supplierProfile.contact_email}
-                      </a>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Not provided</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <User className="h-5 w-5 text-muted-foreground mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Contact Person</p>
-                    <p className="text-sm text-muted-foreground">
-                      {supplierProfile.contact_name || "Not provided"}
-                    </p>
-                  </div>
-                </div>
-
-                {supplierProfile.phone && (
-                  <div className="flex items-start gap-3">
-                    <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Phone</p>
-                      <a
-                        href={`tel:${supplierProfile.phone}`}
-                        className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                      >
-                        {supplierProfile.phone}
-                      </a>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Your Relationship */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Your Relationship</CardTitle>
-                <CardDescription>Your organisation&apos;s relationship with this supplier</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">Status</p>
-                  {getEngagementBadge(brandRelationship?.engagement_status ?? null)}
-                </div>
-
-                {brandRelationship?.relationship_type && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Type</span>
-                    <span className="capitalize">{brandRelationship.relationship_type.replace(/_/g, " ")}</span>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Annual Spend</span>
-                  <span className="font-semibold">
-                    {formatCurrency(brandRelationship?.annual_spend ?? null, brandRelationship?.spend_currency ?? null)}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Added</span>
-                  <span>{formatDate(brandRelationship?.added_at ?? null)}</span>
-                </div>
-
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Products Available</span>
-                  <span className="font-semibold">{products.length}</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Quick Stats (only if supplier has products) */}
-            {products.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Product Summary</CardTitle>
-                  <CardDescription>Overview of available product data</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Ingredients</span>
-                    <span className="font-semibold">
-                      {products.filter(p => p.product_type === "ingredient").length}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Packaging</span>
-                    <span className="font-semibold">
-                      {products.filter(p => p.product_type === "packaging").length}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">With Climate Data</span>
-                    <span className="font-semibold">
-                      {products.filter(p => p.impact_climate != null).length}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">With Water Data</span>
-                    <span className="font-semibold">
-                      {products.filter(p => p.impact_water != null).length}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Notes */}
-          {brandRelationship?.notes && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Notes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                  {brandRelationship.notes}
-                </p>
-              </CardContent>
-            </Card>
+        <div>
+          {supplierProfile.catalogue_url && (
+            <FactRow
+              subject={
+                <a
+                  href={
+                    supplierProfile.catalogue_url.startsWith("http")
+                      ? supplierProfile.catalogue_url
+                      : `https://${supplierProfile.catalogue_url}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-room-accent transition-opacity hover:opacity-70"
+                >
+                  View catalogue ↗
+                </a>
+              }
+              meta="Catalogue"
+            />
           )}
-        </TabsContent>
-
-        {/* Products Tab */}
-        <TabsContent value="products" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div>
-                <CardTitle>Product Portfolio</CardTitle>
-                <CardDescription>
-                  Products and materials provided by this supplier
-                </CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {!resolvedSupplierId ? (
-                <div className="text-center py-12">
-                  <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-sm text-muted-foreground">
-                    This supplier has not yet joined the platform. Products will appear here once they register and add their catalogue.
-                  </p>
-                </div>
-              ) : products.length === 0 ? (
-                <div className="text-center py-12">
-                  <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-sm text-muted-foreground">
-                    No products added by this supplier yet.
-                  </p>
-                </div>
+          <FactRow
+            subject={
+              supplierProfile.contact_email ? (
+                <a
+                  href={`mailto:${supplierProfile.contact_email}`}
+                  className="text-room-accent transition-opacity hover:opacity-70"
+                >
+                  {supplierProfile.contact_email}
+                </a>
               ) : (
-                <div className="space-y-4">
-                  {products.map((product) => (
-                    <div
-                      key={product.id}
-                      className="flex items-start gap-4 p-4 border rounded-lg"
-                    >
-                      <div className="relative h-20 w-20 flex-shrink-0 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800">
-                        {product.product_image_url ? (
-                          <Image
-                            src={product.product_image_url}
-                            alt={product.name}
-                            fill
-                            className="object-contain"
-                          />
-                        ) : (
-                          <div className="h-full w-full flex items-center justify-center">
-                            <Package className="h-8 w-8 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <h4 className="font-medium">{product.name}</h4>
-                          {product.product_type && (
-                            <Badge variant="outline" className="text-xs capitalize">
-                              {product.product_type}
-                            </Badge>
-                          )}
-                          {product.product_code && (
-                            <Badge variant="outline" className="text-xs">{product.product_code}</Badge>
-                          )}
-                          {product.origin_country_code && (
-                            <Badge variant="secondary" className="text-xs">
-                              <MapPin className="h-3 w-3 mr-0.5" />
-                              {product.origin_country_code}
-                            </Badge>
-                          )}
-                        </div>
-                        {product.description && (
-                          <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
-                            {product.description}
-                          </p>
-                        )}
+                <span className="text-studio-dim">Not provided</span>
+              )
+            }
+            meta="Email"
+          />
+          <FactRow subject={supplierProfile.contact_name || <span className="text-studio-dim">Not provided</span>} meta="Contact" />
+          {supplierProfile.phone && (
+            <FactRow
+              subject={
+                <a
+                  href={`tel:${supplierProfile.phone}`}
+                  className="text-room-accent transition-opacity hover:opacity-70"
+                >
+                  {supplierProfile.phone}
+                </a>
+              }
+              meta="Phone"
+            />
+          )}
+          <FactRow
+            subject={<StateChip tone={engagement.tone}>{engagement.label}</StateChip>}
+            meta="Status"
+          />
+          {brandRelationship?.relationship_type && (
+            <FactRow
+              subject={<span className="capitalize">{brandRelationship.relationship_type.replace(/_/g, " ")}</span>}
+              meta="Type"
+            />
+          )}
+          <FactRow
+            subject={
+              <span className="tabular-nums">
+                {formatCurrency(brandRelationship?.annual_spend ?? null, brandRelationship?.spend_currency ?? null)}
+              </span>
+            }
+            meta="Annual spend"
+          />
+          <FactRow subject={<span className="tabular-nums">{products.length}</span>} meta="Products available" />
+          <FactRow subject={<span className="tabular-nums">{formatDate(brandRelationship?.added_at ?? null)}</span>} meta="Added" />
+          <FactRow
+            subject={<span className="tabular-nums">{getProfileCompleteness(supplierProfile as any).percent}% complete</span>}
+            meta="Profile"
+          />
+        </div>
 
-                        {/* Impact metrics row */}
-                        <div className="flex items-center gap-3 text-xs flex-wrap mt-1">
-                          {product.category && (
-                            <span className="text-muted-foreground">{product.category}</span>
-                          )}
-                          {product.impact_climate != null && (
-                            <span className="flex items-center gap-1 font-medium text-foreground bg-emerald-500/10 px-2 py-0.5 rounded">
-                              <Leaf className="h-3 w-3 text-emerald-500" />
-                              {formatImpact(product.impact_climate)} kg CO₂e/{product.unit}
-                            </span>
-                          )}
-                          {product.impact_water != null && (
-                            <span className="flex items-center gap-1 font-medium text-foreground bg-blue-500/10 px-2 py-0.5 rounded">
-                              <Droplets className="h-3 w-3 text-blue-500" />
-                              {formatImpact(product.impact_water)} L/{product.unit}
-                            </span>
-                          )}
-                          {product.impact_land != null && (
-                            <span className="flex items-center gap-1 font-medium text-foreground bg-amber-500/10 px-2 py-0.5 rounded">
-                              <Mountain className="h-3 w-3 text-amber-500" />
-                              {formatImpact(product.impact_land)} m²/{product.unit}
-                            </span>
-                          )}
-                          {product.impact_waste != null && (
-                            <span className="flex items-center gap-1 font-medium text-foreground bg-orange-500/10 px-2 py-0.5 rounded">
-                              <Trash2 className="h-3 w-3 text-orange-500" />
-                              {formatImpact(product.impact_waste)} kg/{product.unit}
-                            </span>
-                          )}
-                        </div>
+        {brandRelationship?.notes && (
+          <div className="space-y-1.5">
+            <Eyebrow tone="dim">Notes</Eyebrow>
+            <p className="max-w-2xl whitespace-pre-wrap text-sm text-muted-foreground">
+              {brandRelationship.notes}
+            </p>
+          </div>
+        )}
+      </Section>
 
-                        {/* Certifications */}
-                        {(product as any).certifications && (product as any).certifications.length > 0 && (
-                          <div className="flex items-center gap-1 mt-2">
-                            {(product as any).certifications.map((cert: string) => (
-                              <Badge key={cert} variant="secondary" className="text-xs">
-                                <ShieldCheck className="h-3 w-3 mr-0.5" />
-                                {cert}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
+      {/* ── THE PRODUCTS ── */}
+      <Section label="THE PRODUCTS">
+        {!resolvedSupplierId ? (
+          <p className="text-sm text-studio-dim">This supplier has not joined yet.</p>
+        ) : products.length === 0 ? (
+          <p className="text-sm text-studio-dim">No products added by this supplier yet.</p>
+        ) : (
+          <div>
+            {products.map((product) => {
+              const metaParts = [
+                product.product_type,
+                product.origin_country_code,
+                product.product_code,
+                product.category,
+              ].filter(Boolean);
 
-                        {/* Packaging-specific details */}
-                        {product.product_type === "packaging" && (
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-2 flex-wrap">
-                            {product.weight_g != null && (
-                              <span>Weight: {product.weight_g}g</span>
-                            )}
-                            {product.primary_material && (
-                              <span>Material: {product.primary_material.replace(/_/g, " ")}</span>
-                            )}
-                            {product.recycled_content_pct != null && (
-                              <span>Recycled: {product.recycled_content_pct}%</span>
-                            )}
-                            {product.packaging_category && (
-                              <span className="capitalize">{product.packaging_category}</span>
-                            )}
-                          </div>
-                        )}
+              const impacts = [
+                { label: "CLIMATE", value: product.impact_climate, unit: `kg CO₂e/${product.unit}` },
+                { label: "WATER", value: product.impact_water, unit: `L/${product.unit}` },
+                { label: "LAND", value: product.impact_land, unit: `m²/${product.unit}` },
+                { label: "WASTE", value: product.impact_waste, unit: `kg/${product.unit}` },
+              ].filter((m) => m.value != null);
 
-                        {/* Data quality indicator */}
-                        {product.data_quality_score != null && (
-                          <div className="mt-2">
-                            <span className="text-xs text-muted-foreground">
-                              Data quality: {product.data_quality_score <= 2 ? "High" : product.data_quality_score <= 3 ? "Medium" : "Low"}
-                              {product.methodology_standard && ` (${product.methodology_standard})`}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+              const certs = ((product as any).certifications as string[] | undefined) || [];
+
+              const packagingMeta =
+                product.product_type === "packaging"
+                  ? [
+                      product.weight_g != null ? `${product.weight_g}g` : null,
+                      product.primary_material ? product.primary_material.replace(/_/g, " ") : null,
+                      product.recycled_content_pct != null ? `${product.recycled_content_pct}% recycled` : null,
+                      product.packaging_category ?? null,
+                    ].filter(Boolean)
+                  : [];
+
+              const quality =
+                product.data_quality_score != null
+                  ? `${product.data_quality_score <= 2 ? "High" : product.data_quality_score <= 3 ? "Medium" : "Low"}${
+                      product.methodology_standard ? ` (${product.methodology_standard})` : ""
+                    }`
+                  : null;
+
+              return (
+                <div key={product.id} className="space-y-2 border-b border-studio-hairline py-4 last:border-0">
+                  <div className="flex items-baseline justify-between gap-4">
+                    <span className="font-display text-sm font-semibold text-foreground">{product.name}</span>
+                    {metaParts.length > 0 && (
+                      <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.15em] text-studio-dim">
+                        {metaParts.join(" · ")}
+                      </span>
+                    )}
+                  </div>
+
+                  {product.description && (
+                    <p className="max-w-2xl truncate text-xs text-muted-foreground">{product.description}</p>
+                  )}
+
+                  {impacts.length > 0 && (
+                    <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1.5">
+                      {impacts.map((m) => (
+                        <span key={m.label} className="inline-flex items-baseline gap-1.5">
+                          <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-studio-dim">
+                            {m.label}
+                          </span>
+                          <span className="font-mono text-xs tabular-nums text-foreground">
+                            {formatImpact(m.value)}
+                          </span>
+                          <span className="font-mono text-[10px] text-studio-dim">{m.unit}</span>
+                        </span>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  )}
 
-        {/* ESG Assessment Tab */}
-        <TabsContent value="esg" className="space-y-6">
-          {!resolvedSupplierId ? (
-            <Card>
-              <CardContent className="py-12">
-                <div className="text-center">
-                  <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Supplier Not Yet Joined</h3>
-                  <p className="text-muted-foreground">
-                    ESG data will appear here once the supplier joins the platform and completes their assessment.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          ) : esgAssessment && (esgAssessment.submitted || esgAssessment.is_verified) ? (
-            <>
-              {/* Verification status */}
-              {esgAssessment.is_verified && (
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-3">
-                      <ShieldCheck className="h-6 w-6 text-emerald-500" />
-                      <div>
-                        <p className="font-semibold text-emerald-500">ESG Verified</p>
-                        <p className="text-sm text-muted-foreground">
-                          Verified on{" "}
-                          {new Date(esgAssessment.verified_at!).toLocaleDateString("en-GB", {
-                            day: "numeric",
-                            month: "long",
-                            year: "numeric",
-                          })}
-                        </p>
-                      </div>
-                      <div className="ml-auto text-right">
-                        <p className="text-3xl font-bold">{esgAssessment.score_total ?? "N/A"}</p>
-                        <EsgRatingBadge rating={esgAssessment.score_rating} />
-                      </div>
+                  {(certs.length > 0 || packagingMeta.length > 0 || quality) && (
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10px] uppercase tracking-[0.15em] text-studio-dim">
+                      {certs.length > 0 && <span>Certified: {certs.join(" · ")}</span>}
+                      {packagingMeta.length > 0 && <span>{packagingMeta.join(" · ")}</span>}
+                      {quality && <span>Data quality: {quality}</span>}
                     </div>
-                  </CardContent>
-                </Card>
-              )}
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Section>
 
-              {/* Score breakdown */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Score Breakdown</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {ESG_SECTIONS.map((section) => {
-                    const scoreKey = {
-                      labour_human_rights: "score_labour",
-                      environment: "score_environment",
-                      ethics: "score_ethics",
-                      health_safety: "score_health_safety",
-                      management_systems: "score_management",
-                    }[section.key] as keyof typeof esgAssessment;
-                    const score = (esgAssessment[scoreKey] as number) ?? 0;
+      {/* ── THE ESG ASSESSMENT ── */}
+      <Section label="THE ESG ASSESSMENT">
+        {!resolvedSupplierId ? (
+          <div className="space-y-4">
+            <p className="text-sm text-studio-dim">
+              ESG data appears here once the supplier joins the platform and completes their assessment.
+            </p>
+            <PillButton variant="room" onClick={() => setEsgSurveyOpen(true)}>
+              Send ESG survey
+            </PillButton>
+          </div>
+        ) : esgAssessment && (esgAssessment.submitted || esgAssessment.is_verified) ? (
+          <div className="space-y-8">
+            {esgAssessment.is_verified && esgAssessment.verified_at && (
+              <p className="text-sm text-studio-good">
+                ESG verified on{" "}
+                {new Date(esgAssessment.verified_at).toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+                .
+              </p>
+            )}
 
-                    return (
-                      <div key={section.key} className="space-y-1">
-                        <div className="flex items-center justify-between text-sm">
-                          <span>{section.label}</span>
-                          <span className="font-medium">{score}%</span>
-                        </div>
-                        <Progress value={score} className="h-2" />
-                      </div>
-                    );
-                  })}
-                </CardContent>
-              </Card>
+            {/* Per-section breakdown, quiet hairline bars. */}
+            <div className="max-w-xl space-y-4">
+              {ESG_SECTIONS.map((section) => {
+                const scoreKey = {
+                  labour_human_rights: "score_labour",
+                  environment: "score_environment",
+                  ethics: "score_ethics",
+                  health_safety: "score_health_safety",
+                  management_systems: "score_management",
+                }[section.key] as keyof typeof esgAssessment;
+                const score = (esgAssessment[scoreKey] as number) ?? 0;
+                return <ScoreBar key={section.key} label={section.label} value={score} />;
+              })}
+            </div>
 
-              {/* Section-by-section Q&A */}
+            {/* Section-by-section Q&A. */}
+            <div className="space-y-8">
               {ESG_SECTIONS.map((section) => {
                 const questions = getQuestionsBySection(section.key);
                 const answers = (esgAssessment.answers || {}) as Record<string, EsgResponse>;
-
                 return (
-                  <Card key={section.key}>
-                    <CardHeader>
-                      <CardTitle className="text-base">{section.label}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        {questions.map((q) => {
-                          const answer = answers[q.id];
-                          const answerStyles: Record<string, string> = {
-                            yes: "bg-emerald-500/20 text-emerald-400",
-                            partial: "bg-amber-500/20 text-amber-400",
-                            no: "bg-red-500/20 text-red-400",
-                            na: "bg-slate-500/20 text-slate-400",
-                          };
-                          const answerLabels: Record<string, string> = {
-                            yes: "Yes",
-                            partial: "Partial",
-                            no: "No",
-                            na: "N/A",
-                          };
-
-                          return (
-                            <div
-                              key={q.id}
-                              className="flex items-start justify-between gap-4 text-sm py-1.5 border-b border-border/50 last:border-0"
-                            >
-                              <span className="text-muted-foreground flex-1">{q.text}</span>
-                              {answer ? (
-                                <Badge className={`text-xs flex-shrink-0 ${answerStyles[answer] || ""}`}>
-                                  {answerLabels[answer] || answer}
-                                </Badge>
-                              ) : (
-                                <span className="text-muted-foreground text-xs">&mdash;</span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <div key={section.key} className="space-y-2">
+                    <Eyebrow tone="dim">{section.label}</Eyebrow>
+                    <div>
+                      {questions.map((q) => {
+                        const answer = answers[q.id];
+                        return (
+                          <div
+                            key={q.id}
+                            className="flex items-start justify-between gap-6 border-b border-studio-hairline py-2 last:border-0"
+                          >
+                            <span className="flex-1 text-sm text-muted-foreground">{q.text}</span>
+                            {answer ? (
+                              <StateChip tone={ANSWER_TONE[answer] ?? "quiet"}>
+                                {ANSWER_LABEL[answer] ?? answer}
+                              </StateChip>
+                            ) : (
+                              <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+                                Not answered
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 );
               })}
-            </>
-          ) : esgInvitationStatus === "pending" || esgInvitationStatus === "accepted" ? (
-            <Card>
-              <CardContent className="py-12">
-                <div className="text-center">
-                  <ClipboardCheck className="h-12 w-12 text-amber-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Survey sent, awaiting completion</h3>
-                  <p className="text-muted-foreground mb-4 max-w-md mx-auto">
-                    You&apos;ve invited this supplier to complete the ESG self-assessment.
-                    Their scores will appear here once they submit it.
-                  </p>
-                  <Button variant="outline" onClick={() => setEsgSurveyOpen(true)}>
-                    <ClipboardCheck className="h-4 w-4 mr-2" />
-                    Resend survey
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="py-12">
-                <div className="text-center">
-                  <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No ESG Assessment</h3>
-                  <p className="text-muted-foreground mb-4">
-                    This supplier has not yet completed an ESG assessment.
-                  </p>
-                  <Button onClick={() => setEsgSurveyOpen(true)}>
-                    <ClipboardCheck className="h-4 w-4 mr-2" />
-                    Send ESG Survey
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      </Tabs>
+            </div>
+          </div>
+        ) : esgInvitationStatus === "pending" || esgInvitationStatus === "accepted" ? (
+          <div className="space-y-4">
+            <p className="max-w-xl text-sm text-studio-attention">
+              Survey sent, awaiting completion. Their scores appear here once they submit it.
+            </p>
+            <PillButton variant="outline" onClick={() => setEsgSurveyOpen(true)}>
+              Resend survey
+            </PillButton>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-studio-dim">This supplier has not yet completed an ESG assessment.</p>
+            <PillButton variant="room" onClick={() => setEsgSurveyOpen(true)}>
+              Send ESG survey
+            </PillButton>
+          </div>
+        )}
+      </Section>
 
       <SendEsgSurveyDialog
         open={esgSurveyOpen}
@@ -798,20 +536,5 @@ export default function SupplierDetailPage() {
         defaultContactName={(supplierProfile as any)?.contact_name || ""}
       />
     </div>
-  );
-}
-
-function EsgRatingBadge({ rating }: { rating: string | null }) {
-  if (!rating) return null;
-  const styles: Record<string, string> = {
-    leader: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-    progressing: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-    needs_improvement: "bg-red-500/20 text-red-400 border-red-500/30",
-    not_assessed: "bg-slate-500/20 text-slate-400 border-slate-500/30",
-  };
-  return (
-    <Badge className={`text-xs ${styles[rating] || ""}`}>
-      {getRatingLabel(rating as any)}
-    </Badge>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Panel } from '@/components/studio/panel';
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -224,7 +224,7 @@ export default function BlogDashboard() {
     );
   }
 
-  const getStatusBadge = (status: string) => {
+  const getStatusChip = (status: string) => {
     switch (status) {
       case 'published':
         return <StateChip tone="good">Published</StateChip>;
@@ -242,7 +242,7 @@ export default function BlogDashboard() {
       {/* Header */}
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <Eyebrow className="mb-3">THE WIRING · BLOG</Eyebrow>
+          <Eyebrow className="mb-3">THE WIRING · ADMIN</Eyebrow>
           <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
             The blog.
           </h1>
@@ -275,12 +275,12 @@ export default function BlogDashboard() {
       )}
 
       {/* Posts Table */}
-      <Card className="rounded-[6px]">
-        <CardHeader>
-          <CardTitle>All Posts</CardTitle>
-          <CardDescription>Manage and edit your blog posts</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <Panel className="rounded-[6px]">
+        <div className="mb-4 space-y-1">
+          <h2 className="font-display text-base font-semibold text-foreground">All Posts</h2>
+          <p className="text-sm text-studio-dim">Manage and edit your blog posts</p>
+        </div>
+        <div>
           {isLoading ? (
             <div className="space-y-4">
               {[1, 2, 3, 4, 5].map((i) => (
@@ -351,7 +351,7 @@ export default function BlogDashboard() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>{getStatusBadge(post.status)}</TableCell>
+                    <TableCell>{getStatusChip(post.status)}</TableCell>
                     <TableCell className="capitalize">{post.content_type}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-x-2 gap-y-1">
@@ -402,8 +402,8 @@ export default function BlogDashboard() {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     </div>
   );
 }

@@ -32,6 +32,7 @@ import {
   WASTE_EMISSION_FACTORS,
 } from "@/lib/calculations/waste-circularity";
 import { RelatableMetric } from "@/components/shared/RelatableMetric";
+import { StateChip } from "@/components/studio";
 
 interface WasteEntry {
   id: string;
@@ -73,9 +74,9 @@ export function OperationalWasteCard({ reportId, entries, xeroEntries, onUpdate,
 
   const getDisposalIcon = (method: string) => {
     if (method === "recycling" || method === "composting" || method === "anaerobic_digestion") {
-      return <Recycle className="h-3 w-3 text-green-600" />;
+      return <Recycle className="h-3 w-3 text-current" />;
     }
-    return <Trash2 className="h-3 w-3 text-slate-600" />;
+    return <Trash2 className="h-3 w-3 text-current" />;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -128,14 +129,12 @@ export function OperationalWasteCard({ reportId, entries, xeroEntries, onUpdate,
 
   return (
     <>
-      <Card className="relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 dark:bg-emerald-950 rounded-full -mr-16 -mt-16 opacity-50" />
-
+      <Card>
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center">
-                <Trash2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              <div className="h-10 w-10 rounded-lg bg-secondary flex items-center justify-center">
+                <Trash2 className="h-5 w-5 text-room-accent" />
               </div>
               <div>
                 <CardTitle className="text-lg">Operational Waste</CardTitle>
@@ -144,10 +143,10 @@ export function OperationalWasteCard({ reportId, entries, xeroEntries, onUpdate,
             </div>
             <div className="flex flex-col items-end gap-1.5">
               {(entries.length > 0 || (xeroEntries && xeroEntries.length > 0)) && (
-                <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100">
+                <StateChip tone="quiet">
                   {entries.length} {entries.length === 1 ? "entry" : "entries"}
                   {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} from Xero`}
-                </Badge>
+                </StateChip>
               )}
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-muted-foreground">Not applicable</span>
@@ -162,7 +161,7 @@ export function OperationalWasteCard({ reportId, entries, xeroEntries, onUpdate,
             <>
               <div className="py-4 border-b space-y-3">
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">
+                  <div className="text-3xl font-bold text-foreground">
                     {formatEmissions(combinedTotal)}
                   </div>
                   <div className="text-sm text-muted-foreground mt-1">
@@ -184,7 +183,7 @@ export function OperationalWasteCard({ reportId, entries, xeroEntries, onUpdate,
                 {entries.map((entry) => (
                   <div
                     key={entry.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-900"
+                    className="flex items-center justify-between p-3 rounded-lg bg-secondary"
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
@@ -196,7 +195,7 @@ export function OperationalWasteCard({ reportId, entries, xeroEntries, onUpdate,
                       <div className="font-medium text-sm truncate flex items-center gap-1.5">
                         {entry.material_type}
                         {entry.data_source === 'xero_upgrade' && (
-                          <Badge variant="outline" className="text-[9px] shrink-0 border-teal-300 text-teal-700 dark:text-teal-400 dark:border-teal-700">Xero</Badge>
+                          <StateChip tone="quiet" className="text-[9px] shrink-0">Xero</StateChip>
                         )}
                       </div>
                       <div className="text-xs text-muted-foreground">
@@ -259,19 +258,19 @@ export function OperationalWasteCard({ reportId, entries, xeroEntries, onUpdate,
                 <SelectContent>
                   <SelectItem value="recycling">
                     <div className="flex items-center gap-2">
-                      <Recycle className="h-3 w-3 text-green-600" />
+                      <Recycle className="h-3 w-3 text-current" />
                       Recycling (0.02 kgCO₂e/kg)
                     </div>
                   </SelectItem>
                   <SelectItem value="composting">
                     <div className="flex items-center gap-2">
-                      <Recycle className="h-3 w-3 text-green-600" />
+                      <Recycle className="h-3 w-3 text-current" />
                       Composting (0.01 kgCO₂e/kg)
                     </div>
                   </SelectItem>
                   <SelectItem value="anaerobic_digestion">
                     <div className="flex items-center gap-2">
-                      <Recycle className="h-3 w-3 text-green-600" />
+                      <Recycle className="h-3 w-3 text-current" />
                       Anaerobic Digestion (0.005 kgCO₂e/kg)
                     </div>
                   </SelectItem>
@@ -309,7 +308,7 @@ export function OperationalWasteCard({ reportId, entries, xeroEntries, onUpdate,
             </div>
 
             {weightKg && parseFloat(weightKg) > 0 && (
-              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900">
+              <div className="p-3 rounded-lg bg-secondary">
                 <div className="text-xs text-muted-foreground mb-1">Estimated Emissions</div>
                 <div className="text-lg font-semibold">
                   {formatEmissions(parseFloat(weightKg) * getWasteEmissionFactor(disposalMethod))}

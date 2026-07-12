@@ -444,7 +444,7 @@ export function BOMImportFlow({
           <DialogHeader>
             <DialogTitle>Parsing your BOM</DialogTitle>
             <DialogDescription>
-              Reading the file you uploaded — this usually takes a few seconds.
+              Reading the file you uploaded. This usually takes a few seconds.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center gap-3 py-6">

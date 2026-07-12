@@ -1,62 +1,64 @@
 'use client';
 
+/**
+ * The hospitality landing (/hospitality/): studio grammar.
+ *
+ * One statement, the vitality hero as a quiet panel beneath it, the
+ * footprint-inclusion setting as a hairline row, and every sub-surface
+ * (venues, meals, drinks, menus, rooms, sales, waste) as a quiet fact
+ * row with a live count where the dashboard already knows one.
+ */
+
 import { useState } from 'react';
-import Link from 'next/link';
-import { Store, UtensilsCrossed, Wine, BookOpen, BedDouble, BarChart3, Trash2, Settings2, ArrowRight } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Statement } from '@/components/studio/statement';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { FactList, type FactRowItem } from '@/components/studio/fact-list';
 import { HospitalitySetup } from '@/components/hospitality/HospitalitySetup';
-import { HospitalityOverview } from '@/components/hospitality/dashboard/HospitalityOverview';
+import {
+  HospitalityOverview,
+  type HospitalityCounts,
+} from '@/components/hospitality/dashboard/HospitalityOverview';
 import { HospitalityFootprintToggle } from '@/components/hospitality/HospitalityFootprintToggle';
 import { useHospitalitySettings } from '@/hooks/data/useHospitalitySettings';
 import { hospitalitySectionFromHref, isHospitalitySectionEnabled } from '@/lib/hospitality/settings';
 
 const SECTIONS = [
-  { href: '/hospitality/venues/', icon: Store, title: 'Venues', blurb: 'Set up your restaurants, bars and accommodation. Each venue anchors its own impact reporting.' },
-  { href: '/hospitality/meals/', icon: UtensilsCrossed, title: 'Meals', blurb: 'Build recipes from ingredients and see carbon, water and land impact per cover.' },
-  { href: '/hospitality/drinks/', icon: Wine, title: 'Drinks', blurb: 'Cocktails and coffees as recipes; impact per serve from the same engine.' },
-  { href: '/hospitality/menus/', icon: BookOpen, title: 'Menus', blurb: 'Collect meals and drinks — including your own wines, pulled live from their LCA — and see the menu average per cover.' },
-  { href: '/hospitality/rooms/', icon: BedDouble, title: 'Rooms', blurb: 'Per-room-night impact: purchased consumables plus allocated energy and water.' },
-  { href: '/hospitality/sales/', icon: BarChart3, title: 'Sales', blurb: 'Record covers, drinks and room-nights served — this drives your company total.' },
-  { href: '/hospitality/waste/', icon: Trash2, title: 'Waste', blurb: 'Log food and dry waste with how it is treated; tracked separately and added to your footprint.' },
+  { href: '/hospitality/venues/', title: 'The venues', hint: 'Restaurants, bars and accommodation; each venue anchors its own impact reporting', countKey: 'venues', unit: ['VENUE', 'VENUES'] },
+  { href: '/hospitality/meals/', title: 'The meals', hint: 'Recipes built from ingredients, with carbon, water and land impact per cover', countKey: 'meals', unit: ['RECIPE', 'RECIPES'] },
+  { href: '/hospitality/drinks/', title: 'The drinks', hint: 'Cocktails and coffees as recipes; impact per serve from the same engine', countKey: 'drinks', unit: ['RECIPE', 'RECIPES'] },
+  { href: '/hospitality/menus/', title: 'The menus', hint: 'Meals and drinks together, your own wines pulled live from their LCA, averaged per cover', countKey: 'menus', unit: ['MENU', 'MENUS'] },
+  { href: '/hospitality/rooms/', title: 'The rooms', hint: 'Per-room-night impact: purchased consumables plus allocated energy and water', countKey: 'rooms', unit: ['ROOM', 'ROOMS'] },
+  { href: '/hospitality/sales/', title: 'The sales', hint: 'Covers, drinks and room nights served; this drives your company total', countKey: null, unit: null },
+  { href: '/hospitality/waste/', title: 'The waste', hint: 'Food and dry waste with how it is treated; tracked separately and added to your footprint', countKey: null, unit: null },
 ] as const;
 
 export default function HospitalityDashboard() {
-  // Dashboard: rich impact overview (HospitalityOverview) + section shortcuts.
-  const { settings, isLoading } = useHospitalitySettings();
+  const router = useRouter();
+  const { settings, isLoading, refresh } = useHospitalitySettings();
   const [editing, setEditing] = useState(false);
+  const [counts, setCounts] = useState<HospitalityCounts | null>(null);
 
   const header = (
-    <div className="flex items-start justify-between gap-3">
-      <div className="flex items-center gap-3">
-        <UtensilsCrossed className="h-7 w-7" />
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold">Hospitality</h1>
-            <Badge variant="secondary">Beta</Badge>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Measure the impact of meals, drinks, menus and room nights, and roll it into
-            your total company footprint.
-          </p>
-        </div>
-      </div>
+    <Statement eyebrow="THE WORKBENCH · HOSPITALITY · BETA" headline="The hospitality.">
       {settings?.configured && !editing && (
-        <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-          <Settings2 className="mr-2 h-4 w-4" />
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground transition-colors hover:text-foreground"
+        >
           Customise
-        </Button>
+        </button>
       )}
-    </div>
+    </Statement>
   );
 
   if (isLoading || !settings) {
     return (
-      <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+      <div className="mx-auto max-w-6xl space-y-10 p-4 sm:p-6">
         {header}
-        <Skeleton className="h-40 w-full rounded-lg" />
+        <Skeleton className="h-40 w-full rounded-[6px]" />
       </div>
     );
   }
@@ -64,16 +66,19 @@ export default function HospitalityDashboard() {
   // First open (or "Customise") → show the function chooser.
   if (!settings.configured || editing) {
     return (
-      <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
+      <div className="mx-auto max-w-6xl space-y-10 p-4 sm:p-6">
         {header}
-        <HospitalitySetup
-          initial={settings}
-          onSaved={() => {
-            // Reload so the sidebar nav picks up the new section selection.
-            window.location.reload();
-          }}
-          onCancel={settings.configured ? () => setEditing(false) : undefined}
-        />
+        <div className="max-w-2xl">
+          <HospitalitySetup
+            initial={settings}
+            onSaved={() => {
+              setEditing(false);
+              refresh();
+              router.refresh();
+            }}
+            onCancel={settings.configured ? () => setEditing(false) : undefined}
+          />
+        </div>
       </div>
     );
   }
@@ -83,38 +88,30 @@ export default function HospitalityDashboard() {
     return section ? isHospitalitySectionEnabled(section, settings) : true;
   });
 
+  const rows: FactRowItem[] = visibleSections.map((s) => {
+    const n = s.countKey && counts ? counts[s.countKey] : undefined;
+    return {
+      id: s.href,
+      title: s.title,
+      hint: s.hint,
+      value: n === undefined ? undefined : String(n),
+      unit: n === undefined || !s.unit ? undefined : n === 1 ? s.unit[0] : s.unit[1],
+      href: s.href,
+    };
+  });
+
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+    <div className="mx-auto max-w-6xl space-y-10 p-4 sm:p-6">
       {header}
 
-      <HospitalityOverview />
+      <HospitalityOverview onCounts={setCounts} />
 
       <HospitalityFootprintToggle />
 
-      <div>
-        <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Manage</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-        {visibleSections.map((s) => {
-          const Icon = s.icon;
-          return (
-            <Link key={s.href} href={s.href} className="block">
-              <Card className="h-full transition-colors hover:border-primary">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                  <div className="flex items-center gap-2">
-                    <Icon className="h-5 w-5" />
-                    <CardTitle className="text-base">{s.title}</CardTitle>
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">{s.blurb}</p>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
-        </div>
-      </div>
+      <section>
+        <Eyebrow className="mb-3">Manage</Eyebrow>
+        <FactList items={rows} />
+      </section>
     </div>
   );
 }

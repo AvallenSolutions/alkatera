@@ -60,7 +60,7 @@ function dataSourceBadge(packaging: PackagingFormData) {
   if (packaging.data_source === 'supplier') {
     return (
       <Badge variant="outline" className="text-xs gap-1 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800">
-        <Shield className="h-3 w-3 text-emerald-600" /> Supplier
+        <Shield className="h-3 w-3 text-studio-dim" /> Supplier
       </Badge>
     );
   }
@@ -106,7 +106,7 @@ export function PackagingRow(props: PackagingRowProps) {
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-muted/40 rounded-t-md focus:outline-none focus:ring-2 focus:ring-ring"
       >
-        <div className="flex h-7 w-7 items-center justify-center rounded bg-orange-500 text-white flex-shrink-0">
+        <div className="flex h-7 w-7 items-center justify-center rounded-[4px] bg-studio-ink/5 text-studio-dim flex-shrink-0">
           <Icon className="h-3.5 w-3.5" />
         </div>
         <div className="flex-1 min-w-0">
@@ -119,9 +119,9 @@ export function PackagingRow(props: PackagingRowProps) {
               )}
             </span>
             {allComplete ? (
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" aria-label="Complete" />
+              <CheckCircle2 className="h-3.5 w-3.5 text-studio-good flex-shrink-0" aria-label="Complete" />
             ) : (
-              <AlertCircle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" aria-label="Incomplete" />
+              <AlertCircle className="h-3.5 w-3.5 text-studio-attention flex-shrink-0" aria-label="Incomplete" />
             )}
           </div>
           <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">

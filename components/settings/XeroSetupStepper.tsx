@@ -12,9 +12,9 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Eyebrow } from '@/components/studio/eyebrow'
+import { Panel } from '@/components/studio/panel'
 import { Check, RefreshCw, Users, BarChart3, X, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { useOrganization } from '@/lib/organizationContext'
@@ -131,7 +131,7 @@ export function XeroSetupStepper() {
       })
       await fetchData()
     } catch {
-      // Ignore — fetchData will pick up the new status
+      // Ignore: fetchData will pick up the new status
     } finally {
       setIsResettingSync(false)
     }
@@ -183,8 +183,8 @@ export function XeroSetupStepper() {
   }
 
   return (
-    <Card className="rounded-[6px] border-border bg-card">
-      <CardContent className="py-4">
+    <Panel flush>
+      <div className="px-5 py-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Eyebrow tone="dim">Setup guide</Eyebrow>
@@ -294,7 +294,7 @@ export function XeroSetupStepper() {
             </Button>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   )
 }

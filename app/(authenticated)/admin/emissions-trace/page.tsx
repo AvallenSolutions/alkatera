@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useIsAlkateraAdmin } from '@/hooks/usePermissions'
 import { supabase } from '@/lib/supabaseClient'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Panel } from '@/components/studio/panel'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -89,8 +89,8 @@ export default function EmissionsTracePage() {
 
   if (!isAlkateraAdmin) {
     return (
-      <Card className="max-w-xl mx-auto mt-12">
-        <CardContent className="py-6 flex items-start gap-3">
+      <Panel className="max-w-xl mx-auto mt-12">
+        <div className="flex items-start gap-3">
           <ShieldAlert className="h-5 w-5 text-muted-foreground mt-0.5" />
           <div>
             <h2 className="font-semibold">Admin access required</h2>
@@ -98,8 +98,8 @@ export default function EmissionsTracePage() {
               This diagnostic tool is only available to <Brand /> platform administrators.
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     )
   }
 
@@ -120,12 +120,12 @@ export default function EmissionsTracePage() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Select an organisation &amp; year</CardTitle>
-          <CardDescription>Read-only. Does not modify any data.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-[1fr_120px_auto] items-end">
+      <Panel>
+        <div className="mb-4 space-y-1">
+          <h2 className="font-display text-base font-semibold text-foreground">Select an organisation &amp; year</h2>
+          <p className="text-sm text-studio-dim">Read-only. Does not modify any data.</p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-[1fr_120px_auto] items-end">
           <div className="space-y-1.5">
             <Label>Organisation</Label>
             <Select value={orgId} onValueChange={setOrgId}>
@@ -154,8 +154,8 @@ export default function EmissionsTracePage() {
           <Button onClick={runTrace} disabled={!orgId || loading}>
             {loading ? 'Running…' : 'Run trace'}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
 
       {trace && (
         <>
@@ -170,27 +170,27 @@ export default function EmissionsTracePage() {
           </div>
 
           {suppressedKg > 0 && (
-            <Card>
-              <CardContent className="py-3 text-sm text-muted-foreground">
+            <Panel>
+              <div className="text-sm text-muted-foreground">
                 {suppressedKg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kgCO2e
                 in rows currently excluded from totals (upgrade_status = upgraded or dismissed).
-              </CardContent>
-            </Card>
+              </div>
+            </Panel>
           )}
 
           {trace.warnings.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
+            <Panel>
+              <div className="mb-4 space-y-1">
+                <h2 className="font-display text-base font-semibold text-foreground flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-studio-attention" />
                   Overlap warnings
-                </CardTitle>
-                <CardDescription>
+                </h2>
+                <p className="text-sm text-studio-dim">
                   Two or more sources contribute to the same scope slice + month. Each of these
                   is a likely double-count that Phase 1 suppression rules will resolve.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+                </p>
+              </div>
+              <div>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -211,19 +211,19 @@ export default function EmissionsTracePage() {
                     ))}
                   </TableBody>
                 </Table>
-              </CardContent>
-            </Card>
+              </div>
+            </Panel>
           )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Per-slice attribution</CardTitle>
-              <CardDescription>
+          <Panel>
+            <div className="mb-4 space-y-1">
+              <h2 className="font-display text-base font-semibold text-foreground">Per-slice attribution</h2>
+              <p className="text-sm text-studio-dim">
                 What currently counts toward each scope slice, per month, with suppressed sources
                 listed for context.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+              </p>
+            </div>
+            <div>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -239,13 +239,13 @@ export default function EmissionsTracePage() {
                     <TableRow key={i}>
                       <TableCell className="font-mono text-xs">{a.scopeSlice}</TableCell>
                       <TableCell>{a.period}</TableCell>
-                      <TableCell className="text-xs">{a.winningSource || '—'}</TableCell>
+                      <TableCell className="text-xs">{a.winningSource || '·'}</TableCell>
                       <TableCell className="text-right font-mono text-xs">
                         {a.kgCO2e.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {a.suppressedSources.length === 0
-                          ? '—'
+                          ? '·'
                           : a.suppressedSources
                               .map((s) => `${s.source} (${s.rowCount})`)
                               .join(', ')}
@@ -254,8 +254,8 @@ export default function EmissionsTracePage() {
                   ))}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
+            </div>
+          </Panel>
         </>
       )}
     </div>
@@ -264,14 +264,14 @@ export default function EmissionsTracePage() {
 
 function StatCard({ label, value, tone = 'neutral' }: { label: string; value: string; tone?: 'neutral' | 'warn' | 'ok' }) {
   return (
-    <Card>
-      <CardContent className="py-4">
+    <Panel>
+      <div>
         <BigNumber
           value={value}
           label={label}
           tone={tone === 'warn' ? 'attention' : tone === 'ok' ? 'good' : 'ink'}
         />
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   )
 }
