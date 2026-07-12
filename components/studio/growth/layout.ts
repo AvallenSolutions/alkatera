@@ -17,7 +17,7 @@ import { between, mulberry32, rngFromString, smoothstep, type Rng } from './prng
 import { GRASSES } from './species/grasses';
 import { FLOWERS } from './species/flowers';
 import { UNDERSTORY } from './species/understory';
-import { canopyBand, FORE_PALETTE, MID_PALETTE, TREES } from './species/trees';
+import { canopyBand, FORE_PALETTE, MID_PALETTE, TREE_MIX } from './species/trees';
 import { makeCreatures, type Creature } from './species/creatures';
 import type { Prim } from './species/shared';
 
@@ -99,9 +99,9 @@ function buildPrims(layer: LayerKey, speciesIndex: number, rng: Rng): Prim[] {
     case 'understory':
       return UNDERSTORY[speciesIndex % UNDERSTORY.length](rng);
     case 'midTree':
-      return TREES[speciesIndex % TREES.length](rng, MID_PALETTE);
+      return TREE_MIX[speciesIndex % TREE_MIX.length](rng, MID_PALETTE);
     case 'foreTree':
-      return TREES[speciesIndex % TREES.length](rng, FORE_PALETTE);
+      return TREE_MIX[speciesIndex % TREE_MIX.length](rng, FORE_PALETTE);
   }
 }
 

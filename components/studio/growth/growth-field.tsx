@@ -192,6 +192,15 @@ function Resident({
     return null;
   }
   const s = creature.scale * (creature.flip ? -1 : 1);
+  const body = seasonalPrims(creature.prims, season, 'creature');
+  const tail = creature.tail ? seasonalPrims(creature.tail, season, 'creature') : null;
+  // The tail wags whether or not the body drifts (Rosa stands; she wags).
+  const inner = (
+    <>
+      {body}
+      {tail && (still ? tail : <g className="growth-wag">{tail}</g>)}
+    </>
+  );
   return (
     <g
       style={{
@@ -205,23 +214,51 @@ function Resident({
           className={MOTION_CLASS[creature.motion]}
           style={{ animationDuration: `${creature.motionDuration}s` }}
         >
-          {seasonalPrims(creature.prims, season, 'creature')}
-          {creature.tail && (
-            <g className="growth-wag">{seasonalPrims(creature.tail, season, 'creature')}</g>
-          )}
+          {inner}
         </g>
       ) : (
-        <>
-          {seasonalPrims(creature.prims, season, 'creature')}
-          {creature.tail && seasonalPrims(creature.tail, season, 'creature')}
-        </>
+        inner
       )}
     </g>
   );
 }
 
+/**
+ * Rosa's spot for this session: somewhere new each time you arrive, the
+ * same somewhere as you walk between rooms. Deliberately NOT seeded by
+ * the org (the forest is deterministic; the dog is alive). Session-
+ * scoped so she only moves when you come back, never mid-visit.
+ */
+function rosaSpotForSession(seed: string): { x: number; flip: boolean } | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const key = `alkatera:rosa:${seed}`;
+    const stored = window.sessionStorage.getItem(key);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (typeof parsed?.x === 'number' && typeof parsed?.flip === 'boolean') return parsed;
+    }
+    const spot = {
+      x: Math.round(FIELD_W * (0.08 + Math.random() * 0.84)),
+      flip: Math.random() > 0.5,
+    };
+    window.sessionStorage.setItem(key, JSON.stringify(spot));
+    return spot;
+  } catch {
+    return null; // private browsing: the seeded fallback position stands
+  }
+}
+
 export function GrowthField({ score, seed, replayFrom, season, className }: GrowthFieldProps) {
   const population = useMemo(() => makePopulation(seed), [seed]);
+  const rosaSpot = useMemo(() => rosaSpotForSession(seed), [seed]);
+  const creatures = useMemo(
+    () =>
+      population.creatures.map((c) =>
+        c.kind === 'rosa' && rosaSpot ? { ...c, x: rosaSpot.x, flip: rosaSpot.flip } : c,
+      ),
+    [population, rosaSpot],
+  );
   const liveSeason = season ?? seasonForDate(new Date());
   const [still, setStill] = useState(false);
   // The replay: open on the score you last saw, then grow to today's.
@@ -363,7 +400,7 @@ export function GrowthField({ score, seed, replayFrom, season, className }: Grow
 
         {/* The residents live in front of the meadow. */}
         <g>
-          {population.creatures.map((creature) => (
+          {creatures.map((creature) => (
             <Resident
               key={creature.id}
               creature={creature}

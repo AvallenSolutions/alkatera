@@ -171,7 +171,8 @@ export const hawthorn: TreeBuilder = (rng, p) => {
   ];
 };
 
-/** Scots pine: bare trunk, flat canopy plates near the top. */
+/** Scots pine: bare trunk, flat canopy plates near the top. Evergreen:
+ *  it holds its green all year and collects snow along each plate. */
 export const scotsPine: TreeBuilder = (rng, p) => {
   const h = between(rng, 150, 195);
   const prims: Prim[] = [trunk(rng, h * 0.8, between(rng, 3, 4), p.trunk, p.opacity)];
@@ -179,11 +180,22 @@ export const scotsPine: TreeBuilder = (rng, p) => {
   for (let i = 0; i < plates; i++) {
     const y = -h * (0.72 + i * 0.11);
     const spread = between(rng, 30, 42) * (1 - i * 0.22);
+    const cx = between(rng, -6, 6);
     prims.push({
       kind: 'path',
-      d: blob(rng, between(rng, -6, 6), y, spread, between(rng, 9, 13), 6, 0.28),
+      d: blob(rng, cx, y, spread, between(rng, 9, 13), 6, 0.28),
       fill: i === plates - 1 ? p.canopyLight : p.canopy,
       opacity: p.opacity,
+    });
+    prims.push({
+      kind: 'ellipse',
+      cx: round1(cx),
+      cy: round1(y - between(rng, 7, 10)),
+      rx: round1(spread * 0.85),
+      ry: between(rng, 3, 4.5),
+      fill: G.snow,
+      opacity: 0.85,
+      tag: 'snowcap',
     });
   }
   return prims;
@@ -225,7 +237,8 @@ export const willow: TreeBuilder = (rng, p) => {
   return prims;
 };
 
-/** Holly: small, dense, conical. */
+/** Holly: small, dense, conical. Evergreen: green all year, and it
+ *  collects a crown of snow in winter. */
 export const holly: TreeBuilder = (rng, p) => {
   const h = between(rng, 55, 75);
   return [
@@ -241,6 +254,16 @@ export const holly: TreeBuilder = (rng, p) => {
       d: blob(rng, -4, -h * 0.68, 9, 13, 6),
       fill: p.canopyLight,
       opacity: p.opacity * 0.7,
+    },
+    {
+      kind: 'ellipse',
+      cx: 0,
+      cy: round1(-h * 0.88),
+      rx: between(rng, 10, 14),
+      ry: between(rng, 3, 4.5),
+      fill: G.snow,
+      opacity: 0.85,
+      tag: 'snowcap',
     },
   ];
 };
@@ -282,6 +305,33 @@ export const TREES: readonly TreeBuilder[] = [
   fieldMaple,
   willow,
   holly,
+  ash,
+];
+
+/**
+ * The planting mix the layout cycles through: every species reachable,
+ * but the deciduous majority a British broadleaf wood actually has (the
+ * two evergreens appear once each, the broadleaves twice), so winter
+ * reads properly bare.
+ */
+export const TREE_MIX: readonly TreeBuilder[] = [
+  oak,
+  beech,
+  birch,
+  rowan,
+  hawthorn,
+  scotsPine,
+  fieldMaple,
+  willow,
+  holly,
+  ash,
+  oak,
+  beech,
+  birch,
+  rowan,
+  hawthorn,
+  fieldMaple,
+  willow,
   ash,
 ];
 

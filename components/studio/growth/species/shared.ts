@@ -11,9 +11,11 @@
 
 import { between, type Rng } from '../prng';
 
-/** Marks a primitive the seasons repaint: deciduous leaf mass turns with
- *  the year; untagged prims (trunks, evergreens, flower heads) hold. */
-export type SeasonTag = 'canopy';
+/** Marks a primitive the seasons repaint: 'canopy' is deciduous leaf
+ *  mass that turns with the year; 'snowcap' is snow an evergreen
+ *  collects, drawn only in winter. Untagged prims (trunks, evergreen
+ *  leaf, flower heads) hold. */
+export type SeasonTag = 'canopy' | 'snowcap';
 
 export type Prim =
   | {

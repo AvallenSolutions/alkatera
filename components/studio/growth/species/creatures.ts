@@ -103,7 +103,10 @@ function bird(): Prim[] {
 export function makeCreatures(rng: Rng, fieldW: number, groundY: number): Creature[] {
   const creatures: Creature[] = [];
 
-  // Rosa: with you from the very first growth, somewhere in the meadow.
+  // Rosa: with you from the very first growth. She stands (tail going)
+  // rather than sliding about; the growth field re-seats her in a fresh
+  // spot each session, so she is found somewhere new every visit. The
+  // seeded position here is the fallback (and the artefact's pose).
   const rosa = rosaTheDog(rng);
   creatures.push({
     id: 'rosa',
@@ -115,8 +118,6 @@ export function makeCreatures(rng: Rng, fieldW: number, groundY: number): Creatu
     flip: rng() > 0.5,
     prims: rosa.body,
     tail: rosa.tail,
-    motion: 'amble',
-    motionDuration: between(rng, 40, 60),
   });
 
   // Bees, once there are flowers to visit.

@@ -44,6 +44,10 @@ const SPRING_LIGHTEN: Record<string, string> = {
  * season hides it entirely (flowers in winter).
  */
 export function dressForSeason(p: Prim, season: Season, layer: LayerKey | 'band' | 'creature'): Prim | null {
+  // Snow the evergreens collect: drawn by the tree builders, shown only
+  // in winter. Checked first so no other rule can leak it into summer.
+  if (p.tag === 'snowcap') return season === 'winter' ? p : null;
+
   if (season === 'summer' || layer === 'creature') return p;
 
   // The flowers: dimmed by autumn, asleep in winter.
@@ -78,8 +82,13 @@ export function dressForSeason(p: Prim, season: Season, layer: LayerKey | 'band'
     if (layer === 'band') {
       return { ...p, fill: G.winterLeaf, opacity: (p.opacity ?? 1) * 0.6 };
     }
-    // Bare: the leaf mass fades to a ghost and the drawn structure holds.
-    return { ...p, opacity: (p.opacity ?? 1) * 0.18 };
+    // Bare: the leaf mass goes to a grey-green ghost (no summer green
+    // left in it) and the drawn structure holds.
+    const out = { ...p };
+    if (out.fill && out.fill !== 'none') out.fill = G.winterLeaf;
+    if (out.stroke && out.stroke !== 'none') out.stroke = G.winterLeaf;
+    out.opacity = (p.opacity ?? 1) * 0.3;
+    return out;
   }
 
   if (season === 'autumn') {
