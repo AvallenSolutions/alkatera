@@ -22,6 +22,7 @@ import { geoSoilBaselineRun } from './geo';
 import { trialReminderSweep } from './trial-reminders';
 import { pulseRefreshRun } from './pulse-refresh';
 import { outreachReportEnrich } from './outreach';
+import { growthStallSweep } from './growth';
 
 export const allFunctions: InngestFunction.Any[] = [
   scrapingQueueTick,
@@ -41,4 +42,5 @@ export const allFunctions: InngestFunction.Any[] = [
   trialReminderSweep,
   pulseRefreshRun,
   outreachReportEnrich,
+  growthStallSweep,
 ];

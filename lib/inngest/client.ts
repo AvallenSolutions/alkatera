@@ -101,6 +101,9 @@ export interface AlkateraEvents {
   'outreach/report.enrich': {
     data: { report_id: string };
   };
+
+  // ─────────── Growth score: "forest gone quiet" stall sweep ───────────
+  'growth/stall.check': { data: Record<string, never> };
 }
 
 const eventKey = process.env.INNGEST_EVENT_KEY;

@@ -52,7 +52,12 @@ function getNotificationIcon(type: string) {
 }
 
 function getNotificationRoute(
-  notification: { entity_type: string | null; entity_id: string | null; notification_type: string },
+  notification: {
+    entity_type: string | null
+    entity_id: string | null
+    notification_type: string
+    metadata?: Record<string, unknown>
+  },
   isAdmin: boolean
 ): string | null {
   if (notification.entity_type === 'feedback_ticket' && notification.entity_id) {
@@ -65,6 +70,9 @@ function getNotificationRoute(
   }
   if (notification.entity_type === 'ingredient_match') {
     return '/products/supplier-matches'
+  }
+  if (notification.notification_type === 'growth_stall') {
+    return typeof notification.metadata?.href === 'string' ? notification.metadata.href : '/desk/'
   }
   return null
 }
