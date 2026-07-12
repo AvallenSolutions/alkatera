@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
 import { RecipeManager } from '@/components/hospitality/RecipeManager';
+import { BenchmarkingExport } from '@/components/hospitality/BenchmarkingExport';
 import { RECIPE_KINDS } from '@/lib/hospitality/recipe-kinds';
 
 export default function HospitalityRoomsPage() {
@@ -16,6 +17,7 @@ export default function HospitalityRoomsPage() {
         Hospitality
       </Link>
       <RecipeManager cfg={RECIPE_KINDS.room_night} />
+      <BenchmarkingExport />
     </div>
   );
 }

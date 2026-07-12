@@ -9,7 +9,7 @@
  * adds quantities per dish in the recipe editor.
  */
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { UploadCloud, Sparkles, Trash2, FileText, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -61,16 +61,23 @@ export function MenuImportDialog({
   onOpenChange,
   onComplete,
   lockKind,
+  initialStashId,
+  onStashConsumed,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onComplete: (result: { created: number; menuId?: string }) => void
   /** When set, all items are forced to this kind and the menu toggle is hidden. */
   lockKind?: ItemKind
+  /** When set, the dialog auto-loads this stashed file (from Smart Upload) on open. */
+  initialStashId?: string | null
+  /** Called once the stashed file has been consumed, so the parent can clear the URL param. */
+  onStashConsumed?: () => void
 }) {
   const { toast } = useToast()
   const { venues } = useHospitalityVenues()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const stashLoadedRef = useRef<string | null>(null)
 
   const [phase, setPhase] = useState<'upload' | 'review'>('upload')
   const [extracting, setExtracting] = useState(false)
@@ -134,6 +141,36 @@ export function MenuImportDialog({
     [lockKind],
   )
 
+  // Smart Upload handoff: when opened with a stashed file, fetch and extract it.
+  useEffect(() => {
+    if (!open || !initialStashId) return
+    if (stashLoadedRef.current === initialStashId) return
+    stashLoadedRef.current = initialStashId
+    let cancelled = false
+    ;(async () => {
+      setExtracting(true)
+      setError(null)
+      try {
+        const meta = await fetch(`/api/ingest/stash?path=${encodeURIComponent(initialStashId)}`, { credentials: 'include' })
+        const metaBody = await meta.json().catch(() => ({}))
+        if (!meta.ok) throw new Error(metaBody?.error || 'Could not load the uploaded file.')
+        const fileRes = await fetch(metaBody.signedUrl)
+        const blob = await fileRes.blob()
+        const file = new File([blob], metaBody.fileName || 'menu', { type: blob.type })
+        if (!cancelled) await extract(file)
+        // Best-effort cleanup of the stash entry.
+        void fetch(`/api/ingest/stash?path=${encodeURIComponent(initialStashId)}`, { method: 'DELETE', credentials: 'include' })
+        onStashConsumed?.()
+      } catch (e: unknown) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Could not load the uploaded file.')
+        setExtracting(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, initialStashId, extract, onStashConsumed])
+
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) extract(file)
@@ -185,7 +222,7 @@ export function MenuImportDialog({
       const created = Number(body.created ?? 0)
       toast({
         title: `Imported ${created} ${created === 1 ? 'item' : 'items'}`,
-        description: 'Add quantities to each dish to calculate its footprint.',
+        description: 'Open "Fill in quantities" to set real amounts, then calculate each footprint.',
       })
       handleOpenChange(false)
       onComplete({ created, menuId: body.menu_id })

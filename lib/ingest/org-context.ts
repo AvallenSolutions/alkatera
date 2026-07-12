@@ -17,6 +17,8 @@ export interface IngestOrgContextData {
   facilities: string[];
   suppliers: string[];
   products: string[];
+  /** Count of active hospitality venues; > 0 makes menus/POS exports expected. */
+  hospitalityVenues: number;
   profiles: Array<{
     supplier: string;
     doc_type: string;
@@ -76,9 +78,23 @@ export function formatIngestOrgContext(data: IngestOrgContextData): string | nul
     .sort((a, b) => b.times_seen - a.times_seen || a.supplier.localeCompare(b.supplier))
     .slice(0, CAPS.profiles);
 
-  if (!industry && facilities.length === 0 && suppliers.length === 0 && products.length === 0 && profiles.length === 0) {
+  const hospitalityVenues = typeof data.hospitalityVenues === 'number' ? data.hospitalityVenues : 0;
+
+  if (
+    !industry &&
+    facilities.length === 0 &&
+    suppliers.length === 0 &&
+    products.length === 0 &&
+    profiles.length === 0 &&
+    hospitalityVenues === 0
+  ) {
     return null;
   }
+
+  const hospitalityNote =
+    hospitalityVenues > 0
+      ? `This organisation runs ${hospitalityVenues} hospitality venue${hospitalityVenues === 1 ? '' : 's'} (restaurant/bar/accommodation), so food or drinks menus and POS sales exports are expected document types.`
+      : null;
 
   const serialise = () =>
     JSON.stringify({
@@ -86,6 +102,7 @@ export function formatIngestOrgContext(data: IngestOrgContextData): string | nul
       ...(facilities.length ? { facilities } : {}),
       ...(suppliers.length ? { suppliers } : {}),
       ...(products.length ? { products } : {}),
+      ...(hospitalityNote ? { hospitality: hospitalityNote } : {}),
       ...(profiles.length ? { known_documents: profiles } : {}),
     });
 
@@ -120,11 +137,12 @@ export async function buildIngestOrgContext(
   const timeoutMs = opts?.timeoutMs ?? 2500;
   try {
     const fetchAll = async (): Promise<IngestOrgContextData> => {
-      const [org, facilities, suppliers, products, profiles] = await Promise.all([
+      const [org, facilities, suppliers, products, venues, profiles] = await Promise.all([
         supabase.from('organizations').select('industry_sector, product_type').eq('id', organizationId).maybeSingle(),
         supabase.from('facilities').select('name').eq('organization_id', organizationId).order('name').limit(CAPS.facilities),
         supabase.from('suppliers').select('name').eq('organization_id', organizationId).order('name').limit(CAPS.suppliers),
         supabase.from('products').select('name').eq('organization_id', organizationId).order('name').limit(CAPS.products),
+        supabase.from('hospitality_venues').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('status', 'active'),
         supabase
           .from('ingest_document_profiles')
           .select('supplier_key, result_type, times_seen, hints')
@@ -138,6 +156,7 @@ export async function buildIngestOrgContext(
         facilities: (facilities.data ?? []).map((f) => f.name),
         suppliers: (suppliers.data ?? []).map((s) => s.name),
         products: (products.data ?? []).map((p) => p.name),
+        hospitalityVenues: venues.count ?? 0,
         profiles: (profiles.data ?? []).map((p) => ({
           supplier: p.supplier_key,
           doc_type: p.result_type,

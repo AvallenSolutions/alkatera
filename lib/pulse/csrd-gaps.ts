@@ -20,6 +20,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { HOSPITALITY_KINDS } from '@/lib/hospitality/constants';
 
 export type GapSeverity = 'critical' | 'warning' | 'ok';
 
@@ -61,6 +62,11 @@ interface EvalContext {
   workforceRowCount: number;
   governancePolicyCount: number;
   materialityCompletedAt: string | null;
+  /** Hospitality module context (0 for orgs that don't run venues). */
+  hospitalityVenueCount: number;
+  hospitalityRecipeCount: number;
+  hospitalityRecipesWithPcf: number;
+  hospitalityVolumeRows12m: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -70,6 +76,8 @@ interface EvalContext {
 const RULES: Array<{
   rule: GapRule;
   evaluate: (ctx: EvalContext) => Omit<GapResult, keyof GapRule>;
+  /** Only surfaced when the org runs hospitality venues (no noise otherwise). */
+  hospitalityOnly?: boolean;
 }> = [
   // ESRS E1 -- Climate change ------------------------------------------------
   {
@@ -305,6 +313,75 @@ const RULES: Array<{
     },
   },
 
+  // Hospitality (only shown when the org runs venues) ------------------------
+  {
+    hospitalityOnly: true,
+    rule: {
+      id: 'hospitality-throughput',
+      esrs_ref: 'ESRS E1-6',
+      title: 'Hospitality throughput logged',
+      why: 'Without service volumes, the hospitality element of Scope 3 reads as zero even though meals and drinks are being served.',
+      category: 'environmental',
+    },
+    evaluate: ctx => {
+      if (ctx.hospitalityRecipeCount === 0) {
+        return {
+          severity: 'warning',
+          evidence: 'Venues exist but no meals, drinks or rooms have been built yet.',
+          fix_href: '/hospitality/meals',
+          fix_label: 'Add recipes',
+        };
+      }
+      if (ctx.hospitalityVolumeRows12m === 0) {
+        return {
+          severity: 'warning',
+          evidence: 'Recipes exist but no service volumes in the last 12 months, so hospitality Scope 3 will read as zero.',
+          fix_href: '/hospitality/sales',
+          fix_label: 'Log sales',
+        };
+      }
+      return {
+        severity: 'ok',
+        evidence: `${ctx.hospitalityVolumeRows12m} service-volume row${ctx.hospitalityVolumeRows12m === 1 ? '' : 's'} in the last 12 months.`,
+        fix_href: '/hospitality/sales',
+      };
+    },
+  },
+  {
+    hospitalityOnly: true,
+    rule: {
+      id: 'hospitality-recipe-coverage',
+      esrs_ref: 'ESRS E1-6',
+      title: 'Hospitality recipe footprints calculated',
+      why: 'A recipe with no calculated footprint contributes nothing to your hospitality emissions.',
+      category: 'environmental',
+    },
+    evaluate: ctx => {
+      if (ctx.hospitalityRecipeCount === 0) {
+        return {
+          severity: 'warning',
+          evidence: 'No hospitality recipes built yet.',
+          fix_href: '/hospitality/meals',
+          fix_label: 'Add recipes',
+        };
+      }
+      const covered = ctx.hospitalityRecipesWithPcf;
+      const share = covered / ctx.hospitalityRecipeCount;
+      if (share < 0.5) {
+        return {
+          severity: 'warning',
+          evidence: `Only ${covered} of ${ctx.hospitalityRecipeCount} recipes have a calculated footprint.`,
+          fix_href: '/hospitality/meals',
+        };
+      }
+      return {
+        severity: 'ok',
+        evidence: `${covered} of ${ctx.hospitalityRecipeCount} recipes have a calculated footprint.`,
+        fix_href: '/hospitality/meals',
+      };
+    },
+  },
+
   // ESRS 2 -- General disclosures -------------------------------------------
   {
     rule: {
@@ -419,6 +496,39 @@ export async function evaluateCsrdGaps(
     .limit(1)
     .maybeSingle();
 
+  // Hospitality context — only query the detail when the org runs venues.
+  const { count: hospitalityVenueCount } = await supabase
+    .from('hospitality_venues')
+    .select('id', { count: 'exact', head: true })
+    .eq('organization_id', organizationId)
+    .eq('status', 'active');
+  let hospitalityRecipeCount = 0;
+  let hospitalityRecipesWithPcf = 0;
+  let hospitalityVolumeRows12m = 0;
+  if ((hospitalityVenueCount ?? 0) > 0) {
+    const { data: hospProducts } = await supabase
+      .from('products')
+      .select('id')
+      .eq('organization_id', organizationId)
+      .in('product_kind', HOSPITALITY_KINDS as unknown as string[]);
+    const hospIds = (hospProducts ?? []).map((p: any) => p.id);
+    hospitalityRecipeCount = hospIds.length;
+    if (hospIds.length > 0) {
+      const { data: pcfs } = await supabase
+        .from('product_carbon_footprints')
+        .select('product_id')
+        .in('product_id', hospIds)
+        .eq('status', 'completed');
+      hospitalityRecipesWithPcf = new Set((pcfs ?? []).map((r: any) => r.product_id)).size;
+    }
+    const { count: volCount } = await supabase
+      .from('hospitality_service_volumes')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', organizationId)
+      .gte('period_end', cutoffIso);
+    hospitalityVolumeRows12m = volCount ?? 0;
+  }
+
   const ctx: EvalContext = {
     organizationId,
     cutoffIso,
@@ -431,12 +541,19 @@ export async function evaluateCsrdGaps(
     workforceRowCount: workforceRowCount ?? 0,
     governancePolicyCount: governancePolicyCount ?? 0,
     materialityCompletedAt: (materiality?.completed_at as string | null) ?? null,
+    hospitalityVenueCount: hospitalityVenueCount ?? 0,
+    hospitalityRecipeCount,
+    hospitalityRecipesWithPcf,
+    hospitalityVolumeRows12m,
   };
 
-  const results: GapResult[] = RULES.map(({ rule, evaluate }) => ({
-    ...rule,
-    ...evaluate(ctx),
-  }));
+  const results: GapResult[] = RULES
+    // Hospitality rules only apply to orgs that actually run venues.
+    .filter(({ hospitalityOnly }) => !hospitalityOnly || ctx.hospitalityVenueCount > 0)
+    .map(({ rule, evaluate }) => ({
+      ...rule,
+      ...evaluate(ctx),
+    }));
 
   const summary = {
     critical: results.filter(r => r.severity === 'critical').length,

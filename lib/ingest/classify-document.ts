@@ -105,6 +105,8 @@ export type ClassifierResultType =
   | 'smart_meter_csv'
   | 'historical_sustainability_report'
   | 'historical_lca_report'
+  | 'hospitality_menu'
+  | 'pos_sales_export'
   | 'unsupported';
 
 export interface ClassifierResult {
@@ -201,6 +203,16 @@ export function shapeIngestResult(
       return {
         result_type: type,
         result_payload: { type, historicalLcaReport: { ...payload, stashId } },
+      };
+    case 'hospitality_menu':
+      return {
+        result_type: type,
+        result_payload: { type, hospitalityMenu: { ...payload, stashId } },
+      };
+    case 'pos_sales_export':
+      return {
+        result_type: type,
+        result_payload: { type, posSalesExport: { ...payload, stashId } },
       };
     case 'unsupported':
     default:
@@ -745,6 +757,35 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
         },
       },
       {
+        name: 'identify_hospitality_menu',
+        description:
+          "Use for a food/drink MENU: a list of dishes, meals, cocktails or drinks with names (and often prices/descriptions), e.g. a restaurant menu, bar/cocktail list or room-service card. This is a menu to build recipes from, NOT a supplier invoice or a bill of materials for one product. Just identify it; the hospitality menu importer does the extraction.",
+        input_schema: {
+          type: 'object',
+          properties: {
+            looks_like: {
+              type: 'string',
+              enum: ['food_menu', 'drinks_menu', 'mixed_menu'],
+              description: 'Whether the menu is mostly food, mostly drinks, or both.',
+            },
+            approx_item_count: { type: 'number', description: 'Rough number of menu items seen.' },
+          },
+          required: [],
+        },
+      },
+      {
+        name: 'identify_pos_sales_export',
+        description:
+          "Use for a POS/till SALES export or item-sales report: rows of menu items with quantities SOLD over a period (e.g. a Square, Toast or Lightspeed product-sales report). This records throughput, not purchases. Just identify it; the hospitality sales importer does the extraction.",
+        input_schema: {
+          type: 'object',
+          properties: {
+            pos_hint: { type: 'string', description: 'POS system if identifiable (e.g. Square, Toast, Lightspeed).' },
+          },
+          required: [],
+        },
+      },
+      {
         name: 'unsupported_document',
         description:
           'Use if the document is not one of the supported types above.',
@@ -840,6 +881,10 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
         type: 'historical_sustainability_report',
         payload: (toolUse.input as Record<string, unknown>) || {},
       };
+    case 'identify_hospitality_menu':
+      return { type: 'hospitality_menu', payload: (toolUse.input as Record<string, unknown>) || {} };
+    case 'identify_pos_sales_export':
+      return { type: 'pos_sales_export', payload: (toolUse.input as Record<string, unknown>) || {} };
     case 'extract_lca_report':
       return {
         type: 'historical_lca_report',

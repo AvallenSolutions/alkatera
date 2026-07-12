@@ -16,6 +16,7 @@ import {
   getRecipe,
   updateRecipe,
   deleteRecipe,
+  duplicateRecipe,
   type ServiceResult,
 } from './recipe-service'
 import type { RecipeKindConfig } from './recipe-kinds'
@@ -62,6 +63,18 @@ export function recipeCollectionHandlers(cfg: RecipeKindConfig) {
         return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
       }
       return send(await createRecipe(a.db, a.organizationId, a.userId, cfg, body), 'recipe', 201)
+    },
+  }
+}
+
+export function recipeDuplicateHandler(cfg: RecipeKindConfig) {
+  return {
+    async POST(_request: NextRequest, { params }: { params: { id: string } }) {
+      const a = await auth()
+      if ('error' in a) return a.error
+      const denied = await denyReadOnlyAdvisor(a.db, { id: a.userId }, a.organizationId)
+      if (denied) return denied
+      return send(await duplicateRecipe(a.db, a.organizationId, a.userId, cfg, params.id), 'recipe', 201)
     },
   }
 }

@@ -1,6 +1,7 @@
 /**
  * Hospitality contribution to the company total for a year.
- * GET /api/hospitality/summary[?year=YYYY]  → { year, total, food, supplies, volume_rows }
+ * GET /api/hospitality/summary[?year=YYYY]  → { year, total, food, supplies, waste, water_m3, land_m2, volume_rows }
+ * (water_m3 / land_m2 are embodied supply-chain figures for what was served, not operational metered water.)
  *
  * This is the same `calculateHospitality` that feeds Scope 3 in
  * `calculateCorporateEmissions`, surfaced for the Hospitality dashboard.

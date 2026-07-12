@@ -18,6 +18,7 @@ interface UseHospitalityRecipesResult {
   refresh: () => Promise<void>
   createRecipe: (input: RecipeCreateInput) => Promise<{ id: number }>
   deleteRecipe: (id: number) => Promise<void>
+  duplicateRecipe: (id: number) => Promise<{ id: number }>
 }
 
 async function readError(res: Response): Promise<string> {
@@ -82,5 +83,16 @@ export function useHospitalityRecipes(cfg: RecipeKindConfig): UseHospitalityReci
     [cfg.apiBase],
   )
 
-  return { recipes, isLoading, error, refresh, createRecipe, deleteRecipe }
+  const duplicateRecipe = useCallback(
+    async (id: number) => {
+      const res = await fetch(`${cfg.apiBase}/${id}/duplicate`, { method: 'POST', credentials: 'include' })
+      if (!res.ok) throw new Error(await readError(res))
+      const body = await res.json()
+      await refresh()
+      return body.recipe as { id: number }
+    },
+    [cfg.apiBase, refresh],
+  )
+
+  return { recipes, isLoading, error, refresh, createRecipe, deleteRecipe, duplicateRecipe }
 }

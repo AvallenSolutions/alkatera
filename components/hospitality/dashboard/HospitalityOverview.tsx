@@ -47,6 +47,15 @@ interface Dashboard {
   water_litres: number;
   water_source?: 'metered' | 'embodied';
   land_m2a: number;
+  intensity?: {
+    covers: number;
+    fnb_revenue: number;
+    currency: string;
+    room_nights: number;
+    per_cover: number | null;
+    per_revenue: number | null;
+    per_room_night: number | null;
+  };
   waste: WasteSummary;
   score: { value: number; label: string; tone: string };
   pillar_scores: { climate: number | null; water: number | null; waste: number | null; nature: number | null };
@@ -178,7 +187,7 @@ export function HospitalityOverview() {
   }
   if (!data) return null;
 
-  const { total, prev_total, weekly, water_litres, land_m2a, waste, score, pillar_scores } = data;
+  const { total, prev_total, weekly, water_litres, land_m2a, intensity, waste, score, pillar_scores } = data;
   const waterMetered = data.water_source === 'metered';
   const band = bandFor(score.value);
   const togglePillar = (p: string) => setExpandedPillar(expandedPillar === p ? null : p);
@@ -286,8 +295,35 @@ export function HospitalityOverview() {
         </PillarCard>
       </PillarGrid>
 
+      {intensity && (intensity.per_cover != null || intensity.per_revenue != null || intensity.per_room_night != null) && (
+        <div className="rounded-xl border bg-card p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-semibold">Carbon intensity</h3>
+            <span className="text-xs text-muted-foreground">
+              {fmtNum(intensity.covers)} covers · {intensity.currency} {fmtNum(intensity.fnb_revenue)} revenue · {fmtNum(intensity.room_nights)} room-nights
+            </span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <IntensityCard label="Per cover" value={intensity.per_cover} unit="kg CO₂e" />
+            <IntensityCard label={`Per ${intensity.currency}`} value={intensity.per_revenue} unit="kg CO₂e" />
+            <IntensityCard label="Per room-night" value={intensity.per_room_night} unit="kg CO₂e" />
+          </div>
+        </div>
+      )}
+
       {/* Strengths & improvements — same component as /performance */}
       <PerformanceSummary strengths={strengths} improvements={improvements} />
+    </div>
+  );
+}
+
+function IntensityCard({ label, value, unit }: { label: string; value: number | null; unit: string }) {
+  const display = value == null ? '--' : value < 1 ? `${Math.round(value * 1000)} g` : value.toLocaleString('en-GB', { maximumFractionDigits: 2 });
+  return (
+    <div className="rounded-lg border bg-background p-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-lg font-semibold">{display}</p>
+      {value != null && <p className="text-[11px] text-muted-foreground">{value < 1 ? 'CO₂e' : unit}</p>}
     </div>
   );
 }

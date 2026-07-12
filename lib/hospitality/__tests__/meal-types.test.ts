@@ -33,5 +33,22 @@ describe('perCoverImpact', () => {
     expect(impact!.per_cover_co2e).toBe(4)
     expect(impact!.per_cover_water).toBe(0)
     expect(impact!.per_cover_land).toBe(0)
+    expect(impact!.per_cover_cooking_co2e).toBe(0)
+    expect(impact!.per_cover_display_co2e).toBe(4)
+  })
+
+  it('uplifts ingredient impact by the prep-waste percentage', () => {
+    const impact = perCoverImpact({ climate_change_gwp100: 10, water_consumption: 4 }, 2, { prepWastePct: 10 })
+    // 10 * 1.1 / 2 = 5.5; water 4 * 1.1 / 2 = 2.2
+    expect(impact!.per_cover_co2e).toBeCloseTo(5.5, 6)
+    expect(impact!.per_cover_water).toBeCloseTo(2.2, 6)
+    expect(impact!.total_co2e).toBeCloseTo(11, 6)
+  })
+
+  it('adds cooking energy to the display figure only, not the ingredient figure', () => {
+    const impact = perCoverImpact({ climate_change_gwp100: 8 }, 4, { cookingCo2eTotal: 2 })
+    expect(impact!.per_cover_co2e).toBe(2) // 8 / 4, ingredients only
+    expect(impact!.per_cover_cooking_co2e).toBe(0.5) // 2 / 4
+    expect(impact!.per_cover_display_co2e).toBe(2.5)
   })
 })

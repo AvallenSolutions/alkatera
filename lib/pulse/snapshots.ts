@@ -21,6 +21,7 @@ import { normaliseToCubicMetres, normaliseToKg } from '@/lib/calculations/utilit
 import { calculateCorporateEmissions } from '@/lib/calculations/corporate-emissions';
 import { calculateDiversionRate, isCircularTreatment } from '@/lib/calculations/waste-circularity';
 import { aggregateImpacts, type PcfRowForAggregator } from '@/lib/vitality/environmental';
+import { HOSPITALITY_KINDS } from '@/lib/hospitality/constants';
 
 export interface SnapshotRow {
   organization_id: string;
@@ -143,10 +144,20 @@ export async function computeOrgSnapshots(
     .eq('status', 'completed')
     .lte('updated_at', `${snapshotDate}T23:59:59Z`);
 
+  // Hospitality meals/drinks/rooms are PCF rows too but are not drinks products —
+  // exclude them from both the assessed count and the completeness denominator so
+  // they don't inflate LCA coverage.
+  const { data: hospProducts } = await supabase
+    .from('products')
+    .select('id')
+    .eq('organization_id', orgId)
+    .in('product_kind', HOSPITALITY_KINDS as unknown as string[]);
+  const hospitalityProductIds = new Set<string>((hospProducts ?? []).map((p: any) => String(p.id)));
+
   const assessedProductIds = new Set<string>();
   for (const p of completedPcfs ?? []) {
     const id = (p as any).product_id as string | null;
-    if (id) assessedProductIds.add(id);
+    if (id && !hospitalityProductIds.has(String(id))) assessedProductIds.add(id);
   }
   const completedCount = assessedProductIds.size;
 
@@ -167,6 +178,7 @@ export async function computeOrgSnapshots(
     .from('products')
     .select('id', { count: 'exact', head: true })
     .eq('organization_id', orgId)
+    .eq('product_kind', 'product')
     .lte('created_at', `${snapshotDate}T23:59:59Z`);
 
   const totalProducts = productsQuery.count ?? 0;

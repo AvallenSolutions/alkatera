@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Store, UtensilsCrossed, Wine, BookOpen, BedDouble, BarChart3, Trash2, Settings2, ArrowRight } from 'lucide-react';
+import { Store, UtensilsCrossed, Wine, BookOpen, BedDouble, BarChart3, Trash2, Settings2, ArrowRight, PartyPopper, Handshake, Plug } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { HospitalitySetup } from '@/components/hospitality/HospitalitySetup';
 import { HospitalityOverview } from '@/components/hospitality/dashboard/HospitalityOverview';
 import { HospitalityFootprintToggle } from '@/components/hospitality/HospitalityFootprintToggle';
+import { HospitalityBandThresholds } from '@/components/hospitality/HospitalityBandThresholds';
+import { ComplianceExports } from '@/components/hospitality/ComplianceExports';
 import { useHospitalitySettings } from '@/hooks/data/useHospitalitySettings';
 import { hospitalitySectionFromHref, isHospitalitySectionEnabled } from '@/lib/hospitality/settings';
 
@@ -21,6 +23,9 @@ const SECTIONS = [
   { href: '/hospitality/rooms/', icon: BedDouble, title: 'Rooms', blurb: 'Per-room-night impact: purchased consumables plus allocated energy and water.' },
   { href: '/hospitality/sales/', icon: BarChart3, title: 'Sales', blurb: 'Record covers, drinks and room-nights served — this drives your company total.' },
   { href: '/hospitality/waste/', icon: Trash2, title: 'Waste', blurb: 'Log food and dry waste with how it is treated; tracked separately and added to your footprint.' },
+  { href: '/hospitality/events/', icon: PartyPopper, title: 'Events', blurb: 'Weddings, festivals and functions: attendee travel, temporary power and catering in one per-event footprint.' },
+  { href: '/hospitality/marketplace/', icon: Handshake, title: 'Marketplace', blurb: 'Find producers whose verified drinks LCAs you can pull into your menus, and list your own org for venues to find.' },
+  { href: '/hospitality/integrations/', icon: Plug, title: 'Integrations', blurb: 'Connect your POS, property, procurement and waste systems to pull data automatically.' },
 ] as const;
 
 export default function HospitalityDashboard() {
@@ -89,7 +94,12 @@ export default function HospitalityDashboard() {
 
       <HospitalityOverview />
 
-      <HospitalityFootprintToggle />
+      <div className="grid gap-3 lg:grid-cols-2">
+        <HospitalityFootprintToggle />
+        <HospitalityBandThresholds />
+      </div>
+
+      <ComplianceExports />
 
       <div>
         <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Manage</h2>

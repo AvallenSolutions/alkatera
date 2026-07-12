@@ -8,17 +8,22 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { carbonBand, formatFootprint, type CarbonBand } from '@/lib/hospitality/carbon-band';
+import { bandLegend, formatFootprint, type CarbonBand, type CarbonBandLegendEntry } from '@/lib/hospitality/carbon-band';
+import { dietaryLabel, allergenLabel } from '@/lib/hospitality/dietary';
 
 interface PublicItem {
   name: string;
   item_kind: string;
   co2e: number | null;
+  band: CarbonBand | null;
+  dietary_tags?: string[];
+  allergens?: string[];
 }
 interface PublicMenu {
   name: string;
   description: string | null;
   venue_name: string | null;
+  legend?: CarbonBandLegendEntry[];
   items: PublicItem[];
 }
 
@@ -38,6 +43,11 @@ export default function PublicMenuPage() {
       })
       .catch(() => setStatus('notfound'));
   }, [slug]);
+
+  // Legend + band → swatch lookup come from the server payload (org-configurable
+  // thresholds); fall back to the defaults if an older payload omits them.
+  const legend = menu?.legend ?? bandLegend();
+  const bandMeta = Object.fromEntries(legend.map((e) => [e.band, e])) as Record<CarbonBand, CarbonBandLegendEntry>;
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0a0a', color: '#fafafa' }}>
@@ -66,50 +76,59 @@ export default function PublicMenuPage() {
             </header>
 
             <div style={{ display: 'flex', gap: 16, marginBottom: 20, fontSize: 12, color: '#a3a3a3' }}>
-              {(['low', 'medium', 'high'] as CarbonBand[]).map((b) => {
-                const meta = carbonBand(b === 'low' ? 0.5 : b === 'medium' ? 2 : 5)!;
-                return (
-                  <span key={b} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 10, height: 10, borderRadius: 9999, background: meta.color }} />
-                    {meta.label}
-                  </span>
-                );
-              })}
+              {legend.map((entry) => (
+                <span key={entry.band} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 9999, background: entry.color }} />
+                  {entry.label}
+                </span>
+              ))}
             </div>
 
             <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
               {[...menu.items]
                 .sort((a, b) => {
-                  const ba = carbonBand(a.co2e);
-                  const bb = carbonBand(b.co2e);
-                  return (ba ? BAND_ORDER[ba.band] : 9) - (bb ? BAND_ORDER[bb.band] : 9);
+                  return (a.band ? BAND_ORDER[a.band] : 9) - (b.band ? BAND_ORDER[b.band] : 9);
                 })
                 .map((item, i) => {
-                  const meta = carbonBand(item.co2e);
+                  const meta = item.band ? bandMeta[item.band] : null;
+                  const tags = item.dietary_tags ?? [];
+                  const allergens = item.allergens ?? [];
                   return (
                     <li
                       key={i}
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 12,
                         padding: '14px 0',
                         borderTop: i === 0 ? 'none' : '1px solid #262626',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                        <span
-                          title={meta?.label ?? 'Not calculated'}
-                          style={{ width: 12, height: 12, borderRadius: 9999, background: meta?.color ?? '#404040', flexShrink: 0 }}
-                        />
-                        <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {item.name}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                          <span
+                            title={meta?.label ?? 'Not calculated'}
+                            style={{ width: 12, height: 12, borderRadius: 9999, background: meta?.color ?? '#404040', flexShrink: 0 }}
+                          />
+                          <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {item.name}
+                          </span>
+                        </div>
+                        <span style={{ color: '#d4d4d4', fontSize: 14, whiteSpace: 'nowrap' }}>
+                          {formatFootprint(item.co2e)}
                         </span>
                       </div>
-                      <span style={{ color: '#d4d4d4', fontSize: 14, whiteSpace: 'nowrap' }}>
-                        {formatFootprint(item.co2e)}
-                      </span>
+                      {tags.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8, marginLeft: 22 }}>
+                          {tags.map((t) => (
+                            <span key={t} style={{ fontSize: 11, color: '#a3e635', border: '1px solid #3f6212', borderRadius: 9999, padding: '1px 8px' }}>
+                              {dietaryLabel(t)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {allergens.length > 0 && (
+                        <p style={{ fontSize: 11, color: '#737373', marginTop: 6, marginLeft: 22 }}>
+                          Allergens: {allergens.map(allergenLabel).join(', ')}
+                        </p>
+                      )}
                     </li>
                   );
                 })}

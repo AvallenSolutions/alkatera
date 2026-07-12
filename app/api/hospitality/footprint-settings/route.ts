@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSupabaseServerClient } from '@/lib/supabase/server-client'
+import { parseBandThresholds } from '@/lib/hospitality/carbon-band'
 
 export const runtime = 'nodejs'
 
@@ -51,8 +52,10 @@ export async function GET() {
     .select('report_defaults')
     .eq('id', ctx.organizationId)
     .maybeSingle()
-  const include = (data?.report_defaults as any)?.include_hospitality !== false
-  return NextResponse.json({ include_hospitality: include })
+  const defaults = (data?.report_defaults as any) ?? {}
+  const include = defaults.include_hospitality !== false
+  const band_thresholds = parseBandThresholds(defaults.hospitality_band_thresholds)
+  return NextResponse.json({ include_hospitality: include, band_thresholds })
 }
 
 export async function PUT(req: NextRequest) {
@@ -61,26 +64,47 @@ export async function PUT(req: NextRequest) {
   if (ctx.role !== 'owner' && ctx.role !== 'admin') {
     return NextResponse.json({ error: 'Only owners and admins can change this' }, { status: 403 })
   }
-  let body: { include_hospitality?: unknown }
+  let body: { include_hospitality?: unknown; band_thresholds?: unknown }
   try {
     body = await req.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
-  if (typeof body.include_hospitality !== 'boolean') {
-    return NextResponse.json({ error: 'include_hospitality must be a boolean' }, { status: 400 })
+
+  const patch: Record<string, unknown> = {}
+  if (body.include_hospitality !== undefined) {
+    if (typeof body.include_hospitality !== 'boolean') {
+      return NextResponse.json({ error: 'include_hospitality must be a boolean' }, { status: 400 })
+    }
+    patch.include_hospitality = body.include_hospitality
   }
+  if (body.band_thresholds !== undefined) {
+    const raw = body.band_thresholds as any
+    const low = Number(raw?.low)
+    const medium = Number(raw?.medium)
+    if (!Number.isFinite(low) || !Number.isFinite(medium) || low <= 0 || medium <= low) {
+      return NextResponse.json({ error: 'band_thresholds must have 0 < low < medium' }, { status: 400 })
+    }
+    patch.hospitality_band_thresholds = { low, medium }
+  }
+  if (Object.keys(patch).length === 0) {
+    return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
+  }
+
   // Read-modify-write the JSONB so other report_defaults keys survive.
   const { data: org } = await ctx.service
     .from('organizations')
     .select('report_defaults')
     .eq('id', ctx.organizationId)
     .maybeSingle()
-  const merged = { ...((org?.report_defaults as any) ?? {}), include_hospitality: body.include_hospitality }
+  const merged = { ...((org?.report_defaults as any) ?? {}), ...patch }
   const { error } = await ctx.service
     .from('organizations')
     .update({ report_defaults: merged })
     .eq('id', ctx.organizationId)
   if (error) return NextResponse.json({ error: 'Failed to save' }, { status: 500 })
-  return NextResponse.json({ include_hospitality: body.include_hospitality })
+  return NextResponse.json({
+    include_hospitality: merged.include_hospitality !== false,
+    band_thresholds: parseBandThresholds(merged.hospitality_band_thresholds),
+  })
 }

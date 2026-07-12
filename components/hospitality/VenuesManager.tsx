@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react'
-import { Plus, Store, Pencil, Trash2, UtensilsCrossed, Wine, BedDouble } from 'lucide-react'
+import { Plus, Store, Pencil, Trash2, UtensilsCrossed, Wine, BedDouble, PartyPopper } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -51,6 +51,7 @@ const VENUE_ICON: Record<VenueType, typeof Store> = {
   restaurant: UtensilsCrossed,
   bar: Wine,
   accommodation: BedDouble,
+  events: PartyPopper,
 }
 
 export function VenuesManager() {

@@ -2,9 +2,9 @@
 
 /** Menus list + create. Each menu opens the menu editor to add items. */
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Plus, BookOpen, Trash2, Leaf, Upload } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Plus, BookOpen, Trash2, Leaf, Upload, Archive, ArchiveRestore } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -49,12 +49,25 @@ function fmt(n: number, digits = 2): string {
 
 export function MenusManager() {
   const router = useRouter()
-  const { menus, isLoading, error, refresh, createMenu, deleteMenu } = useHospitalityMenus()
+  const { menus, isLoading, error, refresh, createMenu, deleteMenu, setMenuStatus, showArchived, setShowArchived } = useHospitalityMenus()
   const { venues } = useHospitalityVenues()
   const { toast } = useToast()
 
+  const searchParams = useSearchParams()
   const [importOpen, setImportOpen] = useState(false)
+  const [stashId, setStashId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+
+  // Smart Upload handoff: a photographed/exported menu was stashed and deep-linked here.
+  useEffect(() => {
+    if (searchParams.get('stash_kind') === 'hospitality_menu') {
+      const id = searchParams.get('stash_id')
+      if (id) {
+        setStashId(id)
+        setImportOpen(true)
+      }
+    }
+  }, [searchParams])
   const [name, setName] = useState('')
   const [venueId, setVenueId] = useState<string>(NO_VENUE)
   const [submitting, setSubmitting] = useState(false)
@@ -102,6 +115,20 @@ export function MenusManager() {
     }
   }
 
+  const toggleArchive = async (menu: MenuListItem) => {
+    const next = menu.status === 'archived' ? 'active' : 'archived'
+    try {
+      await setMenuStatus(menu.id, next)
+      toast({ title: next === 'archived' ? 'Menu archived' : 'Menu restored', description: menu.name })
+    } catch (e: unknown) {
+      toast({
+        title: 'Could not update menu',
+        description: e instanceof Error ? e.message : 'Please try again',
+        variant: 'destructive',
+      })
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -112,6 +139,9 @@ export function MenusManager() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setShowArchived(!showArchived)}>
+            {showArchived ? 'Hide archived' : 'Show archived'}
+          </Button>
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
             Import from menu
@@ -161,21 +191,42 @@ export function MenusManager() {
                   <BookOpen className="h-5 w-5 text-muted-foreground" />
                   <span className="font-medium">{menu.name}</span>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-destructive opacity-0 transition-opacity group-hover:opacity-100"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setPendingDelete(menu)
-                  }}
-                  aria-label="Delete menu"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      toggleArchive(menu)
+                    }}
+                    aria-label={menu.status === 'archived' ? 'Restore menu' : 'Archive menu'}
+                  >
+                    {menu.status === 'archived' ? (
+                      <ArchiveRestore className="h-3.5 w-3.5" />
+                    ) : (
+                      <Archive className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setPendingDelete(menu)
+                    }}
+                    aria-label="Delete menu"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {menu.venue_name && <Badge variant="secondary">{menu.venue_name}</Badge>}
+                {menu.status === 'archived' && (
+                  <Badge variant="outline" className="text-muted-foreground">Archived</Badge>
+                )}
                 <Badge variant="outline">
                   {menu.item_count} {menu.item_count === 1 ? 'item' : 'items'}
                 </Badge>
@@ -198,7 +249,15 @@ export function MenusManager() {
 
       <MenuImportDialog
         open={importOpen}
-        onOpenChange={setImportOpen}
+        onOpenChange={(o) => {
+          setImportOpen(o)
+          if (!o) setStashId(null)
+        }}
+        initialStashId={stashId}
+        onStashConsumed={() => {
+          // Clear the deep-link params so a refresh doesn't re-trigger the import.
+          router.replace('/hospitality/menus')
+        }}
         onComplete={({ menuId }) => {
           if (menuId) router.push(`/hospitality/menus/${menuId}`)
           else refresh()

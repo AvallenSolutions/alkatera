@@ -20,6 +20,8 @@ export interface RoomAllocationInput {
   electricity_kwh: number
   gas_kwh: number
   water_litres: number
+  /** Laundry energy per room-night (a hotel hot-spot); treated as electricity. */
+  laundry_kwh: number
   country: string
 }
 
@@ -27,6 +29,7 @@ export interface AllocatedImpact {
   electricity_co2e: number
   gas_co2e: number
   water_co2e: number
+  laundry_co2e: number
   total_co2e: number
   grid_factor: number
 }
@@ -36,11 +39,13 @@ export function computeAllocatedImpact(input: RoomAllocationInput): AllocatedImp
   const electricity_co2e = (Number(input.electricity_kwh) || 0) * grid
   const gas_co2e = (Number(input.gas_kwh) || 0) * NATURAL_GAS_FACTOR
   const water_co2e = ((Number(input.water_litres) || 0) / 1000) * WATER_FACTOR_PER_M3
+  const laundry_co2e = (Number(input.laundry_kwh) || 0) * grid
   return {
     electricity_co2e,
     gas_co2e,
     water_co2e,
-    total_co2e: electricity_co2e + gas_co2e + water_co2e,
+    laundry_co2e,
+    total_co2e: electricity_co2e + gas_co2e + water_co2e + laundry_co2e,
     grid_factor: grid,
   }
 }
@@ -50,5 +55,6 @@ export const DEFAULT_ROOM_ALLOCATION: RoomAllocationInput = {
   electricity_kwh: 0,
   gas_kwh: 0,
   water_litres: 0,
+  laundry_kwh: 0,
   country: 'GB',
 }

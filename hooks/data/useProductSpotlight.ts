@@ -40,11 +40,14 @@ export interface ProductSpotlightItem {
 async function fetchProductSpotlight(organizationId: string): Promise<ProductSpotlightItem[]> {
   const supabase = getSupabaseBrowserClient();
 
-  // 1. Fetch up to 20 products ordered by updated_at DESC
+  // 1. Fetch up to 20 products ordered by updated_at DESC.
+  // Exclude hospitality meals/drinks/rooms — they are `products` rows too, but
+  // are not drinks products and shouldn't feature in the product spotlight.
   const { data: productData, error: productError } = await supabase
     .from('products')
     .select('id, name, product_image_url, updated_at')
     .eq('organization_id', organizationId)
+    .eq('product_kind', 'product')
     .order('updated_at', { ascending: false })
     .limit(20);
 

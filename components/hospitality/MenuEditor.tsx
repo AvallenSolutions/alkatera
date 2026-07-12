@@ -215,6 +215,20 @@ export function MenuEditor({ menuId }: { menuId: string }) {
     }
   };
 
+  // Download the QR as a print-quality SVG (vector, scales to any table-card size).
+  const downloadQr = () => {
+    const svg = document.getElementById('menu-qr-code');
+    if (!svg) return;
+    const source = new XMLSerializer().serializeToString(svg);
+    const blob = new Blob(['<?xml version="1.0" standalone="no"?>\n', source], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(menu?.name || 'menu').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-qr.svg`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (loading) {
     return (
       <div className="mx-auto max-w-4xl space-y-4 p-4 sm:p-6">
@@ -352,7 +366,7 @@ export function MenuEditor({ menuId }: { menuId: string }) {
           {menu.is_public && publicUrl ? (
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
               <div className="rounded-lg bg-white p-2">
-                <QRCodeSVG value={publicUrl} size={120} />
+                <QRCodeSVG id="menu-qr-code" value={publicUrl} size={120} />
               </div>
               <div className="min-w-0 flex-1 space-y-2">
                 <p className="text-sm text-muted-foreground">
@@ -368,9 +382,14 @@ export function MenuEditor({ menuId }: { menuId: string }) {
                   </Button>
                   {copied && <span className="text-xs text-muted-foreground">Copied</span>}
                 </div>
-                <Button variant="outline" size="sm" onClick={() => togglePublish(false)} disabled={publishing}>
-                  {publishing ? 'Updating…' : 'Unpublish'}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={downloadQr}>
+                    Download QR
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => togglePublish(false)} disabled={publishing}>
+                    {publishing ? 'Updating…' : 'Unpublish'}
+                  </Button>
+                </div>
               </div>
             </div>
           ) : (

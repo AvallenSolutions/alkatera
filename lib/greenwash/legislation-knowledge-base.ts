@@ -220,6 +220,80 @@ export const LEGISLATION_KNOWLEDGE_BASE = {
       }
     ]
   },
+  hospitality: {
+    name: "Hospitality & Food-Service Green Claims",
+    sources: [
+      {
+        name: "France Décret 2022-539 (climate-neutrality claims)",
+        authority: "French Government",
+        year: 2022,
+        principles: [
+          {
+            id: "FR-539-1",
+            title: "No unconditional 'carbon neutral' claims",
+            description: "'Carbon neutral', 'net zero' and equivalent claims on a product or menu are prohibited unless the operator publishes a full GHG assessment, a genuine reduction trajectory, and the offset methodology.",
+            violations: [
+              "Labelling a dish, drink or menu 'carbon neutral' without a published assessment",
+              "Relying on offsets without disclosing the methodology and additionality",
+              "Implying neutrality through imagery (leaves, globes) without substantiation"
+            ]
+          }
+        ]
+      },
+      {
+        name: "France Décret 2022-982 (environmental display for food)",
+        authority: "French Government / ADEME",
+        year: 2022,
+        principles: [
+          {
+            id: "FR-982-1",
+            title: "Food environmental labelling must use an approved method",
+            description: "Where an environmental impact is displayed for food and drink, the calculation must follow the officially recognised method and cover the full life cycle, not a single cherry-picked stage.",
+            violations: [
+              "Displaying a per-dish footprint that omits major life-cycle stages",
+              "Using a bespoke method that overstates performance",
+              "Comparing dishes on an inconsistent basis"
+            ]
+          }
+        ]
+      },
+      {
+        name: "ASA/CMA guidance applied to menus and venue marketing",
+        authority: "Advertising Standards Authority / CMA",
+        year: 2023,
+        principles: [
+          {
+            id: "ASA-HOSP-1",
+            title: "Menu and venue sustainability claims must be substantiated",
+            description: "Claims on menus, table cards, QR labels, websites and social posts ('low carbon', 'sustainable', 'local', 'plant-based hero') must be accurate, clear, and backed by evidence, with the basis of any comparison stated.",
+            violations: [
+              "'Sustainable menu' with no supporting method or data",
+              "'Local' without defining the sourcing radius",
+              "Highlighting one low-carbon dish to imply the whole menu is low impact",
+              "Using a carbon label without a published methodology footer"
+            ]
+          }
+        ]
+      },
+      {
+        name: "FTC Green Guides (US food-service marketing)",
+        authority: "US Federal Trade Commission",
+        year: 2012,
+        principles: [
+          {
+            id: "FTC-HOSP-1",
+            title: "Qualify general environmental benefit claims",
+            description: "Unqualified general claims of environmental benefit are hard to substantiate and likely deceptive; qualify claims and avoid overstating an attribute.",
+            violations: [
+              "Blanket 'eco-friendly' menu or venue claims",
+              "Overstating recycled/compostable serviceware benefits",
+              "Deceptive carbon-offset claims"
+            ]
+          }
+        ]
+      }
+    ]
+  },
   commonIssues: [
     {
       type: "vague_claim",

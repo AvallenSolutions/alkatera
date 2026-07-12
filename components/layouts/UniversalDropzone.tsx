@@ -39,6 +39,7 @@ import {
   ClipboardList,
   Package,
   ScrollText,
+  BookOpen,
 } from 'lucide-react'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
@@ -769,6 +770,56 @@ function ReviewPanel(props: ReviewPanelProps) {
   if (result.type === 'historical_lca_report') {
     return (
       <HistoricalLcaPanel result={result} onClose={props.onClose} onSaved={props.onSaved} />
+    )
+  }
+
+  if (result.type === 'hospitality_menu') {
+    const stashId = result.hospitalityMenu?.stashId
+    const href = stashId
+      ? `/hospitality/menus?${new URLSearchParams({ stash_id: stashId, stash_kind: 'hospitality_menu' }).toString()}`
+      : '/hospitality/menus'
+    return (
+      <div className="space-y-3">
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+          <BookOpen className="h-4 w-4 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-medium">This looks like a menu.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              We&apos;ll open the menu importer with this file so you can turn it into meals and drinks.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <Button asChild size="sm">
+            <Link href={href} onClick={props.onClose}>Import menu</Link>
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (result.type === 'pos_sales_export') {
+    const stashId = result.posSalesExport?.stashId
+    const href = stashId
+      ? `/hospitality/sales?${new URLSearchParams({ stash_id: stashId, stash_kind: 'pos_sales' }).toString()}`
+      : '/hospitality/sales'
+    return (
+      <div className="space-y-3">
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+          <FileSpreadsheet className="h-4 w-4 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-medium">This looks like a POS sales export.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              We&apos;ll open hospitality sales with this file so you can import how many of each item sold.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <Button asChild size="sm">
+            <Link href={href} onClick={props.onClose}>Import sales</Link>
+          </Button>
+        </div>
+      </div>
     )
   }
 

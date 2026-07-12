@@ -8,6 +8,7 @@ export const VENUE_TYPES = [
   { value: 'restaurant', label: 'Restaurant' },
   { value: 'bar', label: 'Bar' },
   { value: 'accommodation', label: 'Accommodation' },
+  { value: 'events', label: 'Events' },
 ] as const;
 
 export type VenueType = (typeof VENUE_TYPES)[number]['value'];

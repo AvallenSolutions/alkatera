@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/lib/organizationContext';
 import { VerificationCard } from '@/components/partners/VerificationCard';
+import { HOSPITALITY_KINDS } from '@/lib/hospitality/constants';
 
 interface LCAReport {
   id: string;
@@ -68,8 +69,26 @@ export default function LcasPage() {
         return;
       }
 
+      // Hospitality meals/drinks/rooms are `product_carbon_footprints` rows too,
+      // but they belong on the hospitality surfaces, not the product-LCA list —
+      // exclude them so they don't pollute the drinks LCA reports.
+      const { data: hospProducts } = await supabase
+        .from('products')
+        .select('id')
+        .eq('organization_id', currentOrganization!.id)
+        .in('product_kind', HOSPITALITY_KINDS as unknown as string[]);
+      const hospitalityProductIds = new Set((hospProducts ?? []).map((p: any) => Number(p.id)));
+      const visibleLcas = lcas.filter(
+        (lca: any) => lca.product_id == null || !hospitalityProductIds.has(Number(lca.product_id)),
+      );
+
+      if (visibleLcas.length === 0) {
+        setReports([]);
+        return;
+      }
+
       // Transform the data - single source of truth: aggregated_impacts.climate_change_gwp100
-      const transformedReports: LCAReport[] = lcas.map((lca: any) => {
+      const transformedReports: LCAReport[] = visibleLcas.map((lca: any) => {
         // Get total GHG emissions from aggregated_impacts JSONB field (single source of truth)
         const totalCO2e = lca.aggregated_impacts?.climate_change_gwp100 || 0;
 

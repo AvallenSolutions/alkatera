@@ -25,6 +25,9 @@ export interface MenuItemView {
   serves: number
   internal_consumption: boolean
   sort_order: number
+  /** Dietary labels + allergens (recipe items only; empty for own-product drinks). */
+  dietary_tags: string[]
+  allergens: string[]
   /** Per-serving impact (reuses MealImpact; per_cover_* are per serving here). */
   impact: MealImpact | null
 }
@@ -41,6 +44,7 @@ export interface MenuAggregate {
 export interface MenuListItem {
   id: string
   name: string
+  status: string
   venue_id: string | null
   venue_name: string | null
   item_count: number
@@ -61,7 +65,9 @@ export interface MenuDetail {
 
 export function summariseMenu(items: MenuItemView[]): MenuAggregate {
   const priced = items.filter((i) => i.impact)
-  const total = priced.reduce((s, i) => s + (i.impact?.per_cover_co2e ?? 0), 0)
+  // Use the guest-facing display figure (ingredients + cooking) so the menu
+  // average matches the per-item figures shown on the public menu.
+  const total = priced.reduce((s, i) => s + (i.impact?.per_cover_display_co2e ?? 0), 0)
   return {
     item_count: items.length,
     priced_count: priced.length,

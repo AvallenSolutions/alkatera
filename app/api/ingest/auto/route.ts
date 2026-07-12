@@ -186,6 +186,8 @@ export type IngestResultType =
   | 'smart_meter_csv'
   | 'historical_sustainability_report'
   | 'historical_lca_report'
+  | 'hospitality_menu'
+  | 'pos_sales_export'
   | 'unsupported'
 
 export interface IngestResponse {
@@ -337,6 +339,15 @@ export interface IngestResponse {
     water_footprint_l?: number
     methodology?: string
     study_commissioned_by?: string
+    stashId?: string
+  }
+  hospitalityMenu?: {
+    looks_like?: 'food_menu' | 'drinks_menu' | 'mixed_menu'
+    approx_item_count?: number
+    stashId?: string
+  }
+  posSalesExport?: {
+    pos_hint?: string
     stashId?: string
   }
   reason?: string

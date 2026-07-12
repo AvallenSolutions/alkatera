@@ -22,12 +22,14 @@ export function useHospitalityMenus() {
   const [menus, setMenus] = useState<MenuListItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showArchived, setShowArchived] = useState(false)
 
   const refresh = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/hospitality/menus', { credentials: 'include' })
+      const status = showArchived ? 'all' : 'active'
+      const res = await fetch(`/api/hospitality/menus?status=${status}`, { credentials: 'include' })
       if (!res.ok) throw new Error(await readError(res))
       const body = await res.json()
       setMenus(body.menus ?? [])
@@ -36,7 +38,7 @@ export function useHospitalityMenus() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [showArchived])
 
   useEffect(() => {
     refresh()
@@ -61,5 +63,16 @@ export function useHospitalityMenus() {
     setMenus((prev) => prev.filter((m) => m.id !== id))
   }, [])
 
-  return { menus, isLoading, error, refresh, createMenu, deleteMenu }
+  const setMenuStatus = useCallback(async (id: string, status: 'active' | 'archived') => {
+    const res = await fetch(`/api/hospitality/menus/${id}`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    })
+    if (!res.ok) throw new Error(await readError(res))
+    await refresh()
+  }, [refresh])
+
+  return { menus, isLoading, error, refresh, createMenu, deleteMenu, setMenuStatus, showArchived, setShowArchived }
 }

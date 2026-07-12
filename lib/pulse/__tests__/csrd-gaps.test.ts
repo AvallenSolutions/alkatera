@@ -23,6 +23,10 @@ function ctx(overrides: Partial<Parameters<typeof RULES[number]['evaluate']>[0]>
     workforceRowCount: 0,
     governancePolicyCount: 0,
     materialityCompletedAt: null,
+    hospitalityVenueCount: 0,
+    hospitalityRecipeCount: 0,
+    hospitalityRecipesWithPcf: 0,
+    hospitalityVolumeRows12m: 0,
     ...overrides,
   };
 }
@@ -46,6 +50,27 @@ describe('csrd-gaps rules', () => {
 
   it('flags Scope 2 critical when no electricity', () => {
     expect(runRule('e1-scope2-electricity', ctx()).severity).toBe('critical');
+  });
+
+  it('warns on hospitality throughput when recipes exist but no volumes', () => {
+    expect(
+      runRule('hospitality-throughput', ctx({ hospitalityRecipeCount: 5, hospitalityVolumeRows12m: 0 })).severity,
+    ).toBe('warning');
+  });
+
+  it('marks hospitality throughput ok when volumes are logged', () => {
+    expect(
+      runRule('hospitality-throughput', ctx({ hospitalityRecipeCount: 5, hospitalityVolumeRows12m: 3 })).severity,
+    ).toBe('ok');
+  });
+
+  it('warns on recipe coverage when under half have a footprint', () => {
+    expect(
+      runRule('hospitality-recipe-coverage', ctx({ hospitalityRecipeCount: 10, hospitalityRecipesWithPcf: 3 })).severity,
+    ).toBe('warning');
+    expect(
+      runRule('hospitality-recipe-coverage', ctx({ hospitalityRecipeCount: 10, hospitalityRecipesWithPcf: 8 })).severity,
+    ).toBe('ok');
   });
 
   it('flags target critical when none set', () => {

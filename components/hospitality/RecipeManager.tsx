@@ -9,7 +9,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, UtensilsCrossed, Wine, Trash2, Leaf, Upload } from 'lucide-react'
+import { Plus, UtensilsCrossed, Wine, Trash2, Leaf, Upload, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -55,7 +55,7 @@ function fmt(n: number, digits = 2): string {
 
 export function RecipeManager({ cfg }: { cfg: RecipeKindConfig }) {
   const router = useRouter()
-  const { recipes, isLoading, error, refresh, createRecipe, deleteRecipe } = useHospitalityRecipes(cfg)
+  const { recipes, isLoading, error, refresh, createRecipe, deleteRecipe, duplicateRecipe } = useHospitalityRecipes(cfg)
   const { venues } = useHospitalityVenues()
   const { toast } = useToast()
 
@@ -64,6 +64,7 @@ export function RecipeManager({ cfg }: { cfg: RecipeKindConfig }) {
   const lc = cfg.label.toLowerCase()
   // Import only applies to meals and drinks (rooms reuse this component).
   const canImport = cfg.kind === 'meal' || cfg.kind === 'drink'
+  const unconfirmedCount = recipes.filter((r) => r.quantities_status === 'unconfirmed').length
 
   const [importOpen, setImportOpen] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -77,7 +78,7 @@ export function RecipeManager({ cfg }: { cfg: RecipeKindConfig }) {
   const openCreate = () => {
     setName('')
     setVenueId(NO_VENUE)
-    setCovers(cfg.kind === 'drink' ? '1' : '1')
+    setCovers(String(cfg.defaultCovers))
     setFormError(null)
     setDialogOpen(true)
   }
@@ -106,6 +107,20 @@ export function RecipeManager({ cfg }: { cfg: RecipeKindConfig }) {
       setFormError(e instanceof Error ? e.message : `Could not create ${lc}`)
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const duplicate = async (recipe: HospitalityMealListItem) => {
+    try {
+      const copy = await duplicateRecipe(recipe.id)
+      toast({ title: `${cfg.label} duplicated`, description: `${recipe.name} (copy)` })
+      router.push(`${cfg.basePath}/${copy.id}`)
+    } catch (e: unknown) {
+      toast({
+        title: `Could not duplicate ${lc}`,
+        description: e instanceof Error ? e.message : 'Please try again',
+        variant: 'destructive',
+      })
     }
   }
 
@@ -150,6 +165,17 @@ export function RecipeManager({ cfg }: { cfg: RecipeKindConfig }) {
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
+      {unconfirmedCount > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+          <span className="text-amber-700 dark:text-amber-400">
+            {unconfirmedCount} imported {unconfirmedCount === 1 ? `${lc} still needs` : `${lc}s still need`} real quantities before their impact can be calculated.
+          </span>
+          <Button variant="outline" size="sm" onClick={() => router.push('/hospitality/quantities')}>
+            Fill in quantities
+          </Button>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2].map((i) => (
@@ -186,21 +212,46 @@ export function RecipeManager({ cfg }: { cfg: RecipeKindConfig }) {
                   <Icon className="h-5 w-5 text-muted-foreground" />
                   <span className="font-medium">{recipe.name}</span>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-destructive opacity-0 transition-opacity group-hover:opacity-100"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setPendingDelete(recipe)
-                  }}
-                  aria-label={`Delete ${lc}`}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      duplicate(recipe)
+                    }}
+                    aria-label={`Duplicate ${lc}`}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setPendingDelete(recipe)
+                    }}
+                    aria-label={`Delete ${lc}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {recipe.venue_name && <Badge variant="secondary">{recipe.venue_name}</Badge>}
+                {recipe.venue_status === 'archived' && (
+                  <Badge variant="outline" className="text-muted-foreground">Venue archived</Badge>
+                )}
+                {recipe.quantities_status === 'unconfirmed' && (
+                  <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                    Quantities unconfirmed
+                  </Badge>
+                )}
+                {recipe.quantities_status === 'estimated' && (
+                  <Badge variant="outline" className="text-muted-foreground">AI-estimated quantities</Badge>
+                )}
                 <Badge variant="outline">
                   {recipe.covers} {recipe.covers === 1 ? portion : `${portion}s`}
                 </Badge>
@@ -209,7 +260,7 @@ export function RecipeManager({ cfg }: { cfg: RecipeKindConfig }) {
                 {recipe.impact ? (
                   <div className="flex items-center gap-2 text-sm">
                     <Leaf className="h-4 w-4 text-primary" />
-                    <span className="font-semibold">{fmt(recipe.impact.per_cover_co2e)} kg CO₂e</span>
+                    <span className="font-semibold">{fmt(recipe.impact.per_cover_display_co2e)} kg CO₂e</span>
                     <span className="text-muted-foreground">per {portion}</span>
                   </div>
                 ) : (

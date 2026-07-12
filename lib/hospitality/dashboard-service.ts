@@ -12,6 +12,8 @@
 import { listMenus } from './menu-service'
 import { summariseWaste, wasteCo2e, type WasteRangeSummary } from './waste-service'
 import { HOSPITALITY_KINDS, type HospitalityKind } from './constants'
+import { scope3Of } from '@/lib/calculations/hospitality-emissions'
+import { computeIntensity, type IntensitySummary } from './operating-service'
 
 type Db = any
 
@@ -83,6 +85,8 @@ export interface HospitalityDashboard {
   water_embodied_litres: number
   /** Land use embodied in food/drink served (biodiversity proxy), m²a. */
   land_m2a: number
+  /** Intensity KPIs (carbon per cover / per £ revenue / per room-night). */
+  intensity: IntensitySummary
   waste: WasteRangeSummary
   score: VitalityScore
   /** Per-pillar 0-100 ratings (year-on-year trend for climate/water/nature, diversion for waste). Null when not scorable. */
@@ -98,12 +102,6 @@ export interface HospitalityDashboard {
     venues: number
     has_sales: boolean
   }
-}
-
-function scope3Of(aggregated: any): number {
-  const s3 = aggregated?.breakdown?.by_scope?.scope3
-  if (typeof s3 === 'number') return s3
-  return Number(aggregated?.climate_change_gwp100 ?? 0)
 }
 
 function climateOf(aggregated: any): number {
@@ -156,13 +154,21 @@ export async function getHospitalityDashboard(
 
   // covers + latest PCF per product → per-serving scope3 and per-cover climate.
   const coversById = new Map<number, number>()
+  const prepUpliftById = new Map<number, number>()
   const scope3ById = new Map<number, number>()
   const perCoverClimateById = new Map<number, number>()
   const waterServeById = new Map<number, number>()
   const landServeById = new Map<number, number>()
   if (ids.length > 0) {
-    const { data: metas } = await db.from('hospitality_meal_meta').select('product_id, covers').in('product_id', ids)
-    for (const m of metas ?? []) coversById.set(m.product_id, Number(m.covers) || 1)
+    const { data: metas } = await db
+      .from('hospitality_meal_meta')
+      .select('product_id, covers, prep_waste_pct')
+      .in('product_id', ids)
+    for (const m of metas ?? []) {
+      coversById.set(m.product_id, Number(m.covers) || 1)
+      // Prep waste uplifts purchased-food impact (matches calculateHospitality).
+      prepUpliftById.set(m.product_id, 1 + Math.max(0, Number(m.prep_waste_pct) || 0) / 100)
+    }
 
     const { data: pcfs } = await db
       .from('product_carbon_footprints')
@@ -172,10 +178,11 @@ export async function getHospitalityDashboard(
     for (const pcf of pcfs ?? []) {
       if (!scope3ById.has(pcf.product_id) && pcf.aggregated_impacts) {
         const covers = coversById.get(pcf.product_id) ?? 1
-        scope3ById.set(pcf.product_id, scope3Of(pcf.aggregated_impacts))
-        perCoverClimateById.set(pcf.product_id, climateOf(pcf.aggregated_impacts) / covers)
-        waterServeById.set(pcf.product_id, waterOf(pcf.aggregated_impacts) / covers)
-        landServeById.set(pcf.product_id, landOf(pcf.aggregated_impacts) / covers)
+        const uplift = prepUpliftById.get(pcf.product_id) ?? 1
+        scope3ById.set(pcf.product_id, scope3Of(pcf.aggregated_impacts) * uplift)
+        perCoverClimateById.set(pcf.product_id, (climateOf(pcf.aggregated_impacts) * uplift) / covers)
+        waterServeById.set(pcf.product_id, (waterOf(pcf.aggregated_impacts) * uplift) / covers)
+        landServeById.set(pcf.product_id, (landOf(pcf.aggregated_impacts) * uplift) / covers)
       }
     }
   }
@@ -358,6 +365,8 @@ export async function getHospitalityDashboard(
   const total = throughputCo2e + waste.total_co2e
   const prevTotalAll = prevTotal + prevWaste.total_co2e
 
+  const intensity = await computeIntensity(db, organizationId, yearStart, yearEnd, { total, supplies })
+
   // Rolling 12-week trend of total footprint, anchored to the latest activity so
   // sparse data still shows a trend instead of an empty chart.
   const weekly = await buildWeekly(db, organizationId, perServing)
@@ -398,6 +407,7 @@ export async function getHospitalityDashboard(
     water_operational_litres: waterOperationalLitres,
     water_embodied_litres: waterLitres,
     land_m2a: landM2a,
+    intensity,
     waste,
     score,
     pillar_scores,

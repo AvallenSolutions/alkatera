@@ -9,6 +9,9 @@
  */
 
 import { perCoverImpact } from './meal-types'
+import { cookingCo2e } from './cooking-energy'
+import { carbonBand, bandLegend, parseBandThresholds } from './carbon-band'
+import { getOrgCountry } from './recipe-service'
 import {
   DEFAULT_SERVES_PER_BOTTLE,
   summariseMenu,
@@ -45,20 +48,30 @@ async function latestImpacts(db: Db, productIds: number[]): Promise<Map<number, 
   return map
 }
 
-/** Compute the live per-serving impact for each menu item row. */
-async function computeItemImpacts(db: Db, rows: any[], productNames: Map<number, string>): Promise<MenuItemView[]> {
+/** Compute the live per-serving impact for each menu item row. `country` sets the grid region for cooking energy (display-only). */
+async function computeItemImpacts(db: Db, rows: any[], productNames: Map<number, string>, country: string = 'GB'): Promise<MenuItemView[]> {
   const productIds = Array.from(new Set(rows.map((r) => r.product_id)))
   const impacts = await latestImpacts(db, productIds)
 
   // Recipe items divide by covers; own-product drinks by serves_per_container.
   const recipeIds = rows.filter((r) => r.item_kind !== 'own_product_drink').map((r) => r.product_id)
-  const covers = new Map<number, number>()
+  interface RecipeMeta { covers: number; prep_waste_pct: number; cooking_method: string | null; cooking_minutes: number | null; dietary_tags: string[]; allergens: string[] }
+  const recipeMeta = new Map<number, RecipeMeta>()
   if (recipeIds.length > 0) {
     const { data } = await db
       .from('hospitality_meal_meta')
-      .select('product_id, covers')
+      .select('product_id, covers, prep_waste_pct, cooking_method, cooking_minutes, dietary_tags, allergens')
       .in('product_id', recipeIds)
-    for (const m of data ?? []) covers.set(m.product_id, Number(m.covers ?? 1))
+    for (const m of data ?? []) {
+      recipeMeta.set(m.product_id, {
+        covers: Number(m.covers ?? 1),
+        prep_waste_pct: Number(m.prep_waste_pct ?? 0),
+        cooking_method: m.cooking_method ?? null,
+        cooking_minutes: m.cooking_minutes != null ? Number(m.cooking_minutes) : null,
+        dietary_tags: Array.isArray(m.dietary_tags) ? m.dietary_tags : [],
+        allergens: Array.isArray(m.allergens) ? m.allergens : [],
+      })
+    }
   }
   const wineIds = rows.filter((r) => r.item_kind === 'own_product_drink').map((r) => r.product_id)
   const productServes = new Map<number, number | null>()
@@ -69,11 +82,16 @@ async function computeItemImpacts(db: Db, rows: any[], productNames: Map<number,
 
   return rows.map((r) => {
     let serves: number
+    let opts: { prepWastePct?: number; cookingCo2eTotal?: number } = {}
     if (r.item_kind === 'own_product_drink') {
       serves = Number(r.serves_per_container) || productServes.get(r.product_id) || DEFAULT_SERVES_PER_BOTTLE
     } else {
-      serves = covers.get(r.product_id) ?? 1
+      const meta = recipeMeta.get(r.product_id)
+      serves = meta?.covers ?? 1
+      const cooking = meta ? cookingCo2e(meta.cooking_method, meta.cooking_minutes, country) : null
+      opts = { prepWastePct: meta?.prep_waste_pct ?? 0, cookingCo2eTotal: cooking?.co2e ?? 0 }
     }
+    const meta = r.item_kind === 'own_product_drink' ? undefined : recipeMeta.get(r.product_id)
     return {
       id: r.id,
       product_id: r.product_id,
@@ -82,17 +100,27 @@ async function computeItemImpacts(db: Db, rows: any[], productNames: Map<number,
       serves,
       internal_consumption: !!r.internal_consumption,
       sort_order: r.sort_order ?? 0,
-      impact: perCoverImpact(impacts.get(r.product_id), serves),
+      dietary_tags: meta?.dietary_tags ?? [],
+      allergens: meta?.allergens ?? [],
+      impact: perCoverImpact(impacts.get(r.product_id), serves, opts),
     }
   })
 }
 
-export async function listMenus(db: Db, organizationId: string): Promise<ServiceResult<unknown[]>> {
-  const { data: menus, error } = await db
+const MENU_STATUS_VALUES = new Set(['active', 'archived'])
+
+export async function listMenus(
+  db: Db,
+  organizationId: string,
+  status: string = 'active',
+): Promise<ServiceResult<unknown[]>> {
+  let query = db
     .from('hospitality_menus')
-    .select('id, name, venue_id')
+    .select('id, name, venue_id, status')
     .eq('organization_id', organizationId)
     .order('created_at', { ascending: false })
+  if (status !== 'all') query = query.eq('status', status)
+  const { data: menus, error } = await query
   if (error) return fail(500, error.message)
   const ids = (menus ?? []).map((m: any) => m.id)
   if (ids.length === 0) return ok([])
@@ -112,9 +140,10 @@ export async function listMenus(db: Db, organizationId: string): Promise<Service
   const productNames = await productNameMap(db, allItems.map((i: any) => i.product_id))
   const venueNames = await venueNameMap(db, (menus ?? []).map((m: any) => m.venue_id))
 
+  const country = await getOrgCountry(db, organizationId)
   const computedByMenu = new Map<string, MenuItemView[]>()
   for (const [menuId, rows] of Array.from(itemsByMenu.entries())) {
-    computedByMenu.set(menuId, await computeItemImpacts(db, rows, productNames))
+    computedByMenu.set(menuId, await computeItemImpacts(db, rows, productNames, country))
   }
 
   const result = (menus ?? []).map((m: any) => {
@@ -123,6 +152,7 @@ export async function listMenus(db: Db, organizationId: string): Promise<Service
     return {
       id: m.id,
       name: m.name,
+      status: m.status ?? 'active',
       venue_id: m.venue_id ?? null,
       venue_name: m.venue_id ? venueNames.get(m.venue_id) ?? null : null,
       item_count: agg.item_count,
@@ -178,7 +208,7 @@ export async function getMenu(db: Db, organizationId: string, menuId: string): P
     .order('created_at', { ascending: true })
 
   const productNames = await productNameMap(db, (itemRows ?? []).map((i: any) => i.product_id))
-  const items = await computeItemImpacts(db, itemRows ?? [], productNames)
+  const items = await computeItemImpacts(db, itemRows ?? [], productNames, await getOrgCountry(db, organizationId))
   const venueNames = await venueNameMap(db, [menu.venue_id])
 
   return ok({
@@ -214,6 +244,11 @@ export async function updateMenu(db: Db, organizationId: string, menuId: string,
       if (!venue) return fail(400, 'invalid venue_id')
     }
     updates.venue_id = venue_id
+  }
+  if (body?.status !== undefined) {
+    const status = String(body.status)
+    if (!MENU_STATUS_VALUES.has(status)) return fail(400, 'invalid status')
+    updates.status = status
   }
   if (Object.keys(updates).length === 0) return fail(400, 'no updatable fields provided')
   const { data, error } = await db
@@ -377,7 +412,7 @@ export async function publishMenu(
 export async function getPublicMenu(db: Db, slug: string): Promise<ServiceResult<unknown>> {
   const { data: menu, error } = await db
     .from('hospitality_menus')
-    .select('id, name, description, venue_id')
+    .select('id, name, description, venue_id, organization_id')
     .eq('public_slug', slug)
     .eq('is_public', true)
     .maybeSingle()
@@ -392,19 +427,36 @@ export async function getPublicMenu(db: Db, slug: string): Promise<ServiceResult
     .order('created_at', { ascending: true })
 
   const productNames = await productNameMap(db, (itemRows ?? []).map((i: any) => i.product_id))
-  const items = await computeItemImpacts(db, itemRows ?? [], productNames)
+  const items = await computeItemImpacts(db, itemRows ?? [], productNames, await getOrgCountry(db, menu.organization_id))
   const venueNames = await venueNameMap(db, [menu.venue_id])
 
-  // Public-safe shape: name + per-serving carbon only (no internal flags / ids).
+  // Resolve the org's band thresholds so bands + legend are computed server-side
+  // (the public page has no org context).
+  const { data: org } = await db
+    .from('organizations')
+    .select('report_defaults')
+    .eq('id', menu.organization_id)
+    .maybeSingle()
+  const thresholds = parseBandThresholds((org?.report_defaults as any)?.hospitality_band_thresholds)
+
+  // Public-safe shape: name + per-serving carbon + band only (no internal flags / ids).
   return ok({
     name: menu.name,
     description: menu.description ?? null,
     venue_name: menu.venue_id ? venueNames.get(menu.venue_id) ?? null : null,
-    items: items.map((i) => ({
-      name: i.product_name,
-      item_kind: i.item_kind,
-      co2e: i.impact?.per_cover_co2e ?? null,
-    })),
+    legend: bandLegend(thresholds),
+    items: items.map((i) => {
+      // Guest-facing figure = ingredients + cooking energy (display only).
+      const co2e = i.impact?.per_cover_display_co2e ?? null
+      return {
+        name: i.product_name,
+        item_kind: i.item_kind,
+        co2e,
+        band: carbonBand(co2e, thresholds)?.band ?? null,
+        dietary_tags: i.dietary_tags,
+        allergens: i.allergens,
+      }
+    }),
   })
 }
 

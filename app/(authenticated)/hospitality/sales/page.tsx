@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
 import { SalesManager } from '@/components/hospitality/SalesManager';
+import { OperatingPeriodsCard } from '@/components/hospitality/OperatingPeriodsCard';
 
 export default function HospitalitySalesPage() {
   return (
@@ -15,6 +16,7 @@ export default function HospitalitySalesPage() {
         Hospitality
       </Link>
       <SalesManager />
+      <OperatingPeriodsCard />
     </div>
   );
 }

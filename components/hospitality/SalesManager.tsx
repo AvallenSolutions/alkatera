@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Upload, Trash2, BarChart3, CopyPlus, Store } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -83,6 +84,20 @@ export function SalesManager() {
   const [resolveMap, setResolveMap] = useState<Record<number, string>>({});
   const [resolving, setResolving] = useState(false);
   const [posOpen, setPosOpen] = useState(false);
+  const [posStashId, setPosStashId] = useState<string | null>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Smart Upload handoff: a POS sales export was stashed and deep-linked here.
+  useEffect(() => {
+    if (searchParams.get('stash_kind') === 'pos_sales') {
+      const id = searchParams.get('stash_id');
+      if (id) {
+        setPosStashId(id);
+        setPosOpen(true);
+      }
+    }
+  }, [searchParams]);
 
   // Copy from last period
   const [copyOpen, setCopyOpen] = useState(false);
@@ -443,7 +458,12 @@ export function SalesManager() {
 
       <PosSalesImportDialog
         open={posOpen}
-        onOpenChange={setPosOpen}
+        onOpenChange={(o) => {
+          setPosOpen(o);
+          if (!o) setPosStashId(null);
+        }}
+        initialStashId={posStashId}
+        onStashConsumed={() => router.replace('/hospitality/sales')}
         products={products}
         onComplete={load}
       />
@@ -522,6 +542,9 @@ export function SalesManager() {
             <div className="space-y-1">
               <Label htmlFor="vol-units">Units sold</Label>
               <Input id="vol-units" type="number" min="0" step="1" value={units} onChange={(e) => setUnits(e.target.value)} />
+              <p className="text-xs text-muted-foreground">
+                How many individual covers, serves or room-nights you sold in the period. Each unit is multiplied by the item&apos;s per-serving footprint.
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">

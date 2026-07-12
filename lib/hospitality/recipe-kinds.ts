@@ -22,6 +22,8 @@ export interface RecipeKindConfig {
   portionWord: string
   /** Whole-recipe noun ("recipe" / "batch"). */
   batchWord: string
+  /** Default portion count seeded in the create dialog (meals are usually written for 4). */
+  defaultCovers: number
   /** UI base path and API base path. */
   basePath: string
   apiBase: string
@@ -36,6 +38,7 @@ export const RECIPE_KINDS: Record<RecipeKind, RecipeKindConfig> = {
     productCategory: 'Food',
     portionWord: 'cover',
     batchWord: 'recipe',
+    defaultCovers: 4,
     basePath: '/hospitality/meals',
     apiBase: '/api/hospitality/meals',
   },
@@ -47,6 +50,7 @@ export const RECIPE_KINDS: Record<RecipeKind, RecipeKindConfig> = {
     productCategory: 'Beverage',
     portionWord: 'serve',
     batchWord: 'batch',
+    defaultCovers: 1,
     basePath: '/hospitality/drinks',
     apiBase: '/api/hospitality/drinks',
   },
@@ -58,6 +62,7 @@ export const RECIPE_KINDS: Record<RecipeKind, RecipeKindConfig> = {
     productCategory: 'Accommodation',
     portionWord: 'night',
     batchWord: 'room night',
+    defaultCovers: 1,
     basePath: '/hospitality/rooms',
     apiBase: '/api/hospitality/rooms',
   },
@@ -67,4 +72,11 @@ export const PRODUCT_KIND_BY_RECIPE: Record<RecipeKind, string> = {
   meal: RECIPE_KINDS.meal.productKind,
   drink: RECIPE_KINDS.drink.productKind,
   room_night: RECIPE_KINDS.room_night.productKind,
+}
+
+/** Resolve a products.product_kind value back to its recipe kind config. */
+export const RECIPE_KIND_BY_PRODUCT_KIND: Record<string, RecipeKind> = {
+  hospitality_meal: 'meal',
+  hospitality_drink: 'drink',
+  hospitality_room_night: 'room_night',
 }
