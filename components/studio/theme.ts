@@ -191,9 +191,12 @@ export const GROWTH_PALETTE = {
   straw: '#AFA487',
   autumnLeaf: '#C08A3E',
   winterLeaf: '#B9BDB1',
-  // the residents
-  rosaCoat: '#DFC493',
-  rosaShade: '#C6A567',
+  // the residents (Rosa's coat matched to the real dog: white-cream
+  // curls, soft apricot paws and muzzle)
+  rosaCoat: '#EAE1CD',
+  rosaShade: '#D2B48F',
+  rosaLine: '#C4A277',
+  snow: '#FFFFFF',
   butterfly: '#B77083',
   bee: STUDIO.ochreInk,
   bird: STUDIO.dim,

@@ -6,9 +6,9 @@
  * renderer, the org's living signature.
  */
 
-import { STUDIO } from '@/components/studio/theme';
+import { GROWTH_PALETTE, STUDIO } from '@/components/studio/theme';
 import { FIELD_H, FIELD_W, GROUND_Y, growthAt, makePopulation } from './layout';
-import { smoothstep } from './prng';
+import { rngFromString, smoothstep } from './prng';
 import { dressForSeason, seasonForDate, type Season } from './season';
 import type { Prim } from './species/shared';
 
@@ -115,10 +115,34 @@ export function buildForestSvg({ seed, score, season }: ForestSvgOptions): strin
     // The bird's home position is offstage; place it mid-sky for the still.
     const x = creature.kind === 'bird' ? Math.round(FIELD_W * 0.62) : creature.x;
     const sx = ((creature.flip ? -1 : 1) * creature.scale).toFixed(4);
-    const body = creature.prims.map(primToString).join('');
+    const body = [...creature.prims, ...(creature.tail ?? [])].map(primToString).join('');
     parts.push(
       `<g transform="translate(${x},${creature.y}) scale(${sx},${creature.scale.toFixed(4)})" opacity="${g.toFixed(3)}">${body}</g>`,
     );
+  }
+
+  // Winter: settled drifts and a quiet scatter of held snow.
+  if (liveSeason === 'winter') {
+    const rng = rngFromString(`${seed}:snow`);
+    for (let i = 0; i < 36; i++) {
+      const x = Math.round(rng() * FIELD_W);
+      const r = 1.4 + rng() * 1.6;
+      rng(); // duration slot (animation-only)
+      const delay = rng() * 30;
+      const opacity = 0.5 + rng() * 0.4;
+      parts.push(
+        `<circle cx="${x}" cy="${Math.round((delay / 30) * (GROUND_Y - 20))}" r="${r.toFixed(1)}" fill="${GROWTH_PALETTE.snow}" opacity="${opacity.toFixed(2)}"/>`,
+      );
+    }
+    for (let i = 0; i < 6; i++) {
+      const x = Math.round(rng() * FIELD_W);
+      const rx = 40 + rng() * 60;
+      const ry = 3.5 + rng() * 3;
+      const opacity = 0.55 + rng() * 0.25;
+      parts.push(
+        `<ellipse cx="${x}" cy="${GROUND_Y}" rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}" fill="${GROWTH_PALETTE.snow}" opacity="${opacity.toFixed(2)}"/>`,
+      );
+    }
   }
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${FIELD_W} ${FIELD_H}" width="${FIELD_W}" height="${FIELD_H}">${parts.join('')}</svg>`;

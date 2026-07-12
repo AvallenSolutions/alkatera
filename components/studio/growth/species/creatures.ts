@@ -24,45 +24,52 @@ export interface Creature {
   scale: number;
   flip: boolean;
   prims: Prim[];
+  /** Prims with their own motion inside the body (Rosa's wagging tail). */
+  tail?: Prim[];
   /** CSS animation class applied by the growth field (motion-gated). */
   motion?: 'amble' | 'hover' | 'flutter' | 'glide';
   motionDuration?: number;
 }
 
 /**
- * Rosa herself, side-on, facing left, root at her paws. Fluffy blobs for
- * the coat, a floppy ear, a plume of a tail held high, an ink nose and
- * eye, and a brick collar (the one saturated touch she is allowed).
- * Roughly 46 units tall before scaling: miniature, as she should be.
+ * Rosa herself, side-on, facing left, root at her paws. White-cream
+ * curls matched to the real dog, soft apricot paws, muzzle and ear, a
+ * fine shade outline so she reads on the paper, an ink nose and eye,
+ * and a brick collar (the one saturated touch she is allowed). The tail
+ * is its own group so it can wag. Roughly 46 units tall before scaling:
+ * miniature, as she should be.
  */
-export function rosaTheDog(rng: Rng): Prim[] {
+export function rosaTheDog(rng: Rng): { body: Prim[]; tail: Prim[] } {
   const coat = G.rosaCoat;
   const shade = G.rosaShade;
-  const prims: Prim[] = [
-    // legs first, behind the body fluff
+  const line = G.rosaLine;
+  const body: Prim[] = [
+    // legs first, behind the body fluff; apricot paws like the photo
     { kind: 'path', d: 'M-13,-16 L-14,0', stroke: shade, strokeWidth: 4, fill: 'none', opacity: 0.95 },
-    { kind: 'path', d: 'M-5,-15 L-5,0', stroke: coat, strokeWidth: 4, fill: 'none', opacity: 0.95 },
-    { kind: 'path', d: 'M6,-15 L6,0', stroke: coat, strokeWidth: 4, fill: 'none', opacity: 0.95 },
+    { kind: 'path', d: 'M-5,-15 L-5,0', stroke: shade, strokeWidth: 4, fill: 'none', opacity: 0.85 },
+    { kind: 'path', d: 'M6,-15 L6,0', stroke: shade, strokeWidth: 4, fill: 'none', opacity: 0.85 },
     { kind: 'path', d: 'M13,-16 L15,0', stroke: shade, strokeWidth: 4, fill: 'none', opacity: 0.95 },
-    // the body: two overlapping fluff blobs
-    { kind: 'path', d: blob(rng, 0, -24, 19, 12, 8, 0.12), fill: coat, opacity: 1 },
-    { kind: 'path', d: blob(rng, 8, -22, 12, 10, 7, 0.14), fill: shade, opacity: 0.55 },
-    // the tail: a proud plume
-    { kind: 'path', d: 'M17,-30 Q26,-42 22,-50', stroke: coat, strokeWidth: 5, fill: 'none', opacity: 1 },
-    { kind: 'path', d: 'M18,-32 Q25,-42 22,-48', stroke: shade, strokeWidth: 2, fill: 'none', opacity: 0.5 },
+    // the body: two overlapping fluff blobs, outlined to hold on paper
+    { kind: 'path', d: blob(rng, 0, -24, 19, 12, 8, 0.12), fill: coat, stroke: line, strokeWidth: 1, opacity: 1 },
+    { kind: 'path', d: blob(rng, 8, -22, 12, 10, 7, 0.14), fill: shade, opacity: 0.35 },
     // the head: fluffy round, with a topknot
-    { kind: 'path', d: blob(rng, -18, -38, 10, 9.5, 8, 0.1), fill: coat, opacity: 1 },
-    { kind: 'path', d: blob(rng, -16, -46, 5, 3.5, 6, 0.15), fill: coat, opacity: 0.95 },
+    { kind: 'path', d: blob(rng, -18, -38, 10, 9.5, 8, 0.1), fill: coat, stroke: line, strokeWidth: 1, opacity: 1 },
+    { kind: 'path', d: blob(rng, -16, -46, 5, 3.5, 6, 0.15), fill: coat, stroke: line, strokeWidth: 0.8, opacity: 0.95 },
     // the floppy ear
-    { kind: 'ellipse', cx: -11, cy: -35, rx: 4.5, ry: 8, fill: shade, opacity: 0.9 },
+    { kind: 'ellipse', cx: -11, cy: -35, rx: 4.5, ry: 8, fill: shade, opacity: 0.8 },
     // the muzzle, nose and eye
-    { kind: 'ellipse', cx: -26.5, cy: -35.5, rx: 5, ry: 4, fill: coat, opacity: 1 },
+    { kind: 'ellipse', cx: -26.5, cy: -35.5, rx: 5, ry: 4, fill: shade, opacity: 0.7 },
     { kind: 'circle', cx: -30.5, cy: -36, r: 1.7, fill: STUDIO.ink, opacity: 0.85 },
     { kind: 'circle', cx: -21.5, cy: -40.5, r: 1.3, fill: STUDIO.ink, opacity: 0.8 },
     // the collar: one thin line of brick
     { kind: 'path', d: 'M-13,-31.5 Q-9,-29 -6,-30.5', stroke: STUDIO.brick, strokeWidth: 1.8, fill: 'none', opacity: 0.9 },
   ];
-  return prims;
+  // The tail: a proud plume, wagging from its base at the rump.
+  const tail: Prim[] = [
+    { kind: 'path', d: 'M17,-30 Q26,-42 22,-50', stroke: coat, strokeWidth: 5, fill: 'none', opacity: 1 },
+    { kind: 'path', d: 'M18,-32 Q25,-42 22,-48', stroke: shade, strokeWidth: 2, fill: 'none', opacity: 0.5 },
+  ];
+  return { body, tail };
 }
 
 /** A bee: a dot of ochre ink with a wing fleck. */
@@ -97,6 +104,7 @@ export function makeCreatures(rng: Rng, fieldW: number, groundY: number): Creatu
   const creatures: Creature[] = [];
 
   // Rosa: with you from the very first growth, somewhere in the meadow.
+  const rosa = rosaTheDog(rng);
   creatures.push({
     id: 'rosa',
     kind: 'rosa',
@@ -105,9 +113,10 @@ export function makeCreatures(rng: Rng, fieldW: number, groundY: number): Creatu
     y: groundY,
     scale: between(rng, 0.95, 1.1),
     flip: rng() > 0.5,
-    prims: rosaTheDog(rng),
+    prims: rosa.body,
+    tail: rosa.tail,
     motion: 'amble',
-    motionDuration: between(rng, 80, 110),
+    motionDuration: between(rng, 40, 60),
   });
 
   // Bees, once there are flowers to visit.

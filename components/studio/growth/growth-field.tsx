@@ -30,8 +30,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { STUDIO, STUDIO_EASE } from '@/components/studio/theme';
-import { smoothstep } from './prng';
+import { GROWTH_PALETTE, STUDIO, STUDIO_EASE } from '@/components/studio/theme';
+import { rngFromString, smoothstep } from './prng';
 import {
   FIELD_H,
   FIELD_W,
@@ -57,12 +57,14 @@ interface GrowthFieldProps {
   className?: string;
 }
 
-/** How far each depth layer drifts with the scroll, in field units. */
-const PARALLAX: Partial<Record<LayerKey | 'band', number>> = {
-  band: 0.05,
-  midTree: 0.03,
-  foreTree: 0.015,
-};
+/**
+ * The parallax: only the distant canopy band drifts with the scroll.
+ * Rooted plants never move vertically (a tree that leaves the ground
+ * breaks the world); the horizon breathing behind the still forest is
+ * what sells the depth. The drift is capped inside the band's 40-unit
+ * below-ground bleed so no paper gap can ever open at the ground line.
+ */
+const BAND_DRIFT_MAX = 34;
 
 const MOTION_CLASS: Record<NonNullable<Creature['motion']>, string> = {
   amble: 'growth-amble',
@@ -204,9 +206,15 @@ function Resident({
           style={{ animationDuration: `${creature.motionDuration}s` }}
         >
           {seasonalPrims(creature.prims, season, 'creature')}
+          {creature.tail && (
+            <g className="growth-wag">{seasonalPrims(creature.tail, season, 'creature')}</g>
+          )}
         </g>
       ) : (
-        seasonalPrims(creature.prims, season, 'creature')
+        <>
+          {seasonalPrims(creature.prims, season, 'creature')}
+          {creature.tail && seasonalPrims(creature.tail, season, 'creature')}
+        </>
       )}
     </g>
   );
@@ -259,7 +267,29 @@ export function GrowthField({ score, seed, replayFrom, season, className }: Grow
   const shown = still ? score : displayScore;
   const bandGrowth = smoothstep(70, 98, shown);
   const groundOpacity = smoothstep(0, 10, shown) * 0.6;
-  const drift = still ? 0 : scrollDrift;
+  const bandDrift = still ? 0 : Math.min(BAND_DRIFT_MAX, scrollDrift * 0.5);
+
+  // Winter's snow: seeded flakes falling out of the mist, and settled
+  // drifts along the ground line. Deterministic like everything else.
+  const snow = useMemo(() => {
+    const rng = rngFromString(`${seed}:snow`);
+    const flakes = Array.from({ length: 36 }, (_, i) => ({
+      id: i,
+      x: Math.round(rng() * FIELD_W),
+      r: 1.4 + rng() * 1.6,
+      duration: 14 + rng() * 16,
+      delay: rng() * 30,
+      opacity: 0.5 + rng() * 0.4,
+    }));
+    const drifts = Array.from({ length: 6 }, (_, i) => ({
+      id: i,
+      x: Math.round(rng() * FIELD_W),
+      rx: 40 + rng() * 60,
+      ry: 3.5 + rng() * 3,
+      opacity: 0.55 + rng() * 0.25,
+    }));
+    return { flakes, drifts };
+  }, [seed]);
 
   const byLayer = useMemo(() => {
     const groups = new Map<LayerKey, PlantSlot[]>();
@@ -295,10 +325,11 @@ export function GrowthField({ score, seed, replayFrom, season, className }: Grow
         viewBox={`0 0 ${FIELD_W} ${FIELD_H}`}
         preserveAspectRatio="xMidYMax slice"
       >
-        {/* The distant canopy: closes the horizon as the org nears 100. */}
+        {/* The distant canopy: closes the horizon as the org nears 100,
+            and breathes gently with the scroll (within its bleed). */}
         <g
           style={{
-            transform: `translate(0px, ${GROUND_Y - drift * (PARALLAX.band ?? 0) * 20}px) scale(1, ${bandGrowth})`,
+            transform: `translate(0px, ${GROUND_Y - bandDrift}px) scale(1, ${bandGrowth})`,
             opacity: bandGrowth,
             transition: still
               ? undefined
@@ -323,12 +354,7 @@ export function GrowthField({ score, seed, replayFrom, season, className }: Grow
         />
 
         {layerOrder.map((layer) => (
-          <g
-            key={layer}
-            style={{
-              transform: `translateY(${-drift * (PARALLAX[layer] ?? 0) * 20}px)`,
-            }}
-          >
+          <g key={layer}>
             {(byLayer.get(layer) ?? []).map((slot) => (
               <Plant key={slot.id} slot={slot} score={shown} season={liveSeason} still={still} />
             ))}
@@ -347,6 +373,47 @@ export function GrowthField({ score, seed, replayFrom, season, className }: Grow
             />
           ))}
         </g>
+
+        {/* Winter: settled drifts on the ground, and falling snow. */}
+        {liveSeason === 'winter' && (
+          <g>
+            {snow.drifts.map((d) => (
+              <ellipse
+                key={`drift-${d.id}`}
+                cx={d.x}
+                cy={GROUND_Y}
+                rx={d.rx}
+                ry={d.ry}
+                fill={GROWTH_PALETTE.snow}
+                opacity={d.opacity}
+              />
+            ))}
+            {snow.flakes.map((f) =>
+              still ? (
+                // Reduced motion: a quiet scatter, held still.
+                <circle
+                  key={`flake-${f.id}`}
+                  cx={f.x}
+                  cy={Math.round((f.delay / 30) * (GROUND_Y - 20))}
+                  r={f.r}
+                  fill={GROWTH_PALETTE.snow}
+                  opacity={f.opacity}
+                />
+              ) : (
+                <g
+                  key={`flake-${f.id}`}
+                  className="growth-snowfall"
+                  style={{
+                    animationDuration: `${f.duration}s`,
+                    animationDelay: `-${f.delay}s`,
+                  }}
+                >
+                  <circle cx={f.x} cy={-860} r={f.r} fill={GROWTH_PALETTE.snow} opacity={f.opacity} />
+                </g>
+              ),
+            )}
+          </g>
+        )}
       </svg>
     </div>
   );

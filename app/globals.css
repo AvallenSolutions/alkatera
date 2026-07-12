@@ -238,6 +238,26 @@
   }
 }
 
+/* Rosa's tail: a happy wag from the base of the plume. */
+@keyframes growth-wag {
+  from {
+    transform: rotate(-7deg);
+  }
+  to {
+    transform: rotate(9deg);
+  }
+}
+
+/* Winter's snow: a slow linear fall through the whole field. */
+@keyframes growth-snowfall {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(1700px);
+  }
+}
+
 .growth-amble,
 .growth-hover,
 .growth-flutter,
@@ -266,6 +286,18 @@
   animation-timing-function: linear;
 }
 
+.growth-wag {
+  animation: growth-wag 1.1s ease-in-out infinite alternate;
+  transform-box: fill-box;
+  transform-origin: 10% 90%;
+}
+
+.growth-snowfall {
+  animation-name: growth-snowfall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
 /* Nothing moves for those who ask it not to. */
 @media (prefers-reduced-motion: reduce) {
   .studio-reveal {
@@ -275,7 +307,9 @@
   .growth-amble,
   .growth-hover,
   .growth-flutter,
-  .growth-glide {
+  .growth-glide,
+  .growth-wag,
+  .growth-snowfall {
     animation: none !important;
   }
   .studio-mark,
