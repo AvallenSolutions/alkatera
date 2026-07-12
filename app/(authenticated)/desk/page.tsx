@@ -15,6 +15,7 @@ import { useUserRole } from '@/lib/rosa/useUserRole';
 import { useOrganization } from '@/lib/organizationContext';
 import { resolveRoomPalette } from '@/lib/studio/brand-palette';
 import { VitalityHero } from '@/components/vitality/VitalityHero';
+import { GrowthFieldMount } from '@/components/studio/growth/growth-field-mount';
 
 interface DeskCounts {
   products: number;
@@ -144,7 +145,12 @@ export default function DeskPage() {
   };
 
   return (
-    <div className="space-y-8">
+    <>
+      {/* The living forest: the org's data completeness, growing. */}
+      <GrowthFieldMount />
+      {/* pb-48: the forest's stage. Open paper at the page foot so the
+          ground layer (grasses, flowers, understory) is always on show. */}
+      <div className="relative z-[1] space-y-8 pb-48">
       <Statement
         eyebrow="THE DESK"
         headline={`${greeting()}${firstName ? `, ${firstName}` : ''}.`}
@@ -172,6 +178,7 @@ export default function DeskPage() {
         mark={PLATFORM_ROOMS.wiring.mark}
         className="min-h-[7rem]"
       />
-    </div>
+      </div>
+    </>
   );
 }

@@ -17,6 +17,7 @@ import { Statement } from '@/components/studio/statement'
 import { PosterBlock } from '@/components/studio/poster-block'
 import { FactList, type FactRowItem } from '@/components/studio/fact-list'
 import type { WorkingTone } from '@/components/studio/theme'
+import { GrowthFieldMount } from '@/components/studio/growth/growth-field-mount'
 
 interface EvidenceCounts {
   reportsGenerated: number
@@ -162,7 +163,11 @@ export default function EvidenceLandingPage() {
   ]
 
   return (
-    <div className="mx-auto max-w-4xl space-y-10">
+    <>
+      {/* The living forest: the org's data completeness, growing. */}
+      <GrowthFieldMount />
+      {/* pb-48: the forest's stage; open paper at the page foot. */}
+      <div className="relative z-[1] mx-auto max-w-4xl space-y-10 pb-48">
       <Statement eyebrow="THE EVIDENCE" headline="What you can prove." />
 
       <ProofPoster counts={counts} />
@@ -170,6 +175,7 @@ export default function EvidenceLandingPage() {
       <section>
         <FactList items={rows} />
       </section>
-    </div>
+      </div>
+    </>
   )
 }

@@ -155,6 +155,50 @@ export const ROOMS: Record<RoomKey, RoomConfig> = {
   },
 };
 
+/**
+ * The growth field's naturalistic palette (the living forest behind the
+ * desk and the room landings). Realistic layered greens with atmospheric
+ * perspective: palest at the horizon, deepest in the foreground. Muted
+ * wildflower naturals sit alongside; all studio-adjacent, none neon.
+ */
+export const GROWTH_PALETTE = {
+  canopyFar: '#AABCA2',
+  canopyMid: '#6E9678',
+  canopyMidLight: '#87A98D',
+  canopyFore: '#2F7A52',
+  canopyDeep: STUDIO.forest,
+  bark: '#4A4238',
+  barkPale: '#B3AC9C',
+  grass: '#2F7A52',
+  grassDim: '#5E7A62',
+  fern: STUDIO.forest,
+  stem: STUDIO.forest,
+  highlight: STUDIO.cream,
+  // wildflower heads, muted naturals
+  daisy: STUDIO.cream,
+  daisyCentre: STUDIO.ochre,
+  poppy: '#A94F35',
+  cornflower: '#5C6FA0',
+  umbel: STUDIO.dim,
+  foxglove: '#8E5E7B',
+  clover: '#B77E93',
+  buttercup: STUDIO.ochre,
+  thistle: '#7A6390',
+  knapweed: STUDIO.plum,
+  campion: '#B77083',
+  berry: STUDIO.ochreInk,
+  // the seasons' turning colours
+  straw: '#AFA487',
+  autumnLeaf: '#C08A3E',
+  winterLeaf: '#B9BDB1',
+  // the residents
+  rosaCoat: '#DFC493',
+  rosaShade: '#C6A567',
+  butterfly: '#B77083',
+  bee: STUDIO.ochreInk,
+  bird: STUDIO.dim,
+} as const;
+
 export const WORKING_TONE_HEX: Record<Exclude<WorkingTone, 'quiet'>, string> = {
   good: STUDIO.good,
   attention: STUDIO.attention,

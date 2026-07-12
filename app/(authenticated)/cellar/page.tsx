@@ -15,6 +15,7 @@ import { useOrganization } from '@/lib/organizationContext'
 import { Statement } from '@/components/studio/statement'
 import { PosterBlock } from '@/components/studio/poster-block'
 import { FactList, type FactRowItem } from '@/components/studio/fact-list'
+import { GrowthFieldMount } from '@/components/studio/growth/growth-field-mount'
 
 interface CellarCounts {
   products: number
@@ -162,7 +163,11 @@ export default function CellarLandingPage() {
   ]
 
   return (
-    <div className="mx-auto max-w-4xl space-y-10">
+    <>
+      {/* The living forest: the org's data completeness, growing. */}
+      <GrowthFieldMount />
+      {/* pb-48: the forest's stage; open paper at the page foot. */}
+      <div className="relative z-[1] mx-auto max-w-4xl space-y-10 pb-48">
       <Statement eyebrow="THE CELLAR" headline="The footprints being made." />
 
       <VitalityPoster />
@@ -170,6 +175,7 @@ export default function CellarLandingPage() {
       <section>
         <FactList items={rows} />
       </section>
-    </div>
+      </div>
+    </>
   )
 }
