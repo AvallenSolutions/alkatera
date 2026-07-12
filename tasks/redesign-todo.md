@@ -261,6 +261,22 @@ Open questions for the M2 review:
   (d) on orgs with a brand palette the room wears the brand colour, not ochre,
   but the poster/pills still take ink-on-saturated per the room rule.
 
+- 12 July 2026 · The growth field (commit ffa57927): a seeded generative forest
+  behind the desk + all six room landings, grown from a new 0-100 data-completeness
+  score (/api/growth, six weighted bands, unit-tested). Tim approved from visual
+  drafts (realistic layered treatment over quiet-etching/flat-bold), then asked for
+  fuller/richer, 1% organic increments, taller trees, and all six improvement ideas.
+  Shipped: 10 tree species + 10 wildflowers + 6 grasses with per-instance seeded
+  variation; seasons (?season= override, evergreens hold); residents (Rosa the
+  blonde miniature goldendoodle from first growth, bees 40+, butterflies 60+, bird
+  90+); growth-since-last-visit replay (localStorage); scroll parallax; mist mask
+  for text legibility; "Your forest" key with band deep-links; downloadable SVG
+  artefact (/api/growth/forest.svg). Follow-ups for later: forest on report covers/
+  public pages (renderer is ready), graceful thinning when scores regress, the
+  ?growth/?season overrides are dev-only. NB: the embedded browser pane can show a
+  stale compositing layer for the fixed field in screenshots; nudge a repaint
+  (resize event) before capturing.
+
 ## Go-live (later)
 - [ ] Merge latest `main`, full `pnpm build`, full walk-through
 - [ ] Merge `redesign` → `main`, push, Netlify deploys
