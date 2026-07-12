@@ -14,9 +14,9 @@
  */
 
 import { between, mulberry32, rngFromString, smoothstep, type Rng } from './prng';
-import { GRASSES } from './species/grasses';
-import { FLOWERS } from './species/flowers';
-import { UNDERSTORY } from './species/understory';
+import { GRASSES, tussock, shortTurf } from './species/grasses';
+import { FLOWERS, clover, buttercup } from './species/flowers';
+import { UNDERSTORY, shrub } from './species/understory';
 import { canopyBand, FORE_PALETTE, MID_PALETTE, TREE_MIX } from './species/trees';
 import { makeCreatures, type Creature } from './species/creatures';
 import type { Prim } from './species/shared';
@@ -42,6 +42,24 @@ export function growthAt(emergence: number, score: number): number {
   return smoothstep(emergence, emergence + GROW_SPAN, score) * maturity(score);
 }
 
+/**
+ * The floor: how much a guaranteed first-growth plant (see makeFloorSlots
+ * below) has grown at a score. Unlike growthAt's cold start from zero,
+ * the floor jumps straight to FLOOR_MIN stature the instant the score
+ * leaves zero — the endowed-progress moment, "your forest has started" —
+ * then eases smoothly up to full local scale by FLOOR_SPAN, so a day-one
+ * score (1-10) already reads as young growth, and a score of 30 reads as
+ * visibly further along rather than merely "also present".
+ */
+const FLOOR_MIN = 0.45;
+const FLOOR_SPAN = 28;
+
+export function floorGrowthAt(score: number): number {
+  if (score <= 0) return 0;
+  const t = smoothstep(0, FLOOR_SPAN, score);
+  return FLOOR_MIN + (1 - FLOOR_MIN) * t;
+}
+
 export type LayerKey = 'midTree' | 'foreTree' | 'understory' | 'grass' | 'flower';
 
 export interface PlantSlot {
@@ -56,6 +74,12 @@ export interface PlantSlot {
   prims: Prim[];
   /** Slow sway settings for the light layers; undefined = holds still. */
   sway?: { duration: number; delay: number };
+  /**
+   * A guaranteed first-growth slot (see makeFloorSlots): renders via
+   * floorGrowthAt instead of growthAt, so it is visible the instant the
+   * score leaves zero rather than emerging from nothing.
+   */
+  floor?: boolean;
 }
 
 export interface Population {
@@ -89,6 +113,78 @@ const LAYERS: LayerSpec[] = [
   { layer: 'grass', count: 60, emergence: [1, 40], scale: [1.0, 1.8], swayable: true },
   { layer: 'flower', count: 40, emergence: [8, 60], scale: [1.0, 1.6], swayable: true },
 ];
+
+/**
+ * The floor: a small, fixed, seeded planting guaranteed at any score
+ * above zero, so a brand-new org's very first data point already shows
+ * visible growth ("your forest has started") instead of bare paper.
+ * Deliberately separate from LAYERS above — a handful of young grass
+ * tufts, a couple of wildflower seedlings, and one small sapling shrub,
+ * spread across the width right at the ground line. Seeded off its own
+ * `${seed}:floor` stream so adding or resizing it never reshuffles the
+ * rest of the seeded population.
+ */
+const FLOOR_GRASS_COUNT = 5;
+const FLOOR_FLOWER_COUNT = 3;
+
+function makeFloorSlots(seed: string): PlantSlot[] {
+  const rng = rngFromString(`${seed}:floor`);
+  const slots: PlantSlot[] = [];
+
+  // Grass tufts: short, dense species so they read as one continuous
+  // fringe of new growth along the ground line.
+  const grassSpecies = [tussock, shortTurf];
+  for (let i = 0; i < FLOOR_GRASS_COUNT; i++) {
+    const subseed = Math.floor(rng() * 4294967296);
+    const cell = FIELD_W / FLOOR_GRASS_COUNT;
+    slots.push({
+      id: `floor-grass-${i}`,
+      layer: 'grass',
+      x: Math.round(cell * i + cell * between(rng, 0.2, 0.8)),
+      scale: between(rng, 1.6, 2.1),
+      flip: rng() > 0.5,
+      emergence: 0,
+      floor: true,
+      prims: grassSpecies[i % grassSpecies.length](mulberry32(subseed)),
+      sway: { duration: between(rng, 18, 30), delay: between(rng, 0, 8) },
+    });
+  }
+
+  // Wildflower seedlings: the smallest, earliest-headed species, kept at
+  // a modest scale so they read as sprouts rather than a full bloom.
+  const flowerSpecies = [clover, buttercup];
+  for (let i = 0; i < FLOOR_FLOWER_COUNT; i++) {
+    const subseed = Math.floor(rng() * 4294967296);
+    const cell = FIELD_W / FLOOR_FLOWER_COUNT;
+    slots.push({
+      id: `floor-flower-${i}`,
+      layer: 'flower',
+      x: Math.round(cell * i + cell * between(rng, 0.25, 0.75)),
+      scale: between(rng, 1.1, 1.4),
+      flip: rng() > 0.5,
+      emergence: 0,
+      floor: true,
+      prims: flowerSpecies[i % flowerSpecies.length](mulberry32(subseed)),
+      sway: { duration: between(rng, 18, 30), delay: between(rng, 0, 8) },
+    });
+  }
+
+  // One small sapling: a shrub at a fraction of its full-grown scale,
+  // set near the centre so it reads as a single deliberate planting.
+  const saplingSeed = Math.floor(rng() * 4294967296);
+  slots.push({
+    id: 'floor-sapling-0',
+    layer: 'understory',
+    x: Math.round(FIELD_W * between(rng, 0.4, 0.6)),
+    scale: between(rng, 0.5, 0.65),
+    flip: rng() > 0.5,
+    emergence: 0,
+    floor: true,
+    prims: shrub(mulberry32(saplingSeed)),
+  });
+
+  return slots;
+}
 
 function buildPrims(layer: LayerKey, speciesIndex: number, rng: Rng): Prim[] {
   switch (layer) {
@@ -133,6 +229,11 @@ export function makePopulation(seed: string): Population {
       });
     }
   }
+
+  // The floor: appended after the seeded population above, from its own
+  // rng stream, so it never shifts the layout or shapes of the LAYERS
+  // plants — same seed, same forest, plus a guaranteed first growth.
+  slots.push(...makeFloorSlots(seed));
 
   const band = canopyBand(rngFromString(`${seed}:band`), FIELD_W, 380);
   const creatures = makeCreatures(rngFromString(`${seed}:creatures`), FIELD_W, GROUND_Y);

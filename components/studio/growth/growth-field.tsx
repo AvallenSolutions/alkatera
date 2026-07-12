@@ -36,6 +36,7 @@ import {
   FIELD_H,
   FIELD_W,
   GROUND_Y,
+  floorGrowthAt,
   growthAt,
   makePopulation,
   type LayerKey,
@@ -144,7 +145,7 @@ function Plant({
   still: boolean;
 }) {
   const body = useMemo(() => seasonalPrims(slot.prims, season, slot.layer), [slot, season]);
-  const g = growthAt(slot.emergence, score);
+  const g = slot.floor ? floorGrowthAt(score) : growthAt(slot.emergence, score);
   if (g === 0 && still) return null; // nothing to animate towards; skip the node
   if (body.length === 0) return null; // the season hid it (flowers in winter)
   const sx = (slot.flip ? -1 : 1) * slot.scale * g;

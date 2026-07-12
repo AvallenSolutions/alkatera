@@ -7,7 +7,7 @@
  */
 
 import { GROWTH_PALETTE, STUDIO } from '@/components/studio/theme';
-import { FIELD_H, FIELD_W, GROUND_Y, growthAt, makePopulation } from './layout';
+import { FIELD_H, FIELD_W, GROUND_Y, floorGrowthAt, growthAt, makePopulation } from './layout';
 import { rngFromString, smoothstep } from './prng';
 import { dressForSeason, seasonForDate, type Season } from './season';
 import type { Prim } from './species/shared';
@@ -113,7 +113,7 @@ export function buildForestSvg({ seed, score, season, rosa, caption }: ForestSvg
 
   // The plants, in slot (depth) order.
   for (const slot of population.slots) {
-    const g = growthAt(slot.emergence, score);
+    const g = slot.floor ? floorGrowthAt(score) : growthAt(slot.emergence, score);
     if (g === 0) continue;
     const body = slot.prims
       .map((p) => dressForSeason(p, liveSeason, slot.layer))
