@@ -25,23 +25,27 @@ export function ArrivalPersonaStep() {
   const { completeStep, skipStep, updatePersonalization } = useOnboarding()
   const [saving, setSaving] = useState<PersonaChoice | null>(null)
 
-  const choose = async (persona: PersonaChoice) => {
+  const choose = (persona: PersonaChoice) => {
     if (saving) return
     setSaving(persona)
+    // The persona choice is written into onboarding_state synchronously
+    // (updatePersonalization), which is the backup of record if the
+    // /api/rosa/memory write below fails or is slow. Advance the ritual
+    // immediately after a brief visual confirmation of the selected card —
+    // no network round-trip belongs on this critical path.
     updatePersonalization({ persona })
-    try {
-      await fetch('/api/rosa/memory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: 'persona', value: persona, scope: 'user' }),
-      })
-    } catch (err) {
-      // Don't block the ritual on a memory write failure — the choice is
-      // still saved in onboarding_state and can be retried later.
-      console.error('[arrival-persona] failed to write persona memory:', err)
-    } finally {
-      completeStep()
-    }
+    window.setTimeout(() => completeStep(), 200)
+
+    // Fire-and-forget: write the rosa_memory 'persona' key in the
+    // background. Failure doesn't block the ritual — the choice already
+    // lives in onboarding_state and useUserRole can fall back to that.
+    fetch('/api/rosa/memory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'persona', value: persona, scope: 'user' }),
+    }).catch((err) => {
+      console.warn('[arrival-persona] failed to write persona memory:', err)
+    })
   }
 
   return (

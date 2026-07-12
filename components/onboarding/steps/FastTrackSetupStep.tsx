@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { CountrySelect } from '@/components/shared/CountrySelect'
 import { COUNTRIES } from '@/lib/countries'
 import { RosaIntro } from './RosaIntro'
+import { GROWTH_PALETTE, STUDIO } from '@/components/studio/theme'
 
 const BEVERAGE_OPTIONS: { value: BeverageType; label: string; icon: string }[] = [
   { value: 'beer', label: 'Beer', icon: '🍺' },
@@ -114,6 +115,52 @@ function FromWebsiteTag() {
   )
 }
 
+/** Live states for the background website crawl, surfaced next to the
+ * website field so it never looks like nothing is happening. */
+type CrawlPhase = 'idle' | 'running' | 'done' | 'failed'
+
+/** Tiny inline butterfly, adapted from the growth field's resident
+ * (components/studio/growth/species/creatures.ts: two wing pairs around a
+ * thin body). Flaps gently while `active`, stilled the instant the crawl
+ * settles. prefers-reduced-motion is handled by the .onboarding-wing-flap
+ * class itself (app/globals.css), which is only applied while active. */
+function ScrapeButterfly({ active }: { active: boolean }) {
+  const wingClass = active ? 'onboarding-wing-flap' : ''
+  return (
+    <svg width="16" height="14" viewBox="-8 -6 16 12" className="shrink-0" aria-hidden="true">
+      <g className={wingClass}>
+        <ellipse cx="-3" cy="-1" rx="3.4" ry="2.4" fill={GROWTH_PALETTE.butterfly} opacity={0.85} />
+        <ellipse cx="-3.4" cy="1.6" rx="2.2" ry="1.5" fill={GROWTH_PALETTE.butterfly} opacity={0.6} />
+      </g>
+      <g className={wingClass}>
+        <ellipse cx="3" cy="-1" rx="3.4" ry="2.4" fill={GROWTH_PALETTE.butterfly} opacity={0.7} />
+        <ellipse cx="3.4" cy="1.6" rx="2.2" ry="1.5" fill={GROWTH_PALETTE.butterfly} opacity={0.5} />
+      </g>
+      <path d="M0,-3 L0,3" stroke={STUDIO.ink} strokeWidth={0.9} opacity={0.5} />
+    </svg>
+  )
+}
+
+/** Turns the job's real progress signals (phase_message, status from
+ * product_import_jobs, exposed by GET /api/products/import-from-url/
+ * [jobId]) into an honest, generic status line. Never claims a specific
+ * page or step that isn't backed by what the job actually reports. */
+function stageLabelForPoll(phaseMessage: string | null | undefined, status: string | undefined): string {
+  const msg = (phaseMessage || '').toLowerCase()
+  if (msg.includes('shopify') || msg.includes('catalogue') || msg.includes('extracting products')) {
+    return 'Counting products.'
+  }
+  if (msg.includes('scanning') && msg.includes('pages')) {
+    return 'Reading your pages.'
+  }
+  if (msg.includes('homepage')) {
+    return 'Reading your website.'
+  }
+  // No specific phase yet (job still 'pending', or a message we don't
+  // recognise) — a generic, honest default rather than guessing.
+  return status === 'scraping' ? 'Reading your pages.' : 'Reading your website.'
+}
+
 export function FastTrackSetupStep() {
   const { completeStep, skipStep, updatePersonalization, state, onboardingFlow } = useOnboarding()
   const { currentOrganization, refreshOrganizations } = useOrganization()
@@ -159,6 +206,18 @@ export function FastTrackSetupStep() {
   // label until the user edits the field.
   const [highlightedFields, setHighlightedFields] = useState<Set<AutofillableField>>(new Set())
   const crawlInflightRef = useRef<string | null>(null)
+  // Live status for the background crawl, surfaced next to the website
+  // field (see ScrapeButterfly + stageLabelForPoll above) so entering a
+  // website never looks like nothing happened until results appear.
+  const [crawlPhase, setCrawlPhase] = useState<CrawlPhase>('idle')
+  const [crawlLabel, setCrawlLabel] = useState<string>('Reading your website.')
+  const crawlSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clearCrawlSettleTimer = () => {
+    if (crawlSettleTimerRef.current) {
+      clearTimeout(crawlSettleTimerRef.current)
+      crawlSettleTimerRef.current = null
+    }
+  }
 
   // Marks fields as scrape-filled: adds the "From your website." label and
   // a ~1.4s highlight, quiet enough not to startle but visible enough that
@@ -204,15 +263,29 @@ export function FastTrackSetupStep() {
   // pass URL validation), kick off the import in the background. When it
   // returns brand_metadata, gently pre-fill any fields the user hasn't
   // already touched. Empty/invalid URL cancels in-flight work.
+  //
+  // crawlPhase/crawlLabel (declared above) turn this from a silent black
+  // box into a live indicator: 'running' while the job is in flight, with
+  // the label re-derived from the job's real phase_message on every poll
+  // (stageLabelForPoll); 'done' for a few seconds once products land;
+  // 'failed' — quietly, no alarm — on an explicit failure or a 60s timeout.
   useEffect(() => {
     const trimmed = websiteUrl.trim()
-    if (!trimmed) { crawlInflightRef.current = null; return }
+    if (!trimmed) {
+      crawlInflightRef.current = null
+      clearCrawlSettleTimer()
+      setCrawlPhase('idle')
+      return
+    }
     // Debounce so we don't fire on every keystroke.
     const handle = setTimeout(async () => {
       // Bail if URL doesn't look right or already crawling this one.
       if (websiteUrlError) return
       if (crawlInflightRef.current === trimmed) return
       crawlInflightRef.current = trimmed
+      clearCrawlSettleTimer()
+      setCrawlPhase('running')
+      setCrawlLabel('Reading your website.')
       try {
         const start = await fetch('/api/products/import-from-url', {
           method: 'POST',
@@ -220,10 +293,16 @@ export function FastTrackSetupStep() {
           body: JSON.stringify({ url: trimmed }),
         })
         const startBody = await start.json().catch(() => ({}))
-        if (!start.ok || !startBody?.jobId) return
+        if (!start.ok || !startBody?.jobId) {
+          setCrawlPhase('failed')
+          setCrawlLabel("I couldn't read the site. You can fill things in by hand.")
+          crawlSettleTimerRef.current = setTimeout(() => setCrawlPhase('idle'), 6000)
+          return
+        }
         const jobId = startBody.jobId as string
 
         // Poll up to ~60s. The crawl typically finishes well before that.
+        let settled = false
         for (let i = 0; i < 30; i++) {
           await new Promise(r => setTimeout(r, 2000))
           // User wiped the field or typed something else; abort.
@@ -231,6 +310,10 @@ export function FastTrackSetupStep() {
           const poll = await fetch(`/api/products/import-from-url/${jobId}`)
           const data = await poll.json().catch(() => ({}))
           if (data?.status === 'completed') {
+            settled = true
+            setCrawlPhase('done')
+            setCrawlLabel('Done. Anything I found is tagged below.')
+            crawlSettleTimerRef.current = setTimeout(() => setCrawlPhase('idle'), 4000)
             const products = Array.isArray(data.products) ? data.products : []
             applyBrandPrefill(data.brandMetadata ?? null, data.orgDescription ?? null, products)
             // Stash what the crawl found so the reveal step can show and
@@ -255,15 +338,38 @@ export function FastTrackSetupStep() {
             })
             return
           }
-          if (data?.status === 'failed') return
+          if (data?.status === 'failed') {
+            settled = true
+            setCrawlPhase('failed')
+            setCrawlLabel("I couldn't read the site. You can fill things in by hand.")
+            crawlSettleTimerRef.current = setTimeout(() => setCrawlPhase('idle'), 6000)
+            return
+          }
+          // Still running — reflect the job's real phase in the status line.
+          setCrawlLabel(stageLabelForPoll(data?.phaseMessage, data?.status))
+        }
+        // Exhausted the poll budget without the job reporting completed or
+        // failed — treat it the same as a failure rather than leaving the
+        // butterfly flapping forever.
+        if (!settled) {
+          setCrawlPhase('failed')
+          setCrawlLabel("I couldn't read the site. You can fill things in by hand.")
+          crawlSettleTimerRef.current = setTimeout(() => setCrawlPhase('idle'), 6000)
         }
       } catch (err) {
         console.warn('[fast-track-setup] background crawl failed:', err)
+        setCrawlPhase('failed')
+        setCrawlLabel("I couldn't read the site. You can fill things in by hand.")
+        crawlSettleTimerRef.current = setTimeout(() => setCrawlPhase('idle'), 6000)
       }
     }, 1200)
     return () => clearTimeout(handle)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [websiteUrl, websiteUrlError])
+
+  // Clean up the "settle" timer (the few quiet seconds a 'done'/'failed'
+  // status line lingers for) if the step unmounts mid-countdown.
+  useEffect(() => clearCrawlSettleTimer, [])
 
   // Apply scraped brand metadata to empty fields only. Never overwrite
   // what the user typed.
@@ -493,6 +599,18 @@ export function FastTrackSetupStep() {
           </div>
           {websiteUrlError ? (
             <p className="text-xs text-studio-stale">{websiteUrlError}</p>
+          ) : crawlPhase !== 'idle' ? (
+            <div className="flex items-center gap-1.5 animate-in fade-in duration-300">
+              <ScrapeButterfly active={crawlPhase === 'running'} />
+              <p
+                className={cn(
+                  'font-mono text-xs',
+                  crawlPhase === 'failed' ? 'text-studio-dim' : 'text-studio-forest',
+                )}
+              >
+                {crawlLabel}
+              </p>
+            </div>
           ) : (
             <p className="text-xs text-studio-dim">We'll scan this to import your products automatically in the next step.</p>
           )}

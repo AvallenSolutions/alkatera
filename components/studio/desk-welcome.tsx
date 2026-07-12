@@ -18,6 +18,20 @@
  * Persistence: markRoomIntroSeen('desk') fires only when the user finishes
  * the tour or dismisses the welcome band — never on a silent page-away —
  * so it never auto-shows again once they've actually acted on it.
+ *
+ * Mounted-under-the-wizard fix: for a genuinely new user the desk page
+ * mounts UNDERNEATH the arrival ritual's full-screen overlay while it's
+ * still open. The decision effect below must not latch a *negative*
+ * decision (phase stays 'closed', decided=true) while shouldShowOnboarding
+ * is true — that would mean the welcome never gets a second chance once
+ * the wizard closes, which is exactly the bug this comment is guarding
+ * against. Instead it waits, and re-evaluates the moment
+ * shouldShowOnboarding flips true -> false (the ritual's completeOnboarding()
+ * sets state.completed synchronously, before the router.push to '/desk/',
+ * so this component sees the flip whether it was already mounted under the
+ * overlay or mounts fresh after the navigation). The *positive* decision
+ * (phase already welcome/tour, or introSeen already true) still latches
+ * exactly once, so a debounced state save mid-tour can't collapse it.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -56,20 +70,30 @@ export function DeskWelcome() {
 
   useEffect(() => {
     if (isLoading || decided) return;
-    setDecided(true);
-    if (!introSeen && !shouldShowOnboarding) {
-      setPhase('welcome');
-      trackOnboarding({
-        organizationId: currentOrganization?.id,
-        flow: 'room_checklist',
-        step: 'desk',
-        event: 'view',
-        meta: { kind: 'desk_welcome_seen' },
-      });
+    if (introSeen) {
+      // Already seen — nothing to show. Safe to latch immediately.
+      setDecided(true);
+      return;
     }
-    // Decide exactly once per mount, as soon as the real state has loaded.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, decided, introSeen, shouldShowOnboarding]);
+    if (shouldShowOnboarding) {
+      // The wizard is still open (mounted underneath it). Don't decide yet
+      // — deciding "no" here would latch and the welcome would never show
+      // once the wizard closes. Wait; this effect re-runs when
+      // shouldShowOnboarding changes.
+      return;
+    }
+    // Wizard is closed (or was never open this visit) and the intro hasn't
+    // been seen — decide to show it, once, for good.
+    setDecided(true);
+    setPhase('welcome');
+    trackOnboarding({
+      organizationId: currentOrganization?.id,
+      flow: 'room_checklist',
+      step: 'desk',
+      event: 'view',
+      meta: { kind: 'desk_welcome_seen' },
+    });
+  }, [isLoading, decided, introSeen, shouldShowOnboarding, currentOrganization?.id]);
 
   // While the tour is running: scroll the current stop into view and ring
   // it. Cleanup removes the ring from the previous stop on every step.

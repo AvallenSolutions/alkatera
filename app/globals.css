@@ -307,6 +307,25 @@
   transition: box-shadow 200ms ease;
 }
 
+/* The onboarding website-scrape indicator's tiny butterfly (adapted from
+   the growth field's resident in components/studio/growth/species/
+   creatures.ts): a gentle wing-flap while the background crawl runs,
+   stilled the moment the job settles. */
+@keyframes onboarding-wing-flap {
+  0%,
+  100% {
+    transform: scaleX(1);
+  }
+  50% {
+    transform: scaleX(0.32);
+  }
+}
+.onboarding-wing-flap {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: onboarding-wing-flap 0.9s ease-in-out infinite;
+}
+
 /* Nothing moves for those who ask it not to. */
 @media (prefers-reduced-motion: reduce) {
   .studio-reveal {
@@ -321,7 +340,8 @@
   .growth-flutter,
   .growth-glide,
   .growth-wag,
-  .growth-snowfall {
+  .growth-snowfall,
+  .onboarding-wing-flap {
     animation: none !important;
   }
   .studio-mark,
