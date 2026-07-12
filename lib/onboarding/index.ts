@@ -6,6 +6,7 @@ export type {
   OnboardingState,
   OnboardingStepConfig,
   PersonalizationData,
+  ScrapedProductDraft,
   UserRole,
   BeverageType,
   CompanySize,

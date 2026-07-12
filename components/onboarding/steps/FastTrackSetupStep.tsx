@@ -11,7 +11,6 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { ArrowRight, Building2, Globe, Upload, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { toast } from 'sonner'
 import { CountrySelect } from '@/components/shared/CountrySelect'
 import { COUNTRIES } from '@/lib/countries'
 import { RosaIntro } from './RosaIntro'
@@ -43,6 +42,76 @@ const BEVERAGE_TO_PRODUCT_TYPE: Record<BeverageType, string> = {
   non_alcoholic: 'Non-Alcoholic',
   functional: 'Non-Alcoholic',
   other: 'Non-Alcoholic',
+}
+
+// Inverse of the above, for guessing a beverage type from the scraped
+// products' categories. "Beer & Cider" and "Non-Alcoholic" are ambiguous —
+// we pick the more common of the two forms rather than trying to tell beer
+// from cider on ingredient text alone.
+const PRODUCT_CATEGORY_TO_BEVERAGE: Record<string, BeverageType> = {
+  'Spirits': 'spirits',
+  'Beer & Cider': 'beer',
+  'Wine': 'wine',
+  'Ready-to-Drink & Cocktails': 'rtd',
+  'Non-Alcoholic': 'non_alcoholic',
+}
+
+/** Best-guess beverage type from the scraped product list's categories.
+ * Only confident when one category clearly leads — mixed or empty results
+ * leave the field blank rather than guessing. */
+function guessBeverageTypeFromProducts(products: { product_category?: string }[]): BeverageType | null {
+  if (!products.length) return null
+  const counts = new Map<string, number>()
+  for (const p of products) {
+    if (!p.product_category) continue
+    counts.set(p.product_category, (counts.get(p.product_category) ?? 0) + 1)
+  }
+  const ranked = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])
+  if (!ranked.length) return null
+  const [topCategory, topCount] = ranked[0]
+  const runnerUpCount = ranked[1]?.[1] ?? 0
+  if (topCount <= runnerUpCount) return null // tie or no clear majority
+  return PRODUCT_CATEGORY_TO_BEVERAGE[topCategory] ?? null
+}
+
+/** Maps a free-text or ISO country string (from the site's JSON-LD address,
+ * locale meta tag, or an LLM guess) onto the form's ISO alpha-2 codes. Only
+ * matches exact codes, exact labels, or a short list of common aliases —
+ * anything else is left blank rather than guessed. */
+const COUNTRY_ALIASES: Record<string, string> = {
+  uk: 'GB',
+  'u.k.': 'GB',
+  'united kingdom': 'GB',
+  'great britain': 'GB',
+  england: 'GB',
+  scotland: 'GB',
+  wales: 'GB',
+  'northern ireland': 'GB',
+  usa: 'US',
+  'u.s.a.': 'US',
+  'u.s.': 'US',
+  'united states of america': 'US',
+  america: 'US',
+}
+
+function mapScrapedCountry(raw: string | null | undefined): string | null {
+  const trimmed = raw?.trim()
+  if (!trimmed) return null
+  const byCode = COUNTRIES.find(c => c.value.toLowerCase() === trimmed.toLowerCase())
+  if (byCode) return byCode.value
+  const byLabel = COUNTRIES.find(c => c.label.toLowerCase() === trimmed.toLowerCase())
+  if (byLabel) return byLabel.value
+  return COUNTRY_ALIASES[trimmed.toLowerCase()] ?? null
+}
+
+/** Quiet mono label shown beside a field's Label when its value came from
+ * the background website scrape, not the user's own typing. */
+function FromWebsiteTag() {
+  return (
+    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-studio-forest">
+      From your website.
+    </span>
+  )
 }
 
 export function FastTrackSetupStep() {
@@ -79,11 +148,43 @@ export function FastTrackSetupStep() {
     state.personalization?.companySize ?? null
   )
   const [isSaving, setIsSaving] = useState(false)
+  const [logoError, setLogoError] = useState<string | null>(null)
   // Track which fields the background crawl filled, so we can show a small
-  // "from your website" caption + avoid clobbering anything the user has
-  // already typed.
-  const [autofilledFromSite, setAutofilledFromSite] = useState<Set<'country' | 'foundingYear' | 'description' | 'logo'>>(new Set())
+  // "from your website" label next to the field + avoid clobbering anything
+  // the user has already typed.
+  type AutofillableField = 'country' | 'foundingYear' | 'description' | 'logo' | 'beverageType'
+  const [autofilledFromSite, setAutofilledFromSite] = useState<Set<AutofillableField>>(new Set())
+  // Fields that were *just* autofilled, for a brief highlight/fade as the
+  // value lands — separate from autofilledFromSite, which persists the
+  // label until the user edits the field.
+  const [highlightedFields, setHighlightedFields] = useState<Set<AutofillableField>>(new Set())
   const crawlInflightRef = useRef<string | null>(null)
+
+  // Marks fields as scrape-filled: adds the "From your website." label and
+  // a ~1.4s highlight, quiet enough not to startle but visible enough that
+  // the user notices the field just changed under them.
+  const markAutofilled = (keys: AutofillableField[]) => {
+    if (!keys.length) return
+    setAutofilledFromSite(prev => {
+      const next = new Set(prev)
+      keys.forEach(k => next.add(k))
+      return next
+    })
+    setHighlightedFields(prev => {
+      const next = new Set(prev)
+      keys.forEach(k => next.add(k))
+      return next
+    })
+    setTimeout(() => {
+      setHighlightedFields(prev => {
+        const next = new Set(prev)
+        keys.forEach(k => next.delete(k))
+        return next
+      })
+    }, 1400)
+  }
+  const highlightClass = (field: AutofillableField) =>
+    cn('transition-colors duration-700 ease-studio rounded-[6px]', highlightedFields.has(field) && 'bg-studio-forest/10')
 
   // Lightweight URL check: accept anything that has a dot (domain) and no
   // whitespace. Don't require a scheme — the import route normalises that.
@@ -130,16 +231,27 @@ export function FastTrackSetupStep() {
           const poll = await fetch(`/api/products/import-from-url/${jobId}`)
           const data = await poll.json().catch(() => ({}))
           if (data?.status === 'completed') {
-            applyBrandPrefill(data.brandMetadata ?? null, data.orgDescription ?? null)
-            // Stash what the crawl found so the reveal step can show it: the
-            // brand colour (for the room recolour), logo and product names.
-            const found = Array.isArray(data.products)
-              ? data.products.map((p: any) => p?.name).filter(Boolean).slice(0, 12)
-              : []
+            const products = Array.isArray(data.products) ? data.products : []
+            applyBrandPrefill(data.brandMetadata ?? null, data.orgDescription ?? null, products)
+            // Stash what the crawl found so the reveal step can show and
+            // materialise it: the brand colour (for the room recolour), the
+            // logo, and the product drafts (name plus whatever category and
+            // size the scrape provided).
+            const drafts = products
+              .filter((p: any) => typeof p?.name === 'string' && p.name.trim())
+              .slice(0, 12)
+              .map((p: any) => ({
+                name: String(p.name).trim(),
+                category: typeof p.product_category === 'string' ? p.product_category : null,
+                unitSizeValue: typeof p.unit_size_value === 'number' ? p.unit_size_value : null,
+                unitSizeUnit: typeof p.unit_size_unit === 'string' ? p.unit_size_unit : null,
+              }))
             updatePersonalization({
               ...(data.brandMetadata?.brand_colour ? { brandColour: data.brandMetadata.brand_colour } : {}),
               ...(data.brandMetadata?.logo_url ? { brandLogoUrl: data.brandMetadata.logo_url } : {}),
-              ...(found.length ? { scrapedProductNames: found } : {}),
+              ...(drafts.length
+                ? { scrapedProducts: drafts, scrapedProductNames: drafts.map((d: { name: string }) => d.name) }
+                : {}),
             })
             return
           }
@@ -160,30 +272,61 @@ export function FastTrackSetupStep() {
       founding_year?: number | null
       logo_url?: string | null
       mission?: string | null
+      country?: string | null
     } | null,
     orgDescription: string | null,
+    products: { product_category?: string }[],
   ) => {
-    const filled = new Set(autofilledFromSite)
-    if (!countryCode) {
-      // brand_metadata doesn't carry a country directly, so we leave it
-      // alone. Could be enhanced by reading distribution_markets[0].
-    }
+    const filled: AutofillableField[] = []
+
     if (!foundingYear && brand?.founding_year) {
       setFoundingYear(String(brand.founding_year))
-      filled.add('foundingYear')
+      filled.push('foundingYear')
     }
     if (!description) {
       const candidate = brand?.mission || orgDescription || null
       if (candidate) {
         setDescription(candidate)
-        filled.add('description')
+        filled.push('description')
       }
     }
     if (!logoUrl && brand?.logo_url) {
       setLogoUrl(brand.logo_url)
-      filled.add('logo')
+      filled.push('logo')
     }
-    if (filled.size > 0) setAutofilledFromSite(filled)
+    if (!countryCode) {
+      const mapped = mapScrapedCountry(brand?.country)
+      if (mapped) {
+        setCountryCode(mapped)
+        filled.push('country')
+      }
+    }
+    if (!beverageType) {
+      const guess = guessBeverageTypeFromProducts(products)
+      if (guess) {
+        setBeverageType(guess)
+        filled.push('beverageType')
+      }
+    }
+
+    markAutofilled(filled)
+  }
+
+  // Clears a field's "from your website" state when the user edits it
+  // themselves — the badge and any lingering highlight both go away.
+  const clearAutofill = (key: AutofillableField) => {
+    setAutofilledFromSite(prev => {
+      if (!prev.has(key)) return prev
+      const next = new Set(prev)
+      next.delete(key)
+      return next
+    })
+    setHighlightedFields(prev => {
+      if (!prev.has(key)) return prev
+      const next = new Set(prev)
+      next.delete(key)
+      return next
+    })
   }
 
   const isValid =
@@ -192,8 +335,9 @@ export function FastTrackSetupStep() {
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (!file.type.startsWith('image/')) { toast.error('Please select an image file'); return }
-    if (file.size > 10 * 1024 * 1024) { toast.error('Logo must be under 10MB'); return }
+    setLogoError(null)
+    if (!file.type.startsWith('image/')) { setLogoError('Please select an image file.'); return }
+    if (file.size > 10 * 1024 * 1024) { setLogoError('Logo must be under 10MB.'); return }
 
     setUploadingLogo(true)
     try {
@@ -202,11 +346,16 @@ export function FastTrackSetupStep() {
       const { data, error } = await supabase.storage
         .from('report-assets')
         .upload(`logos/${fileName}`, file, { cacheControl: '3600', upsert: true })
-      if (error) { toast.error('Logo upload failed'); return }
+      if (error) {
+        console.warn('[fast-track-setup] logo upload failed:', error.message)
+        setLogoError("The logo didn't upload. Try again, or skip it for now.")
+        return
+      }
       const { data: urlData } = supabase.storage.from('report-assets').getPublicUrl(data.path)
       setLogoUrl(urlData.publicUrl)
-    } catch {
-      toast.error('Logo upload failed')
+    } catch (err) {
+      console.warn('[fast-track-setup] logo upload failed:', err)
+      setLogoError("The logo didn't upload. Try again, or skip it for now.")
     } finally {
       setUploadingLogo(false)
     }
@@ -276,7 +425,10 @@ export function FastTrackSetupStep() {
 
         {/* Logo */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium text-foreground">Logo</Label>
+          <Label className="text-sm font-medium text-foreground flex items-center gap-2">
+            Logo
+            {autofilledFromSite.has('logo') && <FromWebsiteTag />}
+          </Label>
           <input
             ref={fileInputRef}
             type="file"
@@ -286,7 +438,7 @@ export function FastTrackSetupStep() {
             disabled={uploadingLogo}
           />
           {logoUrl ? (
-            <div className="flex items-center gap-3 p-3 bg-card border border-border rounded-[6px]">
+            <div className={cn('flex items-center gap-3 p-3 bg-card border border-border', highlightClass('logo'))}>
               <img
                 src={logoUrl}
                 alt="Company logo"
@@ -296,7 +448,12 @@ export function FastTrackSetupStep() {
                 <p className="text-xs text-muted-foreground truncate">Logo uploaded</p>
               </div>
               <button
-                onClick={() => { setLogoUrl(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
+                onClick={() => {
+                  setLogoUrl(null)
+                  setLogoError(null)
+                  clearAutofill('logo')
+                  if (fileInputRef.current) fileInputRef.current.value = ''
+                }}
                 className="text-studio-dim hover:text-foreground transition-colors"
               >
                 <X className="w-4 h-4" />
@@ -304,7 +461,7 @@ export function FastTrackSetupStep() {
             </div>
           ) : (
             <button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => { setLogoError(null); fileInputRef.current?.click() }}
               disabled={uploadingLogo}
               className="w-full flex items-center gap-3 p-4 bg-card border border-dashed border-border hover:bg-secondary hover:border-studio-ink/25 rounded-[6px] transition-colors text-left"
             >
@@ -315,6 +472,7 @@ export function FastTrackSetupStep() {
               </div>
             </button>
           )}
+          {logoError && <p className="text-xs text-studio-stale">{logoError}</p>}
         </div>
 
         {/* Website */}
@@ -342,50 +500,58 @@ export function FastTrackSetupStep() {
 
         {/* Description */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium text-foreground">About your company</Label>
+          <Label className="text-sm font-medium text-foreground flex items-center gap-2">
+            About your company
+            {autofilledFromSite.has('description') && <FromWebsiteTag />}
+          </Label>
           <Textarea
             placeholder="A few words about what you make and your sustainability ambitions..."
             value={description}
-            onChange={e => { setDescription(e.target.value); autofilledFromSite.delete('description') }}
+            onChange={e => { setDescription(e.target.value); clearAutofill('description') }}
             rows={2}
-            className="resize-none"
+            className={cn('resize-none', highlightClass('description'))}
           />
-          {autofilledFromSite.has('description') && (
-            <p className="text-xs text-studio-forest">Pulled from your website, edit if needed.</p>
-          )}
         </div>
 
         {/* Country + Year */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-foreground">Country</Label>
+            <Label className="text-sm font-medium text-foreground flex items-center gap-2">
+              Country
+              {autofilledFromSite.has('country') && <FromWebsiteTag />}
+            </Label>
             <CountrySelect
               value={countryCode}
-              onChange={setCountryCode}
+              onChange={code => { setCountryCode(code); clearAutofill('country') }}
               placeholder="Select country"
+              className={highlightClass('country')}
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-foreground">Year founded</Label>
+            <Label className="text-sm font-medium text-foreground flex items-center gap-2">
+              Year founded
+              {autofilledFromSite.has('foundingYear') && <FromWebsiteTag />}
+            </Label>
             <Input
               placeholder="e.g., 2018"
               value={foundingYear}
-              onChange={e => { setFoundingYear(e.target.value.replace(/\D/g, '').slice(0, 4)); autofilledFromSite.delete('foundingYear') }}
+              onChange={e => { setFoundingYear(e.target.value.replace(/\D/g, '').slice(0, 4)); clearAutofill('foundingYear') }}
+              className={highlightClass('foundingYear')}
             />
-            {autofilledFromSite.has('foundingYear') && (
-              <p className="text-xs text-studio-forest">From your website</p>
-            )}
           </div>
         </div>
 
         {/* Drink type — maps to organizations.product_type */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium text-foreground">What do you make? <span className="text-studio-dim">(required)</span></Label>
-          <div className="grid grid-cols-3 gap-2">
+          <Label className="text-sm font-medium text-foreground flex items-center gap-2">
+            What do you make? <span className="text-studio-dim">(required)</span>
+            {autofilledFromSite.has('beverageType') && <FromWebsiteTag />}
+          </Label>
+          <div className={cn('grid grid-cols-3 gap-2 p-1 -m-1', highlightClass('beverageType'))}>
             {BEVERAGE_OPTIONS.map(opt => (
               <button
                 key={opt.value}
-                onClick={() => setBeverageType(opt.value)}
+                onClick={() => { setBeverageType(opt.value); clearAutofill('beverageType') }}
                 className={cn(
                   'flex flex-col items-center gap-1 p-3 rounded-[6px] border text-xs font-medium transition-colors',
                   beverageType === opt.value

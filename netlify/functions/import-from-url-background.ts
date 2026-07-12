@@ -27,6 +27,10 @@ interface PageData {
   text: string;
   images: ImageCandidate[];
   links: string[];
+  /** Raw HTML, kept alongside the cleaned text so brand-metadata regex/JSON-LD
+   * extraction (theme colour, address country) has something to run against
+   * even on the generic (non-Shopify) crawl path. */
+  html: string;
 }
 
 // ───────────────────────────────────────────────────────────────────────────────
@@ -135,14 +139,32 @@ interface BrandMetadata {
   production_locations?: string[];
   logo_url?: string | null;
   brand_colour?: string | null;
+  /** Country the company is based in, if stated (free text or ISO code —
+   * the client maps either onto the form's country dropdown). */
+  country?: string | null;
+}
+
+/** Normalise a CSS colour string to a clean `#RRGGBB` hex, or null if it
+ * isn't a hex colour we can use (named colours, rgb(), gradients, etc. are
+ * deliberately not supported — keeps this a cheap regex pass, not a CSS
+ * parser). */
+function normaliseHex(raw: string | undefined | null): string | null {
+  if (!raw) return null;
+  const m = raw.trim().match(/^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/);
+  if (!m) return null;
+  let hex = m[1];
+  if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
+  if (hex.length === 8) hex = hex.slice(0, 6); // drop alpha channel
+  return `#${hex.toUpperCase()}`;
 }
 
 /**
  * Light-weight brand metadata extraction from a homepage HTML string. Looks
  * for JSON-LD Organization/Brand blocks (Shopify ships these on most themes)
  * plus a few high-yield regex passes for things like footer "Est. 2018".
- * This is the cheap path used by the Shopify fast lane so we don't have to
- * spend an Anthropic call for every site.
+ * This is the cheap path used by the Shopify fast lane, and is also run
+ * against the main page's raw HTML on the generic Claude path to backfill
+ * whatever the LLM prompt can't see (colour, locale) — see mergeBrandMetadata.
  */
 function extractBrandMetadataFromHtml(html: string): BrandMetadata {
   const out: BrandMetadata = {};
@@ -171,6 +193,12 @@ function extractBrandMetadataFromHtml(html: string): BrandMetadata {
           if (item.logo && !out.logo_url) {
             out.logo_url = typeof item.logo === 'string' ? item.logo : item.logo?.url ?? null;
           }
+          if (item.address && !out.country) {
+            const addr = Array.isArray(item.address) ? item.address[0] : item.address;
+            const countryVal =
+              typeof addr?.addressCountry === 'string' ? addr.addressCountry : addr?.addressCountry?.name;
+            if (typeof countryVal === 'string' && countryVal.trim()) out.country = countryVal.trim();
+          }
         }
       }
     } catch {
@@ -178,22 +206,65 @@ function extractBrandMetadataFromHtml(html: string): BrandMetadata {
     }
   }
 
-  // Footer "Established YYYY" / "Est. YYYY" / "Since YYYY"
+  // Footer "Established YYYY" / "Est. YYYY" / "Since YYYY" / "Founded in YYYY" / "Started in YYYY"
   if (!out.founding_year) {
-    const m = html.match(/(?:est(?:ablished)?\.?|since)\s+(\d{4})/i);
+    const m = html.match(/(?:est(?:ablished)?\.?|founded(?:\s+in)?|since|started in)\s+(\d{4})/i);
     if (m) {
       const y = parseInt(m[1], 10);
       if (y > 1500 && y < 2100) out.founding_year = y;
     }
   }
 
-  // Theme colour from meta tag
+  // Country from the page locale meta tag (e.g. <meta property="og:locale"
+  // content="en_GB">) — a common signal even on sites with no address schema.
+  if (!out.country) {
+    const m = html.match(/<meta[^>]+property=["']og:locale["'][^>]+content=["']([a-z]{2})[_-]([A-Z]{2})["']/i);
+    if (m) out.country = m[2].toUpperCase();
+  }
+
+  // Brand colour, in order of preference:
+  // 1. <meta name="theme-color"> — what the browser chrome uses, usually the brand colour.
+  // 2. A CSS custom property that looks like the brand/primary/accent colour.
+  // We deliberately stop there — sampling the dominant logo colour would need
+  // an image-decoding dependency, which is more than this cheap regex pass
+  // should carry.
   if (!out.brand_colour) {
     const m = html.match(/<meta[^>]+name=["']theme-color["'][^>]+content=["']([^"']+)["']/i);
-    if (m) out.brand_colour = m[1];
+    out.brand_colour = normaliseHex(m?.[1]);
+  }
+  if (!out.brand_colour) {
+    const m = html.match(/--[\w-]*(?:brand|primary|accent)[\w-]*\s*:\s*(#[0-9a-fA-F]{3,8})/i);
+    out.brand_colour = normaliseHex(m?.[1]);
   }
 
   return out;
+}
+
+/**
+ * Merge brand metadata from two sources, preferring `primary`'s value for
+ * any field it actually found (non-null, non-empty-array) and falling back
+ * to `fallback` otherwise. Used to backfill the Claude-extracted metadata
+ * with whatever the cheap HTML regex pass found (chiefly brand_colour and
+ * country, which the LLM prompt doesn't reliably see).
+ */
+function mergeBrandMetadata(primary: BrandMetadata | undefined | null, fallback: BrandMetadata): BrandMetadata {
+  const pick = <K extends keyof BrandMetadata>(key: K): BrandMetadata[K] => {
+    const p = primary?.[key];
+    if (p !== undefined && p !== null && !(Array.isArray(p) && p.length === 0)) return p;
+    return fallback[key];
+  };
+  return {
+    founding_year: pick('founding_year'),
+    founder_names: pick('founder_names'),
+    mission: pick('mission'),
+    awards: pick('awards'),
+    suppliers: pick('suppliers'),
+    distribution_markets: pick('distribution_markets'),
+    production_locations: pick('production_locations'),
+    logo_url: pick('logo_url'),
+    brand_colour: pick('brand_colour'),
+    country: pick('country'),
+  };
 }
 
 function packagingFromShopify(p: ShopifyProduct): 'glass_bottle' | 'aluminium_can' | 'keg_cask' | 'pet_bag' | null {
@@ -404,6 +475,7 @@ async function fetchPageData(url: string): Promise<PageData | null> {
       text: cleanText,
       images: uniqueImages,
       links: Array.from(new Set(links)),
+      html,
     };
   } catch {
     return null;
@@ -544,6 +616,11 @@ export const handler = async (event: { body?: string | null; headers: Record<str
     const visitedUrls = new Set<string>([url]);
     const baseHost = parsedUrl.host;
 
+    // About/story-type pages score highest: that's where founding year,
+    // HQ country and mission are usually written, and on a big catalogue
+    // site the product pages would otherwise crowd them out of the top-9
+    // crawl slice below, leaving brand_metadata mostly empty.
+    const aboutKeywords = /about|our-story|ourstory|story|history|who-we-are|mission|team|company/i;
     const productKeywords = /product|shop|store|range|collection|catalog|beer|wine|spirit|cider|whisky|whiskey|gin|vodka|rum|ale|lager|slijterij|boutique|tienda|negozio/i;
     const skipKeywords = /account|login|signin|signup|register|winkelwagen|cart|checkout|basket|wishlist|privacy|terms|contact/i;
     const seenPaths = new Set<string>();
@@ -563,6 +640,7 @@ export const handler = async (event: { body?: string | null; headers: Record<str
         const path = (() => { try { return new URL(href).pathname + new URL(href).search; } catch { return href; } })();
         const score =
           skipKeywords.test(path) ? -1 :
+          aboutKeywords.test(path) ? 2 :
           productKeywords.test(path) ? 1 :
           0;
         return { href, score };
@@ -640,6 +718,10 @@ export const handler = async (event: { body?: string | null; headers: Record<str
                     type: ['integer', 'null'],
                     description: 'Year the company was founded (4 digit, between 1500 and current year). Null if not found.',
                   },
+                  country: {
+                    type: ['string', 'null'],
+                    description: 'Country the company is based/headquartered in, if clearly stated (e.g. "United Kingdom", "France"). Null if not found — do not guess from language or currency alone.',
+                  },
                   founder_names: {
                     type: 'array',
                     items: { type: 'string' },
@@ -712,7 +794,7 @@ Extract all individual drink products from the website content below. Focus on a
 Also extract:
 - org_certifications: any certifications held by the company itself (B Corp, Soil Association Organic, SIBA Member, Rainforest Alliance, etc.) visible anywhere on the site
 - org_description: a concise description of the company (from About page, homepage, or meta description)
-- brand_metadata: founding year, founder names, mission, awards, named production partners or suppliers, distribution markets, production locations, and brand logo URL. Be conservative: only fill a field when the site clearly states it. Leave arrays empty if unsure.
+- brand_metadata: founding year, the company's home country, founder names, mission, awards, named production partners or suppliers, distribution markets, production locations, and brand logo URL. Be conservative: only fill a field when the site clearly states it. Leave arrays empty if unsure, and leave country null rather than guessing from language or currency.
 
 IMAGE SELECTION RULES - this is critical:
 - Each image below includes its URL, alt text, and nearby page text
@@ -742,6 +824,12 @@ Important:
       ],
     });
 
+    // Cheap regex/JSON-LD pass over the homepage's raw HTML, used to backfill
+    // whatever the LLM prompt can't reliably see — chiefly brand_colour
+    // (Claude reads text, not CSS) and country as a fallback when the site
+    // has structured address/locale data but doesn't say so in prose.
+    const htmlBrandMetadata = extractBrandMetadataFromHtml(mainPage.html);
+
     const toolUse = response.content.find((block: any) => block.type === 'tool_use');
     if (!toolUse || toolUse.type !== 'tool_use') {
       await updateJob({
@@ -751,7 +839,7 @@ Important:
         products: [],
         org_certifications: [],
         org_description: null,
-        brand_metadata: {},
+        brand_metadata: mergeBrandMetadata(undefined, htmlBrandMetadata),
       });
       return { statusCode: 200, body: 'ok' };
     }
@@ -770,7 +858,7 @@ Important:
       products: toolInput.products ?? [],
       org_certifications: toolInput.org_certifications ?? [],
       org_description: toolInput.org_description ?? null,
-      brand_metadata: toolInput.brand_metadata ?? {},
+      brand_metadata: mergeBrandMetadata(toolInput.brand_metadata, htmlBrandMetadata),
     });
 
     return { statusCode: 200, body: 'ok' };

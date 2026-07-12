@@ -216,6 +216,22 @@ export type AnnualProductionBucket = '<10k' | '10k-100k' | '100k-1M' | '1M+'
  */
 export type PersonaChoice = 'operator' | 'finance' | 'leadership' | 'sustainability'
 
+/**
+ * A product found by the website scrape, carried through personalization to
+ * the arrival flow's reveal step so it can be materialised as an is_draft
+ * products row (the 5-step arrival flow has no import step to do it).
+ * Field names mirror the products columns they map onto.
+ */
+export interface ScrapedProductDraft {
+  name: string
+  /** products.product_category (e.g. "Spirits"). Null when the scrape wasn't sure. */
+  category?: string | null
+  /** products.unit_size_value. Null when the site didn't state a size. */
+  unitSizeValue?: number | null
+  /** products.unit_size_unit ('ml' | 'cl' | 'l'). Null when unknown. */
+  unitSizeUnit?: string | null
+}
+
 export interface PersonalizationData {
   role?: UserRole
   roleOther?: string
@@ -236,6 +252,12 @@ export interface PersonalizationData {
   brandLogoUrl?: string
   /** Product names found on the website (shown on the reveal step). */
   scrapedProductNames?: string[]
+  /**
+   * Full product drafts found on the website, for the reveal step to insert
+   * as is_draft products. Superset of scrapedProductNames, which is kept for
+   * back-compat with state saved before this field existed.
+   */
+  scrapedProducts?: ScrapedProductDraft[]
   /** Country of operation */
   country?: string
   /** Year company was founded */
