@@ -6,6 +6,7 @@ import {
   ONBOARDING_STEPS,
   MEMBER_ONBOARDING_STEPS,
   FAST_TRACK_STEPS,
+  ARRIVAL_STEPS,
   type OnboardingStepConfig,
 } from '@/lib/onboarding/types'
 import { ArrowRight, X, Sparkles } from 'lucide-react'
@@ -27,6 +28,7 @@ export function OnboardingResumeBanner() {
 
   const steps =
     onboardingFlow === 'fast_track' ? FAST_TRACK_STEPS
+    : onboardingFlow === 'arrival' ? ARRIVAL_STEPS
     : onboardingFlow === 'member' ? MEMBER_ONBOARDING_STEPS
     : ONBOARDING_STEPS
 

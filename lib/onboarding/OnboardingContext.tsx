@@ -16,6 +16,7 @@ import {
   getProgressPercentage,
   getInitialStateForFlow,
   FAST_TRACK_STEPS,
+  ARRIVAL_STEPS,
 } from './types'
 import { trackOnboarding } from './telemetry'
 
@@ -81,7 +82,7 @@ const OnboardingContext = createContext<OnboardingContextType | undefined>(undef
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<OnboardingState>(INITIAL_ONBOARDING_STATE)
   const [isLoading, setIsLoading] = useState(true)
-  const [onboardingFlow, setOnboardingFlow] = useState<OnboardingFlow>('fast_track')
+  const [onboardingFlow, setOnboardingFlow] = useState<OnboardingFlow>('arrival')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const { user } = useAuth()
@@ -93,7 +94,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const loadedOrgIdRef = useRef<string | null>(null)
   // Track the org ID and flow for saves so the callback doesn't need them in deps
   const orgIdRef = useRef<string | null>(null)
-  const flowRef = useRef<OnboardingFlow>('fast_track')
+  const flowRef = useRef<OnboardingFlow>('arrival')
   // Guard against saving while a fetch is in flight
   const isFetchingRef = useRef(false)
   // Counter to ignore stale fetch responses
@@ -182,7 +183,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         if (res.ok) {
           const data = await res.json()
           // Set the flow from the API response
-          const serverFlow: OnboardingFlow = data.flow || (isAdvisor ? 'advisor' : isOwner ? 'fast_track' : 'member')
+          const serverFlow: OnboardingFlow = data.flow || (isAdvisor ? 'advisor' : isOwner ? 'arrival' : 'member')
           setOnboardingFlow(serverFlow)
 
           if (data.state) {
@@ -313,6 +314,9 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       flowRef.current === 'member' ? 'member-completion' :
       flowRef.current === 'fast_track' ? 'fast-track-completion' :
       flowRef.current === 'advisor' ? 'advisor-completion' :
+      // The arrival flow has no separate completion step — the estimate
+      // step doubles as the "forest has started" close.
+      flowRef.current === 'arrival' ? 'arrival-estimate' :
       'completion'
     const completedState: OnboardingState = {
       ...state,
@@ -428,6 +432,8 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         // Advance past welcome-screen since it triggered this switch
         currentStep: flow === 'fast_track'
           ? (FAST_TRACK_STEPS[1]?.id ?? 'fast-track-setup')
+          : flow === 'arrival'
+          ? (ARRIVAL_STEPS[1]?.id ?? 'arrival-persona')
           : (flow === 'member' ? 'member-welcome' : 'meet-rosa'),
         completedSteps: ['welcome-screen'],
       }

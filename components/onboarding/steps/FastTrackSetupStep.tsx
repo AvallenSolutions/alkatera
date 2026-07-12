@@ -46,7 +46,7 @@ const BEVERAGE_TO_PRODUCT_TYPE: Record<BeverageType, string> = {
 }
 
 export function FastTrackSetupStep() {
-  const { completeStep, updatePersonalization, state } = useOnboarding()
+  const { completeStep, skipStep, updatePersonalization, state, onboardingFlow } = useOnboarding()
   const { currentOrganization, refreshOrganizations } = useOrganization()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -432,6 +432,21 @@ export function FastTrackSetupStep() {
             <>Continue <ArrowRight className="w-4 h-4 ml-2" /></>
           )}
         </Button>
+
+        {/* Arrival flow only: this step is skippable there (see
+            ARRIVAL_STEPS), and the fast-track flow has no equivalent
+            top-chrome "skip step" control, so the affordance lives here. */}
+        {onboardingFlow === 'arrival' && (
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={skipStep}
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground transition-opacity duration-150 ease-studio hover:text-foreground"
+            >
+              Skip for now
+            </button>
+          </div>
+        )}
 
       </div>
     </div>

@@ -11,7 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
-import { computeGrowthScore } from '@/lib/desk/growth-score'
+import { gatherGrowthIngredients, scoreFromIngredients, computeGrowthSignals } from '@/lib/desk/growth-score'
 
 export const runtime = 'nodejs'
 
@@ -29,10 +29,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No organisation' }, { status: 403 })
   }
 
-  const { score, bands } = await computeGrowthScore(client as any, organizationId)
+  const ingredients = await gatherGrowthIngredients(client as any, organizationId)
+  const { score, bands } = scoreFromIngredients(ingredients)
+  // Additive: per-band setup signals, so the never-empty desk and future
+  // room checklists can read what's still undone without a second query.
+  const signals = computeGrowthSignals(ingredients)
 
   return NextResponse.json(
-    { score, bands },
+    { score, bands, signals },
     { headers: { 'Cache-Control': 'private, max-age=120' } },
   )
 }

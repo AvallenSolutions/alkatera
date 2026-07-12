@@ -118,6 +118,59 @@ export function scoreFromIngredients(i: GrowthIngredients): GrowthScore {
   return { score: Math.min(100, Math.max(0, Math.round(total))), bands };
 }
 
+/**
+ * A single setup action behind a growth-band signal: what it is, whether
+ * it's done, and where to do it. Never-empty desk (Phase 1) reads these to
+ * fill Rosa's priorities for a new org that has no real priorities yet.
+ */
+export interface GrowthSignal {
+  id: string;
+  label: string;
+  href: string;
+  done: boolean;
+}
+
+function signal(done: boolean, id: string, label: string, href: string): GrowthSignal {
+  return { id, label, href, done };
+}
+
+/**
+ * Per-band setup signals, derived from the same ingredients the score uses
+ * so the checklists, the desk priorities and the forest can never disagree.
+ * Additive alongside scoreFromIngredients — same inputs, a different view.
+ */
+export function computeGrowthSignals(i: GrowthIngredients): Record<GrowthBandKey, GrowthSignal[]> {
+  return {
+    foundations: [
+      signal(i.facilities > 0, 'facility', 'Add your first facility.', '/company/facilities/'),
+      signal(i.members >= 3, 'team', 'Invite your team.', '/settings?tab=team'),
+      signal(i.integrations > 0, 'integration', 'Connect an integration.', '/settings/integrations'),
+    ],
+    production: [
+      signal(i.products > 0, 'product', 'Add your first product.', '/products/'),
+      signal((i.lcaCompletenessPct ?? 0) > 0 || i.lcasCompleted > 0, 'lca', 'Complete a product LCA.', '/reports/lcas/'),
+    ],
+    measurement: [
+      signal(i.activityEntries12m > 0, 'activity', 'Log your energy or fuel use.', '/data/scope-1-2/'),
+    ],
+    network: [
+      signal(i.suppliers > 0, 'supplier', 'Add a supplier.', '/suppliers/'),
+      signal(i.esgSubmitted > 0, 'esg', 'Request supplier ESG data.', '/suppliers/'),
+      signal(i.responsibilityAttested > 0, 'attestation', 'Confirm responsible sourcing.', '/supplier-responsibility/'),
+    ],
+    evidence: [
+      signal(i.certificationsActive > 0, 'certification', 'Start a certification.', '/certifications/'),
+      signal(i.targetsActive > 0, 'target', 'Set a reduction target.', '/pulse/targets/'),
+      signal(i.reportsGenerated > 0, 'report', 'Generate a sustainability report.', '/reports/sustainability/'),
+    ],
+    stewardship: [
+      signal(i.peopleScore !== null, 'people', 'Run your people and culture score.', '/people-culture/'),
+      signal(i.governanceScore !== null, 'governance', 'Run your governance score.', '/governance/'),
+      signal(i.communityScore !== null, 'community', 'Run your community impact score.', '/community-impact/'),
+    ],
+  };
+}
+
 /** ISO date a year ago, for the trailing activity window. */
 function yearAgoISO(): string {
   const d = new Date();
@@ -130,10 +183,10 @@ function yearAgoISO(): string {
  * org-scoped, one round trip. Any failed query degrades to zero rather than
  * failing the score; the forest simply grows a little later.
  */
-export async function computeGrowthScore(
+export async function gatherGrowthIngredients(
   db: any,
   organizationId: string,
-): Promise<GrowthScore> {
+): Promise<GrowthIngredients> {
   const count = async (
     table: string,
     refine?: (q: any) => any,
@@ -218,7 +271,7 @@ export async function computeGrowthScore(
     latestScore('community_impact_scores'),
   ]);
 
-  return scoreFromIngredients({
+  return {
     facilities,
     members,
     integrations,
@@ -235,5 +288,14 @@ export async function computeGrowthScore(
     peopleScore,
     governanceScore,
     communityScore,
-  });
+  };
+}
+
+/** Convenience wrapper: gather ingredients, then score them. */
+export async function computeGrowthScore(
+  db: any,
+  organizationId: string,
+): Promise<GrowthScore> {
+  const ingredients = await gatherGrowthIngredients(db, organizationId);
+  return scoreFromIngredients(ingredients);
 }

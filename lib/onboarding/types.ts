@@ -9,7 +9,7 @@
  * Fast track flow: 5-step "see your footprint in 10 min" path
  */
 
-export type OnboardingFlow = 'owner' | 'member' | 'fast_track' | 'advisor'
+export type OnboardingFlow = 'owner' | 'member' | 'fast_track' | 'advisor' | 'arrival'
 
 export type OnboardingPhase =
   | 'welcome'           // Phase 1: Welcome & Orientation
@@ -57,6 +57,13 @@ export type OnboardingStep =
   | 'fast-track-estimate'
   | 'fast-track-target'
   | 'fast-track-completion'
+  // Arrival flow steps — the 5-screen studio-language ritual for fresh
+  // owners (see tasks/onboarding-support-plan.md, Phase 1)
+  | 'arrival-welcome'
+  | 'arrival-persona'
+  | 'arrival-company'
+  | 'arrival-reveal'
+  | 'arrival-estimate'
 
 export interface OnboardingStepConfig {
   id: OnboardingStep
@@ -131,6 +138,24 @@ export const TOTAL_FAST_TRACK_STEPS = FAST_TRACK_STEPS.length
 /** Phases shown in the fast track top bar */
 export const FAST_TRACK_PHASES: OnboardingPhase[] = ['welcome', 'quick-wins', 'first-insights', 'power-features']
 
+/**
+ * Arrival onboarding: the 5-screen studio-language ritual for fresh owners
+ * (see tasks/onboarding-support-plan.md, Phase 1). Reuses the fast-track
+ * company/reveal/estimate step internals rather than rewriting them — only
+ * the wrapper components and chrome are new. All five steps share a single
+ * phase; the wizard renders a quiet mono step counter for this flow instead
+ * of a phase bar.
+ */
+export const ARRIVAL_STEPS: OnboardingStepConfig[] = [
+  { id: 'arrival-welcome',  phase: 'welcome', title: 'Welcome',       description: 'Welcome to alkatera',          skippable: false, index: 0 },
+  { id: 'arrival-persona',  phase: 'welcome', title: 'You',           description: 'What you do here',             skippable: true,  index: 1 },
+  { id: 'arrival-company',  phase: 'welcome', title: 'Your Company',  description: 'Tell us about your business',  skippable: true,  index: 2 },
+  { id: 'arrival-reveal',   phase: 'welcome', title: 'Here You Are',  description: 'What we found on your website', skippable: true, index: 3 },
+  { id: 'arrival-estimate', phase: 'welcome', title: 'Your Forest',   description: 'Your instant estimate',        skippable: false, index: 4 },
+]
+
+export const TOTAL_ARRIVAL_STEPS = ARRIVAL_STEPS.length
+
 export const PHASE_CONFIG: Record<OnboardingPhase, { label: string; duration: string; color: string }> = {
   'welcome': { label: 'Welcome & Orientation', duration: '~3 min', color: 'lime' },
   'quick-wins': { label: 'Quick Wins', duration: '~5 min', color: 'cyan' },
@@ -181,6 +206,14 @@ export type PrimaryGoal =
 
 export type AnnualProductionBucket = '<10k' | '10k-100k' | '100k-1M' | '1M+'
 
+/**
+ * The arrival flow's persona choice ("What do you do here?"). Matches
+ * lib/rosa/useUserRole.ts's RosaPersona values (minus 'unknown', which is
+ * never a user choice) so it writes straight into the rosa_memory 'persona'
+ * key that hook already reads.
+ */
+export type PersonaChoice = 'operator' | 'finance' | 'leadership' | 'sustainability'
+
 export interface PersonalizationData {
   role?: UserRole
   roleOther?: string
@@ -188,6 +221,8 @@ export interface PersonalizationData {
   beverageTypeOther?: string
   companySize?: CompanySize
   primaryGoals?: PrimaryGoal[]
+  /** "What do you do here?" — set on the arrival flow's persona step. */
+  persona?: PersonaChoice
   // Fast Track fields — all stored in personalization for estimate calculation
   /** Annual production volume bucket (used for footprint estimate) */
   annualProductionBucket?: AnnualProductionBucket
@@ -293,6 +328,21 @@ export const INITIAL_FAST_TRACK_STATE: OnboardingState = {
   factorInfoHintCompleted: false,
 }
 
+export const INITIAL_ARRIVAL_STATE: OnboardingState = {
+  completed: false,
+  dismissed: false,
+  currentStep: 'arrival-welcome',
+  completedSteps: [],
+  personalization: {},
+  dashboardGuideCompleted: false,
+  searchGuideCompleted: false,
+  productGuideCompleted: false,
+  emissionsGuideCompleted: false,
+  emissionsGuideDismissed: false,
+  recipeSidebarTourCompleted: false,
+  factorInfoHintCompleted: false,
+}
+
 export const INITIAL_ADVISOR_ONBOARDING_STATE: OnboardingState = {
   completed: false,
   dismissed: false,
@@ -317,6 +367,7 @@ export function getStepsForFlow(flow: OnboardingFlow): OnboardingStepConfig[] {
   if (flow === 'member') return MEMBER_ONBOARDING_STEPS
   if (flow === 'fast_track') return FAST_TRACK_STEPS
   if (flow === 'advisor') return ADVISOR_ONBOARDING_STEPS
+  if (flow === 'arrival') return ARRIVAL_STEPS
   return ONBOARDING_STEPS
 }
 
@@ -325,6 +376,7 @@ export function getInitialStateForFlow(flow: OnboardingFlow): OnboardingState {
   if (flow === 'member') return { ...INITIAL_MEMBER_ONBOARDING_STATE }
   if (flow === 'fast_track') return { ...INITIAL_FAST_TRACK_STATE }
   if (flow === 'advisor') return { ...INITIAL_ADVISOR_ONBOARDING_STATE }
+  if (flow === 'arrival') return { ...INITIAL_ARRIVAL_STATE }
   return { ...INITIAL_ONBOARDING_STATE }
 }
 
@@ -338,6 +390,8 @@ export function getStepConfig(step: OnboardingStep): OnboardingStepConfig {
   if (fastTrackStep) return fastTrackStep
   const advisorStep = ADVISOR_ONBOARDING_STEPS.find(s => s.id === step)
   if (advisorStep) return advisorStep
+  const arrivalStep = ARRIVAL_STEPS.find(s => s.id === step)
+  if (arrivalStep) return arrivalStep
   // Fallback — should never happen
   return ONBOARDING_STEPS[0]
 }
