@@ -21,6 +21,7 @@ import { Eyebrow } from '@/components/studio/eyebrow'
 import { PosterBlock } from '@/components/studio/poster-block'
 import { FactList, type FactRowItem } from '@/components/studio/fact-list'
 import { GrowthFieldMount } from '@/components/studio/growth/growth-field-mount'
+import { RoomSetupPanel } from '@/components/studio/room-setup-panel'
 
 interface WorkbenchCounts {
   facilities: number
@@ -198,6 +199,8 @@ export default function WorkbenchLandingPage() {
       {/* pb-48: the forest's stage; open paper at the page foot. */}
       <div className="relative z-[1] mx-auto max-w-4xl space-y-10 pb-48">
       <Statement eyebrow="THE WORKBENCH" headline="The data going in." />
+
+      <RoomSetupPanel room="workbench" />
 
       <FootprintPoster />
 

@@ -9,6 +9,8 @@
  * Fast track flow: 5-step "see your footprint in 10 min" path
  */
 
+import type { PlatformRoomKey } from '@/components/studio/platform-rooms'
+
 export type OnboardingFlow = 'owner' | 'member' | 'fast_track' | 'advisor' | 'arrival'
 
 export type OnboardingPhase =
@@ -281,6 +283,23 @@ export interface OnboardingState {
   recipeSidebarTourCompleted?: boolean
   /** Whether the factor-info hover hint coachmark has been seen/dismissed */
   factorInfoHintCompleted?: boolean
+  /**
+   * Phase 2 — room-segmented onboarding (components/studio/room-setup-panel.tsx).
+   * Per-room intro/checklist state, keyed by the room the user is standing
+   * in. Additive and optional so existing saved states keep loading.
+   */
+  rooms?: Partial<Record<PlatformRoomKey, RoomOnboardingState>>
+  /**
+   * Phase 2 — coachmark dismissals (components/studio/coachmark.tsx), keyed
+   * by the coachmark's own id. Additive and optional.
+   */
+  coachmarks?: Record<string, boolean>
+}
+
+/** Per-room onboarding state: has the first-visit intro been shown, has the checklist been hidden. */
+export interface RoomOnboardingState {
+  introSeen?: boolean
+  checklistDismissed?: boolean
 }
 
 export const INITIAL_ONBOARDING_STATE: OnboardingState = {

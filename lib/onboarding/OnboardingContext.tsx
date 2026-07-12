@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useOrganization } from '@/lib/organizationContext'
+import type { PlatformRoomKey } from '@/components/studio/platform-rooms'
 import {
   OnboardingFlow,
   OnboardingState,
@@ -71,6 +72,12 @@ interface OnboardingContextType {
   markRecipeSidebarTourCompleted: () => void
   /** Mark the factor-info hover hint coachmark as seen/dismissed */
   markFactorInfoHintCompleted: () => void
+  /** Mark a room's first-visit intro as seen (RoomSetupPanel) */
+  markRoomIntroSeen: (room: PlatformRoomKey) => void
+  /** Hide a room's setup checklist (RoomSetupPanel) */
+  dismissRoomChecklist: (room: PlatformRoomKey) => void
+  /** Dismiss a coachmark by id (components/studio/coachmark.tsx) */
+  dismissCoachmark: (id: string) => void
   /** Switch to a different onboarding flow and reinitialise steps */
   setFlow: (flow: OnboardingFlow) => void
   /** Reset onboarding (for testing) */
@@ -399,6 +406,27 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     }))
   }, [updateState])
 
+  const markRoomIntroSeen = useCallback((room: PlatformRoomKey) => {
+    updateState(prev => ({
+      ...prev,
+      rooms: { ...prev.rooms, [room]: { ...prev.rooms?.[room], introSeen: true } },
+    }))
+  }, [updateState])
+
+  const dismissRoomChecklist = useCallback((room: PlatformRoomKey) => {
+    updateState(prev => ({
+      ...prev,
+      rooms: { ...prev.rooms, [room]: { ...prev.rooms?.[room], checklistDismissed: true } },
+    }))
+  }, [updateState])
+
+  const dismissCoachmark = useCallback((id: string) => {
+    updateState(prev => ({
+      ...prev,
+      coachmarks: { ...prev.coachmarks, [id]: true },
+    }))
+  }, [updateState])
+
   const resetSearchGuide = useCallback(() => {
     updateState(prev => ({
       ...prev,
@@ -495,6 +523,9 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         reopenEmissionsGuide,
         markRecipeSidebarTourCompleted,
         markFactorInfoHintCompleted,
+        markRoomIntroSeen,
+        dismissRoomChecklist,
+        dismissCoachmark,
         setFlow,
         resetOnboarding,
       }}

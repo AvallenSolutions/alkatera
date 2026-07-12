@@ -15,6 +15,7 @@ import { Statement } from '@/components/studio/statement'
 import { PosterBlock } from '@/components/studio/poster-block'
 import { FactList, type FactRowItem } from '@/components/studio/fact-list'
 import { GrowthFieldMount } from '@/components/studio/growth/growth-field-mount'
+import { RoomSetupPanel } from '@/components/studio/room-setup-panel'
 
 interface LibraryCounts {
   resources: number
@@ -109,6 +110,8 @@ export default function LibraryLandingPage() {
       {/* pb-48: the forest's stage; open paper at the page foot. */}
       <div className="relative z-[1] mx-auto max-w-4xl space-y-10 pb-48">
       <Statement eyebrow="THE LIBRARY" headline="What you know." />
+
+      <RoomSetupPanel room="library" />
 
       <ShelfPoster counts={counts} />
 
