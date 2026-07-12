@@ -2,10 +2,12 @@
  * The forest as a downloadable artefact.
  *
  * GET /api/growth/forest.svg — the org's living signature: the same
- * seeded population the growth field draws, rendered standalone at the
- * org's current score, dressed for today's season. Linked from the
- * "Your forest" panel; ready for report covers later. Same auth as
- * /api/growth.
+ * seeded population the growth field draws, stamped with the brand, who
+ * tended it, and the date. The "Your forest" panel passes the exact
+ * view state (score, season, Rosa's session spot) so the download IS
+ * what the user was looking at; each parameter is validated and falls
+ * back to the server's own truth (computed score, the org's real
+ * season) when absent. Same auth as /api/growth.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -13,9 +15,18 @@ import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
 import { computeGrowthScore } from '@/lib/desk/growth-score'
 import { buildForestSvg } from '@/components/studio/growth/render-svg'
-import { hemisphereForCountry, seasonForDate } from '@/components/studio/growth/season'
+import { FIELD_W } from '@/components/studio/growth/layout'
+import {
+  hemisphereForCountry,
+  seasonForDate,
+  type Season,
+} from '@/components/studio/growth/season'
 
 export const runtime = 'nodejs'
+
+const SEASONS: readonly Season[] = ['spring', 'summer', 'autumn', 'winter']
+
+const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 
 export async function GET(request: NextRequest) {
   const { client, user, error: authError } = await getSupabaseAPIClient()
@@ -31,16 +42,51 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No organisation' }, { status: 403 })
   }
 
-  const [{ score }, org] = await Promise.all([
-    computeGrowthScore(client as any, organizationId),
+  const sp = url.searchParams
+
+  // The view state, validated; the server's own truth when absent.
+  const forcedScore = Number(sp.get('score'))
+  const forcedSeason = sp.get('season') as Season | null
+  const rosaX = Number(sp.get('rosaX'))
+
+  const needsComputedScore = !Number.isFinite(forcedScore)
+  const [computed, org] = await Promise.all([
+    needsComputedScore ? computeGrowthScore(client as any, organizationId) : null,
     (client as any)
       .from('organizations')
-      .select('country')
+      .select('name, country')
       .eq('id', organizationId)
       .maybeSingle(),
   ])
-  const season = seasonForDate(new Date(), hemisphereForCountry(org?.data?.country))
-  const svg = buildForestSvg({ seed: organizationId, score, season })
+
+  const score = needsComputedScore
+    ? (computed?.score ?? 0)
+    : Math.round(clamp(forcedScore, 0, 100))
+  const season =
+    forcedSeason && SEASONS.includes(forcedSeason)
+      ? forcedSeason
+      : seasonForDate(new Date(), hemisphereForCountry(org?.data?.country))
+  const rosa = Number.isFinite(rosaX)
+    ? { x: Math.round(clamp(rosaX, 0, FIELD_W)), flip: sp.get('rosaFlip') === '1' }
+    : undefined
+
+  // The maker's stamp: brand, who tended it, and the day.
+  const brand = (org?.data?.name as string | undefined)?.trim() || 'Our forest'
+  const tendedBy =
+    (user.user_metadata?.full_name as string | undefined)?.trim() || user.email || null
+  const date = new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date())
+
+  const svg = buildForestSvg({
+    seed: organizationId,
+    score,
+    season,
+    rosa,
+    caption: { brand, user: tendedBy, date },
+  })
 
   return new NextResponse(svg, {
     headers: {

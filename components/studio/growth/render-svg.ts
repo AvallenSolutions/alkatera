@@ -60,15 +60,39 @@ export interface ForestSvgOptions {
   seed: string;
   score: number;
   season?: Season;
+  /** Rosa's spot as the user sees her (the session position). */
+  rosa?: { x: number; flip: boolean };
+  /** The maker's stamp: brand, who tended it, and when. */
+  caption?: { brand: string; user?: string | null; date: string };
 }
 
-export function buildForestSvg({ seed, score, season }: ForestSvgOptions): string {
+const SANS = `ui-sans-serif, system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif`;
+const MONO = `ui-monospace, SFMono-Regular, Menlo, monospace`;
+
+export function buildForestSvg({ seed, score, season, rosa, caption }: ForestSvgOptions): string {
   const liveSeason = season ?? seasonForDate(new Date());
   const population = makePopulation(seed);
   const parts: string[] = [];
 
   // The paper ground: the artefact stands alone.
   parts.push(`<rect width="${FIELD_W}" height="${FIELD_H}" fill="${STUDIO.paper}"/>`);
+
+  // The maker's stamp, top-left in the sky: the brand in display ink,
+  // the provenance line beneath in quiet mono.
+  if (caption) {
+    parts.push(
+      `<text x="64" y="104" font-family="${esc(SANS)}" font-size="46" font-weight="600" fill="${STUDIO.ink}">${esc(caption.brand)}</text>`,
+    );
+    const provenance = `GROWN FROM OUR DATA · ${score} OF 100 · ${caption.date.toUpperCase()}`;
+    parts.push(
+      `<text x="64" y="140" font-family="${esc(MONO)}" font-size="16" letter-spacing="3" fill="${STUDIO.dim}">${esc(provenance)}</text>`,
+    );
+    if (caption.user) {
+      parts.push(
+        `<text x="64" y="168" font-family="${esc(MONO)}" font-size="16" letter-spacing="3" fill="${STUDIO.dim}">${esc(`TENDED BY ${caption.user.toUpperCase()}`)}</text>`,
+      );
+    }
+  }
 
   // The distant canopy.
   const bandGrowth = smoothstep(70, 98, score);
@@ -112,9 +136,17 @@ export function buildForestSvg({ seed, score, season }: ForestSvgOptions): strin
     ) {
       continue;
     }
-    // The bird's home position is offstage; place it mid-sky for the still.
-    const x = creature.kind === 'bird' ? Math.round(FIELD_W * 0.62) : creature.x;
-    const sx = ((creature.flip ? -1 : 1) * creature.scale).toFixed(4);
+    // The bird's home position is offstage; place it mid-sky for the
+    // still. Rosa stands where the user last saw her.
+    const isRosa = creature.kind === 'rosa';
+    const x =
+      creature.kind === 'bird'
+        ? Math.round(FIELD_W * 0.62)
+        : isRosa && rosa
+          ? rosa.x
+          : creature.x;
+    const flip = isRosa && rosa ? rosa.flip : creature.flip;
+    const sx = ((flip ? -1 : 1) * creature.scale).toFixed(4);
     const body = [...creature.prims, ...(creature.tail ?? [])].map(primToString).join('');
     parts.push(
       `<g transform="translate(${x},${creature.y}) scale(${sx},${creature.scale.toFixed(4)})" opacity="${g.toFixed(3)}">${body}</g>`,

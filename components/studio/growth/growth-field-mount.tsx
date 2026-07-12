@@ -21,9 +21,9 @@
 import { useEffect, useState } from 'react';
 import { useOrganization } from '@/lib/organizationContext';
 import type { GrowthBandKey } from '@/lib/desk/growth-score';
-import { GrowthField } from './growth-field';
+import { GrowthField, rosaSpotForSession } from './growth-field';
 import { ForestKey } from './forest-key';
-import { hemisphereForCountry, type Season } from './season';
+import { hemisphereForCountry, seasonForDate, type Season } from './season';
 
 interface GrowthPayload {
   score: number;
@@ -114,17 +114,29 @@ export function GrowthFieldMount({ className }: { className?: string }) {
   }, [orgId, payload]);
 
   if (payload === null || !orgId || !replayReady) return null;
+
+  // One view state, shared by the field and the key: what the user sees
+  // is exactly what "Download your forest" hands back.
+  const effectiveSeason =
+    season ?? seasonForDate(new Date(), hemisphereForCountry(currentOrganization?.country));
+  const rosaSpot = rosaSpotForSession(orgId);
+
   return (
     <>
       <GrowthField
         score={payload.score}
         seed={orgId}
         replayFrom={replayFrom}
-        season={season}
-        hemisphere={hemisphereForCountry(currentOrganization?.country)}
+        season={effectiveSeason}
         className={className}
       />
-      <ForestKey score={payload.score} bands={payload.bands} organizationId={orgId} />
+      <ForestKey
+        score={payload.score}
+        bands={payload.bands}
+        organizationId={orgId}
+        season={effectiveSeason}
+        rosaSpot={rosaSpot}
+      />
     </>
   );
 }

@@ -231,7 +231,7 @@ function Resident({
  * the org (the forest is deterministic; the dog is alive). Session-
  * scoped so she only moves when you come back, never mid-visit.
  */
-function rosaSpotForSession(seed: string): { x: number; flip: boolean } | null {
+export function rosaSpotForSession(seed: string): { x: number; flip: boolean } | null {
   if (typeof window === 'undefined') return null;
   try {
     const key = `alkatera:rosa:${seed}`;

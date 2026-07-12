@@ -14,11 +14,16 @@ import { useEffect, useState } from 'react';
 import { GROWTH_WEIGHTS, type GrowthBandKey } from '@/lib/desk/growth-score';
 import { Eyebrow } from '@/components/studio/eyebrow';
 import { FactList, type FactRowItem } from '@/components/studio/fact-list';
+import type { Season } from './season';
 
 interface ForestKeyProps {
   score: number;
   bands: Record<GrowthBandKey, number> | null;
   organizationId: string;
+  /** The season on screen: the download wears the same one. */
+  season: Season;
+  /** Rosa's spot on screen: she stands in the same place in the download. */
+  rosaSpot: { x: number; flip: boolean } | null;
 }
 
 /** Each band in plain words: what it is, and where to grow it. */
@@ -63,8 +68,22 @@ function forestRead(score: number): string {
   return 'A full forest. Look after it.';
 }
 
-export function ForestKey({ score, bands, organizationId }: ForestKeyProps) {
+export function ForestKey({ score, bands, organizationId, season, rosaSpot }: ForestKeyProps) {
   const [open, setOpen] = useState(false);
+
+  // The download carries the exact view state, so what arrives is what
+  // was on screen: this score, this season, Rosa in this spot.
+  const downloadParams = new URLSearchParams({
+    organization_id: organizationId,
+    score: String(score),
+    season,
+  });
+  if (rosaSpot) {
+    downloadParams.set('rosaX', String(rosaSpot.x));
+    downloadParams.set('rosaFlip', rosaSpot.flip ? '1' : '0');
+  }
+  const downloadHref = `/api/growth/forest.svg?${downloadParams.toString()}`;
+  const downloadName = `our-forest-${new Date().toISOString().slice(0, 10)}.svg`;
 
   useEffect(() => {
     if (!open) return;
@@ -116,8 +135,8 @@ export function ForestKey({ score, bands, organizationId }: ForestKeyProps) {
 
             <div className="mt-4 border-t border-studio-hairline pt-3">
               <a
-                href={`/api/growth/forest.svg?organization_id=${organizationId}`}
-                download="our-forest.svg"
+                href={downloadHref}
+                download={downloadName}
                 className="font-mono text-[11px] uppercase tracking-[0.18em] text-studio-dim underline-offset-4 hover:text-studio-ink hover:underline"
               >
                 Download your forest
