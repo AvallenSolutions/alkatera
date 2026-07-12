@@ -2,8 +2,8 @@
 
 import { useEffect, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Button } from "@/components/ui/button";
-import { Sparkles, X } from "lucide-react";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { PillButton } from "@/components/studio/pill-button";
 import { useOnboarding } from "@/lib/onboarding/OnboardingContext";
 
 export type TourStep = "basics" | "source" | "logistics" | "save" | "done";
@@ -49,10 +49,12 @@ const STEP_CONTENT: Record<
     body:
       "Hit Save Ingredients. We will calculate the per-bottle CO₂e and feed it into your LCA report. The dots on each tab show what's done and what's still missing.",
     anchor: "save",
-    ctaPrimary: "Got it",
+    ctaPrimary: "Got it.",
     ctaNext: "done",
   },
 };
+
+const STEP_ORDER: Exclude<TourStep, "done">[] = ["basics", "source", "logistics", "save"];
 
 interface AnchorRect {
   top: number;
@@ -129,6 +131,8 @@ export function RecipeSidebarTour({ active, step, onStepChange }: RecipeSidebarT
   );
   const top = anchorRect.top + anchorRect.height + GAP + window.scrollY;
 
+  const stepNumber = STEP_ORDER.indexOf(step as Exclude<TourStep, "done">) + 1;
+
   return createPortal(
     <>
       {/* Subtle full-screen scrim so the popover stands out without blocking clicks. */}
@@ -139,7 +143,7 @@ export function RecipeSidebarTour({ active, step, onStepChange }: RecipeSidebarT
 
       {/* Highlight ring on the anchor */}
       <div
-        className="fixed z-40 pointer-events-none rounded-md ring-2 ring-primary ring-offset-2 ring-offset-background animate-pulse"
+        className="fixed z-40 pointer-events-none rounded-[6px] ring-2 ring-studio-ink/40 ring-offset-2 ring-offset-background animate-pulse"
         style={{
           top: anchorRect.top - 4 + window.scrollY,
           left: anchorRect.left - 4,
@@ -153,35 +157,25 @@ export function RecipeSidebarTour({ active, step, onStepChange }: RecipeSidebarT
       <div
         role="dialog"
         aria-label={content.title}
-        className="fixed z-50 rounded-md border bg-popover text-popover-foreground shadow-lg p-4"
+        className="fixed z-50 rounded-[6px] border border-studio-hairline bg-studio-cream p-4"
         style={{ top, left, width: POPOVER_WIDTH }}
       >
-        <div className="flex items-start gap-2 mb-2">
-          <Sparkles className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
-          <div className="flex-1">
-            <h3 className="text-sm font-semibold">{content.title}</h3>
-          </div>
-          <button
-            type="button"
-            onClick={handleSkip}
-            aria-label="Close tour"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <p className="text-xs text-muted-foreground leading-relaxed mb-3">{content.body}</p>
+        <Eyebrow tone="dim" className="mb-2">
+          Step {stepNumber} of {STEP_ORDER.length}
+        </Eyebrow>
+        <h3 className="font-display text-sm font-semibold text-foreground mb-2">{content.title}</h3>
+        <p className="text-xs text-studio-dim leading-relaxed mb-3">{content.body}</p>
         <div className="flex items-center justify-between">
           <button
             type="button"
             onClick={handleSkip}
-            className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim hover:text-foreground"
           >
             Skip tour
           </button>
-          <Button size="sm" onClick={handleNext}>
+          <PillButton size="sm" onClick={handleNext}>
             {content.ctaPrimary}
-          </Button>
+          </PillButton>
         </div>
       </div>
     </>,

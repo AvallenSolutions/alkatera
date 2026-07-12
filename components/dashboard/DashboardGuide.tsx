@@ -3,8 +3,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Dog, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
+import { Dog, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Eyebrow } from '@/components/studio/eyebrow'
+import { PillButton } from '@/components/studio/pill-button'
 import { useOnboarding } from '@/lib/onboarding'
 import { GUIDE_STEPS, getVisibleSteps, type GuideStep } from '@/lib/dashboard-guide'
 
@@ -103,22 +105,22 @@ function RosaCard({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 12, scale: 0.97 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="bg-card border border-border rounded-[6px] p-5 max-w-sm shadow-lg relative"
+      className="border border-studio-hairline bg-studio-cream rounded-[6px] p-5 max-w-sm relative"
     >
       {/* Header */}
       <div className="flex items-center gap-3 mb-3">
-        <div className="w-10 h-10 rounded-[6px] bg-secondary border border-border flex items-center justify-center flex-shrink-0">
+        <div className="w-10 h-10 rounded-[6px] border border-studio-hairline bg-studio-ink/5 flex items-center justify-center flex-shrink-0">
           <Dog className="w-5 h-5 text-foreground" />
         </div>
         <div>
-          <p className="text-foreground font-medium text-sm">Rosa</p>
-          <p className="text-muted-foreground text-xs">Your sustainability guide</p>
+          <Eyebrow tone="dim">Rosa</Eyebrow>
+          <p className="text-studio-dim text-xs">Your sustainability guide</p>
         </div>
       </div>
 
       {/* Message with typewriter effect */}
       <div
-        className="text-foreground/80 text-sm leading-relaxed mb-4 min-h-[60px] cursor-pointer"
+        className="text-foreground text-sm leading-relaxed mb-4 min-h-[60px] cursor-pointer"
         onClick={!isComplete ? skipToEnd : undefined}
       >
         {displayed}
@@ -132,23 +134,18 @@ function RosaCard({
         <div className="flex flex-col gap-2 mb-4">
           {step.actions.map((action) =>
             action.variant === 'primary' ? (
-              <Button
-                key={action.label}
-                onClick={() => onAction(action.href)}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full w-full"
-              >
-                <Sparkles className="w-4 h-4 mr-2" />
+              <PillButton key={action.label} onClick={() => onAction(action.href)} className="w-full">
                 {action.label}
-              </Button>
+              </PillButton>
             ) : (
-              <Button
+              <PillButton
                 key={action.label}
                 variant="ghost"
                 onClick={() => onAction('')}
-                className="text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full w-full"
+                className="w-full"
               >
                 {action.label}
-              </Button>
+              </PillButton>
             )
           )}
         </div>
@@ -165,19 +162,15 @@ function RosaCard({
                 variant="ghost"
                 size="sm"
                 onClick={onBack}
-                className="text-muted-foreground hover:text-foreground hover:bg-secondary h-8 px-2"
+                className="text-studio-dim hover:text-foreground hover:bg-studio-ink/5 h-8 px-2"
               >
                 <ChevronLeft className="w-4 h-4" />
               </Button>
             )}
-            <Button
-              size="sm"
-              onClick={onNext}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full h-8 px-3"
-            >
+            <PillButton size="sm" onClick={onNext}>
               Next
               <ChevronRight className="w-4 h-4 ml-1" />
-            </Button>
+            </PillButton>
           </div>
         )}
       </div>
@@ -186,7 +179,7 @@ function RosaCard({
       {!isLastStep && (
         <button
           onClick={onSkip}
-          className="w-full text-center text-xs text-muted-foreground hover:text-foreground mt-3 transition-colors"
+          className="w-full text-center font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim hover:text-foreground mt-3 transition-colors"
         >
           Skip tour
         </button>

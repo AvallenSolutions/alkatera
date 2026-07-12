@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react';
-import Link from 'next/link';
 import { LucideIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Panel } from '@/components/studio/panel';
+import { PillButton } from '@/components/studio/pill-button';
 import { cn } from '@/lib/utils';
 
 interface EmptyStateProps {
@@ -18,6 +17,7 @@ interface EmptyStateProps {
   compact?: boolean;
 }
 
+/** Cream panel, hairline border: the studio's generic "nothing here yet" shell. */
 export function EmptyState({
   icon: Icon,
   title,
@@ -29,28 +29,22 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <div className={cn('flex items-center justify-center', compact ? '' : 'min-h-[60vh]')}>
-      <Card className={cn('w-full', compact ? 'border-dashed' : 'max-w-md')}>
-        <CardContent className="pt-6">
-          <div className="flex flex-col items-center text-center space-y-4">
-            {Icon && (
-              <div className="rounded-full bg-muted p-3">
-                <Icon className="h-6 w-6 text-muted-foreground" />
-              </div>
-            )}
-            <div className="space-y-2">
-              <h3 className="font-semibold text-lg">{title}</h3>
-              <p className="text-sm text-muted-foreground">{description}</p>
+      <Panel className={cn('w-full', compact ? 'max-w-none' : 'max-w-md')}>
+        <div className="flex flex-col items-center text-center space-y-4">
+          {Icon && (
+            <div className="flex h-11 w-11 items-center justify-center rounded-full border border-studio-hairline bg-studio-ink/5">
+              <Icon className="h-5 w-5 text-studio-dim" />
             </div>
-            {action
-              ? action
-              : actionLabel && actionHref && (
-                  <Button asChild>
-                    <Link href={actionHref}>{actionLabel}</Link>
-                  </Button>
-                )}
+          )}
+          <div className="space-y-2">
+            <h3 className="font-display text-lg font-semibold text-foreground">{title}</h3>
+            <p className="text-sm text-studio-dim">{description}</p>
           </div>
-        </CardContent>
-      </Card>
+          {action
+            ? action
+            : actionLabel && actionHref && <PillButton href={actionHref}>{actionLabel}</PillButton>}
+        </div>
+      </Panel>
     </div>
   );
 }

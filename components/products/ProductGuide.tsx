@@ -96,16 +96,16 @@ function RosaCard({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 12, scale: 0.97 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="bg-card border border-border rounded-[6px] p-5 max-w-sm relative"
+      className="border border-studio-hairline bg-studio-cream rounded-[6px] p-5 max-w-sm relative"
     >
       {/* Header */}
       <div className="flex items-center gap-3 mb-3">
-        <div className="w-10 h-10 rounded-[6px] bg-secondary border border-border flex items-center justify-center flex-shrink-0">
+        <div className="w-10 h-10 rounded-[6px] border border-studio-hairline bg-studio-ink/5 flex items-center justify-center flex-shrink-0">
           <Dog className="w-5 h-5 text-room-accent" />
         </div>
         <div>
           <p className="text-room-accent font-medium text-sm">Rosa</p>
-          <p className="text-muted-foreground text-xs">Your sustainability guide</p>
+          <p className="text-studio-dim text-xs">Your sustainability guide</p>
         </div>
       </div>
 
@@ -141,7 +141,7 @@ function RosaCard({
                 key={action.label}
                 variant="ghost"
                 onClick={() => onAction(action.action)}
-                className="text-muted-foreground hover:text-foreground hover:bg-secondary rounded-[6px] w-full"
+                className="text-studio-dim hover:text-foreground hover:bg-studio-ink/5 rounded-[6px] w-full"
               >
                 {action.label}
               </Button>
@@ -161,7 +161,7 @@ function RosaCard({
                 variant="ghost"
                 size="sm"
                 onClick={onBack}
-                className="text-muted-foreground hover:text-foreground hover:bg-secondary h-8 px-2"
+                className="text-studio-dim hover:text-foreground hover:bg-studio-ink/5 h-8 px-2"
               >
                 <ChevronLeft className="w-4 h-4" />
               </Button>
@@ -182,7 +182,7 @@ function RosaCard({
       {!isLastStep && (
         <button
           onClick={onSkip}
-          className="w-full text-center text-xs text-muted-foreground hover:text-foreground mt-3 transition-colors"
+          className="w-full text-center font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim hover:text-foreground mt-3 transition-colors"
         >
           Skip tour
         </button>
