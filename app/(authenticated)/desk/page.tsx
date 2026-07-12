@@ -6,6 +6,7 @@ import { BreathingGrid } from '@/components/studio/breathing-grid';
 import { PosterBlock } from '@/components/studio/poster-block';
 import { Statement } from '@/components/studio/statement';
 import { DeskPriorities } from '@/components/studio/desk-priorities';
+import { DeskWelcome } from '@/components/studio/desk-welcome';
 import {
   PLATFORM_ROOMS,
   deskOrderForPersona,
@@ -132,6 +133,7 @@ export default function DeskPage() {
     return (
       <PosterBlock
         key={key}
+        id={`desk-poster-${key}`}
         eyebrow={c.eyebrow}
         headline={c.headline}
         note={c.note}
@@ -156,6 +158,9 @@ export default function DeskPage() {
         headline={`${greeting()}${firstName ? `, ${firstName}` : ''}.`}
       />
 
+      {/* First desk visit only: a slim welcome + optional room walkthrough. */}
+      <DeskWelcome />
+
       {/* What needs you today: Rosa's top priorities, quiet on paper. */}
       <DeskPriorities />
 
@@ -169,6 +174,7 @@ export default function DeskPage() {
 
       {/* The wiring sits quietly in ink beneath the colours. */}
       <PosterBlock
+        id="desk-poster-wiring"
         eyebrow={content.wiring.eyebrow}
         headline={content.wiring.headline}
         note={content.wiring.note}

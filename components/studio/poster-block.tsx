@@ -20,6 +20,8 @@ interface PosterBlockProps {
   on?: 'cream' | 'ink';
   mark?: MarkShape;
   className?: string;
+  /** DOM id — lets the first-visit desk tour (desk-welcome.tsx) find and scroll to this block. */
+  id?: string;
 }
 
 /**
@@ -36,6 +38,7 @@ export function PosterBlock({
   on = 'cream',
   mark,
   className,
+  id,
 }: PosterBlockProps) {
   const content = (
     <>
@@ -77,13 +80,13 @@ export function PosterBlock({
 
   if (href) {
     return (
-      <Link href={href} className={classes} style={style}>
+      <Link id={id} href={href} className={classes} style={style}>
         {content}
       </Link>
     );
   }
   return (
-    <div className={classes} style={style}>
+    <div id={id} className={classes} style={style}>
       {content}
     </div>
   );

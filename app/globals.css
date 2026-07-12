@@ -298,10 +298,22 @@
   animation-iteration-count: infinite;
 }
 
+/* The desk's first-visit tour (components/studio/desk-welcome.tsx): a quiet
+   hairline ring on whichever poster block is the current stop. No dark
+   overlay — a paper-coloured gap then an ink ring, the same language as
+   the studio's focus rings elsewhere. */
+.desk-tour-highlight {
+  box-shadow: 0 0 0 3px hsl(var(--background)), 0 0 0 5px hsl(var(--ring));
+  transition: box-shadow 200ms ease;
+}
+
 /* Nothing moves for those who ask it not to. */
 @media (prefers-reduced-motion: reduce) {
   .studio-reveal {
     animation: none;
+  }
+  .desk-tour-highlight {
+    transition: none;
   }
   .growth-sway,
   .growth-amble,
