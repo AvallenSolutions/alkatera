@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { NotificationBell } from '@/components/layouts/NotificationBell';
+import { HelpPanel } from './help-panel';
 
 /**
  * The room band's quiet right-hand cluster: notifications, the
@@ -32,6 +33,7 @@ export function BandControls() {
 
   return (
     <div className="flex shrink-0 items-center gap-1">
+      <HelpPanel />
       <span className="[&_button]:text-current [&_svg]:h-4 [&_svg]:w-4">
         <NotificationBell />
       </span>

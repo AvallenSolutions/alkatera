@@ -24,3 +24,4 @@ export { StageBar } from './stage-bar';
 export type { StageSegment } from './stage-bar';
 export { PillButton } from './pill-button';
 export { BreathingGrid } from './breathing-grid';
+export { HelpPanel } from './help-panel';

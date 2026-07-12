@@ -25,6 +25,7 @@ import { proposeAction } from './actions';
 import { loadAttachment, extractStructured } from './document-extraction';
 import { buildOrgSignalPack } from './priority-signals';
 import { getBenchmarkForProductType } from '@/lib/industry-benchmarks';
+import { gatherGrowthIngredients, scoreFromIngredients, computeGrowthSignals } from '@/lib/desk/growth-score';
 
 export interface ToolContext {
   supabase: SupabaseClient;
@@ -47,6 +48,7 @@ export const ACTION_TOOL_NAMES = [
   'propose_dismiss_anomaly',
   'propose_set_progress_tracker',
   'propose_save_bcorp_answer',
+  'propose_support_ticket',
 ] as const;
 export type ActionToolName = typeof ACTION_TOOL_NAMES[number];
 
@@ -309,6 +311,12 @@ export const ROSA_TOOLS: ToolDefinition[] = [
     name: 'suggest_data_gaps',
     description:
       "Identifies the single next most-valuable data-capture step for this org (e.g. 'add a supplier', 'complete the canning facility allocation', 'close reporting period X'). Use when the user asks 'what should I do next?'.",
+    input_schema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'get_setup_next_steps',
+    description:
+      "Returns the organisation's growth score (0-100) and, for each of the six bands (foundations, production, measurement, network, evidence, stewardship), the setup items still undone with a label and href. This is the SAME data the on-screen checklists and the forest read, so your answer to 'what should I do next?', 'what's left to set up?' or 'how do I get started here?' always matches what the user sees on the page. Prefer this for onboarding/setup questions; use get_data_readiness for questions about data quality once the basics exist.",
     input_schema: { type: 'object', properties: {}, required: [] },
   },
   {
@@ -610,6 +618,26 @@ export const ROSA_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'propose_support_ticket',
+    description:
+      "Propose filing a support ticket for a human to pick up, landing in the user's support desk (Settings > Feedback). Only use this AFTER trying to resolve the question yourself with search_knowledge_bank, explain_methodology, or the page context, and the user is still stuck, or they explicitly ask for a human / to raise a ticket. This conversation is attached automatically so support starts with full context. Stages a pending action; the user clicks Confirm to actually file it.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        subject: { type: 'string', description: 'A short one-line subject for the ticket.' },
+        summary_of_issue: {
+          type: 'string',
+          description: 'Plain-English summary of what the user is stuck on or asking for.',
+        },
+        what_was_tried: {
+          type: 'string',
+          description: 'What you already looked up or explained before escalating. Optional but preferred.',
+        },
+      },
+      required: ['subject', 'summary_of_issue'],
+    },
+  },
+  {
     name: 'generate_export',
     description:
       "Generates a CSV the user can download from inside the chat. Use when they ask for a list, a CSV, a download, or to send something to a colleague. Read-only, no side effects: returns a download URL the chat renders as a clickable chip. Pick the kind that fits the user's question.",
@@ -689,6 +717,8 @@ export async function executeTool(
         return await toolCompareToBenchmark(ctx, input as { product_id: string });
       case 'suggest_data_gaps':
         return await toolSuggestDataGaps(ctx);
+      case 'get_setup_next_steps':
+        return await toolGetSetupNextSteps(ctx);
       case 'get_bcorp_readiness':
         return await toolGetBcorpReadiness(ctx);
       case 'get_bcorp_requirement':
@@ -708,6 +738,7 @@ export async function executeTool(
       case 'propose_dismiss_anomaly':
       case 'propose_set_progress_tracker':
       case 'propose_save_bcorp_answer':
+      case 'propose_support_ticket':
         return await toolProposeAction(ctx, name as ActionToolName, input as Record<string, unknown>);
       case 'extract_from_document':
         return await toolExtractFromDocument(ctx, input as { file_id: string; fields?: string[]; document_kind?: string });
@@ -1613,6 +1644,29 @@ async function toolSuggestDataGaps(ctx: ToolContext): Promise<ToolResult> {
   };
 }
 
+/**
+ * Reads the same growth-score ingredients as GET /api/growth, so Rosa's
+ * "what should I do next" answer always matches the room checklists and the
+ * forest on screen (see lib/desk/growth-score.ts and lib/onboarding/room-guides.ts).
+ */
+async function toolGetSetupNextSteps(ctx: ToolContext): Promise<ToolResult> {
+  const ingredients = await gatherGrowthIngredients(ctx.supabase, ctx.organizationId);
+  const { score, bands } = scoreFromIngredients(ingredients);
+  const signals = computeGrowthSignals(ingredients);
+
+  const undoneByBand: Record<string, Array<{ label: string; href: string }>> = {};
+  for (const band of Object.keys(signals) as Array<keyof typeof signals>) {
+    const undone = signals[band].filter((s) => !s.done).map((s) => ({ label: s.label, href: s.href }));
+    if (undone.length > 0) undoneByBand[band] = undone;
+  }
+
+  return {
+    is_error: false,
+    content: JSON.stringify({ score, bands, undone_by_band: undoneByBand }),
+    audit: { tool: 'get_setup_next_steps', score },
+  };
+}
+
 // ─── Memory tools ───────────────────────────────────────────────────────────
 
 async function toolListMemories(ctx: ToolContext): Promise<ToolResult> {
@@ -1688,6 +1742,9 @@ function buildActionPreview(toolName: ActionToolName, p: Record<string, unknown>
       const ans = String(p.answer ?? '');
       const snippet = ans.length > 140 ? `${ans.slice(0, 140)}…` : ans;
       return `Save this answer to B Corp requirement ${code} as a note (pending verification): "${snippet}"`;
+    }
+    case 'propose_support_ticket': {
+      return `File a support ticket: "${p.subject}". ${p.summary_of_issue}`;
     }
     default:
       return `Perform action: ${toolName}`;
@@ -1833,6 +1890,7 @@ function validateActionInput(toolName: ActionToolName, input: Record<string, unk
     propose_dismiss_anomaly: ['anomaly_id', 'reason'],
     propose_set_progress_tracker: ['tracker_id'],
     propose_save_bcorp_answer: ['requirement_code', 'answer'],
+    propose_support_ticket: ['subject', 'summary_of_issue'],
   };
   const missing: string[] = [];
   for (const f of required[toolName]) {

@@ -108,5 +108,6 @@ function formatResult(r: any): string {
   if (r.entry_id) return `Entry id: ${r.entry_id}`;
   if (r.target_id) return `Target id: ${r.target_id}`;
   if (r.supplier_id) return `Supplier id: ${r.supplier_id}`;
+  if (r.ticket_id) return 'A member of the team will pick this up shortly.';
   return '';
 }

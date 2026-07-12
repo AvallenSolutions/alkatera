@@ -29,6 +29,7 @@ export interface PendingAction {
   id: string;
   organization_id: string;
   user_id: string;
+  conversation_id: string | null;
   tool_name: string;
   payload: Record<string, unknown>;
   preview: string;
@@ -169,6 +170,8 @@ async function dispatchMutation(
       return await execSetProgressTracker(supabase, row.organization_id, row.user_id, p);
     case 'propose_save_bcorp_answer':
       return await execSaveBcorpAnswer(supabase, row.organization_id, p);
+    case 'propose_support_ticket':
+      return await execProposeSupportTicket(supabase, row.organization_id, row.user_id, row.conversation_id, p);
     default:
       throw new Error(`Unsupported action tool: ${row.tool_name}`);
   }
@@ -654,4 +657,44 @@ async function execDismissAnomaly(
     .eq('organization_id', organizationId);
   if (error) throw new Error(error.message);
   return { anomaly_id: anomalyId, status: 'dismissed' };
+}
+
+/**
+ * File a support ticket on Rosa's behalf, landing in the same support desk
+ * the "?" panel and Settings > Feedback use (feedback_tickets). The
+ * conversation id rides in `metadata` (the table has no dedicated column)
+ * so support opens the ticket with full context of what Rosa already tried.
+ */
+async function execProposeSupportTicket(
+  supabase: SupabaseClient,
+  organizationId: string,
+  userId: string,
+  conversationId: string | null,
+  p: any,
+): Promise<Record<string, unknown>> {
+  const subject = String(p.subject ?? '').trim();
+  const summary = String(p.summary_of_issue ?? '').trim();
+  const tried = p.what_was_tried ? String(p.what_was_tried).trim() : '';
+  if (!subject) throw new Error('subject is required.');
+  if (!summary) throw new Error('summary_of_issue is required.');
+
+  const descriptionParts = [summary];
+  if (tried) descriptionParts.push(`What Rosa already tried: ${tried}`);
+  const description = descriptionParts.join('\n\n');
+
+  const { data, error } = await supabase
+    .from('feedback_tickets')
+    .insert({
+      organization_id: organizationId,
+      created_by: userId,
+      title: subject,
+      description,
+      category: 'other',
+      priority: 'medium',
+      metadata: { source: 'rosa', conversation_id: conversationId },
+    })
+    .select('id')
+    .single();
+  if (error) throw new Error(error.message);
+  return { ticket_id: (data as any).id, table: 'feedback_tickets' };
 }

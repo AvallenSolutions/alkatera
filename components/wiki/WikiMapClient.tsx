@@ -93,6 +93,15 @@ interface Edge {
   y2: number;
 }
 
+// Shape returned by GET /api/wiki/search.
+interface SearchHit {
+  slug: string;
+  title: string;
+  type: string;
+  summary: string;
+  score: number;
+}
+
 function formatDate(isoDate: string): string {
   if (!isoDate) return '';
   const date = new Date(`${isoDate}T00:00:00Z`);
@@ -138,6 +147,12 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
   const [edges, setEdges] = useState<Edge[]>([]);
   // Slug currently open in the in-place reader popout (null = closed).
   const [article, setArticle] = useState<string | null>(null);
+  // Full-content search results from /api/wiki/search, debounced. Drives both
+  // the results list under the input and the pill-dimming on the map, so
+  // there is only one search (server-side, over title/tags/summary/body)
+  // rather than a duplicate local filter.
+  const [searchResults, setSearchResults] = useState<SearchHit[] | null>(null);
+  const [searching, setSearching] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const pillRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -250,20 +265,40 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
     return () => window.removeEventListener('resize', recomputeEdges);
   }, [recomputeEdges]);
 
+  // Debounced full-content search: title/tags/summary/body, server-side.
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setSearchResults(null);
+      setSearching(false);
+      return;
+    }
+    let cancelled = false;
+    setSearching(true);
+    const handle = setTimeout(() => {
+      fetch(`/api/wiki/search?q=${encodeURIComponent(q)}`, { credentials: 'include' })
+        .then((r) => (r.ok ? r.json() : { results: [] }))
+        .then((json) => {
+          if (cancelled) return;
+          setSearchResults(Array.isArray(json?.results) ? json.results : []);
+        })
+        .catch(() => {
+          if (!cancelled) setSearchResults([]);
+        })
+        .finally(() => {
+          if (!cancelled) setSearching(false);
+        });
+    }, 220);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [query]);
+
   const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return null;
-    return new Set(
-      nodes
-        .filter(
-          (n) =>
-            n.title.toLowerCase().includes(q) ||
-            n.summary.toLowerCase().includes(q) ||
-            n.tags.some((t) => t.toLowerCase().includes(q)),
-        )
-        .map((n) => n.slug),
-    );
-  }, [nodes, query]);
+    if (!searchResults) return null;
+    return new Set(searchResults.map((r) => r.slug));
+  }, [searchResults]);
 
   // Which pills stay at full opacity: the selection and its neighbours beat
   // search matches; with neither, everything is active.
@@ -312,6 +347,30 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
             placeholder="Search, e.g. Scope 3, CSRD..."
             className="w-full rounded-[6px] border border-border bg-card py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-studio-dim transition-colors duration-200 focus:border-room-accent focus:outline-none"
           />
+          {query.trim().length >= 2 && (
+            <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-72 overflow-y-auto rounded-[6px] border border-border bg-card shadow-lg">
+              {searchResults === null || searching ? (
+                <p className="px-4 py-3 text-xs text-studio-dim">Searching…</p>
+              ) : searchResults.length > 0 ? (
+                searchResults.map((r) => (
+                  <button
+                    key={r.slug}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openArticle(r.slug);
+                      setQuery('');
+                    }}
+                    className="block w-full border-b border-border px-4 py-2.5 text-left last:border-b-0 transition-colors hover:bg-accent"
+                  >
+                    <span className="block text-sm font-medium text-foreground">{r.title}</span>
+                    <span className="block text-xs text-studio-dim">{r.summary}</span>
+                  </button>
+                ))
+              ) : (
+                <p className="px-4 py-3 text-xs text-studio-dim">No matches.</p>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono text-xs uppercase tracking-widest text-studio-dim">Tours:</span>

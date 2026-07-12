@@ -63,6 +63,8 @@ const nextConfig = {
       '/api/cron/sync-wiki-to-rosa': ['./wiki/pages/**/*'],
       // The library landing counts published wiki pages from disk too.
       '/api/library/counts': ['./wiki/pages/**/*'],
+      // The wiki search endpoint (map search box + the "?" panel's link).
+      '/api/wiki/search': ['./wiki/pages/**/*'],
     },
     optimizePackageImports: [
       'lucide-react',
