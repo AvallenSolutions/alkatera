@@ -159,7 +159,10 @@ export async function POST(request: NextRequest) {
         </div>`;
 
       try {
-        await Promise.all([
+        // resend.emails.send resolves with { data, error } and does NOT throw on
+        // an API error (e.g. an unverified sending domain), so we must inspect the
+        // returned error explicitly or failures go silent.
+        const [guestRes, teamRes] = await Promise.all([
           resend.emails.send({
             from: FROM_EMAIL,
             to: [email],
@@ -177,8 +180,14 @@ export async function POST(request: NextRequest) {
             attachments: [icsAttachment],
           }),
         ]);
+        if (guestRes.error) {
+          console.error('Demo booking guest email failed (event still created):', guestRes.error);
+        }
+        if (teamRes.error) {
+          console.error('Demo booking team email failed (event still created):', teamRes.error);
+        }
       } catch (mailErr) {
-        console.error('Demo booking emails failed (event still created):', mailErr);
+        console.error('Demo booking emails threw (event still created):', mailErr);
       }
     }
 
