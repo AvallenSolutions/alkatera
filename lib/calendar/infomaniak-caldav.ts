@@ -23,17 +23,24 @@ import { randomUUID } from 'node:crypto';
 const MAIL_DOMAIN =
   (process.env.INFOMANIAK_EMAIL || 'alkatera.com').split('@').pop() || 'alkatera.com';
 
+// The CalDAV endpoint + username are NOT secrets — they're stable endpoint
+// identifiers (the internal account id + this calendar's UUID), useless without
+// the password. They live here as constants rather than env vars deliberately:
+// the Netlify function-env budget is capped at ~3.5 KB (AWS Lambda's 4 KB limit),
+// and keeping these two out of the Lambda env keeps the booking secrets footprint
+// to just the password. See scripts/check-function-env-budget.mjs + docs/env-vars.md.
+// Only INFOMANIAK_CALDAV_PASSWORD is env-scoped (a genuine secret).
+const CALDAV_URL =
+  'https://sync.infomaniak.com/calendars/TE01729/426ee35f-49f5-4f74-91c4-05f49945b4fc/';
+const CALDAV_USERNAME = 'TE01729';
+
 export function calendarConfigured(): boolean {
-  return !!(
-    process.env.INFOMANIAK_CALDAV_USERNAME &&
-    process.env.INFOMANIAK_CALDAV_PASSWORD &&
-    process.env.INFOMANIAK_CALDAV_URL
-  );
+  return !!process.env.INFOMANIAK_CALDAV_PASSWORD;
 }
 
 function caldavHeaders() {
   return getBasicAuthHeaders({
-    username: process.env.INFOMANIAK_CALDAV_USERNAME!,
+    username: CALDAV_USERNAME,
     password: process.env.INFOMANIAK_CALDAV_PASSWORD!,
   });
 }
@@ -57,7 +64,7 @@ export async function listBusy(opts: { from: Date; to: Date }): Promise<BusyWind
   if (!calendarConfigured()) throw new Error('Infomaniak calendar not configured');
 
   const objects = await fetchCalendarObjects({
-    calendar: { url: process.env.INFOMANIAK_CALDAV_URL! },
+    calendar: { url: CALDAV_URL },
     timeRange: { start: opts.from.toISOString(), end: opts.to.toISOString() },
     expand: true,
     headers: caldavHeaders(),
@@ -179,7 +186,7 @@ export async function createEvent(
   const uid = `${randomUUID()}@${MAIL_DOMAIN}`;
   // Stored calendar objects must NOT carry an iTIP METHOD.
   const stored = buildVEventLines({ ...input, uid }).join('\r\n');
-  const baseUrl = process.env.INFOMANIAK_CALDAV_URL!;
+  const baseUrl = CALDAV_URL;
   const filename = `${uid}.ics`;
   const res = await createCalendarObject({
     calendar: { url: baseUrl },
