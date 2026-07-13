@@ -28,6 +28,7 @@ export const Navigation = ({ onOpenContact }: NavigationProps) => {
     { label: 'Manifesto', href: '/manifesto' },
     { label: 'Impact', href: '/impact' },
     { label: 'Knowledge', href: '/knowledge' },
+    { label: 'Book a demo', href: '/demo' },
     { label: 'Login', href: '/login' },
   ];
 
