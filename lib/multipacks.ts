@@ -1,5 +1,8 @@
 import { supabase } from './supabaseClient';
 import { boundaryToDbEnum } from './system-boundaries';
+import { buildPackagingMaterialData } from './products/packaging-material-data';
+import type { PackagingFormData } from '@/components/products/PackagingFormCard';
+import type { PackagingCategory } from './types/lca';
 import type {
   MultipackComponent,
   MultipackSecondaryPackaging,
@@ -10,6 +13,90 @@ import type {
   MultipackAggregatedData,
   Product,
 } from './types/products';
+
+// ============================================================================
+// Multipack packaging → product_materials
+// ============================================================================
+// A multipack's own transit/grouping packaging lives on product_materials as
+// ordinary packaging rows on the multipack product, exactly like a single SKU.
+// That makes it visible to the Specification tab, the LCA calculator and EPR,
+// and editable through the same machinery. (It used to live in the parallel,
+// impoverished multipack_secondary_packaging table, read only by the Overview
+// card.) These helpers build and read those rows.
+
+export interface MultipackPackagingInput {
+  material_name: string;
+  material_type: string;
+  /** Packaging role: the multipack's own packaging is transit/grouping, so
+   *  shipment (courier), secondary (retail grouping) or tertiary (pallet). */
+  packaging_category?: string;
+  weight_grams: number;
+  is_recyclable?: boolean;
+  recycled_content_percentage?: number;
+  notes?: string;
+}
+
+/**
+ * Build a product_materials packaging row for one item of a multipack's own
+ * packaging, reusing the single-SKU mapping (buildPackagingMaterialData) so
+ * EPR level, allocation and circularity fields are populated identically.
+ *
+ * A multipack's own packaging is 1 per multipack unit, so units_per_group=1
+ * (the multipack IS the sellable unit; its transit packaging is not shared
+ * across several multipacks). Shared categories require units_per_group≥1 or
+ * packagingFormErrors blocks the row — 1 satisfies that and is correct here.
+ */
+export function buildMultipackPackagingRow(
+  pkg: MultipackPackagingInput,
+  multipackProductId: string | number,
+): Record<string, any> {
+  const category = (pkg.packaging_category || 'shipment') as PackagingCategory;
+  const form: PackagingFormData = {
+    tempId: `mp-pkg-${multipackProductId}-${pkg.material_name}`,
+    name: pkg.material_name,
+    data_source: null,
+    amount: '',
+    unit: 'g',
+    packaging_category: category,
+    recycled_content_percentage: pkg.recycled_content_percentage ?? 0,
+    printing_process: '',
+    net_weight_g: pkg.weight_grams,
+    origin_country: '',
+    transport_mode: 'truck',
+    distance_km: '',
+    has_component_breakdown: false,
+    components: [],
+    epr_is_household: true,
+    epr_is_drinks_container: false,
+    units_per_group: 1,
+    // is_recyclable → recyclability_percent (all-or-nothing until the user
+    // refines it in the packaging editor).
+    recyclability_percent: (pkg.is_recyclable ?? true) ? 100 : 0,
+  };
+  return buildPackagingMaterialData(form, String(multipackProductId));
+}
+
+/**
+ * Fetch a multipack's own packaging as product_materials rows (material_type
+ * 'packaging'). Used by the Overview card so Overview and Specification agree.
+ */
+export async function fetchMultipackPackagingMaterials(
+  multipackProductId: string,
+): Promise<any[]> {
+  const { data, error } = await supabase
+    .from('product_materials')
+    .select('*')
+    .eq('product_id', multipackProductId)
+    .eq('material_type', 'packaging')
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching multipack packaging materials:', error);
+    throw new Error(error.message);
+  }
+
+  return data || [];
+}
 
 // ============================================================================
 // Multipack Component Functions
@@ -284,19 +371,12 @@ export interface CreateCompleteMultipackInput {
     component_product_id: string;
     quantity: number;
   }>;
-  secondaryPackaging?: Array<{
-    material_name: string;
-    material_type: string;
-    weight_grams: number;
-    is_recyclable?: boolean;
-    recycled_content_percentage?: number;
-    notes?: string;
-  }>;
+  secondaryPackaging?: MultipackPackagingInput[];
 }
 
 export async function createCompleteMultipack(
   input: CreateCompleteMultipackInput
-): Promise<{ product: Product; components: MultipackComponent[]; packaging: MultipackSecondaryPackaging[] }> {
+): Promise<{ product: Product; components: MultipackComponent[]; packaging: any[] }> {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
@@ -362,26 +442,23 @@ export async function createCompleteMultipack(
     throw new Error(componentsError.message);
   }
 
-  // Add secondary packaging if provided
-  let packaging: MultipackSecondaryPackaging[] = [];
+  // Add the multipack's own transit/grouping packaging as product_materials
+  // packaging rows on the multipack product. This unifies multipacks with
+  // single SKUs: the packaging is now visible to the Specification tab, the
+  // LCA calculator and EPR, and editable through the same machinery.
+  let packaging: any[] = [];
   if (input.secondaryPackaging && input.secondaryPackaging.length > 0) {
-    const packagingToInsert = input.secondaryPackaging.map((pkg) => ({
-      multipack_product_id: product.id,
-      material_name: pkg.material_name,
-      material_type: pkg.material_type,
-      weight_grams: pkg.weight_grams,
-      is_recyclable: pkg.is_recyclable ?? true,
-      recycled_content_percentage: pkg.recycled_content_percentage ?? 0,
-      notes: pkg.notes || null,
-    }));
+    const packagingToInsert = input.secondaryPackaging.map((pkg) =>
+      buildMultipackPackagingRow(pkg, product.id)
+    );
 
     const { data: packagingData, error: packagingError } = await supabase
-      .from('multipack_secondary_packaging')
+      .from('product_materials')
       .insert(packagingToInsert)
       .select();
 
     if (packagingError) {
-      console.error('Error adding multipack secondary packaging:', packagingError);
+      console.error('Error adding multipack packaging materials:', packagingError);
       // Continue without packaging - not critical
     } else {
       packaging = packagingData || [];

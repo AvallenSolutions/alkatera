@@ -240,6 +240,7 @@ export default function NewProductLCAPage() {
         secondaryPackaging: secondaryPackaging.map((p) => ({
           material_name: p.material_name,
           material_type: p.material_type,
+          packaging_category: p.packaging_category,
           weight_grams: p.weight_grams,
           is_recyclable: p.is_recyclable,
           recycled_content_percentage: p.recycled_content_percentage,

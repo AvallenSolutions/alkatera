@@ -250,7 +250,7 @@ export function computeAttributionRatio(
  * Reconstruct a WaterfallResult from a previously stored product_carbon_footprint_materials row.
  * Used in pinned-mode to skip the waterfall resolver and use the exact same factor values.
  */
-function buildResultFromPinnedMaterial(pinned: any, newQuantityKg: number): WaterfallResult {
+export function buildResultFromPinnedMaterial(pinned: any, newQuantityKg: number): WaterfallResult {
   // The pinned material stores total impacts for its original quantity.
   // Scale to the new quantity: scale = newQty / oldQty
   const oldQuantity = Number(pinned.quantity) || 1;
@@ -261,6 +261,15 @@ function buildResultFromPinnedMaterial(pinned: any, newQuantityKg: number): Wate
     impact_climate_fossil: (pinned.impact_climate_fossil || 0) * scale,
     impact_climate_biogenic: (pinned.impact_climate_biogenic || 0) * scale,
     impact_climate_dluc: (pinned.impact_climate_dluc || 0) * scale,
+    // Carry the OpenLCA-decomposition markers forward. On the decomposition
+    // path the pinned impact_climate ALREADY has user transport folded in, and
+    // the aggregator only skips re-adding impact_transport when these two are
+    // both > 0. Dropping them (the old behaviour) made every pinned recalc
+    // double-count inbound transport. Scaled to stay consistent with impact_climate;
+    // geography is a passthrough label.
+    impact_climate_production: (pinned.impact_climate_production || 0) * scale,
+    impact_climate_transport_embedded: (pinned.impact_climate_transport_embedded || 0) * scale,
+    embedded_electricity_geography: pinned.embedded_electricity_geography ?? null,
     impact_water: (pinned.impact_water || 0) * scale,
     impact_water_scarcity: (pinned.impact_water_scarcity || 0) * scale,
     impact_land: (pinned.impact_land || 0) * scale,
@@ -392,11 +401,84 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       throw new Error(`Failed to fetch materials: ${materialsError.message}`);
     }
 
-    if (!materials || materials.length === 0) {
+    // Plain-language warnings for the user, passed through the aggregator into
+    // aggregated_impacts.calculation_warnings so they appear in the LCA report.
+    const calculatorWarnings: string[] = [];
+
+    // ── Multipack footprint path ────────────────────────────────────────────
+    // A multipack is an assembly of other products. Its footprint is the sum of
+    // its component products' latest completed footprints (× quantity) plus its
+    // OWN packaging — ordinary product_materials packaging rows (transit/grouping
+    // packaging), processed by the loop below exactly like a single SKU. We fetch
+    // the component footprints up front so we can (a) allow the calculation to
+    // proceed even when a multipack carries no own packaging, and (b) inject them
+    // as material rows before aggregation. NOTE: this carries the component
+    // climate footprint (with fossil/biogenic/DLUC split); component water/land
+    // are a known v1 gap tracked separately from the headline GHG total.
+    let multipackComponentFootprints: Array<{
+      name: string;
+      quantity: number;
+      total: number;
+      fossil: number;
+      biogenic: number;
+      dluc: number;
+    }> = [];
+    if (product.is_multipack) {
+      const { data: mpComponents, error: mpErr } = await supabase
+        .from('multipack_components')
+        .select('quantity, component_product:products!component_product_id(id, name)')
+        .eq('multipack_product_id', productId);
+      if (mpErr) {
+        throw new Error(`Failed to fetch multipack components: ${mpErr.message}`);
+      }
+      for (const comp of (mpComponents || []) as any[]) {
+        const cp: any = comp.component_product;
+        if (!cp) continue;
+        // Latest completed footprint for this component product. The single
+        // source of truth for a footprint is aggregated_impacts — the client
+        // aggregator writes ONLY that JSON and leaves the total_ghg_emissions
+        // scalar column at 0 (it is deprecated, see product-lca-aggregator).
+        // We read aggregated_impacts first and fall back to the legacy columns
+        // for older/seeded rows that predate aggregated_impacts.
+        const { data: cpcf } = await supabase
+          .from('product_carbon_footprints')
+          .select('aggregated_impacts, total_ghg_emissions, total_ghg_emissions_fossil, total_ghg_emissions_biogenic, total_ghg_emissions_dluc')
+          .eq('product_id', cp.id)
+          .eq('status', 'completed')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const qty = Number(comp.quantity) || 0;
+        const agg = (cpcf?.aggregated_impacts || null) as any;
+        const componentTotal =
+          agg?.climate_change_gwp100 ?? agg?.total_carbon_footprint ?? cpcf?.total_ghg_emissions ?? null;
+        if (!cpcf || componentTotal == null) {
+          calculatorWarnings.push(
+            `The product "${cp.name || `#${cp.id}`}" in this multipack doesn't have a finished footprint yet, so it adds 0 to the multipack total. Calculate that product's footprint first, then recalculate this multipack.`
+          );
+          continue;
+        }
+        const componentFossil = agg?.total_climate_fossil ?? cpcf?.total_ghg_emissions_fossil ?? 0;
+        const componentBiogenic = agg?.total_climate_biogenic ?? cpcf?.total_ghg_emissions_biogenic ?? 0;
+        const componentDluc = agg?.total_climate_dluc ?? cpcf?.total_ghg_emissions_dluc ?? 0;
+        multipackComponentFootprints.push({
+          name: cp.name || `Product ${cp.id}`,
+          quantity: qty,
+          total: Math.max(0, Number(componentTotal) * qty),
+          fossil: Math.max(0, Number(componentFossil) * qty),
+          biogenic: Math.max(0, Number(componentBiogenic) * qty),
+          dluc: Math.max(0, Number(componentDluc) * qty),
+        });
+      }
+      console.log(`[calculateProductCarbonFootprint] Multipack: aggregated ${multipackComponentFootprints.length} component footprints`);
+    }
+
+    const hasOwnMaterials = !!materials && materials.length > 0;
+    if (!hasOwnMaterials && multipackComponentFootprints.length === 0) {
       throw new Error('No materials found for this product. Please add ingredients and packaging first.');
     }
 
-    console.log(`[calculateProductCarbonFootprint] Found ${materials.length} materials to process`);
+    console.log(`[calculateProductCarbonFootprint] Found ${materials?.length || 0} materials to process`);
     onProgress?.(`Resolving impact factors for ${materials.length} materials...`, 20);
 
     // 3b. Recalculate distances based on current production facilities
@@ -548,10 +630,6 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
     // 4a. Handle facility allocations
     const { facilityAllocations } = params;
-
-    // Plain-language warnings for the user, passed through the aggregator into
-    // aggregated_impacts.calculation_warnings so they appear in the LCA report.
-    const calculatorWarnings: string[] = [];
 
     // The aggregator's contract is "productVolume = units of THIS PRODUCT
     // produced" (it divides facility emissions by it for per-unit values).
@@ -1009,10 +1087,19 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           }
 
           // Scope 1 from utility data (fuels, gas, etc.) — still needs attribution
-          // because fuel usage is facility-level, not product-specific
-          const rawAttributionRatio = allocation.facilityTotalProduction > 0
-            ? allocation.productionVolume / allocation.facilityTotalProduction
-            : 0;
+          // because fuel usage is facility-level, not product-specific. Use the
+          // SAME unit-normalised ratio as Path B (computeAttributionRatio), so
+          // mixed units (e.g. product in litres, facility total in hectolitres)
+          // don't skew the facility share by 100x and silently clamp to 100%.
+          const { rawRatio: rawAttributionRatio, warnings: ratioWarnings } =
+            computeAttributionRatio(allocation, fuSizeLitres, fuSizeKnown);
+          if (ratioWarnings.length > 0) {
+            calculatorWarnings.push(...ratioWarnings);
+            console.warn(
+              `[calculateProductCarbonFootprint] ⚠️ Facility allocation for ${allocation.facilityName}:`,
+              ratioWarnings.join(' | ')
+            );
+          }
           attributionRatio = Math.min(1, Math.max(0, rawAttributionRatio));
           scope1Emissions = scope1Raw * attributionRatio;
 
@@ -2849,6 +2936,42 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     }
 
     // 6. Insert all materials with impact values into product_lca_materials
+    // Inject multipack component footprints as material rows so the aggregator
+    // folds them into the headline total. Each row carries a component product's
+    // full lifecycle footprint (already per functional unit) × quantity. With a
+    // material_type that isn't 'packaging' and a plain name, they land in the
+    // aggregator's raw-materials ("contents") bucket. impact_source must be one
+    // of the enum values (secondary_modelled) per the DB CHECK.
+    for (const cf of multipackComponentFootprints) {
+      lcaMaterialsWithImpacts.push({
+        product_carbon_footprint_id: lca.id,
+        name: `${cf.name} (×${cf.quantity})`,
+        material_name: `${cf.name} (×${cf.quantity})`,
+        material_type: 'multipack_component',
+        quantity: cf.quantity,
+        unit: 'unit',
+        unit_name: 'unit',
+        impact_climate: cf.total,
+        impact_climate_fossil: cf.fossil,
+        impact_climate_biogenic: cf.biogenic,
+        impact_climate_dluc: cf.dluc,
+        impact_transport: 0,
+        is_biogenic_carbon: false,
+        carbon_split_estimated: false,
+        // The component footprint is itself a fully resolved PCF, so treat its
+        // data quality as good rather than dragging the multipack DQI down.
+        confidence_score: 80,
+        data_priority: 1,
+        data_quality_grade: 'HIGH',
+        source_reference: 'Component product footprint',
+        impact_source: 'secondary_modelled',
+        methodology: 'Aggregated component PCF',
+      });
+    }
+    if (multipackComponentFootprints.length > 0) {
+      console.log(`[calculateProductCarbonFootprint] Injected ${multipackComponentFootprints.length} multipack component rows`);
+    }
+
     // Ensure every row has impact_removals_co2e set (NOT NULL column, DEFAULT 0).
     // The Supabase JS client sends undefined as null which violates the constraint.
     const materialsWithDefaults = lcaMaterialsWithImpacts.map((m: any) => ({

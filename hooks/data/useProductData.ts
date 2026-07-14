@@ -157,6 +157,21 @@ export function useProductData(productId: string | undefined) {
 
       if (packagingError) throw packagingError;
 
+      // A multipack carries no ingredients of its own — its "contents" are its
+      // component products. Fetch the component count so readiness can key off
+      // that instead of ingredients (which a multipack never has).
+      let multipackComponentCount = 0;
+      if (productData.is_multipack) {
+        const { count, error: componentsError } = await supabase
+          .from("multipack_components")
+          .select("id", { count: "exact", head: true })
+          .eq("multipack_product_id", productId);
+        if (componentsError) {
+          console.warn("Error fetching multipack component count:", componentsError);
+        }
+        multipackComponentCount = count || 0;
+      }
+
       // Fetch LCA reports - filter by completed status and order by created_at
       // to match passport fetch behavior and ensure consistency.
       // Use created_at (not updated_at) to ensure the newest calculation is always
@@ -185,10 +200,15 @@ export function useProductData(productId: string | undefined) {
         supplier_name: item.supplier_products?.suppliers?.name || null,
       }));
 
-      // Calculate data health
+      // Calculate data health. A multipack is ready to calculate once it has
+      // component products (its contents); its own packaging is optional
+      // transit/grouping packaging. A single SKU needs both ingredients and
+      // packaging.
       const hasIngredients = transformedIngredients.length > 0;
       const hasPackaging = transformedPackaging.length > 0;
-      const isHealthy = hasIngredients && hasPackaging;
+      const isHealthy = productData.is_multipack
+        ? multipackComponentCount > 0
+        : hasIngredients && hasPackaging;
 
       setData({
         product: productData,

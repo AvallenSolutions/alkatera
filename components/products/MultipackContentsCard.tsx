@@ -6,8 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Package, Layers, Edit, Box, ArrowRight } from "lucide-react";
-import { fetchMultipackComponents, fetchMultipackSecondaryPackaging } from "@/lib/multipacks";
-import type { MultipackComponent, MultipackSecondaryPackaging } from "@/lib/types/products";
+import { fetchMultipackComponents, fetchMultipackPackagingMaterials } from "@/lib/multipacks";
+import type { MultipackComponent } from "@/lib/types/products";
 import Link from "next/link";
 
 interface MultipackContentsCardProps {
@@ -18,7 +18,9 @@ interface MultipackContentsCardProps {
 
 export function MultipackContentsCard({ productId, productName, onEdit }: MultipackContentsCardProps) {
   const [components, setComponents] = useState<MultipackComponent[]>([]);
-  const [packaging, setPackaging] = useState<MultipackSecondaryPackaging[]>([]);
+  // Packaging now lives on product_materials (unified with single SKUs), so
+  // Overview reads the same rows the Specification tab and calculator use.
+  const [packaging, setPackaging] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -27,7 +29,7 @@ export function MultipackContentsCard({ productId, productName, onEdit }: Multip
       try {
         const [componentsData, packagingData] = await Promise.all([
           fetchMultipackComponents(productId),
-          fetchMultipackSecondaryPackaging(productId),
+          fetchMultipackPackagingMaterials(productId),
         ]);
         setComponents(componentsData);
         setPackaging(packagingData);
@@ -42,7 +44,10 @@ export function MultipackContentsCard({ productId, productName, onEdit }: Multip
   }, [productId]);
 
   const totalUnits = components.reduce((sum, c) => sum + c.quantity, 0);
-  const totalPackagingWeight = packaging.reduce((sum, p) => sum + p.weight_grams, 0);
+  const totalPackagingWeight = packaging.reduce(
+    (sum, p) => sum + (Number(p.net_weight_g) || 0),
+    0
+  );
 
   if (isLoading) {
     return (
@@ -155,8 +160,8 @@ export function MultipackContentsCard({ productId, productName, onEdit }: Multip
           <div className="pt-3 border-t border-border dark:border-white/10">
             <div className="flex items-center gap-2 mb-3">
               <Box className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Secondary Packaging</span>
-              <span className="text-xs text-muted-foreground">({totalPackagingWeight}g total)</span>
+              <span className="text-sm text-muted-foreground">Transit &amp; Secondary Packaging</span>
+              <span className="text-xs text-muted-foreground">({totalPackagingWeight.toFixed(1)}g total)</span>
             </div>
             <div className="flex flex-wrap gap-2">
               {packaging.map((pkg) => (
@@ -165,8 +170,8 @@ export function MultipackContentsCard({ productId, productName, onEdit }: Multip
                   variant="outline"
                   className="bg-muted/40 dark:bg-white/5 text-foreground border-border dark:border-slate-700"
                 >
-                  {pkg.material_name} ({pkg.weight_grams}g)
-                  {pkg.is_recyclable && (
+                  {pkg.material_name} ({Number(pkg.net_weight_g) || 0}g)
+                  {Number(pkg.recyclability_percent) > 0 && (
                     <span className="ml-1 text-green-600 dark:text-green-400">♻</span>
                   )}
                 </Badge>
