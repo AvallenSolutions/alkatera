@@ -774,7 +774,10 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         barrel_type: profile.barrel_type,
         barrel_volume_litres: profile.barrel_volume_litres,
         barrel_use_number: profile.barrel_use_number,
-        barrel_co2e_new: profile.barrel_co2e_new || null,
+        // ?? not ||: an explicit 0 override is a legitimate value (e.g. a
+        // supplier-verified zero-burden reconditioned cask) and must not be
+        // coerced back to the 40-65 kg default.
+        barrel_co2e_new: profile.barrel_co2e_new ?? null,
         aging_duration_months: profile.aging_duration_months,
         angel_share_percent_per_year: profile.angel_share_percent_per_year,
         climate_zone: profile.climate_zone,

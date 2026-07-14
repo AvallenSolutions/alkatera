@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle, Download, Users } from 'lucide-react';
-import { useWizardContext } from '../WizardContext';
+import { useWizardContext, STANDARD_ISO_TEXT } from '../WizardContext';
 
 // ============================================================================
 // AUDIENCE OPTIONS
@@ -98,6 +98,11 @@ export function GoalStep() {
           rows={3}
           className="resize-none"
         />
+        {formData.intendedApplication === STANDARD_ISO_TEXT.intendedApplication && (
+          <p className="text-xs text-muted-foreground">
+            This is standard wording. Edit it to describe how you will actually use the results.
+          </p>
+        )}
         <p className="text-xs text-muted-foreground">
           {formData.intendedApplication.length}/500 characters
         </p>
@@ -119,6 +124,11 @@ export function GoalStep() {
           rows={3}
           className="resize-none"
         />
+        {formData.reasonsForStudy === STANDARD_ISO_TEXT.reasonsForStudy && (
+          <p className="text-xs text-muted-foreground">
+            This is standard wording. Edit it to say why you are running this study now.
+          </p>
+        )}
       </div>
 
       {/* Intended Audience */}

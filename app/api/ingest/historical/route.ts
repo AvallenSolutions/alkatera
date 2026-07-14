@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
 import { createClient } from '@supabase/supabase-js'
+import { userHasOrgAccess } from '@/lib/supabase/verify-org-access'
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access'
 
 // POST /api/ingest/historical
 //
@@ -44,13 +46,13 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
     )
 
-    const { data: membership } = await serviceClient
-      .from('organization_members')
-      .select('id')
-      .eq('organization_id', payload.organizationId)
-      .eq('user_id', user.id)
-      .maybeSingle()
-    if (!membership) return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+    // Advisor-aware access (a member-only check locked out write-access
+    // advisors who had legitimately uploaded and reviewed the report), plus
+    // the standard write guard for read-only advisors.
+    const hasAccess = await userHasOrgAccess(serviceClient, user.id, payload.organizationId)
+    if (!hasAccess) return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+    const denied = await denyReadOnlyAdvisor(serviceClient, user, payload.organizationId)
+    if (denied) return denied
 
     // Move the source PDF from staging into the long-term audit bucket if provided.
     let finalStoragePath: string | null = null

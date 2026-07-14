@@ -91,7 +91,16 @@ export function buildPackagingMaterialData(form: PackagingFormData, productId: s
     packaging_category: form.packaging_category || null,
     origin_country: form.origin_country || null,
     net_weight_g: Number(form.net_weight_g) || null,
-    recycled_content_percentage: form.recycled_content_percentage ? Number(form.recycled_content_percentage) : null,
+    // '' / null / undefined mean "unknown"; an explicit 0 is a DECLARED zero
+    // (e.g. a supplier-confirmed virgin material) and must round-trip. The
+    // old truthy check collapsed 0 to null on every save.
+    recycled_content_percentage:
+      form.recycled_content_percentage === '' ||
+      form.recycled_content_percentage === null ||
+      form.recycled_content_percentage === undefined ||
+      isNaN(Number(form.recycled_content_percentage))
+        ? null
+        : Number(form.recycled_content_percentage),
     printing_process: form.printing_process || null,
   };
 

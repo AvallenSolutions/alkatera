@@ -66,6 +66,12 @@ export interface ProductMaterial {
   openlca_no_match_at?: string | null;
   /** Whether this ingredient is grown on the producer's own vineyard/farm */
   is_self_grown?: boolean;
+  /** Farm links for self-grown ingredients: the calculator injects field-level
+   *  impacts only when one of these is set, so the zero-shortcut below must
+   *  never fire without one. */
+  vineyard_id?: string | null;
+  orchard_id?: string | null;
+  arable_field_id?: string | null;
 
   // Inbound delivery container (ingredient rows only)
   inbound_container_type?: string | null;
@@ -490,13 +496,25 @@ export async function resolveImpactFactors(
   const supabase = getSupabaseBrowserClient();
   const category = detectMaterialCategory(material);
 
-  // ── VITICULTURE: Self-grown ingredients ───────────────────────────────
-  // When a producer grows their own ingredient (e.g. grapes from own vineyard),
-  // impacts are calculated by viticulture-calculator.ts and injected as
-  // synthetic [Viticulture] rows. Return zero here to avoid double-counting.
-  if (material.is_self_grown) {
+  // ── SELF-GROWN: farm-linked ingredients ───────────────────────────────
+  // When a producer grows their own ingredient (grapes, fruit or grain from
+  // their own vineyard/orchard/arable field), field-level impacts are
+  // calculated by the farm calculators and injected as synthetic
+  // [Viticulture]/[Orchard]/[Arable] rows. Return zero here to avoid
+  // double-counting — but ONLY when the material is actually linked to a
+  // farm record. A self-grown row without any farm link gets nothing
+  // injected, so it must resolve normally through the waterfall below.
+  const hasFarmLink = Boolean(
+    material.vineyard_id || material.orchard_id || material.arable_field_id
+  );
+  if (material.is_self_grown && !hasFarmLink) {
     console.log(
-      `[Waterfall] Self-grown ingredient "${material.material_name}" — impacts handled by viticulture calculator, returning zero`
+      `[Waterfall] Self-grown ingredient "${material.material_name}" has no vineyard/orchard/arable field link — resolving through the standard waterfall`
+    );
+  }
+  if (material.is_self_grown && hasFarmLink) {
+    console.log(
+      `[Waterfall] Self-grown ingredient "${material.material_name}" — impacts handled by the farm calculator, returning zero`
     );
     return {
       impact_climate: 0, impact_climate_fossil: 0, impact_climate_biogenic: 0,
@@ -512,9 +530,9 @@ export async function resolveImpactFactors(
       data_priority: 1,
       data_quality_tag: 'Primary_Verified',
       data_quality_grade: 'MEDIUM',
-      source_reference: 'Self-grown ingredient: impacts calculated by viticulture-calculator.ts',
+      source_reference: 'Self-grown ingredient: impacts calculated by the linked farm growing profile',
       confidence_score: 70,
-      methodology: 'Viticulture questionnaire (IPCC Tier 1, DEFRA 2025)',
+      methodology: 'Farm growing questionnaire (IPCC Tier 1, DEFRA 2025)',
       gwp_data_source: 'viticulture_primary',
       non_gwp_data_source: 'viticulture_primary',
       is_hybrid_source: false,

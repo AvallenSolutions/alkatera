@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
-import { resolveUserOrganization } from '@/lib/supabase/resolve-organization';
+import { verifyPcfAccess } from '@/lib/lca/verify-pcf-access';
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access';
 
 /**
  * POST /api/lca/[id]/review/comment
@@ -17,19 +18,14 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Verify the caller's org owns this PCF before mutating its review.
-  const { organizationId, error: orgError } = await resolveUserOrganization(client, user);
-  if (orgError || !organizationId) {
-    return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+  // Verify the caller has access to the PCF's org before mutating its review.
+  const access = await verifyPcfAccess(client, user, pcfId);
+  if (!access.ok) {
+    return NextResponse.json({ error: 'Not found' }, { status: access.status });
   }
-  const { data: pcf } = await client
-    .from('product_carbon_footprints')
-    .select('organization_id')
-    .eq('id', pcfId)
-    .single();
-  if (!pcf || pcf.organization_id !== organizationId) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
+
+  const denied = await denyReadOnlyAdvisor(client, user, access.organizationId);
+  if (denied) return denied;
 
   const body = await request.json();
   const { section, comment, severity, reviewer_id } = body;

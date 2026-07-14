@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+import { userHasOrgAccess } from '@/lib/supabase/verify-org-access';
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access';
 
 async function getAuthenticatedSupabase() {
   const cookieStore = cookies();
@@ -111,6 +113,23 @@ export async function POST(request: NextRequest) {
     }
     if (!Array.isArray(products) || products.length === 0) {
       return NextResponse.json({ error: 'products array is required' }, { status: 400 });
+    }
+
+    // SECURITY: organizationId comes from the body and gates service-role
+    // seed writes further down (organization_certifications,
+    // agent_exceptions, ingest_jobs). The product insert below is only
+    // accidentally safe (cookie client + RLS); validate membership
+    // explicitly so a refactor to the service-role pattern used by sibling
+    // routes can never open a cross-org write. Read-only advisors are
+    // blocked from what is a bulk write.
+    {
+      const accessClient = getServiceClient();
+      const hasAccess = await userHasOrgAccess(accessClient, userId, organizationId);
+      if (!hasAccess) {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      }
+      const denied = await denyReadOnlyAdvisor(accessClient, { id: userId }, organizationId);
+      if (denied) return denied;
     }
 
     // Map original (full-array) index → included-array index so the client's

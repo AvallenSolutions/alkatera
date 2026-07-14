@@ -10,18 +10,23 @@ import { boundaryToDbEnum } from './system-boundaries';
 import { computeBottlesPerBatch, type ProductionStage } from './types/products';
 import { calculateMaturationImpacts } from './maturation-calculator';
 import type { MaturationProfile } from './types/maturation';
+import { resolveMaturationAbv } from './types/maturation';
+import { isMaturationEligibleProduct } from './maturation-eligibility';
 import { calculateViticultureImpacts } from './viticulture-calculator';
 import { calculateMultiVintageAverage } from './viticulture-multi-vintage';
 import type { VineyardGrowingProfile, Vineyard } from './types/viticulture';
 import { calculateOrchardImpacts } from './orchard-calculator';
 import { calculateMultiHarvestAverage } from './orchard-multi-harvest';
 import type { Orchard } from './types/orchard';
+import { calculateArableMultiHarvestAverage } from './arable-multi-harvest';
+import type { ArableField, ArableCalculatorInput } from './types/arable';
 import { getGridFactor } from './grid-emission-factors';
 import { getAwareFactor } from './calculations/water-risk';
-import { DEFAULT_RECYCLED_CONTENT_CREDIT } from './constants/packaging-defaults';
-import { getPackagingUnitsPerGroup, SHARED_PACKAGING_CATEGORIES } from './end-of-life-factors';
+import { DEFAULT_RECYCLED_CONTENT_CREDIT, RECYCLED_CONTENT_DISPLACEMENT, FACTOR_EMBEDS_RECYCLED_CONTENT } from './constants/packaging-defaults';
+import { getPackagingUnitsPerGroup, SHARED_PACKAGING_CATEGORIES, getMaterialFactorKey } from './end-of-life-factors';
 import { checkPackagingWeight, checkIngredientAmount } from './constants/packaging-weight-ranges';
 import { overlapFraction } from './calculations/utility-factors';
+import { resolveRefrigerantGwp } from './ghg-constants';
 import { checkRunIntensity } from './validation/production-run-sanity';
 import {
   getFacilityArchetypeById,
@@ -442,7 +447,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         // for older/seeded rows that predate aggregated_impacts.
         const { data: cpcf } = await supabase
           .from('product_carbon_footprints')
-          .select('aggregated_impacts, total_ghg_emissions, total_ghg_emissions_fossil, total_ghg_emissions_biogenic, total_ghg_emissions_dluc')
+          .select('aggregated_impacts, system_boundary, total_ghg_emissions, total_ghg_emissions_fossil, total_ghg_emissions_biogenic, total_ghg_emissions_dluc')
           .eq('product_id', cp.id)
           .eq('status', 'completed')
           .order('created_at', { ascending: false })
@@ -458,19 +463,50 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           );
           continue;
         }
+        // Boundary consistency: summing a cradle-to-gate component into a
+        // cradle-to-grave multipack silently omits that component's
+        // distribution/use/end-of-life; the mirror case double counts them.
+        // We proceed (the component's own study is its source of truth) but
+        // the mismatch must be visible in the report.
+        const multipackBoundary = (systemBoundary || 'cradle-to-gate').toLowerCase();
+        const componentBoundary = (cpcf.system_boundary || '').toLowerCase().replace(/_/g, '-');
+        if (componentBoundary && componentBoundary !== multipackBoundary) {
+          calculatorWarnings.push(
+            `The product "${cp.name || `#${cp.id}`}" was calculated as ${componentBoundary} but this multipack is being calculated as ${multipackBoundary}. ` +
+            `The lifecycle stages covered will not line up, which can leave stages out or count them twice. ` +
+            `Recalculate the component product with the same boundary as the multipack for a consistent result.`
+          );
+        }
         const componentFossil = agg?.total_climate_fossil ?? cpcf?.total_ghg_emissions_fossil ?? 0;
         const componentBiogenic = agg?.total_climate_biogenic ?? cpcf?.total_ghg_emissions_biogenic ?? 0;
         const componentDluc = agg?.total_climate_dluc ?? cpcf?.total_ghg_emissions_dluc ?? 0;
+        // Negative totals are legitimate (biogenic-credit-heavy products);
+        // clamping them to zero silently inflated the multipack. Keep the
+        // signed value and note it in the report instead.
+        if (Number(componentTotal) < 0) {
+          calculatorWarnings.push(
+            `The product "${cp.name || `#${cp.id}`}" has a net-negative footprint (${Number(componentTotal).toFixed(3)} kg CO2e per unit), which reduces the multipack total. This is usually due to carbon removals and is carried through as-is.`
+          );
+        }
         multipackComponentFootprints.push({
           name: cp.name || `Product ${cp.id}`,
           quantity: qty,
-          total: Math.max(0, Number(componentTotal) * qty),
-          fossil: Math.max(0, Number(componentFossil) * qty),
-          biogenic: Math.max(0, Number(componentBiogenic) * qty),
-          dluc: Math.max(0, Number(componentDluc) * qty),
+          total: Number(componentTotal) * qty,
+          fossil: Number(componentFossil) * qty,
+          biogenic: Number(componentBiogenic) * qty,
+          dluc: Number(componentDluc) * qty,
         });
       }
       console.log(`[calculateProductCarbonFootprint] Multipack: aggregated ${multipackComponentFootprints.length} component footprints`);
+      // Component rows carry only the climate footprint: water, land and the
+      // other non-climate categories of the components are a known gap, so a
+      // multipack report's non-climate figures reflect its own packaging only.
+      if (multipackComponentFootprints.length > 0) {
+        calculatorWarnings.push(
+          `Multipack water, land and other non-carbon figures cover only the multipack's own packaging. ` +
+          `The products inside contribute their carbon footprint only, so treat non-carbon categories as partial.`
+        );
+      }
     }
 
     const hasOwnMaterials = !!materials && materials.length > 0;
@@ -913,7 +949,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
         const { data: utilityEntries, error: utilityError } = await supabase
           .from('utility_data_entries')
-          .select('utility_type, quantity, unit, calculated_scope, reporting_period_start, reporting_period_end')
+          .select('utility_type, quantity, unit, calculated_scope, reporting_period_start, reporting_period_end, refrigerant_type')
           .eq('facility_id', allocation.facilityId)
           .lte('reporting_period_start', allocation.reportingPeriodEnd)
           .gte('reporting_period_end', allocation.reportingPeriodStart);
@@ -997,6 +1033,14 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
             }
 
             let co2e = proratedQuantity * config.factor;
+
+            // Refrigerant leakage: resolve the GWP for the actual refrigerant
+            // rather than assuming HFC-134a (1430). R-404A is 3922, so the flat
+            // assumption understated leakage ~2.7x and disagreed with the
+            // company Scope 1/2 report built from the same rows.
+            if (entry.utility_type === 'refrigerant_leakage') {
+              co2e = proratedQuantity * resolveRefrigerantGwp((entry as any).refrigerant_type);
+            }
 
             // Handle natural gas m³ → kWh conversion (10.55 kWh/m³).
             // The UI writes 'm3' (utility-types defaultUnit); accept the
@@ -1208,11 +1252,24 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         // Collect for aggregator (passed directly, bypasses broken DB trigger)
         const isContractManufacturer = allocation.operationalControl === 'third_party';
         // Compute total electricity kWh for this facility (attributed)
+        // Pro-rate each bill by the share of its billing period inside the
+        // reporting period, exactly as the emissions figure above does: a
+        // 12-month bill overlapping a 3-month period contributes ~1/4 of its
+        // kWh, otherwise the report's energy table cannot reconcile with its
+        // CO2e figures.
         const totalElectricityKwh = hasDirectRunData
           ? runElectricityKwh
           : (utilityEntries || [])
               .filter((e: any) => e.utility_type === 'electricity_grid')
-              .reduce((sum: number, e: any) => sum + Number(e.quantity || 0), 0) * attributionRatio;
+              .reduce((sum: number, e: any) => {
+                const fraction = overlapFraction(
+                  e.reporting_period_start,
+                  e.reporting_period_end,
+                  allocation.reportingPeriodStart,
+                  allocation.reportingPeriodEnd,
+                );
+                return sum + Number(e.quantity || 0) * fraction;
+              }, 0) * attributionRatio;
 
         collectedFacilityEmissions.push({
           facilityId: allocation.facilityId,
@@ -1405,7 +1462,11 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
                 allocatedWater: site.allocated_water_litres || 0,
                 allocatedWaste: site.allocated_waste_kg || 0,
                 attributionRatio: site.attribution_ratio || 1,
-                productVolume: site.production_volume || 1,
+                // Pass the raw volume: a missing value must reach the
+                // aggregator's invalid-volume guard (which excludes the
+                // facility with a visible warning) rather than silently
+                // becoming 1 and booking the whole run against one unit.
+                productVolume: Number(site.production_volume) || 0,
               });
             }
 
@@ -1436,7 +1497,16 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         .select('*')
         .eq('product_carbon_footprint_id', params.pinnedPcfId);
       if (prevMaterials && prevMaterials.length > 0) {
-        pinnedMaterials = new Map(prevMaterials.map((m: any) => [m.material_name, m]));
+        // Key by the originating product_materials id when the previous PCF
+        // recorded it (source_material_id); fall back to material_name for
+        // PCFs persisted before that column existed. Name keys collapse
+        // duplicate-named rows, which is exactly why the id key exists.
+        pinnedMaterials = new Map(
+          prevMaterials.map((m: any) => [
+            m.source_material_id ? String(m.source_material_id) : m.material_name,
+            m,
+          ])
+        );
         console.log(`[calculateProductCarbonFootprint] Pinned mode: loaded ${pinnedMaterials.size} material factors`);
       } else {
         console.warn(`[calculateProductCarbonFootprint] Pinned mode: no materials found for PCF ${params.pinnedPcfId}, falling back to live resolution`);
@@ -1482,21 +1552,43 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       `(${productionStages.length > 0 ? 'production-chain' : 'v1 batch-mode/per-unit'})`,
     );
 
+    // The batch/chain divisor allocates BATCH-scoped quantities to one
+    // functional unit. Only ingredient quantities are entered per batch: the
+    // packaging forms (and the live impact preview) are strictly per-unit, so
+    // packaging rows must never be divided or they collapse towards zero for
+    // every per_batch and production-chain product.
+    const isPackagingRow = (m: { material_type?: string | null }) => {
+      const t = (m.material_type || '').toLowerCase();
+      return t === 'packaging' || t === 'packaging_material';
+    };
+    const allocationDivisorFor = (m: { material_type?: string | null }) =>
+      isPackagingRow(m) ? 1 : bottlesPerBatch;
+
     // Pre-resolve all impact factors in parallel (OpenLCA calls are the slow part).
     // This turns N sequential API calls into concurrent ones, capped at 4 to avoid
     // overwhelming the OpenLCA server.
     const OPENLCA_CONCURRENCY = 4;
+    // Keyed by the material row's uuid, never by name: duplicate-named rows
+    // (e.g. the same ingredient from two suppliers at different quantities)
+    // used to overwrite each other in this map, booking one row's
+    // quantity-scaled impact twice.
     const resolvedFactors = new Map<string, WaterfallResult>();
+    const getPinnedRow = (m: any) =>
+      pinnedMaterials?.get(String(m.id)) ?? pinnedMaterials?.get(m.material_name) ?? null;
+    // Factor UUIDs actually used, collected for the ISO 14067 §6.5.6 audit log.
+    // Tracked separately because lcaMaterial rows are inserted verbatim and the
+    // PCF materials table has no resolved_factor_id column.
+    const resolvedFactorIdsUsed: string[] = [];
 
     // Build list of materials that need live resolution (not pinned)
-    const materialsToResolve = materials.filter(m => !pinnedMaterials?.has(m.material_name));
+    const materialsToResolve = materials.filter(m => !getPinnedRow(m));
 
     if (materialsToResolve.length > 0) {
       console.log(`[calculateProductCarbonFootprint] Resolving ${materialsToResolve.length} materials in parallel (concurrency: ${OPENLCA_CONCURRENCY})`);
 
       // Semaphore-based concurrency limiter
       const queue = materialsToResolve.map(m => async () => {
-        const quantityKg = normalizeToKg(m.quantity, m.unit) / bottlesPerBatch;
+        const quantityKg = normalizeToKg(m.quantity, m.unit) / allocationDivisorFor(m);
         console.log(`[calculateProductCarbonFootprint] Processing material: ${m.material_name} (${quantityKg} kg)`);
         console.log(`[calculateProductCarbonFootprint] Material OpenLCA data:`, {
           data_source: m.data_source,
@@ -1504,7 +1596,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           organization_id: product.organization_id,
         });
         const result = await resolveImpactFactors(m as ProductMaterial, quantityKg, product.organization_id, fallbackEvents);
-        resolvedFactors.set(m.material_name, result);
+        resolvedFactors.set(String(m.id), result);
       });
 
       // Run with concurrency limit
@@ -1525,9 +1617,10 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
     for (const material of materials) {
       try {
-        // Normalize quantity to kg, allocating batch totals to the functional unit
+        // Normalize quantity to kg, allocating batch totals to the functional
+        // unit. Packaging rows are already per-unit and are never divided.
         const normalised = tryNormalizeToKg(material.quantity, material.unit);
-        const quantityKg = normalised.kg / bottlesPerBatch;
+        const quantityKg = normalised.kg / allocationDivisorFor(material);
 
         // An unrecognised unit passes through as kg, which can be wildly wrong.
         // Surface it as a data-quality warning instead of failing silently.
@@ -1576,6 +1669,23 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           }
         }
 
+        // Count-vs-kg factor mismatch: a count quantity ("6 units") passes
+        // through unchanged, but reference factors (ecoinvent, DEFRA, staging)
+        // are overwhelmingly per kilogram — multiplying books each item as if
+        // it weighed 1 kg. Supplier-declared factors are exempt (they are
+        // frequently genuinely per item).
+        if (
+          normalised.recognised &&
+          normalised.kind === 'count' &&
+          quantityKg > 0 &&
+          material.data_source !== 'supplier'
+        ) {
+          calculatorWarnings.push(
+            `"${material.material_name}" is measured as a count (${material.quantity} ${material.unit}), but its matched emission factor is very likely per kilogram, so each item was treated as weighing 1 kg. ` +
+            `Edit the item and enter its weight in grams or kilograms for an accurate figure.`
+          );
+        }
+
         // Use pre-resolved factors (parallel) or pinned factors
         let resolved: WaterfallResult;
         // Pinned rows come from a previously persisted PCF, so their stored
@@ -1583,13 +1693,13 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         // credit, units_per_group allocation, and inbound-container carbon
         // applied below. Those steps must be skipped for pinned materials or
         // they compound on every pinned recalculation.
-        const pinnedRow = pinnedMaterials?.get(material.material_name) ?? null;
+        const pinnedRow = getPinnedRow(material);
         const isPinned = pinnedRow !== null;
         if (isPinned) {
           console.log(`[calculateProductCarbonFootprint] Using pinned factors for: ${material.material_name}`);
           resolved = buildResultFromPinnedMaterial(pinnedRow, quantityKg);
-        } else if (resolvedFactors.has(material.material_name)) {
-          resolved = resolvedFactors.get(material.material_name)!;
+        } else if (resolvedFactors.has(String(material.id))) {
+          resolved = resolvedFactors.get(String(material.id))!;
         } else {
           // Fallback: resolve individually (should not happen, but safe)
           resolved = await resolveImpactFactors(material as ProductMaterial, quantityKg, product.organization_id, fallbackEvents);
@@ -1655,7 +1765,31 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         const recycledPct = Number.isFinite(Number(rawRecycledPct))
           ? Math.max(0, Math.min(100, Number(rawRecycledPct)))
           : 0;
-        const recycledMultiplier = 1 - (recycledPct / 100) * DEFAULT_RECYCLED_CONTENT_CREDIT;
+        // Material-specific displacement (aluminium saves far more than glass)
+        // rather than a flat 0.5 for everything, and NO credit when the
+        // resolved factor's own name says it already embeds recycled content
+        // (e.g. "glass, 60% cullet") — applying it again double-counted.
+        const materialKeyForCredit = getMaterialFactorKey(
+          material.packaging_category || '',
+          material.material_name,
+          (material as any).matched_source_name || undefined,
+        );
+        const displacementRate =
+          RECYCLED_CONTENT_DISPLACEMENT[materialKeyForCredit] ?? DEFAULT_RECYCLED_CONTENT_CREDIT;
+        const factorNameForCreditCheck = [
+          (material as any).matched_source_name,
+          resolved.source_reference,
+        ].filter(Boolean).join(' ');
+        const factorEmbedsRecycled = FACTOR_EMBEDS_RECYCLED_CONTENT.test(factorNameForCreditCheck);
+        if (factorEmbedsRecycled && recycledPct > 0) {
+          console.log(
+            `[calculateProductCarbonFootprint] Skipping recycled-content credit for ${material.material_name}: ` +
+            `the matched factor ("${factorNameForCreditCheck.slice(0, 80)}") already embeds recycled content`
+          );
+        }
+        const recycledMultiplier = factorEmbedsRecycled
+          ? 1
+          : 1 - (recycledPct / 100) * displacementRate;
 
         if (!isPinned && material.material_type === 'packaging' && reuseTrips > 1) {
           console.log(
@@ -1715,7 +1849,13 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         );
 
         const unitsPerGroup = getPackagingUnitsPerGroup(material as any);
-        if (isSharedPackaging && unitsPerGroup === 1) {
+        // Only warn when units_per_group is genuinely missing/invalid. An
+        // explicit 1 (e.g. one shipper per unit, or the multipack builder's
+        // deliberate per-pack rows) is valid data, and warning on it put a
+        // false alarm in every multipack report.
+        const rawUnitsPerGroupValue = Number((material as any).units_per_group);
+        const unitsPerGroupIsExplicit = Number.isFinite(rawUnitsPerGroupValue) && rawUnitsPerGroupValue >= 1;
+        if (isSharedPackaging && unitsPerGroup === 1 && !unitsPerGroupIsExplicit) {
           console.warn(
             `[calculateProductCarbonFootprint] ⚠️ PACKAGING ALLOCATION: "${material.material_name}" ` +
             `(${material.packaging_category}) is shared packaging but has no valid units_per_group ` +
@@ -1767,6 +1907,10 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         //   adjusted += embedded_electricity × (user_grid / factor_grid - 1)
         // ──────────────────────────────────────────────────────────────
         let adjustedClimate = resolved.impact_climate;
+        // Fossil components folded into adjustedClimate below (DEFRA transport
+        // replacement, grid adjustment, inbound container carbon). Tracked so
+        // the is_biogenic_carbon reclassification never relabels them biogenic.
+        let fossilAddersInClimate = 0;
 
         const hasDecomposition = (resolved.impact_climate_production ?? 0) > 0;
         const embeddedTransport = resolved.impact_climate_transport_embedded ?? 0;
@@ -1776,6 +1920,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         // Transport replacement: swap ecoinvent generic transport for user's actual transport
         if (transportEmissions > 0 && hasDecomposition && embeddedTransport > 0) {
           adjustedClimate = resolved.impact_climate - embeddedTransport + transportEmissions;
+          fossilAddersInClimate += transportEmissions;
           console.log(
             `[calculateProductCarbonFootprint] ⚡ Transport replaced for ${material.material_name}: ` +
             `ecoinvent=${embeddedTransport.toFixed(3)} → DEFRA=${transportEmissions.toFixed(3)} kg CO2e`
@@ -1791,6 +1936,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           if (!userGrid.isEstimated && !factorGrid.isEstimated && Math.abs(userGrid.factor - factorGrid.factor) > 0.001) {
             const electricityAdjustment = embeddedElectricity * (userGrid.factor / factorGrid.factor - 1);
             adjustedClimate += electricityAdjustment;
+            fossilAddersInClimate += electricityAdjustment;
             console.log(
               `[calculateProductCarbonFootprint] ⚡ Electricity adjusted for ${material.material_name}: ` +
               `${embeddedElecGeo}=${factorGrid.factor.toFixed(3)} → ${(material as any).origin_country_code}=${userGrid.factor.toFixed(3)} ` +
@@ -1926,6 +2072,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
           // Add container embodied carbon to the ingredient's climate total
           adjustedClimate += containerCO2PerUnit;
+          fossilAddersInClimate += containerCO2PerUnit;
         }
 
         // Build LCA material record with all impact data
@@ -1948,6 +2095,16 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           unit_name: material.unit,
           packaging_category: material.packaging_category,
           units_per_group: unitsPerGroup,
+          // Circularity/identity projection: the aggregator's end-of-life loop
+          // reads these off PCF material rows (reuse amortisation of disposal,
+          // recyclability caps, stored pathway, material classification), and
+          // source_material_id gives EoL pathway overrides a stable key.
+          source_material_id: material.id ?? null,
+          reuse_trips: (material as any).reuse_trips ?? null,
+          recyclability_percent: (material as any).recyclability_percent ?? null,
+          end_of_life_pathway: (material as any).end_of_life_pathway ?? null,
+          container_material: (material as any).container_material ?? null,
+          matched_source_name: (material as any).matched_source_name ?? null,
           origin_country: material.origin_country,
           country_of_origin: material.origin_country,
           is_organic: material.is_organic_certified,
@@ -1973,8 +2130,16 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
           // Impact values
           impact_climate: adjustedClimate,
-          impact_climate_fossil: (material as any).is_biogenic_carbon ? 0 : resolved.impact_climate_fossil,
-          impact_climate_biogenic: (material as any).is_biogenic_carbon ? adjustedClimate : resolved.impact_climate_biogenic,
+          // ISO 14067 fossil/biogenic split: a biogenic-flagged ingredient's
+          // OWN carbon is biogenic, but the fossil components folded into
+          // adjustedClimate (DEFRA transport, grid adjustment, inbound
+          // container) must stay classified fossil.
+          impact_climate_fossil: (material as any).is_biogenic_carbon
+            ? Math.max(0, fossilAddersInClimate)
+            : resolved.impact_climate_fossil,
+          impact_climate_biogenic: (material as any).is_biogenic_carbon
+            ? Math.max(0, adjustedClimate - Math.max(0, fossilAddersInClimate))
+            : resolved.impact_climate_biogenic,
           impact_climate_dluc: resolved.impact_climate_dluc,
           // True when the resolver could not characterise a fossil/biogenic split
           // and attributed the whole total to fossil (ISO 14067 §6.4.9.3 disclosure).
@@ -2023,6 +2188,9 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         };
 
         lcaMaterialsWithImpacts.push(lcaMaterial);
+        if ((resolved as any).resolved_factor_id) {
+          resolvedFactorIdsUsed.push((resolved as any).resolved_factor_id);
+        }
 
         const allocationNote = unitsPerGroup > 1 ? ` (allocated ÷${unitsPerGroup} units)` : '';
         const adjustedNote = adjustedClimate !== resolved.impact_climate ? ` (adjusted from ${resolved.impact_climate.toFixed(3)})` : '';
@@ -2031,8 +2199,19 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       } catch (error: any) {
         console.error(`[calculateProductCarbonFootprint] ✗ Failed to resolve ${material.material_name}:`, error.message);
 
-        // Clean up: delete the LCA record since we can't proceed
-        await supabase.from('product_carbon_footprints').delete().eq('id', lca.id);
+        // NEVER delete: this row is (or was promoted from) the wizard's
+        // autosaved draft, and deleting it destroyed the user's goal/scope
+        // text, ISO fields and facility allocations on any transient failure
+        // (e.g. the OpenLCA certificate expiring mid-calculation). Mark it
+        // failed so the wizard can resume it.
+        await supabase
+          .from('product_carbon_footprints')
+          .update({
+            status: 'failed',
+            error_message: `Missing emission data for material "${material.material_name}". ${error.message}`.slice(0, 1000),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', lca.id);
 
         throw new Error(`Missing emission data for material "${material.material_name}". ${error.message}`);
       }
@@ -2052,24 +2231,14 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     //
     // product.product_type is drawn from PRODUCT_TYPE_OPTIONS in industry-benchmarks.ts:
     //   'Spirits', 'Beer & Cider', 'Wine', 'Ready-to-Drink & Cocktails', 'Non-Alcoholic'
-    const MATURATION_ELIGIBLE_TYPES = new Set(['spirits', 'wine']);
-    const productTypeLower = (product.product_type || '').toLowerCase();
-    // CRITICAL FIX: Previously allowed empty/null product_type (!product.product_type)
-    // which silently applied barrel impacts (5–20 kg CO₂e) to non-aged products.
-    // Now requires explicit product type match. If product_type is not set and a
-    // maturation profile exists, the profile is SKIPPED with a warning.
-    const isMaturationEligible = !!product.product_type && (
-      MATURATION_ELIGIBLE_TYPES.has(productTypeLower) ||
-      productTypeLower.includes('spirit') ||
-      productTypeLower.includes('whisky') ||
-      productTypeLower.includes('whiskey') ||
-      productTypeLower.includes('rum') ||
-      productTypeLower.includes('brandy') ||
-      productTypeLower.includes('cognac') ||
-      productTypeLower.includes('calvados') ||
-      productTypeLower.includes('armagnac') ||
-      productTypeLower.includes('wine')
-    );
+    // Shared predicate (lib/maturation-eligibility.ts): the SAME rule gates
+    // the recipe editor's Maturation tab, so a profile the user could enter
+    // is never silently dropped here. Checks product_type AND category, since
+    // barrel-aged products are often typed loosely (e.g. an aged RTD).
+    const isMaturationEligible = isMaturationEligibleProduct({
+      productType: product.product_type ?? null,
+      category: (product as any).category ?? null,
+    });
 
     const { data: maturationProfile } = await supabase
       .from('maturation_profiles')
@@ -2083,27 +2252,39 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         `Maturation profile found (${maturationProfile.barrel_type}, ${maturationProfile.aging_duration_months} months) will be SKIPPED to prevent erroneous impacts. ` +
         `If this product is genuinely barrel-aged, update the product type to "Spirits" or "Wine".`
       );
+      // Must be user-visible: a filled-in maturation card silently missing
+      // from the published LCA erodes trust in every other number.
+      calculatorWarnings.push(
+        `This product has a maturation profile (${maturationProfile.barrel_type}, ${maturationProfile.aging_duration_months} months), but its product type "${product.product_type || 'not set'}" is not one that barrel-ages, so maturation was left out of this calculation. ` +
+        `If it really is barrel-aged, set the product type to Spirits or Wine and recalculate.`
+      );
     }
 
     if (maturationProfile && isMaturationEligible) {
       console.log(`[calculateProductCarbonFootprint] Processing maturation profile (${maturationProfile.barrel_type}, ${maturationProfile.aging_duration_months} months)...`);
-      // HIGH FIX #11: Pass the primary facility's country code so the maturation
-    // calculator can use the warehouse's grid factor rather than a hardcoded UK value.
-    // The primary facility (first in facilityAllocations) is the best proxy for the
-    // warehouse location when a dedicated warehouse_country_code field doesn't exist yet.
-    const warehouseCountryCode = params.facilityAllocations?.[0]
-      ? (await supabase.from('facilities').select('location_country_code').eq('id', params.facilityAllocations[0].facilityId).single()).data?.location_country_code ?? null
-      : null;
-    // ABV dilution matters: a spirit filled at cask strength (e.g. 63.5%) and
-    // bottled lower (e.g. 46%) yields proportionally MORE bottles, so omitting
-    // bottleAbvPercent over-states per-bottle maturation CO2e by 40-75% (see
-    // maturation-calculator header). The product page preview already passes
-    // it (SpecificationTab); the persisted LCA must use the same maths.
-    const productAbv = Number(product.alcohol_content_abv);
-    const matResult = calculateMaturationImpacts(maturationProfile as MaturationProfile, {
-      warehouseCountryCode,
-      bottleAbvPercent: Number.isFinite(productAbv) && productAbv > 0 ? productAbv : undefined,
-    });
+      // Warehouse country: the profile's own warehouse_country_code is the
+      // user's explicit answer and always wins. Only when the profile has no
+      // country do we fall back to the primary production facility's country
+      // as a proxy (options override the profile inside the maturation
+      // calculator, so passing the facility country unconditionally used to
+      // silently override "distil in Ireland, mature in Scotland").
+      const facilityCountryFallback = !maturationProfile.warehouse_country_code && params.facilityAllocations?.[0]
+        ? (await supabase.from('facilities').select('location_country_code').eq('id', params.facilityAllocations[0].facilityId).single()).data?.location_country_code ?? null
+        : null;
+      // ABV dilution matters: a spirit filled at cask strength (e.g. 63.5%) and
+      // bottled lower (e.g. 46%) yields proportionally MORE bottles. The
+      // fallback chain is shared with the preview (resolveMaturationAbv) so the
+      // card and the persisted LCA can never disagree.
+      const maturationAbv = resolveMaturationAbv({
+        profileCaskFillAbvPercent: (maturationProfile as MaturationProfile).cask_fill_abv_percent,
+        productCategory: (product as any).category ?? product.product_type ?? null,
+        productAbvPercent: Number(product.alcohol_content_abv),
+      });
+      const matResult = calculateMaturationImpacts(maturationProfile as MaturationProfile, {
+        warehouseCountryCode: maturationProfile.warehouse_country_code ?? facilityCountryFallback,
+        caskFillAbvPercent: maturationAbv.caskFillAbvPercent,
+        bottleAbvPercent: maturationAbv.bottleAbvPercent,
+      });
 
       // --- Per-bottle allocation ---
       // Regular materials are already per-functional-unit (per bottle). Maturation
@@ -2126,17 +2307,82 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       // BOTTLED output volume (post-dilution), not the cask-strength volume —
       // dividing totals by cask-strength bottle counts over-stated per-bottle
       // impacts for every diluted spirit.
-      const totalBottles = maturationProfile.bottles_produced
+      const maturationDerivedBottles = maturationProfile.bottles_produced
         ? Number(maturationProfile.bottles_produced)
         : (matResult.output_volume_bottled_litres > 0 && bottleSizeLitres > 0)
           ? matResult.output_volume_bottled_litres / bottleSizeLitres
           : 1;
+      // Denominator reconciliation: in production-chain mode every OTHER row
+      // in this PCF is divided by chainDivisor (bottling output ÷ bottle
+      // size). Using a different bottle count for maturation rows put two
+      // inconsistent per-bottle bases inside one footprint, so the chain
+      // divisor wins, with a visible note when the two disagree materially.
+      let totalBottles = maturationDerivedBottles;
+      if (productionStages.length > 0 && chainDivisor > 0) {
+        const disagreement = maturationDerivedBottles > 0
+          ? Math.abs(chainDivisor - maturationDerivedBottles) / maturationDerivedBottles
+          : 0;
+        if (disagreement > 0.1) {
+          calculatorWarnings.push(
+            `The maturation profile implies about ${Math.round(maturationDerivedBottles).toLocaleString()} bottles, but the production chain's bottling output implies about ${Math.round(chainDivisor).toLocaleString()}. ` +
+            `The bottling output was used for all per-bottle figures. Check the maturation fill volume, angel's share and bottles produced against the bottling stage.`
+          );
+        }
+        totalBottles = chainDivisor;
+      }
 
       const barrelPerBottle = totalBottles > 0 ? matResult.barrel_total_co2e / totalBottles : 0;
       const warehousePerBottle = totalBottles > 0 ? matResult.warehouse_co2e_total / totalBottles : 0;
       const vocPerBottle = totalBottles > 0 ? matResult.angel_share_photochemical_ozone / totalBottles : 0;
 
       console.log(`[calculateProductCarbonFootprint] Maturation per-bottle: ${totalBottles.toFixed(0)} bottles from ${matResult.output_volume_bottled_litres.toFixed(1)}L bottled (${(bottleSizeLitres * 1000).toFixed(0)}ml/bottle), barrel=${barrelPerBottle.toFixed(4)}/bottle, warehouse=${warehousePerBottle.toFixed(4)}/bottle`);
+
+      // Evaporation uplift (per-unit recipes only): the angel's share means
+      // the distillery consumed MORE raw material per surviving bottle than
+      // the per-bottle recipe says — the ~18% of a 10-year temperate
+      // maturation that evaporated still carried its full grain/new-make
+      // burden. Batch and production-chain modes already capture this
+      // (batch inputs ÷ bottled output), so the uplift applies only when
+      // quantities were entered per finished bottle.
+      const angelShareRetention = 1 - (matResult.angel_share_loss_percent_total / 100);
+      if (
+        productionStages.length === 0 &&
+        bottlesPerBatch === 1 &&
+        angelShareRetention > 0.05 &&
+        angelShareRetention < 1
+      ) {
+        const evaporationUplift = 1 / angelShareRetention;
+        const UPLIFTED_FIELDS = [
+          'quantity', 'impact_climate', 'impact_climate_fossil', 'impact_climate_biogenic',
+          'impact_climate_dluc', 'ch4_kg', 'ch4_fossil_kg', 'ch4_biogenic_kg', 'n2o_kg',
+          'impact_water', 'impact_water_scarcity', 'impact_land', 'impact_waste',
+          'impact_terrestrial_ecotoxicity', 'impact_freshwater_eutrophication',
+          'impact_terrestrial_acidification', 'impact_fossil_resource_scarcity',
+          'impact_transport', 'inbound_container_co2_per_unit',
+          'impact_climate_production', 'impact_climate_transport_embedded',
+          'impact_climate_electricity_embedded',
+        ] as const;
+        let upliftedCount = 0;
+        for (const row of lcaMaterialsWithImpacts as any[]) {
+          if ((row.material_type || '').toLowerCase() !== 'ingredient') continue;
+          for (const field of UPLIFTED_FIELDS) {
+            if (typeof row[field] === 'number' && Number.isFinite(row[field])) {
+              row[field] = row[field] * evaporationUplift;
+            }
+          }
+          upliftedCount++;
+        }
+        if (upliftedCount > 0) {
+          console.log(
+            `[calculateProductCarbonFootprint] Evaporation uplift ×${evaporationUplift.toFixed(3)} applied to ${upliftedCount} ingredient rows ` +
+            `(angel's share ${matResult.angel_share_loss_percent_total.toFixed(1)}% over ${(maturationProfile.aging_duration_months / 12).toFixed(1)} years)`
+          );
+          calculatorWarnings.push(
+            `Because ${matResult.angel_share_loss_percent_total.toFixed(0)}% of this spirit evaporates during maturation, the ingredients for each bottle sold were scaled up by ${((evaporationUplift - 1) * 100).toFixed(0)}% to cover the share that was lost. ` +
+            `This assumes all ingredients go in before maturation; if some are added at bottling, the uplift slightly overstates them.`
+          );
+        }
+      }
 
       // Inject barrel allocation as a synthetic material (per-bottle)
       lcaMaterialsWithImpacts.push({
@@ -2258,7 +2504,31 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       });
 
       console.log(`[calculateProductCarbonFootprint] ✓ Maturation impacts (per-bottle): barrel=${barrelPerBottle.toFixed(4)} kg CO2e, warehouse=${warehousePerBottle.toFixed(4)} kg CO2e, angel's share=${matResult.angel_share_loss_percent_total.toFixed(1)}% volume loss, VOC=${vocPerBottle.toFixed(4)} kg/bottle`);
+
+      // Double-count guard: warehouse energy can also live in a linked
+      // facility's utility data. There is no facility link on maturation
+      // profiles yet, so we cannot dedupe automatically — but we can make
+      // sure nobody double-enters it unknowingly.
+      if (matResult.warehouse_co2e_total > 0 && (params.facilityAllocations?.length ?? 0) > 0) {
+        calculatorWarnings.push(
+          `Warehouse energy for maturation (${maturationProfile.warehouse_energy_kwh_per_barrel_year} kWh per barrel per year) is included from the maturation profile. ` +
+          `If the ageing warehouse is one of the production facilities linked to this product, make sure its electricity is not ALSO in that facility's utility data, or it will be counted twice.`
+        );
+      }
     }
+
+    // Average a series of per-year values with the SAME method the multi-year
+    // impact averaging used ('single'/'average_2yr' = mean, 'median_3yr' =
+    // median), so allocation denominators stay consistent with the numerators.
+    const averageForMethod = (values: number[], method: string): number => {
+      if (values.length === 0) return 0;
+      if (method === 'median_3yr') {
+        const sorted = [...values].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+      }
+      return values.reduce((a, b) => a + b, 0) / values.length;
+    };
 
     // 5c. Check for vineyard growing profile and calculate viticulture impacts
     //
@@ -2370,12 +2640,29 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         : Number(product.unit_size_value || 0.75);
       const bottleSizeLitres = rawBottleSize > 0 ? rawBottleSize : 0.75;
 
-      // Grapes per bottle: typical wine yield ~0.7-0.8 L per kg grapes
-      // Using 1.3 kg grapes per 0.75L bottle as industry average
-      const grapeKgPerBottle = (viticultureProfile.grape_yield_tonnes * 1000) > 0
-        ? bottleSizeLitres / 0.75 * 1.3 // Scale by bottle size relative to 750ml
-        : 1.3;
-      const totalBottles = (viticultureProfile.grape_yield_tonnes * 1000) / grapeKgPerBottle;
+      // Grapes per bottle: prefer the actual self-grown grape quantity from the
+      // ingredient row(s) linked to this vineyard (normalised to kg per unit).
+      // Fall back to the 1.3 kg grapes per 0.75L bottle industry average
+      // (typical wine yield ~0.7-0.8 L per kg grapes), scaled by bottle size.
+      const selfGrownGrapeRows = (materials || []).filter(
+        (m: any) => m.is_self_grown && m.vineyard_id === vineyardId
+      );
+      let grapeKgPerBottle = selfGrownGrapeRows.reduce((sum: number, m: any) => {
+        const norm = tryNormalizeToKg(m.quantity, m.unit);
+        return sum + (norm.recognised && norm.kind !== 'count' ? norm.kg / allocationDivisorFor(m) : 0);
+      }, 0);
+      if (!(grapeKgPerBottle > 0)) {
+        grapeKgPerBottle = (bottleSizeLitres / 0.75) * 1.3;
+        console.log(`[calculateProductCarbonFootprint] Viticulture: no usable self-grown grape quantity on the ingredient row — falling back to ${grapeKgPerBottle.toFixed(2)} kg grapes per bottle (1.3 kg/750ml industry average)`);
+      }
+
+      // Bottle-count denominator uses the multi-vintage AVERAGE yield so it is
+      // consistent with the multi-vintage averaged impact numerators above.
+      const averagedGrapeYieldKg = averageForMethod(
+        viticultureProfiles!.map((p: any) => (Number(p.grape_yield_tonnes) || 0) * 1000),
+        multiVintageResult.method
+      );
+      const totalBottles = grapeKgPerBottle > 0 ? averagedGrapeYieldKg / grapeKgPerBottle : 0;
 
       // Per-bottle factors
       const fertFieldPerBottle = totalBottles > 0
@@ -2450,8 +2737,9 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         name: '[Viticulture] Fertiliser & Field Emissions',
         material_name: '[Viticulture] Fertiliser & Field Emissions',
         impact_climate: fertFieldPerBottle + pesticidePerBottle,
-        impact_climate_fossil: fertFieldPerBottle * 0.95 + pesticidePerBottle, // Fertiliser production is mostly fossil
-        impact_climate_biogenic: 0,
+        // C31: fossil + biogenic must sum exactly to the fertiliser total; the 5% biogenic share covers urea/organic inputs
+        impact_climate_fossil: fertFieldPerBottle * 0.95 + pesticidePerBottle,
+        impact_climate_biogenic: fertFieldPerBottle * 0.05,
         impact_climate_dluc: 0,
         ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0,
         n2o_kg: n2oKgPerBottle,
@@ -2795,8 +3083,9 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         name: '[Orchard] Fertiliser & Field Emissions',
         material_name: '[Orchard] Fertiliser & Field Emissions',
         impact_climate: orchFertFieldPerUnit + orchPesticidePerUnit,
+        // C31: fossil + biogenic must sum exactly to the fertiliser total; the 5% biogenic share covers urea/organic inputs
         impact_climate_fossil: orchFertFieldPerUnit * 0.95 + orchPesticidePerUnit,
-        impact_climate_biogenic: 0,
+        impact_climate_biogenic: orchFertFieldPerUnit * 0.05,
         impact_climate_dluc: 0,
         ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0,
         n2o_kg: orchN2oKgPerUnit,
@@ -2935,6 +3224,404 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       console.log(`[calculateProductCarbonFootprint] ✓ Orchard impacts: emissions=${orchResult.total_emissions.toFixed(1)} kg CO2e, removals=${orchResult.total_removals.toFixed(1)} kg CO2e (${orchResult.flag_removals.methodology}), transport=${orchResult.non_flag_emissions.transport_co2e.toFixed(1)} kg CO2e, per-kg=${orchResult.total_emissions_per_kg.toFixed(4)} kg CO2e/kg fruit`);
     }
 
+    // ========================================================================
+    // 5d. ARABLE (Grain Growing) — Self-grown grain integration
+    // ========================================================================
+    //
+    // Mirrors the viticulture and orchard integrations above. For producers who
+    // grow their own grain (e.g. barley for whisky, wheat for vodka), the
+    // arable calculator computes field-level emissions from fertiliser N2O,
+    // crop residues, lime, machinery fuel, grain drying, irrigation, transport
+    // and soil carbon removals.
+    //
+    // Allocation: unlike the vineyard/orchard sections, this section never
+    // assumes the whole field feeds this product. Per-bottle arable impact =
+    // (field emissions per kg of grain, from the multi-harvest average yield)
+    // x (kg of self-grown grain per bottle from the actual ingredient row).
+
+    // Find arable_field_id from self-grown ingredients linked to this product
+    const { data: selfGrownArableIngredients } = await supabase
+      .from('product_materials')
+      .select('arable_field_id')
+      .eq('product_id', parseInt(productId))
+      .eq('is_self_grown', true)
+      .not('arable_field_id', 'is', null);
+
+    const arableFieldIds = Array.from(new Set(
+      (selfGrownArableIngredients || []).map((m: any) => m.arable_field_id).filter(Boolean)
+    ));
+
+    const arableFieldId = arableFieldIds[0]; // Process first linked field
+    const { data: arableProfilesRaw } = arableFieldId
+      ? await supabase
+          .from('arable_growing_profiles')
+          .select('*, arable_fields(*)')
+          .eq('arable_field_id', arableFieldId)
+          .order('harvest_year', { ascending: false })
+      : { data: null };
+
+    // Draft profiles are incomplete questionnaires — never calculate from them
+    const arableProfiles = (arableProfilesRaw || []).filter((p: any) => !p.is_draft);
+    const arableProfile = arableProfiles[0];
+
+    if (arableFieldId && !arableProfile) {
+      calculatorWarnings.push(
+        'A self-grown ingredient is linked to an arable field with no completed growing profile, so its farming emissions count as 0 in this footprint. Complete the growing profile for that field and recalculate to include them.'
+      );
+    }
+
+    if (arableProfile) {
+      const arableField = arableProfile.arable_fields as unknown as ArableField;
+      const arableProfileCount = arableProfiles.length;
+      console.log(`[calculateProductCarbonFootprint] Processing arable field "${arableField?.name || 'unknown'}" (${arableProfileCount} harvest${arableProfileCount > 1 ? 's' : ''})...`);
+
+      // Resolve AWARE water scarcity factor for the field's country
+      const arableCountryCode = arableField?.location_country_code;
+      let arableAwareFactor = 1.0;
+      if (arableCountryCode) {
+        const arableAwareData = await getAwareFactor(supabase, arableCountryCode);
+        if (arableAwareData) arableAwareFactor = Number(arableAwareData.aware_factor);
+      }
+
+      // Build inputs for all available harvests (same shape the arable field
+      // page and questionnaire pass to calculateArableImpacts)
+      const arableHarvestInputs = arableProfiles.map((p: any) => ({
+        harvest_year: p.harvest_year,
+        input: {
+          crop_type: arableField?.crop_type || 'other',
+          climate_zone: arableField?.climate_zone || 'temperate',
+          certification: arableField?.certification || 'conventional',
+          location_country_code: arableField?.location_country_code || null,
+          aware_factor: arableAwareFactor,
+          area_ha: p.area_ha,
+          soil_management: p.soil_management,
+          straw_management: p.straw_management,
+          straw_yield_tonnes_per_ha: p.straw_yield_tonnes_per_ha,
+          lime_applied_kg_per_ha: p.lime_applied_kg_per_ha,
+          lime_type: p.lime_type,
+          fertiliser_type: p.fertiliser_type,
+          fertiliser_quantity_kg: p.fertiliser_quantity_kg,
+          fertiliser_n_content_percent: p.fertiliser_n_content_percent,
+          uses_pesticides: p.uses_pesticides,
+          pesticide_applications_per_year: p.pesticide_applications_per_year,
+          pesticide_type: p.pesticide_type || 'generic',
+          uses_herbicides: p.uses_herbicides,
+          herbicide_applications_per_year: p.herbicide_applications_per_year,
+          herbicide_type: p.herbicide_type || 'generic',
+          uses_growth_regulators: p.uses_growth_regulators,
+          growth_regulator_applications: p.growth_regulator_applications,
+          seed_rate_kg_per_ha: p.seed_rate_kg_per_ha,
+          diesel_litres_per_year: p.diesel_litres_per_year,
+          petrol_litres_per_year: p.petrol_litres_per_year,
+          grain_drying_fuel: p.grain_drying_fuel,
+          grain_drying_energy_kwh_per_tonne: p.grain_drying_energy_kwh_per_tonne,
+          is_irrigated: p.is_irrigated,
+          water_m3_per_ha: p.water_m3_per_ha,
+          irrigation_energy_source: p.irrigation_energy_source,
+          grain_yield_tonnes: p.grain_yield_tonnes,
+          grain_moisture_percent: p.grain_moisture_percent,
+          transport_distance_km: p.transport_distance_km,
+          transport_mode: p.transport_mode,
+          soil_carbon_override_kg_co2e_per_ha: p.soil_carbon_override_kg_co2e_per_ha,
+          soil_carbon_annual_change_kg_co2e_per_ha: p.soil_carbon_annual_change_kg_co2e_per_ha,
+          soil_carbon_change_methodology: p.soil_carbon_change_methodology,
+          soil_carbon_change_confidence: p.soil_carbon_change_confidence,
+          previous_land_use_type: arableField?.previous_land_use_type,
+          land_conversion_year: arableField?.land_conversion_year,
+          harvest_year: p.harvest_year,
+          land_ownership_type: (p as any).land_ownership_type ?? undefined,
+          lease_expiry_date: (p as any).lease_expiry_date ?? null,
+          is_boundary_controlled: (p as any).is_boundary_controlled ?? undefined,
+          removal_verification_status: (p as any).removal_verification_status ?? 'unverified',
+          removal_verifier_body: (p as any).removal_verifier_body ?? undefined,
+          removal_verifier_standard: (p as any).removal_verifier_standard ?? undefined,
+          removal_verification_date: (p as any).removal_verification_date ?? undefined,
+          removal_verification_expiry: (p as any).removal_verification_expiry ?? undefined,
+          ecosystem_type: (p as any).ecosystem_type ?? undefined,
+          in_biodiversity_sensitive_area: (p as any).in_biodiversity_sensitive_area ?? false,
+          sensitive_area_details: (p as any).sensitive_area_details ?? undefined,
+          water_stress_index: (p as any).water_stress_index ?? undefined,
+        } as ArableCalculatorInput,
+      }));
+
+      // Multi-harvest averaging (median for 3+, mean for 2, single for 1)
+      const multiHarvestArable = calculateArableMultiHarvestAverage(arableHarvestInputs);
+      const araResult = multiHarvestArable.averaged_impacts;
+      const arableHarvestNote = arableProfileCount > 1
+        ? ` (${multiHarvestArable.method}: harvests ${multiHarvestArable.harvests_used.join(', ')})`
+        : '';
+
+      // --- Per-bottle allocation ---
+      // kg of self-grown grain per bottle from the actual ingredient row(s):
+      // batch-scoped ingredient quantities are normalised to kg and divided by
+      // the same bottles-per-batch divisor used for every other ingredient.
+      const selfGrownGrainRows = (materials || []).filter(
+        (m: any) => m.is_self_grown && m.arable_field_id === arableFieldId
+      );
+      const grainKgPerBottle = selfGrownGrainRows.reduce((sum: number, m: any) => {
+        const norm = tryNormalizeToKg(m.quantity, m.unit);
+        return sum + (norm.recognised && norm.kind !== 'count' ? norm.kg / allocationDivisorFor(m) : 0);
+      }, 0);
+
+      // Per-kg grain intensity denominator: multi-harvest AVERAGE yield,
+      // consistent with the multi-harvest averaged impact numerators.
+      const avgGrainYieldKg = averageForMethod(
+        arableProfiles.map((p: any) => (Number(p.grain_yield_tonnes) || 0) * 1000),
+        multiHarvestArable.method
+      );
+
+      if (!(grainKgPerBottle > 0)) {
+        calculatorWarnings.push(
+          `The self-grown ingredient from arable field "${arableField?.name || 'unknown'}" has no usable weight, so its farming emissions count as 0 in this footprint. Enter the ingredient quantity in a weight unit (e.g. kg) and recalculate.`
+        );
+      } else if (!(avgGrainYieldKg > 0)) {
+        calculatorWarnings.push(
+          `The growing profile for arable field "${arableField?.name || 'unknown'}" has no grain yield, so its farming emissions count as 0 in this footprint. Add the grain yield to the growing profile and recalculate.`
+        );
+      } else {
+        // Per-bottle = (field-level total / field yield in kg) x kg grain per bottle
+        const arPerBottle = (fieldTotal: number) =>
+          (fieldTotal / avgGrainYieldKg) * grainKgPerBottle;
+
+        // FLAG field emissions excluding dLUC (dLUC gets its own row below,
+        // total_flag_co2e includes luc_co2e so subtract it to avoid double count)
+        const araFlagExLuc = araResult.flag_emissions.total_flag_co2e - araResult.flag_emissions.luc_co2e;
+        const araFertFieldPerBottle = arPerBottle(araFlagExLuc + araResult.non_flag_emissions.fertiliser_production_co2e);
+        const araInputsPerBottle = arPerBottle(
+          araResult.non_flag_emissions.pesticide_production_co2e +
+          araResult.non_flag_emissions.seed_production_co2e +
+          araResult.non_flag_emissions.growth_regulator_co2e
+        );
+        const araFuelPerBottle = arPerBottle(araResult.non_flag_emissions.machinery_fuel_co2e);
+        const araDryingPerBottle = arPerBottle(araResult.non_flag_emissions.grain_drying_co2e);
+        const araIrrigationPerBottle = arPerBottle(araResult.non_flag_emissions.irrigation_energy_co2e);
+        const araTransportPerBottle = arPerBottle(araResult.non_flag_emissions.transport_co2e);
+        const araWaterPerBottle = arPerBottle(araResult.water_m3);
+        const araWaterScarcityPerBottle = arPerBottle(araResult.water_scarcity_m3_eq);
+        const araLandPerBottle = arPerBottle(araResult.flag_emissions.land_use_m2);
+        const araRemovalsPerBottle = arPerBottle(araResult.total_removals);
+        const araN2oKgPerBottle = arPerBottle(araResult.n2o_kg);
+        const araLucPerBottle = arPerBottle(araResult.flag_emissions.luc_co2e);
+
+        console.log(`[calculateProductCarbonFootprint] Arable per-bottle: ${grainKgPerBottle.toFixed(3)} kg grain/bottle, yield=${avgGrainYieldKg.toFixed(0)} kg, fert+field=${araFertFieldPerBottle.toFixed(4)}, fuel=${araFuelPerBottle.toFixed(4)}, drying=${araDryingPerBottle.toFixed(4)}, removals=${araRemovalsPerBottle.toFixed(4)}`);
+
+        const rawArableUnitSize = product.unit_size_unit === 'ml'
+          ? Number(product.unit_size_value) / 1000.0
+          : Number(product.unit_size_value || 0.75);
+        const arableUnitSizeLitres = rawArableUnitSize > 0 ? rawArableUnitSize : 0.75;
+
+        const CROP_LABELS: Record<string, string> = {
+          barley: 'Barley', wheat: 'Wheat', oats: 'Oats', rye: 'Rye', maize: 'Maize', other: 'Grain',
+        };
+        const cropLabel = CROP_LABELS[arableField?.crop_type || 'other'] || 'Grain';
+
+        // Synthetic row template (shared fields — same shape as the
+        // [Viticulture]/[Orchard] rows so the DB insert cannot fail)
+        const araBaseRow = {
+          product_carbon_footprint_id: lca.id,
+          material_type: 'ingredient' as const,
+          quantity: arableUnitSizeLitres,
+          unit: 'L',
+          unit_name: 'L',
+          packaging_category: null,
+          origin_country: arableField?.address_country || null,
+          country_of_origin: arableField?.address_country || null,
+          is_organic: arableField?.certification === 'organic',
+          is_organic_certified: arableField?.certification === 'organic',
+          supplier_product_id: null,
+          data_source: null,
+          data_source_id: null,
+          transport_mode: null,
+          distance_km: null,
+          impact_transport: 0,
+          origin_address: null,
+          origin_lat: arableField?.address_lat || null,
+          origin_lng: arableField?.address_lng || null,
+          origin_country_code: arableField?.location_country_code || null,
+          data_priority: 2 as const,
+          data_quality_tag: 'Secondary_Modelled' as const,
+          supplier_lca_id: null,
+          impact_source: 'secondary_modelled' as const,
+          impact_reference_id: null,
+          gwp_data_source: 'IPCC 2019 Tier 1 / DEFRA 2025',
+          non_gwp_data_source: 'IPCC 2019 Tier 1 / DEFRA 2025',
+          is_hybrid_source: false,
+          // NOTE: category_type is a Postgres enum (material_category_type)
+          // without an 'arable' value, so the shared manufacturing bucket is
+          // used; the aggregator buckets these rows by the [Arable] name prefix.
+          category_type: 'MANUFACTURING_MATERIAL',
+        };
+
+        // Row 1: Fertiliser & Field Emissions (N2O + residues + lime + input production)
+        lcaMaterialsWithImpacts.push({
+          ...araBaseRow,
+          name: `[Arable] ${cropLabel} Fertiliser & Field Emissions`,
+          material_name: `[Arable] ${cropLabel} Fertiliser & Field Emissions`,
+          impact_climate: araFertFieldPerBottle + araInputsPerBottle,
+          // C31: fossil + biogenic must sum exactly to the fertiliser total; the 5% biogenic share covers urea/organic inputs
+          impact_climate_fossil: araFertFieldPerBottle * 0.95 + araInputsPerBottle,
+          impact_climate_biogenic: araFertFieldPerBottle * 0.05,
+          impact_climate_dluc: 0,
+          ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0,
+          n2o_kg: araN2oKgPerBottle,
+          impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+          impact_freshwater_ecotoxicity: arPerBottle(araResult.freshwater_ecotoxicity),
+          impact_terrestrial_ecotoxicity: arPerBottle(araResult.terrestrial_ecotoxicity),
+          impact_human_toxicity_non_carcinogenic: arPerBottle(araResult.human_toxicity_non_carcinogenic),
+          impact_freshwater_eutrophication: arPerBottle(araResult.freshwater_eutrophication),
+          impact_terrestrial_acidification: arPerBottle(araResult.terrestrial_acidification),
+          impact_fossil_resource_scarcity: 0,
+          confidence_score: 65,
+          methodology: araResult.methodology_notes,
+          source_reference: `Fertiliser: ${araResult.flag_emissions.n2o_direct_co2e.toFixed(1)} kg CO2e direct N2O + ${araResult.flag_emissions.n2o_indirect_co2e.toFixed(1)} kg indirect + ${araResult.flag_emissions.n2o_crop_residue_co2e.toFixed(1)} kg crop residue + ${araResult.flag_emissions.lime_co2e.toFixed(1)} kg lime + ${araResult.non_flag_emissions.fertiliser_production_co2e.toFixed(1)} kg production${arableHarvestNote}`,
+          data_quality_grade: araResult.data_quality_grade,
+        });
+
+        // Row 2: Machinery Fuel
+        if (araFuelPerBottle > 0) {
+          lcaMaterialsWithImpacts.push({
+            ...araBaseRow,
+            name: `[Arable] ${cropLabel} Machinery Fuel`,
+            material_name: `[Arable] ${cropLabel} Machinery Fuel`,
+            impact_climate: araFuelPerBottle,
+            impact_climate_fossil: araFuelPerBottle,
+            impact_climate_biogenic: 0, impact_climate_dluc: 0,
+            ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+            impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+            impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+            impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+            confidence_score: 70,
+            methodology: 'DEFRA 2025 fuel combustion factors',
+            source_reference: `Diesel: ${arableProfile.diesel_litres_per_year} L/yr, Petrol: ${arableProfile.petrol_litres_per_year} L/yr. Total: ${araResult.non_flag_emissions.machinery_fuel_co2e.toFixed(1)} kg CO2e for the field`,
+            data_quality_grade: araResult.data_quality_grade,
+          });
+        }
+
+        // Row 3: Grain Drying
+        if (araDryingPerBottle > 0) {
+          lcaMaterialsWithImpacts.push({
+            ...araBaseRow,
+            name: `[Arable] ${cropLabel} Grain Drying`,
+            material_name: `[Arable] ${cropLabel} Grain Drying`,
+            impact_climate: araDryingPerBottle,
+            impact_climate_fossil: araDryingPerBottle,
+            impact_climate_biogenic: 0, impact_climate_dluc: 0,
+            ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+            impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+            impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+            impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+            confidence_score: 70,
+            methodology: 'DEFRA 2025 fuel combustion / grid emission factors',
+            source_reference: `Grain drying: ${arableProfile.grain_drying_fuel}, ${arableProfile.grain_drying_energy_kwh_per_tonne} kWh/t. Total: ${araResult.non_flag_emissions.grain_drying_co2e.toFixed(1)} kg CO2e for the field`,
+            data_quality_grade: araResult.data_quality_grade,
+          });
+        }
+
+        // Row 4: Irrigation
+        if (araIrrigationPerBottle > 0 || araWaterPerBottle > 0) {
+          lcaMaterialsWithImpacts.push({
+            ...araBaseRow,
+            name: `[Arable] ${cropLabel} Irrigation`,
+            material_name: `[Arable] ${cropLabel} Irrigation`,
+            impact_climate: araIrrigationPerBottle,
+            impact_climate_fossil: araIrrigationPerBottle,
+            impact_climate_biogenic: 0, impact_climate_dluc: 0,
+            ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+            impact_water: araWaterPerBottle,
+            impact_water_scarcity: araWaterScarcityPerBottle, // AWARE-weighted
+            impact_land: 0, impact_waste: 0,
+            impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+            impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+            confidence_score: 60,
+            methodology: 'DEFRA 2025 / grid emission factors',
+            source_reference: `Irrigation: ${araResult.water_m3.toFixed(0)} m3 water, ${arableProfile.irrigation_energy_source}. Energy: ${araResult.non_flag_emissions.irrigation_energy_co2e.toFixed(1)} kg CO2e`,
+            data_quality_grade: araResult.data_quality_grade,
+          });
+        }
+
+        // Row 5: Transport (field to processing facility)
+        if (araTransportPerBottle > 0) {
+          lcaMaterialsWithImpacts.push({
+            ...araBaseRow,
+            name: `[Arable] ${cropLabel} Transport to Facility`,
+            material_name: `[Arable] ${cropLabel} Transport to Facility`,
+            impact_climate: araTransportPerBottle,
+            impact_climate_fossil: araTransportPerBottle,
+            impact_climate_biogenic: 0, impact_climate_dluc: 0,
+            ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+            impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+            impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+            impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+            confidence_score: 70,
+            methodology: 'DEFRA 2024 tonne-km factors',
+            source_reference: `Transport: ${arableProfile.transport_distance_km || 0} km by ${arableProfile.transport_mode || 'road'}. ${araResult.non_flag_emissions.transport_co2e.toFixed(1)} kg CO2e for the field`,
+            data_quality_grade: araResult.data_quality_grade,
+          });
+        }
+
+        // Row 6: Land Occupation
+        lcaMaterialsWithImpacts.push({
+          ...araBaseRow,
+          name: `[Arable] ${cropLabel} Land Occupation`,
+          material_name: `[Arable] ${cropLabel} Land Occupation`,
+          impact_climate: 0, // Land occupation itself has no direct climate impact
+          impact_climate_fossil: 0, impact_climate_biogenic: 0, impact_climate_dluc: 0,
+          ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+          impact_water: 0, impact_water_scarcity: 0,
+          impact_land: araLandPerBottle,
+          impact_waste: 0,
+          impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+          impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+          confidence_score: 80,
+          methodology: 'Direct land occupation measurement',
+          source_reference: `Field: ${arableProfile.area_ha} ha (${araResult.flag_emissions.land_use_m2.toFixed(0)} m2), ${grainKgPerBottle.toFixed(3)} kg grain per bottle`,
+          data_quality_grade: 'HIGH',
+        });
+
+        // Row 6b: Land Use Change (dLUC) — IPCC 2019, amortised over 20 years
+        if (araLucPerBottle > 0) {
+          lcaMaterialsWithImpacts.push({
+            ...araBaseRow,
+            name: `[Arable] ${cropLabel} Land Use Change (dLUC)`,
+            material_name: `[Arable] ${cropLabel} Land Use Change (dLUC)`,
+            impact_climate: araLucPerBottle,
+            impact_climate_fossil: 0, impact_climate_biogenic: 0, impact_climate_dluc: araLucPerBottle,
+            ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+            impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+            impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+            impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+            confidence_score: 50,
+            methodology: 'IPCC 2019 direct land use change, amortised 20 years',
+            source_reference: `dLUC: ${araResult.flag_emissions.luc_co2e.toFixed(1)} kg CO2e from ${arableField?.previous_land_use_type || 'unknown'} conversion`,
+            data_quality_grade: 'MEDIUM',
+          });
+        }
+
+        // Row 7: Soil Carbon Removals (FLAG: separate from emissions)
+        if (araRemovalsPerBottle > 0) {
+          lcaMaterialsWithImpacts.push({
+            ...araBaseRow,
+            name: `[Arable Removals] ${cropLabel} Soil Carbon`,
+            material_name: `[Arable Removals] ${cropLabel} Soil Carbon`,
+            impact_climate: 0, // FLAG: removals NEVER stored in impact_climate
+            impact_climate_fossil: 0, impact_climate_biogenic: 0, impact_climate_dluc: 0,
+            ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+            impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+            impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+            impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+            // FLAG-compliant: removals in dedicated column (always positive)
+            impact_removals_co2e: araRemovalsPerBottle,
+            confidence_score: araResult.flag_removals.is_verified ? 75 : 45,
+            methodology: `Soil carbon: ${araResult.flag_removals.methodology}`,
+            source_reference: `Soil management: ${arableProfile.soil_management}. Total removals: ${araResult.total_removals.toFixed(1)} kg CO2e/yr (${araResult.flag_removals.methodology}). Per bottle: ${araRemovalsPerBottle.toFixed(4)} kg CO2e`,
+            data_quality_grade: araResult.flag_removals.is_verified ? 'MEDIUM' : 'LOW',
+          });
+        }
+
+        console.log(`[calculateProductCarbonFootprint] ✓ Arable impacts: emissions=${araResult.total_emissions.toFixed(1)} kg CO2e, removals=${araResult.total_removals.toFixed(1)} kg CO2e (${araResult.flag_removals.methodology}), per-kg=${araResult.total_emissions_per_kg.toFixed(4)} kg CO2e/kg grain, ${grainKgPerBottle.toFixed(3)} kg grain/bottle`);
+      }
+    }
+
     // 6. Insert all materials with impact values into product_lca_materials
     // Inject multipack component footprints as material rows so the aggregator
     // folds them into the headline total. Each row carries a component product's
@@ -2984,8 +3671,16 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       .insert(materialsWithDefaults);
 
     if (insertError) {
-      // Clean up
-      await supabase.from('product_carbon_footprints').delete().eq('id', lca.id);
+      // NEVER delete the row: it carries the user's autosaved wizard state.
+      // Mark it failed so the wizard can resume it.
+      await supabase
+        .from('product_carbon_footprints')
+        .update({
+          status: 'failed',
+          error_message: `Failed to insert materials: ${insertError.message}`.slice(0, 1000),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', lca.id);
       throw new Error(`Failed to insert materials: ${insertError.message}`);
     }
 
@@ -3117,7 +3812,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       calculationFingerprint = await generateCalculationFingerprint({
         materials: materials.map(m => ({
           name: m.material_name,
-          quantity_kg: normalizeToKg(m.quantity, m.unit) / bottlesPerBatch,
+          quantity_kg: normalizeToKg(m.quantity, m.unit) / allocationDivisorFor(m),
           data_source_id: m.data_source_id,
         })),
         factorValues: materialResolutions.map((r: any) => ({
@@ -3169,9 +3864,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     // now sets resolved_factor_id to the actual DB record UUID used, eliminating
     // the previous sentinel placeholder.
     try {
-      const factorIdsUsed = lcaMaterialsWithImpacts
-        .map((m: any) => m.resolved?.resolved_factor_id || m.resolved_factor_id)
-        .filter((id: string | undefined): id is string => !!id);
+      const factorIdsUsed = resolvedFactorIdsUsed.filter(Boolean);
       // Deduplicate and fall back to a descriptive marker if no IDs were collected
       const uniqueFactorIds = Array.from(new Set(factorIdsUsed));
       if (uniqueFactorIds.length === 0) {

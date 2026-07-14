@@ -15,6 +15,12 @@ import { toValidAllocations } from '@/lib/utils/lca-recalc-allocations';
  * Returns 'skipped' (without calculating) when no facility allocations can be
  * recovered — recalculating with zero facility data would understate
  * processing/scope emissions, so those products must be re-run via the wizard.
+ *
+ * Also returns 'skipped' when the saved settings carry no system boundary.
+ * Defaulting to cradle-to-gate here silently REPLACED a published
+ * cradle-to-grave footprint with a gate-only one during batch repropagation —
+ * the number shrank with no operator-visible diff. Products without a saved
+ * boundary must be re-run via the wizard, where the user picks it explicitly.
  */
 export type RecalcProduct = {
   id: number | string;
@@ -29,6 +35,7 @@ export async function recalculateProductLca(
   orgId: string,
 ): Promise<'done' | 'skipped'> {
   const settings = product.last_wizard_settings ?? {};
+  if (!settings.systemBoundary) return 'skipped';
 
   const { data: pcfs } = await sb
     .from('product_carbon_footprints')
@@ -48,7 +55,7 @@ export async function recalculateProductLca(
   await calculateProductLCA({
     productId: String(product.id),
     functionalUnit: `1 ${product.unit || 'unit'} of ${product.name || 'product'}`,
-    systemBoundary: settings.systemBoundary || 'cradle-to-gate',
+    systemBoundary: settings.systemBoundary,
     referenceYear: settings.referenceYear,
     facilityAllocations: validAllocations,
     usePhaseConfig: settings.usePhaseConfig,

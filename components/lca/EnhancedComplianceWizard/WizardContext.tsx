@@ -175,6 +175,21 @@ interface WizardContextValue {
   dismissSaveTemplatePrompt: () => void;
 }
 
+/**
+ * Standard ISO documentation text pre-filled into empty goal/cut-off fields.
+ * Exported so the step components can recognise an unedited default and
+ * label it ("standard text, edit to fit your study") — silently injected
+ * boilerplate looked like the user's own documented methodology.
+ */
+export const STANDARD_ISO_TEXT = {
+  intendedApplication:
+    'Product carbon footprint assessment to identify environmental hotspots and support sustainability reporting.',
+  reasonsForStudy:
+    'To quantify the carbon footprint and environmental impact of this product in accordance with ISO 14044/14067.',
+  cutoffCriteria:
+    'Mass: <1% of total input mass. Energy: <1% of total energy input. Environmental significance: Any flow contributing >1% to any impact category is included regardless of mass/energy contribution.',
+} as const;
+
 const INITIAL_FORM_DATA: WizardFormData = {
   intendedApplication: '',
   reasonsForStudy: '',
@@ -457,12 +472,16 @@ export function WizardProvider({
       let resumedDraftPcfId: string | null = null;
       let resumedDraftData: any = null;
       if (!initialPcfId) {
+        // 'failed' is resumable too: a calculation that died mid-way (e.g.
+        // an OpenLCA outage) used to strand the row at 'pending' or delete
+        // it, losing all wizard input. Failures now keep their draft_data
+        // and the wizard picks them straight back up.
         const { data: existingDraft } = await sb
           .from('product_carbon_footprints')
-          .select('id, draft_data')
+          .select('id, draft_data, status, error_message')
           .eq('product_id', parseInt(productId, 10))
           .eq('organization_id', productData.organization_id)
-          .eq('status', 'draft')
+          .in('status', ['draft', 'failed'])
           .order('updated_at', { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -822,11 +841,9 @@ export function WizardProvider({
 
         setFormData({
           intendedApplication:
-            pcf.intended_application ||
-            'Product carbon footprint assessment to identify environmental hotspots and support sustainability reporting.',
+            pcf.intended_application || STANDARD_ISO_TEXT.intendedApplication,
           reasonsForStudy:
-            pcf.reasons_for_study ||
-            'To quantify the carbon footprint and environmental impact of this product in accordance with ISO 14044/14067.',
+            pcf.reasons_for_study || STANDARD_ISO_TEXT.reasonsForStudy,
           intendedAudience:
             pcf.intended_audience?.length > 0
               ? pcf.intended_audience
@@ -836,8 +853,7 @@ export function WizardProvider({
             pcf.functional_unit || '',
           systemBoundary: (pcf.system_boundary || 'cradle-to-gate').toLowerCase(),
           cutoffCriteria:
-            pcf.cutoff_criteria ||
-            'Mass: <1% of total input mass. Energy: <1% of total energy input. Environmental significance: Any flow contributing >1% to any impact category is included regardless of mass/energy contribution.',
+            pcf.cutoff_criteria || STANDARD_ISO_TEXT.cutoffCriteria,
           assumptions: (pcf.assumptions_limitations || [])
             .map((a: any) => (typeof a === 'string' ? a : a.text || ''))
             .filter(Boolean),
@@ -1003,30 +1019,34 @@ export function WizardProvider({
     <K extends keyof WizardFormData>(field: K, value: WizardFormData[K]) => {
       setFormData((prev) => ({ ...prev, [field]: value }));
 
-      // HIGH FIX #18: When the system boundary changes, the step list gains or loses
-      // use-phase and end-of-life steps. Numeric `completedSteps` become invalid
-      // because step numbers shift (e.g., old step 6 "Cutoff" → new step 7 if UsePhase inserted).
+      // HIGH FIX #18 (reworked): When the system boundary changes, the step
+      // list gains or loses distribution/use-phase/end-of-life steps and the
+      // numeric `completedSteps` become invalid because step numbers shift.
       //
-      // Fix: when boundary changes, re-anchor completedSteps relative to the new step order.
-      // We keep pre-calculate steps (steps 1..calculateStepNumber) as completed, and
-      // reset all post-calculate steps so the user must complete them again.
-      // This is safe: the calculation result is still valid (stored in DB), but the
-      // ISO doc steps (goal, cutoff, data quality, etc.) need to be re-confirmed in case
-      // the new boundary changes what assumptions apply.
+      // The previous re-anchor marked steps 1..calculateStepNumber complete —
+      // which included the CALCULATE step itself and any newly inserted phase
+      // steps the user had never opened. Combined with autosave writing the
+      // new boundary onto the PCF row, a user could flip cradle-to-gate to
+      // cradle-to-grave after calculating and publish a report titled
+      // cradle-to-grave containing gate-only numbers (distribution, use and
+      // EoL silently zero), or the inverse, overstating a gate claim.
+      //
+      // Now: only the steps BEFORE the boundary step stay completed (they are
+      // boundary-independent: guide/materials/facilities), everything from
+      // the boundary step onwards — including every phase step and calculate
+      // — must be walked again, and any stored calculation is invalidated so
+      // the stored numbers can never disagree with the stored boundary.
       if (field === 'systemBoundary' && typeof value === 'string') {
         const newBoundary = value;
         const newStepIds = getStepIdsForBoundary(newBoundary, showGuide);
-        const newCalcStepNumber = newStepIds.indexOf('calculate') + 1;
-        // Keep steps 1..newCalcStepNumber as completed; clear the rest
-        const preCalcCompleted = Array.from({ length: newCalcStepNumber }, (_, i) => i + 1);
+        const boundaryStepNumber = newStepIds.indexOf('boundary') + 1;
+        const preBoundaryCompleted = Array.from({ length: Math.max(0, boundaryStepNumber - 1) }, (_, i) => i + 1);
         setProgress((prev) => ({
           ...prev,
-          completedSteps: preCalcCompleted,
-          // If currently past calculate, stay at current step if it still exists;
-          // otherwise go back to the step after boundary
-          currentStep: prev.currentStep > newCalcStepNumber
-            ? Math.min(prev.currentStep, newStepIds.length)
-            : prev.currentStep,
+          completedSteps: preBoundaryCompleted,
+          // Never leave the user stranded past steps that are no longer
+          // complete; clamp back to the boundary step at most.
+          currentStep: Math.min(prev.currentStep, Math.max(boundaryStepNumber, 1)),
         }));
       }
 
@@ -1253,6 +1273,31 @@ export function WizardProvider({
       }
       if (formData.productLossConfig) {
         updatePayload.product_loss_config = formData.productLossConfig;
+      }
+
+      // Never silently relabel a completed calculation's boundary. Autosave
+      // writes system_boundary onto the PCF row, so flipping the boundary
+      // after calculating used to produce a report titled with the new
+      // boundary over numbers computed under the old one. If the stored row
+      // is completed and the boundary changed, demote it to draft — the
+      // stored numbers can no longer be presented under the new label, and
+      // recalculating restores completed status.
+      const normaliseBoundary = (b: string | null | undefined) =>
+        (b || '').toLowerCase().replace(/_/g, '-');
+      const { data: currentPcfRow } = await supabase
+        .from('product_carbon_footprints')
+        .select('status, system_boundary')
+        .eq('id', activePcfId)
+        .maybeSingle();
+      if (
+        currentPcfRow?.status === 'completed' &&
+        formData.systemBoundary &&
+        normaliseBoundary(currentPcfRow.system_boundary) !== normaliseBoundary(formData.systemBoundary)
+      ) {
+        updatePayload.status = 'draft';
+        console.warn(
+          '[WizardContext] System boundary changed on a completed LCA — demoting to draft; the results must be recalculated under the new boundary.'
+        );
       }
 
       const { error: updateError } = await supabase

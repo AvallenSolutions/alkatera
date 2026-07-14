@@ -28,6 +28,8 @@ import {
   getTransportModeWarning,
   type TransportMode,
 } from '@/lib/utils/transport-emissions-calculator';
+import { getPackagingUnitsPerGroup } from '@/lib/end-of-life-factors';
+import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 
 // ============================================================================
 // HELPERS
@@ -51,6 +53,78 @@ const TRANSPORT_MODES: { value: TransportMode; label: string }[] = [
  *
  * Falls back to summing all materials only when no product volume is available.
  */
+/**
+ * Per-unit packaging weight. Shared packaging (a 12-bottle shipper case) is
+ * divided by units_per_group — the calculator amortises it per unit, and
+ * summing the full case weight against every bottle inflated the shipped
+ * weight (and so distribution emissions) by the pack factor.
+ */
+function sumPackagingKg(materials: any[]): number {
+  let packagingKg = 0;
+  for (const mat of materials || []) {
+    const matType = (mat.material_type || '').toLowerCase();
+    if (matType !== 'packaging' && matType !== 'packaging_material') continue;
+    const qty = Number(mat.quantity || 0);
+    const unit = (mat.unit || 'kg').toLowerCase();
+    let itemKg: number;
+    if (unit === 'g') {
+      itemKg = qty / 1000;
+    } else if (unit === 'mg') {
+      itemKg = qty / 1_000_000;
+    } else if (unit === 'tonne' || unit === 't') {
+      itemKg = qty * 1000;
+    } else if (unit === 'ml') {
+      itemKg = qty / 1000;
+    } else if (unit === 'l' || unit === 'litre' || unit === 'liter') {
+      itemKg = qty;
+    } else {
+      itemKg = qty; // default assume kg
+    }
+    packagingKg += itemKg / getPackagingUnitsPerGroup(mat);
+  }
+  return packagingKg;
+}
+
+/**
+ * A multipack ships its components plus its own transit packaging. Its own
+ * materials are only the shipper box, so the single-SKU weight helper
+ * understated a 24x330ml case ~30x. Sum each component product's liquid +
+ * packaging weight (x pack quantity) and add the multipack's own packaging.
+ */
+async function getMultipackShippedWeightKg(
+  productId: number | string,
+  ownMaterials: any[]
+): Promise<number> {
+  const supabase = getSupabaseBrowserClient();
+  const { data: comps } = await supabase
+    .from('multipack_components')
+    .select('quantity, component_product:products!component_product_id(id, unit_size_value, unit_size_unit)')
+    .eq('multipack_product_id', productId);
+  const componentIds = ((comps || []) as any[])
+    .map((c) => c.component_product?.id)
+    .filter(Boolean);
+  const matsByProduct: Record<string, any[]> = {};
+  if (componentIds.length > 0) {
+    const { data: mats } = await supabase
+      .from('product_materials')
+      .select('product_id, quantity, unit, material_type, packaging_category, units_per_group')
+      .in('product_id', componentIds)
+      .in('material_type', ['packaging', 'packaging_material']);
+    for (const m of (mats || []) as any[]) {
+      (matsByProduct[String(m.product_id)] ||= []).push(m);
+    }
+  }
+  let componentsKg = 0;
+  for (const c of (comps || []) as any[]) {
+    const cp = c.component_product;
+    if (!cp) continue;
+    const qty = Number(c.quantity) || 0;
+    componentsKg += getProductWeightKg(matsByProduct[String(cp.id)] || [], cp) * qty;
+  }
+  const ownPackagingKg = sumPackagingKg(ownMaterials);
+  return Math.max(componentsKg + ownPackagingKg, 0.001);
+}
+
 function getProductWeightKg(
   materials: any[],
   product?: { unit_size_value?: number; unit_size_unit?: string } | null
@@ -70,25 +144,7 @@ function getProductWeightKg(
   }
 
   // 2. Packaging materials weight
-  let packagingKg = 0;
-  for (const mat of materials || []) {
-    if (mat.material_type !== 'packaging') continue;
-    const qty = Number(mat.quantity || 0);
-    const unit = (mat.unit || 'kg').toLowerCase();
-    if (unit === 'g') {
-      packagingKg += qty / 1000;
-    } else if (unit === 'mg') {
-      packagingKg += qty / 1_000_000;
-    } else if (unit === 'tonne' || unit === 't') {
-      packagingKg += qty * 1000;
-    } else if (unit === 'ml') {
-      packagingKg += qty / 1000;
-    } else if (unit === 'l' || unit === 'litre' || unit === 'liter') {
-      packagingKg += qty;
-    } else {
-      packagingKg += qty; // default assume kg
-    }
-  }
+  const packagingKg = sumPackagingKg(materials);
 
   // If we have a product volume, use liquid + packaging
   if (liquidKg > 0) {
@@ -129,13 +185,29 @@ export function DistributionStep() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [selectedScenario, setSelectedScenario] = useState<string>('custom');
 
-  // Auto-detect product weight on mount if no config exists
+  // Auto-detect product weight on mount if no config exists. Multipacks need
+  // an async lookup of their component products' weights; a cancelled flag
+  // guards against applying a stale result after unmount.
   useEffect(() => {
-    if (!formData.distributionConfig) {
-      const weightKg = getProductWeightKg(preCalcState.materials || [], preCalcState.product);
-      const defaults = getDefaultDistributionConfig(weightKg);
-      updateField('distributionConfig', defaults);
+    if (formData.distributionConfig) return;
+    let cancelled = false;
+    const product: any = preCalcState.product;
+    const applyDefaults = (weightKg: number) => {
+      if (cancelled) return;
+      updateField('distributionConfig', getDefaultDistributionConfig(weightKg));
+    };
+    if (product?.is_multipack && product?.id) {
+      getMultipackShippedWeightKg(product.id, preCalcState.materials || [])
+        .then(applyDefaults)
+        .catch(() => {
+          applyDefaults(getProductWeightKg(preCalcState.materials || [], product));
+        });
+    } else {
+      applyDefaults(getProductWeightKg(preCalcState.materials || [], product));
     }
+    return () => {
+      cancelled = true;
+    };
   }, [preCalcState.materials, preCalcState.product]);
 
   const config: DistributionConfig = formData.distributionConfig || {

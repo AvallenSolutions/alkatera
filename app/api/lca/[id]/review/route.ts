@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
-import { resolveUserOrganization } from '@/lib/supabase/resolve-organization';
+import { verifyPcfAccess } from '@/lib/lca/verify-pcf-access';
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access';
 
 /**
  * GET /api/lca/[id]/review
@@ -17,20 +18,11 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Verify user's org owns this PCF
-  const { organizationId, error: orgError } = await resolveUserOrganization(client, user);
-  if (orgError || !organizationId) {
-    return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
-  }
-
-  const { data: pcf } = await client
-    .from('product_carbon_footprints')
-    .select('organization_id')
-    .eq('id', pcfId)
-    .single();
-
-  if (!pcf || pcf.organization_id !== organizationId) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  // Advisor-aware access check (resolveUserOrganization locked advisors out
+  // of review reads even when they had legitimate access to the client org).
+  const access = await verifyPcfAccess(client, user, pcfId);
+  if (!access.ok) {
+    return NextResponse.json({ error: 'Not found' }, { status: access.status });
   }
 
   const { data: review, error } = await client
@@ -78,32 +70,21 @@ export async function POST(
     return NextResponse.json({ error: 'Invalid review_type' }, { status: 400 });
   }
 
-  // Verify user's org owns this PCF
-  const { organizationId, error: orgError } = await resolveUserOrganization(client, user);
-  if (orgError || !organizationId) {
-    return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+  // Verify the caller has access to the PCF's org and may write to it
+  const access = await verifyPcfAccess(client, user, pcfId);
+  if (!access.ok) {
+    return NextResponse.json({ error: 'LCA not found' }, { status: access.status });
   }
 
-  const { data: pcf, error: pcfError } = await client
-    .from('product_carbon_footprints')
-    .select('organization_id')
-    .eq('id', pcfId)
-    .single();
-
-  if (pcfError || !pcf) {
-    return NextResponse.json({ error: 'LCA not found' }, { status: 404 });
-  }
-
-  if (pcf.organization_id !== organizationId) {
-    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-  }
+  const denied = await denyReadOnlyAdvisor(client, user, access.organizationId);
+  if (denied) return denied;
 
   // Create review record
   const { data: review, error: reviewError } = await client
     .from('lca_critical_reviews')
     .insert({
       product_carbon_footprint_id: pcfId,
-      organization_id: pcf.organization_id,
+      organization_id: access.organizationId,
       review_type,
       status: 'pending',
       review_start_date: new Date().toISOString(),
@@ -138,11 +119,19 @@ export async function POST(
     }
   }
 
-  // Update PCF status
-  await client
+  // Review state lives in its own column: writing 'ready_for_review' into
+  // status violated the lifecycle CHECK constraint (silently, since the
+  // error was never inspected), and would have hidden the PCF from every
+  // consumer filtering on status='completed' had it succeeded.
+  const { error: statusError } = await client
     .from('product_carbon_footprints')
-    .update({ status: 'ready_for_review', updated_at: new Date().toISOString() })
+    .update({ review_status: 'ready_for_review', updated_at: new Date().toISOString() })
     .eq('id', pcfId);
+
+  if (statusError) {
+    console.error('Failed to set review_status:', statusError);
+    return NextResponse.json({ error: 'Review created but its status could not be recorded. Please retry.' }, { status: 500 });
+  }
 
   return NextResponse.json(review, { status: 201 });
 }

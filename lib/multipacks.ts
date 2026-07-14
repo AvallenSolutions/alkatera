@@ -58,7 +58,8 @@ export function buildMultipackPackagingRow(
     amount: '',
     unit: 'g',
     packaging_category: category,
-    recycled_content_percentage: pkg.recycled_content_percentage ?? 0,
+    // Unknown stays unknown (null); an explicit 0 is a declared zero.
+    recycled_content_percentage: pkg.recycled_content_percentage ?? '',
     printing_process: '',
     net_weight_g: pkg.weight_grams,
     origin_country: '',
@@ -69,11 +70,18 @@ export function buildMultipackPackagingRow(
     epr_is_household: true,
     epr_is_drinks_container: false,
     units_per_group: 1,
+    // The material the user picked ("Cardboard", "Plastic Film", "Wood") is
+    // the row's material identity — dropping it forced end-of-life
+    // classification back onto name inference ("Shrink Wrap" → 'other').
+    container_material: pkg.material_type || null,
     // is_recyclable → recyclability_percent (all-or-nothing until the user
     // refines it in the packaging editor).
     recyclability_percent: (pkg.is_recyclable ?? true) ? 100 : 0,
   };
-  return buildPackagingMaterialData(form, String(multipackProductId));
+  const row = buildPackagingMaterialData(form, String(multipackProductId));
+  // The builder has no notes mapping; carry the user's note onto the row.
+  if (pkg.notes) row.notes = pkg.notes;
+  return row;
 }
 
 /**
@@ -383,6 +391,29 @@ export async function createCompleteMultipack(
     throw new Error('User not authenticated');
   }
 
+  // Every component must belong to the same organisation as the multipack.
+  // Product ids are sequential integers, so without this check (and the
+  // matching RLS component-org check) a crafted request could fold another
+  // organisation's product name and footprint into this multipack.
+  const componentIds = input.components.map((c) => c.component_product_id);
+  if (componentIds.length > 0) {
+    const { data: componentOrgs, error: componentOrgsError } = await supabase
+      .from('products')
+      .select('id, organization_id')
+      .in('id', componentIds);
+    if (componentOrgsError) {
+      throw new Error(componentOrgsError.message);
+    }
+    const foundIds = new Set((componentOrgs || []).map((p) => p.id));
+    const wrongOrg = (componentOrgs || []).filter(
+      (p) => p.organization_id !== input.organizationId
+    );
+    const missing = componentIds.filter((id) => !foundIds.has(id));
+    if (wrongOrg.length > 0 || missing.length > 0) {
+      throw new Error('One or more selected products are not available to this organisation.');
+    }
+  }
+
   // First, create the multipack product
   const { data: product, error: productError } = await supabase
     .from('products')
@@ -458,11 +489,16 @@ export async function createCompleteMultipack(
       .select();
 
     if (packagingError) {
+      // The packaging the user just described MUST reach the database — a
+      // swallowed failure meant "Multipack created successfully" while the
+      // shipper box was silently missing from the footprint. Roll back the
+      // half-created multipack so the user can retry cleanly.
       console.error('Error adding multipack packaging materials:', packagingError);
-      // Continue without packaging - not critical
-    } else {
-      packaging = packagingData || [];
+      await supabase.from('multipack_components').delete().eq('multipack_product_id', product.id);
+      await supabase.from('products').delete().eq('id', product.id);
+      throw new Error(`Could not save the multipack's packaging: ${packagingError.message}`);
     }
+    packaging = packagingData || [];
   }
 
   // Increment product count

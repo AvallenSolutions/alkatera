@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
-import { resolveUserOrganization } from '@/lib/supabase/resolve-organization';
+import { verifyPcfAccess } from '@/lib/lca/verify-pcf-access';
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access';
 
 /**
  * PUT /api/lca/[id]/review/comment/[commentId]
@@ -17,20 +18,35 @@ export async function PUT(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Verify user's org owns this PCF
-  const { organizationId, error: orgError } = await resolveUserOrganization(client, user);
-  if (orgError || !organizationId) {
-    return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+  // Verify the caller has access to the PCF's org and may write to it.
+  const access = await verifyPcfAccess(client, user, pcfId);
+  if (!access.ok) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: access.status });
   }
 
-  const { data: pcf } = await client
-    .from('product_carbon_footprints')
-    .select('organization_id')
-    .eq('id', pcfId)
-    .single();
+  const denied = await denyReadOnlyAdvisor(client, user, access.organizationId);
+  if (denied) return denied;
 
-  if (!pcf || pcf.organization_id !== organizationId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  // SECURITY: the comment must belong to a review OF THIS PCF. The previous
+  // version verified the caller owned the pcfId in the URL, then updated the
+  // comment by id alone with the service-role client — letting a member of
+  // one organisation flip another organisation's critical-review comments to
+  // rejected/addressed (gaming the approval gate) by passing any PCF id of
+  // their own plus a foreign comment UUID.
+  const { data: comment } = await client
+    .from('lca_review_comments')
+    .select('id, review:lca_critical_reviews!review_id(product_carbon_footprint_id, organization_id)')
+    .eq('id', commentId)
+    .maybeSingle();
+
+  const commentReview: any = (comment as any)?.review;
+  if (
+    !comment ||
+    !commentReview ||
+    commentReview.product_carbon_footprint_id !== pcfId ||
+    commentReview.organization_id !== access.organizationId
+  ) {
+    return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
   }
 
   const body = await request.json();

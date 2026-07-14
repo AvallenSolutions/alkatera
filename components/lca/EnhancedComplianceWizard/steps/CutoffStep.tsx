@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Plus, X, AlertTriangle, Lightbulb, Sparkles, RotateCcw } from 'lucide-react';
-import { useWizardContext } from '../WizardContext';
+import { useWizardContext, STANDARD_ISO_TEXT } from '../WizardContext';
 import {
   generateAssumptions,
   type AssumptionContext,
@@ -245,6 +245,11 @@ export function CutoffStep() {
           rows={4}
           className="resize-none"
         />
+        {formData.cutoffCriteria === STANDARD_ISO_TEXT.cutoffCriteria && (
+          <p className="text-xs text-muted-foreground">
+            This is alka<strong>tera</strong>&apos;s standard cut-off wording. It suits most drinks LCAs; edit it if your study excludes anything differently.
+          </p>
+        )}
         {!formData.cutoffCriteria.trim() && (
           <Button
             type="button"

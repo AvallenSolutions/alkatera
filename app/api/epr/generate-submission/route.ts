@@ -6,6 +6,7 @@ import { mapActivityToRPD, mapMaterialToRPD, mapNationToRPD, mapRAMRatingToRPD, 
 import { calculateLineFee, getApplicableRate, findFeeRate } from '@/lib/epr/fee-calculator'
 import { isDRSExcluded, isGlassDrinksContainer, processContainerComponents, extractComponentWeights } from '@/lib/epr/drinks-container-rules'
 import { FEE_YEARS, RPD_MATERIAL_NAMES } from '@/lib/epr/constants'
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access'
 import type { EPRFeeRate, RPDMaterialCode, RPDOrganisationSize } from '@/lib/epr/types'
 import type { EPRMaterialType, EPRPackagingActivity, EPRPackagingLevel, EPRRAMRating, EPRUKNation, PackagingCategory } from '@/lib/types/lca'
 
@@ -83,6 +84,11 @@ export async function POST(request: NextRequest) {
     if (!authorized) return NextResponse.json({ error: 'Access denied' }, { status: 403 })
 
     const supabase = getServiceClient()
+
+    // Generating a submission writes rows; advisor read access is not enough
+    // (house rule: every service-role write goes through denyReadOnlyAdvisor).
+    const denied = await denyReadOnlyAdvisor(supabase, user, organizationId)
+    if (denied) return denied
 
     // Fetch EPR settings
     const { data: settings } = await supabase

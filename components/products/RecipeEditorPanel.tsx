@@ -28,6 +28,7 @@ import { BOMImportFlow } from "@/components/products/BOMImportFlow";
 import { stashedLineItemsToExtracted } from "@/lib/bom/parser";
 import type { ExtractedBOMItem } from "@/lib/bom/types";
 import { MaturationProfileCard } from "@/components/products/MaturationProfileCard";
+import { isMaturationEligibleProduct } from "@/lib/maturation-eligibility";
 import { SearchGuidePanel } from "@/components/products/SearchGuidePanel";
 import { RecipeChecklist } from "@/components/products/RecipeChecklist";
 import { PackagingTemplateDialog } from "@/components/products/PackagingTemplateDialog";
@@ -312,9 +313,14 @@ export function RecipeEditorPanel({
 
   // Maturation only earns a tab when there's data or the drink style ages.
   // Hidden tabs cost nothing; permanent irrelevant ones cost attention.
+  // Uses the SAME predicate as the LCA calculator so a profile entered here
+  // can never be silently dropped from the persisted calculation.
   const showMaturationTab =
     hasMaturationProfile ||
-    /whisk|whiskey|rum|brandy|cognac|armagnac|wine|port|sherry|madeira|mead|tequila|mezcal|barrel|cask|aged/i.test(productCategory || '');
+    isMaturationEligibleProduct({
+      productType: (product as any)?.product_type ?? null,
+      category: productCategory,
+    });
 
   const recipeScaleMode = (product?.recipe_scale_mode ?? 'per_unit') as 'per_unit' | 'per_batch';
   const batchYieldValue = product?.batch_yield_value ?? null;

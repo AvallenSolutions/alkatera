@@ -152,7 +152,12 @@ export function CalculationStep() {
 
       const result = await calculateProductLCA({
         productId,
-        functionalUnit: `1 ${product?.unit || 'unit'} of ${product?.name || 'product'}`,
+        // Use the boundary-aware functional unit composed on the Boundary
+        // step when the user has one; the calculator's own size-aware
+        // builder handles the empty case. Hardcoding "1 unit of X" here made
+        // the stored functional_unit flip-flop between this crude string (on
+        // calculate) and the composed one (on the next autosave).
+        functionalUnit: formData.functionalUnit || undefined,
         systemBoundary: boundaryValue,
         referenceYear: formData.referenceYear,
         facilityAllocations:

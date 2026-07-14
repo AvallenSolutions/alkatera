@@ -265,6 +265,9 @@ export async function aggregateProductImpacts(
   let orchardEmissions = 0; // sub-total of rawMaterialsEmissions: on-site orchard growing
   let orchardRemovalsCo2e = 0; // FLAG: orchard soil carbon removals (tracked separately)
   let orchardMethodology: string | null = null; // Captured from first orchard row
+  let arableEmissions = 0; // sub-total of rawMaterialsEmissions: on-site arable growing
+  let arableRemovalsCo2e = 0; // FLAG: arable soil carbon removals (tracked separately)
+  let arableMethodology: string | null = null; // Captured from first arable row
   let packagingEmissions = 0;
   let processingEmissions = 0;
   let distributionEmissions = 0;
@@ -336,9 +339,21 @@ export async function aggregateProductImpacts(
     // Inbound transport is upstream Scope 3 (GHG Protocol Cat 4), so it rides
     // with the material's scope 3 contribution and lifecycle stage bucket
     // (ISO 14044 allocates inbound transport to the material's stage). The
-    // synthetic rows below ([Maturation]/[Viticulture]/[Orchard]) all persist
+    // synthetic rows below ([Maturation]/[Viticulture]/[Orchard]/[Arable]) all persist
     // impact_transport = 0, so transportToAdd only affects real material rows.
-    scope3Emissions += climateWithTransport;
+    //
+    // Exception: maturation warehouse energy. Ageing warehouses are almost
+    // always operated by the producer, so their purchased electricity is
+    // Scope 2 and on-site gas is Scope 1, not Scope 3. The energy source is
+    // carried in the synthetic row's source_reference (e.g. "(grid_electricity)").
+    const isWarehouseEnergyRow = material.material_name === '[Maturation] Warehouse Energy';
+    if (isWarehouseEnergyRow && /\((grid_electricity|renewable|mixed)\)/.test(String((material as any).source_reference || ''))) {
+      scope2Emissions += climateWithTransport;
+    } else if (isWarehouseEnergyRow && /\(natural_gas\)/.test(String((material as any).source_reference || ''))) {
+      scope1Emissions += climateWithTransport;
+    } else {
+      scope3Emissions += climateWithTransport;
+    }
 
     const materialType = (material.material_type || '').toLowerCase();
 
@@ -367,6 +382,16 @@ export async function aggregateProductImpacts(
       orchardEmissions += climateWithTransport;
       if (!orchardMethodology && (material as any).methodology) {
         orchardMethodology = (material as any).methodology;
+      }
+    } else if (material.material_name?.startsWith('[Arable Removals]')) {
+      // FLAG: Arable soil carbon removals tracked separately, never netted.
+      arableRemovalsCo2e += Math.abs(Number((material as any).impact_removals_co2e || 0));
+    } else if (material.material_name?.startsWith('[Arable]')) {
+      // On-site arable growing emissions (fertiliser, fuel, drying, irrigation, land, transport)
+      rawMaterialsEmissions += climateWithTransport;
+      arableEmissions += climateWithTransport;
+      if (!arableMethodology && (material as any).methodology) {
+        arableMethodology = (material as any).methodology;
       }
     } else {
       rawMaterialsEmissions += climateWithTransport;
@@ -431,8 +456,19 @@ export async function aggregateProductImpacts(
     console.log(`[aggregateProductImpacts] Processing ${facilityEmissions.length} facility emissions...`);
 
     for (const fe of facilityEmissions) {
-      // Convert total allocated emissions to per-unit
-      const units = fe.productVolume > 0 ? fe.productVolume : 1;
+      // Convert total allocated emissions to per-unit. A missing or zero
+      // production volume must never silently default to 1: that books the
+      // whole run's emissions against a single unit (a 4,000 kWh run becomes
+      // ~1,000 kg CO2e per bottle). Skip the facility and tell the user.
+      if (!(fe.productVolume > 0)) {
+        calculationWarnings.push(
+          `The facility "${fe.facilityName}" has no valid production volume for this product, so its processing emissions were left out of this calculation. ` +
+          `Edit the facility step and enter how many units of this product were made there, then recalculate.`
+        );
+        console.warn(`[aggregateProductImpacts] ⚠️ Skipping ${fe.facilityName}: productVolume=${fe.productVolume} (invalid)`);
+        continue;
+      }
+      const units = fe.productVolume;
       const perUnitEmissions = fe.allocatedEmissions / units;
       const perUnitScope1 = fe.scope1Emissions / units;
       const perUnitScope2 = fe.scope2Emissions / units;
@@ -524,12 +560,56 @@ export async function aggregateProductImpacts(
       totalClimate += useResult.total;
       totalClimateFossil += useResult.refrigeration; // Refrigeration is fossil-based electricity
       totalCO2Fossil += useResult.refrigeration;
-      totalClimateBiogenic += useResult.carbonation; // Carbonation is biogenic CO2
-      totalCO2Biogenic += useResult.carbonation;
+      // Carbonation origin depends on the CO2 source: fermentation CO2
+      // (beer, sparkling wine) is biogenic, but soft drinks and most RTDs
+      // are carbonated with fossil-derived industrial CO2 (ammonia-plant
+      // by-product). Booking everything biogenic misstated the ISO 14067
+      // origin split for every carbonated soft drink.
+      if (usePhaseConfig.carbonationType === 'soft_drink') {
+        totalClimateFossil += useResult.carbonation;
+        totalCO2Fossil += useResult.carbonation;
+      } else {
+        totalClimateBiogenic += useResult.carbonation; // Fermentation CO2 is biogenic
+        totalCO2Biogenic += useResult.carbonation;
+      }
 
-      console.log(`[aggregateProductImpacts] Use phase: ${useResult.total.toFixed(6)} kg CO2e (refrigeration: ${useResult.refrigeration.toFixed(6)}, carbonation: ${useResult.carbonation.toFixed(6)})`);
+      console.log(`[aggregateProductImpacts] Use phase: ${useResult.total.toFixed(6)} kg CO2e (refrigeration: ${useResult.refrigeration.toFixed(6)}, carbonation: ${useResult.carbonation.toFixed(6)}, carbonation origin: ${usePhaseConfig.carbonationType === 'soft_drink' ? 'fossil (industrial CO2)' : 'biogenic (fermentation)'})`);
     } else {
       console.log('[aggregateProductImpacts] Use phase: skipped (no volume data)');
+    }
+  }
+
+  // 9a-ter. Retail refrigeration at Cradle-to-Shelf. The retail share of
+  // chilled storage happens BEFORE the consumer buys the product, so a
+  // shelf-boundary study must include it even though the use-phase step (a
+  // consumer-boundary concept) is excluded. Without this, chilled RTDs sold
+  // at shelf boundary carried zero retail chiller energy.
+  if (
+    !isStageIncluded(effectiveBoundary, 'use_phase') &&
+    isStageIncluded(effectiveBoundary, 'distribution') &&
+    usePhaseConfig
+  ) {
+    const { data: productForVolume } = await supabase
+      .from('products')
+      .select('unit_size_value, unit_size_unit')
+      .eq('id', lcaData?.product_id)
+      .single();
+    const volumeLitres = productForVolume?.unit_size_unit === 'ml'
+      ? Number(productForVolume.unit_size_value || 0) / 1000
+      : productForVolume?.unit_size_unit === 'L' || productForVolume?.unit_size_unit === 'l'
+        ? Number(productForVolume.unit_size_value || 0)
+        : Number(productForVolume?.unit_size_value || 0) / 1000;
+    if (volumeLitres > 0) {
+      const useResult = calculateUsePhaseEmissions(usePhaseConfig, volumeLitres);
+      const retailRefrigeration = useResult.breakdown?.retailRefrigeration ?? 0;
+      if (retailRefrigeration > 0) {
+        usePhaseEmissions += retailRefrigeration;
+        scope3Emissions += retailRefrigeration;
+        totalClimate += retailRefrigeration;
+        totalClimateFossil += retailRefrigeration;
+        totalCO2Fossil += retailRefrigeration;
+        console.log(`[aggregateProductImpacts] Retail refrigeration at shelf boundary: ${retailRefrigeration.toFixed(6)} kg CO2e`);
+      }
     }
   }
 
@@ -639,10 +719,17 @@ export async function aggregateProductImpacts(
       const containerMaterial = (material as any).container_material || '';
       const factorKey = getMaterialFactorKey(containerMaterial || packagingCategory || 'other', material.material_name, factorName);
 
-      // Get user pathway overrides from the wizard (keyed by material ID or factorKey).
-      // If none set, derive overrides from the material's stored circularity fields
-      // so a firkin marked "reuse" isn't defaulted to the regional recycling mix.
-      let pathwayOverrides = eolConfig?.pathways?.[material.id] || eolConfig?.pathways?.[factorKey];
+      // Get user pathway overrides from the wizard. The wizard keys pathways
+      // by the product_materials row id it loaded pre-calculation, which is
+      // carried onto this PCF row as source_material_id — that key is the one
+      // that actually matches. material.id (the freshly inserted PCF row id)
+      // is kept for completeness and factorKey for legacy configs.
+      let pathwayOverrides =
+        ((material as any).source_material_id
+          ? eolConfig?.pathways?.[(material as any).source_material_id]
+          : undefined) ||
+        eolConfig?.pathways?.[material.id] ||
+        eolConfig?.pathways?.[factorKey];
 
       // Self-heal stale overrides: if the material was reclassified since the
       // override was seeded (e.g. a glass bottle once read as 'other'), the
@@ -1137,6 +1224,7 @@ export async function aggregateProductImpacts(
         inbound_containers: containerEmissions, // sub-item of raw_materials (already included in that total)
         viticulture: viticultureEmissions, // sub-item of raw_materials: on-site vineyard growing (already included)
         orchard: orchardEmissions, // sub-item of raw_materials: on-site orchard growing (already included)
+        arable: arableEmissions, // sub-item of raw_materials: on-site arable growing (already included)
         processing: processingEmissions,
         packaging: packagingEmissions,
         distribution: distributionEmissions,
@@ -1147,14 +1235,15 @@ export async function aggregateProductImpacts(
       // reported SEPARATELY from emissions per FLAG Guidance v1.2.
       // These are NEVER subtracted from total_carbon_footprint.
       flag_removals: {
-        soil_carbon_co2e: viticultureRemovalsCo2e + orchardRemovalsCo2e,
-        methodology: (viticultureRemovalsCo2e + orchardRemovalsCo2e) > 0 ? 'practice_based_default' : null,
+        soil_carbon_co2e: viticultureRemovalsCo2e + orchardRemovalsCo2e + arableRemovalsCo2e,
+        methodology: (viticultureRemovalsCo2e + orchardRemovalsCo2e + arableRemovalsCo2e) > 0 ? 'practice_based_default' : null,
         viticulture_notes: viticultureMethodology,
         orchard_notes: orchardMethodology,
+        arable_notes: arableMethodology,
       },
       // FLAG threshold assessment (SBTi FLAG Guidance v1.2)
       flag_threshold: (() => {
-        const flagEmissionsCo2e = viticultureEmissions + orchardEmissions;
+        const flagEmissionsCo2e = viticultureEmissions + orchardEmissions + arableEmissions;
         const nonFlagEmissionsCo2e = totalCarbonFootprint - flagEmissionsCo2e;
         const flagEmissionsPct = totalCarbonFootprint > 0
           ? (flagEmissionsCo2e / totalCarbonFootprint) * 100
@@ -1353,7 +1442,10 @@ export async function aggregateProductImpacts(
     // Per-facility processing detail for report transparency
     facility_detail: facilityEmissions && facilityEmissions.length > 0
       ? facilityEmissions.map(fe => {
-          const units = fe.productVolume > 0 ? fe.productVolume : 1;
+          // Mirrors the skip guard in the facility loop above: an invalid
+          // volume reports zeros (excluded) rather than whole-run figures.
+          const hasValidVolume = fe.productVolume > 0;
+          const units = hasValidVolume ? fe.productVolume : 1;
           return {
             facility_name: fe.facilityName,
             country_code: fe.countryCode || null,
@@ -1361,12 +1453,13 @@ export async function aggregateProductImpacts(
             data_source: fe.dataSource || 'facility_allocation',
             attribution_ratio: fe.attributionRatio,
             production_volume: fe.productVolume,
+            excluded_invalid_volume: !hasValidVolume || undefined,
             // Per-unit values (consistent with other impacts in aggregated_impacts)
-            per_unit_total: fe.allocatedEmissions / units,
-            per_unit_scope1: fe.scope1Emissions / units,
-            per_unit_scope2: fe.scope2Emissions / units,
-            per_unit_water_litres: fe.allocatedWater / units,
-            per_unit_waste_kg: fe.allocatedWaste / units,
+            per_unit_total: hasValidVolume ? fe.allocatedEmissions / units : 0,
+            per_unit_scope1: hasValidVolume ? fe.scope1Emissions / units : 0,
+            per_unit_scope2: hasValidVolume ? fe.scope2Emissions / units : 0,
+            per_unit_water_litres: hasValidVolume ? fe.allocatedWater / units : 0,
+            per_unit_waste_kg: hasValidVolume ? fe.allocatedWaste / units : 0,
             electricity_kwh: fe.electricityKwh || 0,
             grid_emission_factor: fe.gridEmissionFactor || null,
             energy_breakdown: fe.energyBreakdown || [],
@@ -1462,16 +1555,20 @@ export async function aggregateProductImpacts(
     return { success: false, total_carbon_footprint: 0, impacts: {}, materials_count: 0, production_sites_count: 0, error: `Failed to update LCA: ${updateError.message}` };
   }
 
-  // 12b. Remove old completed PCFs for the same product.
+  // 12b. Supersede old completed PCFs for the same product.
   // Each calculation creates a new PCF record. Without this cleanup, multiple
   // completed records exist and pages relying on ORDER BY can pick different ones,
   // causing discrepancies (e.g. product page shows 1.95 while passport shows 1.43).
-  // We mark old records as 'draft' (valid_status only allows draft/pending/completed/failed)
-  // to ensure only ONE completed PCF per product.
+  // Old records become 'superseded' — the migration that dropped the redundant
+  // valid_status CHECK made the value usable. The previous workaround demoted
+  // them to 'draft', which the wizard's resume query then picked up as the
+  // most recent in-progress draft (supersede bumps updated_at), presenting a
+  // historical record as "resume where you left off" and eventually promoting
+  // it back to completed. Version history became a shell game.
   if (lcaData?.product_id) {
     const { error: supersedeError } = await supabase
       .from('product_carbon_footprints')
-      .update({ status: 'draft', updated_at: new Date().toISOString() })
+      .update({ status: 'superseded', updated_at: new Date().toISOString() })
       .eq('product_id', lcaData.product_id)
       .eq('status', 'completed')
       .neq('id', productCarbonFootprintId);

@@ -32,6 +32,30 @@ describe('getMaterialFactorKey', () => {
     expect(getMaterialFactorKey('glass_bottle')).toBe('glass');
   });
 
+  // Keyword regression tests: names that previously classified as 'other'
+  // (harsh 1.5 kg CO2e/kg incineration factor) or as the wrong material.
+  it('classifies a generic drinks can as aluminium', () => {
+    expect(getMaterialFactorKey('container', '330ml Can')).toBe('aluminium');
+    expect(getMaterialFactorKey('container', 'Cans')).toBe('aluminium');
+  });
+
+  it('keeps tin cans as steel (more specific rule wins)', () => {
+    expect(getMaterialFactorKey('container', 'Tin Can')).toBe('steel');
+  });
+
+  it('does not classify Pet Nat wine as PET plastic', () => {
+    expect(getMaterialFactorKey('container', 'Pet Nat 750ml')).not.toBe('pet');
+  });
+
+  it('classifies PP labels and shrink wrap as plastic, not paper', () => {
+    expect(getMaterialFactorKey('label', 'PP Label')).toBe('hdpe');
+    expect(getMaterialFactorKey('secondary', 'Shrink Wrap')).toBe('hdpe');
+  });
+
+  it('still classifies paper labels as paper', () => {
+    expect(getMaterialFactorKey('label', 'Paper Label')).toBe('paper');
+  });
+
   it('maps glass_jar to glass', () => {
     expect(getMaterialFactorKey('glass_jar')).toBe('glass');
   });

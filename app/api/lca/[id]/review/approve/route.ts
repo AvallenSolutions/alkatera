@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
-import { resolveUserOrganization } from '@/lib/supabase/resolve-organization';
+import { verifyPcfAccess } from '@/lib/lca/verify-pcf-access';
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access';
 
 /**
  * POST /api/lca/[id]/review/approve
@@ -17,20 +18,15 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Verify the caller's org owns this PCF before mutating its review.
+  // Verify the caller has access to the PCF's org before mutating its review.
   // The service-role client bypasses RLS, so this app-level check is required.
-  const { organizationId, error: orgError } = await resolveUserOrganization(client, user);
-  if (orgError || !organizationId) {
-    return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+  const access = await verifyPcfAccess(client, user, pcfId);
+  if (!access.ok) {
+    return NextResponse.json({ error: 'Not found' }, { status: access.status });
   }
-  const { data: pcf } = await client
-    .from('product_carbon_footprints')
-    .select('organization_id')
-    .eq('id', pcfId)
-    .single();
-  if (!pcf || pcf.organization_id !== organizationId) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
+
+  const denied = await denyReadOnlyAdvisor(client, user, access.organizationId);
+  if (denied) return denied;
 
   // Get the active review
   const { data: review, error: reviewError } = await client
@@ -75,11 +71,19 @@ export async function POST(
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
-  // Update PCF status
-  await client
+  // Review state lives in review_status: writing 'approved' into the
+  // lifecycle status column violated its CHECK constraint (silently), and
+  // would have hidden the approved PCF from every status='completed'
+  // consumer (multipacks, pinned factors, product pages) had it succeeded.
+  const { error: statusError } = await client
     .from('product_carbon_footprints')
-    .update({ status: 'approved', updated_at: new Date().toISOString() })
+    .update({ review_status: 'approved', updated_at: new Date().toISOString() })
     .eq('id', pcfId);
+
+  if (statusError) {
+    console.error('Failed to set review_status:', statusError);
+    return NextResponse.json({ error: 'Review approved but its status could not be recorded. Please retry.' }, { status: 500 });
+  }
 
   return NextResponse.json({ success: true, status: 'approved' });
 }
