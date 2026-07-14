@@ -123,7 +123,7 @@ export const handler = async (event: { body?: string | null; headers: Record<str
       orgContext: orgContext ?? undefined,
     });
 
-    const shaped = shapeIngestResult(result.type, result.payload, job.stash_path);
+    const shaped = shapeIngestResult(result.type, result.payload, job.stash_path, result.meta);
 
     await updateJob({
       status: 'completed',

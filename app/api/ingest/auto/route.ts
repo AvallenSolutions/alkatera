@@ -125,7 +125,7 @@ async function runInlineClassifier(
     // path too. Without it, historical-report source PDFs are never preserved
     // and the bom / spray_diary / soil_carbon_evidence handoffs silently
     // degrade to "re-upload the file" for every file under the inline ceiling.
-    const shaped = shapeIngestResult(result.type, result.payload, stashPath)
+    const shaped = shapeIngestResult(result.type, result.payload, stashPath, result.meta)
     await updateJob({
       status: 'completed',
       phase_message: null,
@@ -194,6 +194,8 @@ export type IngestResultType =
 
 export interface IngestResponse {
   type: IngestResultType
+  /** Classifier's self-reported confidence; captured for the learning loop. */
+  classifierMeta?: { confidence?: 'high' | 'medium' | 'low'; alternate?: string }
   utilityBill?: ExtractedBillData
   smartMeter?: {
     format: 'long' | 'wide'

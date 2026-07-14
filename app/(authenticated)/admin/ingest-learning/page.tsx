@@ -11,7 +11,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Brain, Loader2, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react'
+import { Brain, Loader2, AlertCircle, ChevronDown, ChevronRight, ArrowRight, FlaskConical } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { toast } from 'sonner'
 import { useIsAlkateraAdmin } from '@/hooks/usePermissions'
 import { format } from 'date-fns'
 
@@ -20,6 +22,9 @@ interface PerTypeStat {
   total: number
   edited: number
   edit_rate: number
+  misclassified: number
+  misclassification_rate: number
+  dismissed: number
 }
 
 interface TopSupplier {
@@ -28,6 +33,24 @@ interface TopSupplier {
   times_seen: number
   hints: Record<string, unknown>
   last_seen_at: string
+  match_kind: string
+  organization_name: string | null
+}
+
+interface ConfusionPair {
+  from: string
+  to: string
+  count: number
+}
+
+interface Misclassification {
+  id: string
+  created_at: string
+  job_id: string | null
+  result_type: string
+  corrected_result_type: string | null
+  file_name: string | null
+  has_stash: boolean
   organization_name: string | null
 }
 
@@ -48,7 +71,31 @@ export default function IngestLearningPage() {
   const [perType, setPerType] = useState<PerTypeStat[]>([])
   const [topSuppliers, setTopSuppliers] = useState<TopSupplier[]>([])
   const [recent, setRecent] = useState<RecentFeedback[]>([])
+  const [confusionPairs, setConfusionPairs] = useState<ConfusionPair[]>([])
+  const [misclassifications, setMisclassifications] = useState<Misclassification[]>([])
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [promoting, setPromoting] = useState<string | null>(null)
+  const [promoted, setPromoted] = useState<Set<string>>(new Set())
+
+  const promoteToCorpus = async (m: Misclassification) => {
+    if (!m.job_id || promoting) return
+    setPromoting(m.id)
+    try {
+      const res = await fetch('/api/admin/ingest-learning/promote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: m.job_id }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body?.error || 'Promote failed')
+      setPromoted((prev) => new Set(prev).add(m.id))
+      toast.success(`Added to the eval corpus as ${body.expectedType}`)
+    } catch (err: any) {
+      toast.error(err.message || 'Could not promote this file')
+    } finally {
+      setPromoting(null)
+    }
+  }
 
   useEffect(() => {
     if (adminLoading || !isAdmin) return
@@ -60,6 +107,8 @@ export default function IngestLearningPage() {
         setPerType(body.perType || [])
         setTopSuppliers(body.topSuppliers || [])
         setRecent(body.recent || [])
+        setConfusionPairs(body.confusionPairs || [])
+        setMisclassifications(body.misclassifications || [])
       })
       .catch(() => {
         if (!cancelled) setError('Could not load learning stats.')
@@ -130,6 +179,8 @@ export default function IngestLearningPage() {
                       <TableHead className="text-right">Confirmed</TableHead>
                       <TableHead className="text-right">Edited</TableHead>
                       <TableHead className="text-right">Edit rate</TableHead>
+                      <TableHead className="text-right">Wrong type</TableHead>
+                      <TableHead className="text-right">Dismissed</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -143,10 +194,91 @@ export default function IngestLearningPage() {
                             {t.edit_rate}%
                           </Badge>
                         </TableCell>
+                        <TableCell className="text-right">
+                          <Badge variant={t.misclassification_rate > 20 ? 'destructive' : 'outline'}>
+                            {t.misclassified}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-xs text-muted-foreground">{t.dismissed}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <FlaskConical className="h-4 w-4" />
+                Misclassifications
+              </CardTitle>
+              <CardDescription>
+                Documents the user reclassified via &quot;Change document type&quot;. Promote a file to
+                the eval corpus to make it a permanent regression test for the classifier.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {misclassifications.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No type corrections recorded yet.</p>
+              ) : (
+                <div className="space-y-4">
+                  {confusionPairs.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {confusionPairs.map((c) => (
+                        <Badge key={`${c.from}-${c.to}`} variant="secondary" className="font-mono text-[11px]">
+                          {c.from} <ArrowRight className="h-3 w-3 mx-1" /> {c.to} ×{c.count}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>When</TableHead>
+                        <TableHead>File</TableHead>
+                        <TableHead>Read as</TableHead>
+                        <TableHead>Corrected to</TableHead>
+                        <TableHead>Organisation</TableHead>
+                        <TableHead className="text-right">Eval corpus</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {misclassifications.map((m) => (
+                        <TableRow key={m.id}>
+                          <TableCell className="text-xs whitespace-nowrap">
+                            {format(new Date(m.created_at), 'd MMM HH:mm')}
+                          </TableCell>
+                          <TableCell className="text-xs max-w-[220px] truncate">{m.file_name || '—'}</TableCell>
+                          <TableCell className="font-mono text-xs">{m.result_type}</TableCell>
+                          <TableCell className="font-mono text-xs">{m.corrected_result_type || '—'}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{m.organization_name || '—'}</TableCell>
+                          <TableCell className="text-right">
+                            {promoted.has(m.id) ? (
+                              <Badge variant="outline">Added</Badge>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs"
+                                disabled={!m.job_id || !m.has_stash || promoting === m.id}
+                                title={!m.has_stash ? 'The stashed file has been pruned' : undefined}
+                                onClick={() => promoteToCorpus(m)}
+                              >
+                                {promoting === m.id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  'Promote'
+                                )}
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -173,7 +305,14 @@ export default function IngestLearningPage() {
                   <TableBody>
                     {topSuppliers.map((s, i) => (
                       <TableRow key={`${s.supplier_key}-${s.result_type}-${i}`}>
-                        <TableCell className="font-medium">{s.supplier_key}</TableCell>
+                        <TableCell className="font-medium">
+                          {s.supplier_key}
+                          {s.match_kind === 'filename' && (
+                            <Badge variant="outline" className="ml-2 text-[10px]">
+                              filename pattern
+                            </Badge>
+                          )}
+                        </TableCell>
                         <TableCell className="font-mono text-xs">{s.result_type}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{s.organization_name || '—'}</TableCell>
                         <TableCell className="text-right">{s.times_seen}</TableCell>

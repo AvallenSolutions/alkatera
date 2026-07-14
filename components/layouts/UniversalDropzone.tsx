@@ -48,7 +48,7 @@ import {
   saveWaterBill,
   saveWasteBill,
 } from '@/lib/ingest/save-extracted'
-import type { IngestResponse } from '@/app/api/ingest/auto/route'
+import type { IngestResponse, IngestResultType } from '@/app/api/ingest/auto/route'
 import type { ExtractedBillData } from '@/app/api/utilities/import-from-pdf/route'
 
 type Step = 'upload' | 'analysing' | 'review' | 'saving' | 'saved'
@@ -72,6 +72,88 @@ interface UniversalDropzoneProps {
   /** Fired once the supplied `file` has been picked up, so the parent can
    *  clear its own state and avoid re-processing the same file. */
   onFileConsumed?: () => void
+}
+
+// Types whose review panel is a handoff (navigate elsewhere to finish), not a
+// save. Closing the dialog on these is part of the happy path, so it must not
+// be recorded as a dismissal.
+const HANDOFF_TYPES = new Set<IngestResultType>([
+  'spray_diary',
+  'bom',
+  'soil_carbon_evidence',
+  'bulk_xlsx',
+  'accounts_csv',
+  'hospitality_menu',
+  'pos_sales_export',
+  'unsupported',
+])
+
+// Plain-language labels for every document type the user can correct to.
+// Mirrors VALID_TARGETS on /api/ingest/auto/[jobId]/reclassify.
+const TYPE_LABELS: Partial<Record<IngestResultType, string>> = {
+  utility_bill: 'Energy bill',
+  water_bill: 'Water bill',
+  waste_bill: 'Waste invoice',
+  supplier_invoice: 'Supplier invoice',
+  freight_invoice: 'Freight invoice',
+  refrigerant_service: 'Refrigerant service record',
+  packaging_spec: 'Packaging specification',
+  supplier_coa: 'Supplier certificate or spec sheet',
+  certification: 'Certification',
+  soil_carbon_lab: 'Soil lab report',
+  soil_carbon_evidence: 'Soil carbon evidence',
+  bom: 'Product recipe (BOM)',
+  spray_diary: 'Spray diary',
+  bulk_xlsx: 'Product import workbook',
+  accounts_csv: 'Accounts export',
+  smart_meter_csv: 'Smart-meter data',
+  historical_sustainability_report: 'Past sustainability report',
+  historical_lca_report: 'Past LCA report',
+  hospitality_menu: 'Menu',
+  pos_sales_export: 'POS sales export',
+}
+
+/**
+ * "Wrong document type?" affordance shown above every review panel. Picking a
+ * type re-runs extraction on the stashed file with that type forced, and the
+ * correction is recorded so the classifier learns from it.
+ */
+function ChangeTypeMenu({
+  currentType,
+  onReclassify,
+}: {
+  currentType: IngestResultType
+  onReclassify: (t: IngestResultType) => void
+}) {
+  const currentLabel = TYPE_LABELS[currentType]
+  const options = (Object.keys(TYPE_LABELS) as IngestResultType[]).filter(
+    (t) => t !== currentType,
+  )
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-md border border-dashed px-3 py-1.5">
+      <span className="text-xs text-muted-foreground">
+        {currentLabel ? (
+          <>
+            Read as <span className="font-medium text-foreground">{currentLabel}</span>. Not right?
+          </>
+        ) : (
+          'Know what this document is?'
+        )}
+      </span>
+      <Select onValueChange={(v) => onReclassify(v as IngestResultType)}>
+        <SelectTrigger className="h-7 w-auto gap-1 border-none text-xs text-primary shadow-none">
+          <SelectValue placeholder="Change document type" />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((t) => (
+            <SelectItem key={t} value={t}>
+              {TYPE_LABELS[t]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
 }
 
 export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDropzoneProps) {
@@ -139,6 +221,13 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
   }, [open, orgId])
 
   const handleOpenChange = (next: boolean) => {
+    // Weak learning signal, metrics only: the user closed a review panel
+    // without saving or correcting it. Handoff types are excluded — their
+    // panels close the dialog as part of a successful navigation — so a
+    // dismissal here means a save-type panel was abandoned.
+    if (!next && step === 'review' && jobId && result && !HANDOFF_TYPES.has(result.type)) {
+      recordFeedback({}, { dismissed: true })
+    }
     setOpen(next)
     if (!next) reset()
   }
@@ -304,14 +393,62 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
     (savedPayload: Record<string, unknown>, context?: Record<string, unknown>) => {
       if (!jobId) return
       try {
+        // Ride the classifier's self-reported confidence along so the admin
+        // page can chart confidence against the correction rate.
+        const meta = result?.classifierMeta
+        const fullContext = meta ? { ...context, classifier_meta: meta } : context
         void fetch('/api/ingest/feedback', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           keepalive: true,
-          body: JSON.stringify({ jobId, savedPayload, context }),
+          body: JSON.stringify({ jobId, savedPayload, context: fullContext }),
         }).catch(() => {})
       } catch {
         // never surface
+      }
+    },
+    [jobId, result],
+  )
+
+  // "Change document type": re-run extraction with the user's chosen type
+  // forced. On failure the previous result stays on screen.
+  const handleReclassify = useCallback(
+    async (targetType: IngestResultType) => {
+      if (!jobId) return
+      setStep('analysing')
+      setPhaseMessage(`Re-reading as ${TYPE_LABELS[targetType]?.toLowerCase() ?? 'the chosen type'}…`)
+      try {
+        const res = await fetch(`/api/ingest/auto/${jobId}/reclassify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetType }),
+        })
+        const body = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(body?.error || 'Could not change the document type')
+        const data = body.result as IngestResponse
+        setResult(data)
+        // Same bill pre-fill as the classify path.
+        const bill =
+          data.type === 'utility_bill'
+            ? data.utilityBill
+            : data.type === 'water_bill'
+              ? data.waterBill
+              : data.type === 'waste_bill'
+                ? data.wasteBill
+                : null
+        if (bill) {
+          setPeriodStart(bill.period_start ?? '')
+          setPeriodEnd(bill.period_end ?? '')
+          if (bill.supplier_name) {
+            setBillName(
+              `${bill.supplier_name} ${bill.period_start ?? ''} to ${bill.period_end ?? ''}`.trim(),
+            )
+          }
+        }
+        setStep('review')
+      } catch (err: any) {
+        toast.error(err.message || 'Could not change the document type')
+        setStep('review')
       }
     },
     [jobId],
@@ -481,6 +618,8 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
         )}
 
         {step === 'review' && result && (
+          <div className="space-y-3">
+          {jobId && <ChangeTypeMenu currentType={result.type} onReclassify={handleReclassify} />}
           <ReviewPanel
             result={result}
             facilities={facilities}
@@ -502,6 +641,7 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
             onClose={() => handleOpenChange(false)}
             onSaved={recordFeedback}
           />
+          </div>
         )}
 
         {step === 'saving' && (

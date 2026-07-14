@@ -10,6 +10,7 @@ import { parseImportXLSX } from '../bulk-import/xlsx-parser';
 import { parseHalfHourlyCsv } from '../energy/hh-csv-parser';
 import { readingsSpan, deriveMonthlyEntries } from '../energy/derive-utility';
 import { logClaudeUsage } from '../ai/usage-log';
+import { workbookToText, csvToText, sanitiseFileName } from './spreadsheet-text';
 
 /**
  * Shared Smart Upload classifier.
@@ -20,9 +21,11 @@ import { logClaudeUsage } from '../ai/usage-log';
  * shape, so the client dispatches exactly as it did before the move to an
  * async job pattern.
  *
- * Also handles the deterministic paths (XLSX product workbook / spray diary,
- * CSV) that don't need Claude at all — we route everything through the job
- * so the client has one consistent shape to poll.
+ * Every input kind reaches Claude: PDFs and images as native binary blocks,
+ * spreadsheets and CSVs serialised to bounded text (see spreadsheet-text.ts).
+ * Only two deterministic fast paths remain, where the signature is
+ * near-certain: half-hourly smart-meter CSVs and the platform's own bulk
+ * product-import workbook template.
  */
 
 // Tool-forced classification with document/vision input; no thinking needed.
@@ -112,6 +115,8 @@ export type ClassifierResultType =
 export interface ClassifierResult {
   type: ClassifierResultType;
   payload: Record<string, unknown>;
+  /** Self-reported classification confidence, captured for the learning loop. */
+  meta?: { confidence?: 'high' | 'medium' | 'low'; alternate?: string };
 }
 
 export interface ClassifierInput {
@@ -133,6 +138,19 @@ export interface ClassifierInput {
  * Netlify background function and the inline-fallback in /api/ingest/auto.
  */
 export function shapeIngestResult(
+  type: string,
+  payload: Record<string, unknown>,
+  stashId: string,
+  meta?: ClassifierResult['meta'],
+): { result_type: string; result_payload: Record<string, unknown> } {
+  const shaped = shapeIngestResultInner(type, payload, stashId);
+  if (meta && Object.keys(meta).length > 0) {
+    shaped.result_payload = { ...shaped.result_payload, classifierMeta: meta };
+  }
+  return shaped;
+}
+
+function shapeIngestResultInner(
   type: string,
   payload: Record<string, unknown>,
   stashId: string,
@@ -223,20 +241,104 @@ export function shapeIngestResult(
   }
 }
 
-export async function classifyDocument(input: ClassifierInput): Promise<ClassifierResult> {
-  const { fileBytes, fileName, fileMime, orgContext } = input;
+export type ClassifierFileKind = 'csv' | 'xlsx' | 'pdf' | 'image' | 'other';
+
+export function detectFileKind(fileName: string, fileMime: string): ClassifierFileKind {
   const lowerName = fileName.toLowerCase();
-  const isXlsx =
+  if (lowerName.endsWith('.csv') || fileMime === 'text/csv' || fileMime === 'application/csv') {
+    return 'csv';
+  }
+  if (
     lowerName.endsWith('.xlsx') ||
     lowerName.endsWith('.xls') ||
     fileMime === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-    fileMime === 'application/vnd.ms-excel';
-  const isCsv = lowerName.endsWith('.csv') || fileMime === 'text/csv' || fileMime === 'application/csv';
-  const isPdf = fileMime === 'application/pdf' || lowerName.endsWith('.pdf');
-  const isImage = fileMime.startsWith('image/');
+    fileMime === 'application/vnd.ms-excel'
+  ) {
+    return 'xlsx';
+  }
+  if (fileMime === 'application/pdf' || lowerName.endsWith('.pdf')) return 'pdf';
+  if (fileMime.startsWith('image/')) return 'image';
+  return 'other';
+}
 
-  if (isCsv) {
+type ClassifierContentBlock =
+  | { type: 'document'; source: { type: 'base64'; media_type: 'application/pdf'; data: string } }
+  | {
+      type: 'image';
+      source: { type: 'base64'; media_type: 'image/jpeg' | 'image/png' | 'image/webp'; data: string };
+    }
+  | { type: 'text'; text: string };
+
+const UNSUPPORTED_REASON =
+  'Unsupported file type. Upload a PDF, image (JPEG/PNG/WebP), spreadsheet or CSV.';
+
+/**
+ * Build the content block Claude reads. PDFs and images go as native binary
+ * blocks; spreadsheets and CSVs are serialised to bounded CSV text (Claude
+ * cannot read xlsx/csv bytes natively). Pass `preparsedWorkbook` when the
+ * caller has already run XLSX.read, so the file is not parsed twice.
+ * Returns null for unsupported kinds.
+ */
+export function buildClassifierContent(
+  fileBytes: Uint8Array,
+  fileName: string,
+  fileMime: string,
+  preparsedWorkbook?: XLSX.WorkBook,
+): ClassifierContentBlock | null {
+  const kind = detectFileKind(fileName, fileMime);
+  if (kind === 'pdf' || kind === 'image') {
+    const base64Data = Buffer.from(fileBytes).toString('base64');
+    return kind === 'pdf'
+      ? {
+          type: 'document',
+          source: { type: 'base64', media_type: 'application/pdf', data: base64Data },
+        }
+      : {
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: fileMime as 'image/jpeg' | 'image/png' | 'image/webp',
+            data: base64Data,
+          },
+        };
+  }
+  if (kind === 'csv') {
+    return {
+      type: 'text',
+      text: `<spreadsheet_content>\n${csvToText(fileBytes, fileName)}\n</spreadsheet_content>`,
+    };
+  }
+  if (kind === 'xlsx') {
+    const wb = preparsedWorkbook ?? XLSX.read(toArrayBuffer(fileBytes), { type: 'array' });
+    return {
+      type: 'text',
+      text: `<spreadsheet_content>\n${workbookToText(wb, fileName)}\n</spreadsheet_content>`,
+    };
+  }
+  return null;
+}
+
+/** Create a proper ArrayBuffer slice so it's not a SharedArrayBuffer view. */
+function toArrayBuffer(fileBytes: Uint8Array): ArrayBuffer {
+  return fileBytes.buffer.slice(
+    fileBytes.byteOffset,
+    fileBytes.byteOffset + fileBytes.byteLength,
+  ) as ArrayBuffer;
+}
+
+export async function classifyDocument(input: ClassifierInput): Promise<ClassifierResult> {
+  const { fileBytes, fileName, fileMime, orgContext } = input;
+  const kind = detectFileKind(fileName, fileMime);
+
+  if (kind === 'other') {
+    return { type: 'unsupported', payload: { reason: UNSUPPORTED_REASON } };
+  }
+
+  let preparsedWorkbook: XLSX.WorkBook | undefined;
+
+  if (kind === 'csv') {
     // Half-hourly smart-meter export? ("long" timestamp+kWh, or "wide" date+48 cols.)
+    // Near-certain signature, so this deterministic fast path stays free.
     const hh = parseHalfHourlyCsv(fileBytes);
     if (hh.format !== 'unknown' && hh.readings.length >= 48) {
       const span = readingsSpan(hh.readings);
@@ -252,27 +354,21 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
         },
       };
     }
-    return {
-      type: 'accounts_csv',
-      payload: {
-        note: 'Detected as an accounting CSV. Use the Xero / spend-data flow to import it.',
-      },
-    };
+    // Any other CSV goes to Claude as serialised text. The old accounts_csv
+    // catch-all misfiled every non-ledger CSV; a ledger export is now one of
+    // the choosable tools (identify_accounts_csv) instead.
   }
 
-  if (isXlsx) {
-    // Create a proper ArrayBuffer slice so it's not a SharedArrayBuffer view.
-    const buffer = fileBytes.buffer.slice(
-      fileBytes.byteOffset,
-      fileBytes.byteOffset + fileBytes.byteLength,
-    );
+  if (kind === 'xlsx') {
+    const buffer = toArrayBuffer(fileBytes);
     const wb = XLSX.read(buffer, { type: 'array' });
     const sheetNames = wb.SheetNames || [];
     const hasProductSheet = sheetNames.some((n) =>
       ['products', 'ingredients', 'packaging'].includes(n.trim().toLowerCase()),
     );
     if (hasProductSheet) {
-      const parsed = parseImportXLSX(buffer as ArrayBuffer);
+      // The platform's own bulk-import template — near-certain, stays free.
+      const parsed = parseImportXLSX(buffer);
       return {
         type: 'bulk_xlsx',
         payload: {
@@ -286,36 +382,164 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
         },
       };
     }
-    return {
-      type: 'spray_diary',
-      payload: { sheetNames: sheetNames.slice(0, 20) },
-    };
+    // Every other workbook goes to Claude on its serialised sheets. The old
+    // code defaulted every non-template workbook to spray_diary, which
+    // misfiled recipes, ledgers and anything else arriving as a spreadsheet.
+    preparsedWorkbook = wb;
   }
 
-  if (!isPdf && !isImage) {
+  const contentBlock = buildClassifierContent(fileBytes, fileName, fileMime, preparsedWorkbook);
+  if (!contentBlock) {
+    return { type: 'unsupported', payload: { reason: UNSUPPORTED_REASON } };
+  }
+
+  return callClassifier({ contentBlock, fileName, orgContext, usageTag: 'ingest_classify' });
+}
+
+/**
+ * Which classifier tool extracts each user-selectable document type. Drives
+ * the "Change document type" reclassify flow: the client offers these types
+ * and the server re-runs extraction with tool_choice forced to the mapped
+ * tool. bulk_xlsx and smart_meter_csv are deterministic parsers, not tools,
+ * and are special-cased in extractWithForcedTool.
+ */
+export const RECLASSIFY_TARGETS: Partial<Record<ClassifierResultType, string>> = {
+  utility_bill: 'extract_utility_bill',
+  water_bill: 'extract_water_bill',
+  waste_bill: 'extract_waste_bill',
+  bom: 'identify_bom',
+  spray_diary: 'identify_spray_diary',
+  supplier_invoice: 'extract_supplier_invoice',
+  freight_invoice: 'extract_freight_invoice',
+  refrigerant_service: 'extract_refrigerant_service',
+  packaging_spec: 'extract_packaging_spec',
+  supplier_coa: 'extract_supplier_coa',
+  certification: 'extract_certification',
+  soil_carbon_lab: 'extract_soil_carbon_lab',
+  soil_carbon_evidence: 'identify_soil_carbon_evidence',
+  historical_sustainability_report: 'extract_sustainability_report',
+  historical_lca_report: 'extract_lca_report',
+  hospitality_menu: 'identify_hospitality_menu',
+  pos_sales_export: 'identify_pos_sales_export',
+  accounts_csv: 'identify_accounts_csv',
+};
+
+/**
+ * Re-run extraction with the document type the user has chosen (the
+ * "Change document type" flow). Same content handling as classifyDocument,
+ * but tool_choice is forced to the tool for `targetType`.
+ */
+export async function extractWithForcedTool(
+  input: ClassifierInput & { targetType: ClassifierResultType },
+): Promise<ClassifierResult> {
+  const { fileBytes, fileName, fileMime, orgContext, targetType } = input;
+
+  // Deterministic parsers, not Claude tools.
+  if (targetType === 'bulk_xlsx') {
+    if (detectFileKind(fileName, fileMime) !== 'xlsx') {
+      return {
+        type: 'unsupported',
+        payload: { reason: 'A product import must be an Excel workbook using the platform template.' },
+      };
+    }
+    const parsed = parseImportXLSX(toArrayBuffer(fileBytes));
     return {
-      type: 'unsupported',
+      type: 'bulk_xlsx',
       payload: {
-        reason: 'Unsupported file type. Upload a PDF, image (JPEG/PNG/WebP), or Excel workbook.',
+        summary: {
+          products: parsed.products.length,
+          ingredients: parsed.ingredients.length,
+          packaging: parsed.packaging.length,
+          errors: parsed.errors.length,
+        },
+        errors: parsed.errors.slice(0, 10),
+      },
+    };
+  }
+  if (targetType === 'smart_meter_csv') {
+    const hh = parseHalfHourlyCsv(fileBytes);
+    if (hh.format === 'unknown' || hh.readings.length < 48) {
+      return {
+        type: 'unsupported',
+        payload: {
+          reason:
+            'This file does not look like a half-hourly smart-meter export (a timestamp plus kWh column, or a date plus 48 half-hour columns).',
+        },
+      };
+    }
+    const span = readingsSpan(hh.readings);
+    return {
+      type: 'smart_meter_csv',
+      payload: {
+        format: hh.format,
+        readings: hh.readings.length,
+        totalKwh: Math.round(hh.readings.reduce((s, r) => s + r.kwh, 0)),
+        firstDate: span?.from ?? null,
+        lastDate: span?.to ?? null,
+        months: deriveMonthlyEntries(hh.readings, 'electricity').length,
       },
     };
   }
 
-  const base64Data = Buffer.from(fileBytes).toString('base64');
-  const fileContent = isPdf
-    ? ({
-        type: 'document' as const,
-        source: { type: 'base64' as const, media_type: 'application/pdf' as const, data: base64Data },
-      })
-    : ({
-        type: 'image' as const,
-        source: {
-          type: 'base64' as const,
-          media_type: fileMime as 'image/jpeg' | 'image/png' | 'image/webp',
-          data: base64Data,
-        },
-      });
+  const forcedTool = RECLASSIFY_TARGETS[targetType];
+  if (!forcedTool) {
+    return {
+      type: 'unsupported',
+      payload: { reason: `Cannot re-read this document as "${targetType}".` },
+    };
+  }
 
+  const contentBlock = buildClassifierContent(fileBytes, fileName, fileMime);
+  if (!contentBlock) {
+    return { type: 'unsupported', payload: { reason: UNSUPPORTED_REASON } };
+  }
+
+  return callClassifier({
+    contentBlock,
+    fileName,
+    orgContext,
+    forcedTool,
+    usageTag: 'ingest_reclassify',
+  });
+}
+
+interface CallClassifierParams {
+  contentBlock: ClassifierContentBlock;
+  fileName: string;
+  orgContext?: string;
+  /** Force a specific tool (the reclassify path); absent lets Claude choose. */
+  forcedTool?: string;
+  usageTag: string;
+}
+
+/**
+ * Append confidence-capture fields to every tool schema. Near-zero cost
+ * (~300 prompt tokens) and lets the admin page chart confidence against the
+ * correction rate before we invest in a low-confidence chooser UI.
+ */
+function withConfidenceFields(tools: Anthropic.Tool[]): Anthropic.Tool[] {
+  return tools.map((t) => ({
+    ...t,
+    input_schema: {
+      ...t.input_schema,
+      properties: {
+        ...(t.input_schema.properties as Record<string, unknown>),
+        classification_confidence: {
+          type: 'string',
+          enum: ['high', 'medium', 'low'],
+          description: 'How confident you are that this is the right document type.',
+        },
+        second_choice_type: {
+          type: 'string',
+          description: 'If confidence is not high: the other plausible document type.',
+        },
+      },
+    },
+  }));
+}
+
+async function callClassifier(params: CallClassifierParams): Promise<ClassifierResult> {
+  const { contentBlock, fileName, orgContext, forcedTool, usageTag } = params;
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   const response = await anthropic.messages.create({
@@ -323,7 +547,7 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
     // Soil lab reports can carry many sampling locations × depth layers, so the
     // tool-call payload (a samples array) is larger than the single-object bills.
     max_tokens: 4000,
-    tools: [
+    tools: withConfidenceFields([
       {
         name: 'extract_utility_bill',
         description:
@@ -405,7 +629,7 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
       {
         name: 'identify_bom',
         description:
-          'Use for bills of materials (BOM), ingredient lists, or formulation sheets tied to a product. Capture the product header metadata AND the ingredient / packaging lines (name, quantity, unit) when they are visible, so the recipe can be pre-filled.',
+          'Use for bills of materials (BOM), ingredient lists, or formulation sheets tied to a product. Includes spreadsheet recipe/formulation workbooks: rows of ingredients or packaging components with quantity-per-unit columns such as g/Litre, kg/hL or per-bottle dosages, even when the sheet name is generic (e.g. Sheet1). Capture the product header metadata AND the ingredient / packaging lines (name, quantity, unit) when they are visible, so the recipe can be pre-filled.',
         input_schema: {
           type: 'object',
           properties: {
@@ -786,6 +1010,37 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
         },
       },
       {
+        name: 'identify_spray_diary',
+        description:
+          'Use for vineyard / orchard / farm spray diaries or agrochemical application records: rows of application dates, plant-protection products or active ingredients applied to LAND, dose rates per hectare, areas or blocks treated, operator or EAMU details. Do NOT use for beverage recipes or ingredient dosage sheets, even when they list chemical-sounding ingredients with quantities per litre (use identify_bom). Identification only; the user attaches it to a vineyard or orchard.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            note: { type: 'string', description: 'One short sentence describing the records seen.' },
+            sheet_names: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Sheet names, when the document is a workbook.',
+            },
+          },
+        },
+      },
+      {
+        name: 'identify_accounts_csv',
+        description:
+          'Use for an accounting / ledger / spend export (Xero, QuickBooks, Sage, or a bank statement export): rows of dated transactions with amounts and account codes, categories or contact names. This records money spent, not goods on one invoice. Identification only; the spend-data importer handles the rows.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            note: { type: 'string', description: 'One short sentence describing the export.' },
+            source_hint: {
+              type: 'string',
+              description: 'Accounting system if identifiable (e.g. Xero, QuickBooks, Sage).',
+            },
+          },
+        },
+      },
+      {
         name: 'unsupported_document',
         description:
           'Use if the document is not one of the supported types above.',
@@ -797,16 +1052,26 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
           required: ['reason'],
         },
       },
-    ],
-    tool_choice: { type: 'any' },
+    ]),
+    tool_choice: forcedTool ? { type: 'tool', name: forcedTool } : { type: 'any' },
     messages: [
       {
         role: 'user',
         content: [
-          fileContent,
+          contentBlock,
           {
             type: 'text',
-            text: 'Identify what type of document this is and extract the relevant consumption data by calling exactly one of the available tools. Focus on quantities (consumption, volume, or mass), not on cost figures.',
+            text: [
+              `Uploaded file name: ${sanitiseFileName(fileName)}`,
+              contentBlock.type === 'text'
+                ? 'The document is a spreadsheet serialised to CSV text; classify it from its rows and headers.'
+                : null,
+              forcedTool
+                ? `The user has confirmed the document type; extract it with the ${forcedTool} tool.`
+                : 'Identify what type of document this is and extract the relevant consumption data by calling exactly one of the available tools. Focus on quantities (consumption, volume, or mass), not on cost figures.',
+            ]
+              .filter(Boolean)
+              .join('\n'),
           },
           ...(orgContext ? [{ type: 'text' as const, text: orgContext }] : []),
         ],
@@ -814,7 +1079,7 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
     ],
   });
 
-  logClaudeUsage('ingest_classify', CLASSIFIER_MODEL, response);
+  logClaudeUsage(usageTag, CLASSIFIER_MODEL, response);
 
   const toolUse = response.content.find((c) => c.type === 'tool_use');
   if (!toolUse || toolUse.type !== 'tool_use') {
@@ -824,17 +1089,38 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
     };
   }
 
-  switch (toolUse.name) {
+  // Strip the confidence-capture fields out of the extraction payload; they
+  // ride along as meta instead.
+  const {
+    classification_confidence: confidence,
+    second_choice_type: alternate,
+    ...payloadInput
+  } = (toolUse.input as Record<string, unknown>) ?? {};
+
+  const result = mapToolUseToResult(toolUse.name, payloadInput);
+  const meta: ClassifierResult['meta'] = {
+    ...(confidence === 'high' || confidence === 'medium' || confidence === 'low'
+      ? { confidence }
+      : {}),
+    ...(typeof alternate === 'string' && alternate ? { alternate: alternate.slice(0, 60) } : {}),
+  };
+  if (Object.keys(meta).length > 0) result.meta = meta;
+  return result;
+}
+
+/** Map the chosen tool call to the classifier's discriminated result. */
+function mapToolUseToResult(name: string, input: Record<string, unknown>): ClassifierResult {
+  switch (name) {
     case 'extract_utility_bill':
-      return { type: 'utility_bill', payload: toolUse.input as Record<string, unknown> };
+      return { type: 'utility_bill', payload: input };
     case 'extract_water_bill':
-      return { type: 'water_bill', payload: toolUse.input as Record<string, unknown> };
+      return { type: 'water_bill', payload: input };
     case 'extract_waste_bill':
-      return { type: 'waste_bill', payload: toolUse.input as Record<string, unknown> };
+      return { type: 'waste_bill', payload: input };
     case 'identify_bom':
-      return { type: 'bom', payload: (toolUse.input as Record<string, unknown>) || {} };
+      return { type: 'bom', payload: input };
     case 'extract_supplier_invoice': {
-      const payload = (toolUse.input as Record<string, unknown>) || {};
+      const payload = input;
       const items = Array.isArray((payload as any).line_items) ? (payload as any).line_items : [];
       // Not itemised but a grand total was read → synthesise one spend line so
       // the invoice is still saveable.
@@ -846,11 +1132,11 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
       return { type: 'supplier_invoice', payload };
     }
     case 'extract_freight_invoice':
-      return { type: 'freight_invoice', payload: (toolUse.input as Record<string, unknown>) || {} };
+      return { type: 'freight_invoice', payload: input };
     case 'extract_refrigerant_service':
-      return { type: 'refrigerant_service', payload: (toolUse.input as Record<string, unknown>) || {} };
+      return { type: 'refrigerant_service', payload: input };
     case 'extract_packaging_spec': {
-      const payload = (toolUse.input as Record<string, unknown>) || {};
+      const payload = input;
       const components = Array.isArray((payload as any).components) ? (payload as any).components : [];
       if (components.length === 0) {
         return { type: 'unsupported', payload: { reason: 'Packaging document detected, but no components could be read.' } };
@@ -858,11 +1144,11 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
       return { type: 'packaging_spec', payload };
     }
     case 'extract_supplier_coa':
-      return { type: 'supplier_coa', payload: (toolUse.input as Record<string, unknown>) || {} };
+      return { type: 'supplier_coa', payload: input };
     case 'extract_certification':
-      return { type: 'certification', payload: (toolUse.input as Record<string, unknown>) || {} };
+      return { type: 'certification', payload: input };
     case 'extract_soil_carbon_lab': {
-      const payload = (toolUse.input as Record<string, unknown>) || {};
+      const payload = input;
       const samples = Array.isArray((payload as any).samples) ? (payload as any).samples : [];
       // A soil-carbon document with no readable measurements falls back to the
       // evidence handoff rather than presenting an empty review table.
@@ -875,27 +1161,45 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
       return { type: 'soil_carbon_lab', payload };
     }
     case 'identify_soil_carbon_evidence':
-      return { type: 'soil_carbon_evidence', payload: (toolUse.input as Record<string, unknown>) || {} };
+      return { type: 'soil_carbon_evidence', payload: input };
+    case 'identify_spray_diary': {
+      const sheetNames = Array.isArray((input as any).sheet_names)
+        ? ((input as any).sheet_names as string[]).slice(0, 20)
+        : [];
+      const note = typeof (input as any).note === 'string' ? (input as any).note : undefined;
+      return { type: 'spray_diary', payload: { sheetNames, ...(note ? { note } : {}) } };
+    }
+    case 'identify_accounts_csv': {
+      const hint = typeof (input as any).source_hint === 'string' ? (input as any).source_hint : null;
+      return {
+        type: 'accounts_csv',
+        payload: {
+          note: hint
+            ? `Detected as an accounting export (${hint}). Use the Xero / spend-data flow to import it.`
+            : 'Detected as an accounting export. Use the Xero / spend-data flow to import it.',
+        },
+      };
+    }
     case 'extract_sustainability_report':
       return {
         type: 'historical_sustainability_report',
-        payload: (toolUse.input as Record<string, unknown>) || {},
+        payload: input,
       };
     case 'identify_hospitality_menu':
-      return { type: 'hospitality_menu', payload: (toolUse.input as Record<string, unknown>) || {} };
+      return { type: 'hospitality_menu', payload: input };
     case 'identify_pos_sales_export':
-      return { type: 'pos_sales_export', payload: (toolUse.input as Record<string, unknown>) || {} };
+      return { type: 'pos_sales_export', payload: input };
     case 'extract_lca_report':
       return {
         type: 'historical_lca_report',
-        payload: (toolUse.input as Record<string, unknown>) || {},
+        payload: input,
       };
     case 'unsupported_document':
     default: {
-      const input = toolUse.input as { reason?: string };
+      const reason = (input as { reason?: string })?.reason;
       return {
         type: 'unsupported',
-        payload: { reason: input?.reason || 'This document is not one of the supported types yet.' },
+        payload: { reason: reason || 'This document is not one of the supported types yet.' },
       };
     }
   }

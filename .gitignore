@@ -65,3 +65,4 @@ Knowledge Bank - */
 
 # Claude Code worktrees (stale checkouts; also excluded from vitest)
 .claude/worktrees/
+scripts/eval-out/
