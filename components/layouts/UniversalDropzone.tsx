@@ -549,7 +549,7 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-[#8da300] dark:text-[#ccff00]" />
@@ -1578,8 +1578,10 @@ function BomHandoffPanel({ bom, onClose }: { bom?: BomPayload; onClose: () => vo
           <ul className="space-y-0.5 text-xs">
             {bom.line_items.slice(0, 6).map((li, i) => (
               <li key={i} className="flex items-center justify-between gap-2">
-                <span className="truncate">{li.name}</span>
-                <span className="shrink-0 text-muted-foreground">
+                {/* min-w-0 lets truncate actually kick in; without it a long
+                    ingredient name forces the whole dialog to scroll sideways. */}
+                <span className="truncate min-w-0">{li.name}</span>
+                <span className="shrink-0 text-muted-foreground whitespace-nowrap">
                   {li.quantity != null ? `${li.quantity} ${li.unit || ''}`.trim() : ''}
                   {li.type ? ` · ${li.type}` : ''}
                 </span>

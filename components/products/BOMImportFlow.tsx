@@ -212,10 +212,13 @@ export function BOMImportFlow({
     setStep("review");
   };
 
-  // Re-scale the review rows when the user changes the finished size (only
-  // matters while there are volumetric dosages and the size isn't locked).
+  // Re-scale the review rows whenever the finished size changes. This covers
+  // the user typing a size AND the create/attach flow where productUnitSizeMl
+  // arrives a beat after the dialog opens (the product loads async) — without
+  // this, opening before the 250 ml size was known left the rows unscaled and
+  // the locked size never re-applied.
   useEffect(() => {
-    if (!rawItems.length || sizeLocked || !hasVolumetricItems) return;
+    if (!rawItems.length || !hasVolumetricItems) return;
     seedReview(rawItems, effectiveSizeMl);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveSizeMl]);

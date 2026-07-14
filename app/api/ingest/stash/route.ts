@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
 import { createClient } from '@supabase/supabase-js'
+import { userHasOrgAccess } from '@/lib/supabase/verify-org-access'
 
 // /api/ingest/stash?path=<orgId>/<userId>/<file>
 //
@@ -35,13 +36,13 @@ async function verifyOwnership(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   )
-  const { data: membership } = await serviceClient
-    .from('organization_members')
-    .select('id')
-    .eq('organization_id', prefix.orgId)
-    .eq('user_id', userId)
-    .maybeSingle()
-  if (!membership) return { ok: false, status: 403, error: 'Access denied' }
+  // Members OR active advisors — not members-only. The stash path is already
+  // keyed to this user's own upload (userId matched above); a read+write
+  // advisor who uploaded a BOM via /api/ingest/auto must be able to pick it up
+  // again in the recipe editor. The old members-only check denied advisors,
+  // which is why the Toby & Co BOM never reached the recipe.
+  const hasAccess = await userHasOrgAccess(serviceClient, userId, prefix.orgId)
+  if (!hasAccess) return { ok: false, status: 403, error: 'Access denied' }
   return { ok: true, orgId: prefix.orgId }
 }
 
