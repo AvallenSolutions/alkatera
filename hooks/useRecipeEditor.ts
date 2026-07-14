@@ -7,6 +7,7 @@ import {
   packagingFormErrors,
 } from '@/lib/products/packaging-material-data';
 import { autoMatchEmissionFactor } from '@/lib/products/ef-auto-match';
+import { buildIngredientMaterialData } from '@/lib/products/ingredient-material-data';
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { useAutoSave } from "@/hooks/useAutoSave";
@@ -263,6 +264,21 @@ export function useRecipeEditor(productId: string, organizationId: string) {
           carbon_intensity: item.cached_co2_factor || undefined,
           openlca_database: item.openlca_database || undefined,
           stage_id: item.stage_id || undefined,
+          // Multi-leg transport + self-grown / biogenic / inbound-container
+          // fields — without these the form reloaded blank and the next save
+          // wiped them from the row.
+          transport_legs: item.transport_legs ?? undefined,
+          is_self_grown: item.is_self_grown || false,
+          vineyard_id: item.vineyard_id || null,
+          arable_field_id: item.arable_field_id || null,
+          orchard_id: item.orchard_id || null,
+          is_biogenic_carbon: item.is_biogenic_carbon || false,
+          inbound_container_type: item.inbound_container_type || null,
+          inbound_container_volume_l: item.inbound_container_volume_l ?? null,
+          inbound_container_tare_kg: item.inbound_container_tare_kg ?? null,
+          inbound_container_reuse_cycles: item.inbound_container_reuse_cycles ?? null,
+          inbound_container_ef: item.inbound_container_ef ?? null,
+          inbound_container_material: item.inbound_container_material || null,
         }));
         setIngredientForms(mappedIngredients);
         savedIngredientSnapshot.current = formFingerprint(mappedIngredients);
@@ -568,55 +584,11 @@ export function useRecipeEditor(productId: string, organizationId: string) {
 
       if (deleteError) throw new Error(`Failed to clear existing ingredients: ${deleteError.message}`);
 
-      const materialsToInsert = validForms.map(form => {
-        const materialData: any = {
-          product_id: parseInt(productId),
-          material_name: form.name,
-          matched_source_name: form.matched_source_name || null,
-          quantity: Number(form.amount),
-          unit: form.unit,
-          material_type: 'ingredient',
-          match_status: form.match_status ?? null,
-          origin_country: form.origin_country || null,
-          is_organic_certified: form.is_organic_certified || false,
-        };
-
-        if (form.data_source === 'openlca' && form.data_source_id) {
-          materialData.data_source = 'openlca';
-          materialData.data_source_id = form.data_source_id;
-          if (form.openlca_database) {
-            materialData.openlca_database = form.openlca_database;
-          }
-        } else if (form.data_source === 'supplier' && form.supplier_product_id) {
-          materialData.data_source = 'supplier';
-          materialData.supplier_product_id = form.supplier_product_id;
-        }
-
-        // Cache the emission factor value so the LCA calculator has a local
-        // fallback when the original data source (e.g. OpenLCA API) is
-        // unavailable at calculation time.
-        if (form.carbon_intensity != null && Number(form.carbon_intensity) > 0) {
-          materialData.cached_co2_factor = Number(form.carbon_intensity);
-        }
-
-        if (form.transport_mode && form.distance_km) {
-          materialData.transport_mode = form.transport_mode;
-          materialData.distance_km = Number(form.distance_km);
-        }
-
-        if (form.origin_lat && form.origin_lng) {
-          materialData.origin_lat = form.origin_lat;
-          materialData.origin_lng = form.origin_lng;
-          materialData.origin_address = form.origin_address || null;
-          materialData.origin_country_code = form.origin_country_code || null;
-        }
-
-        if (form.stage_id) {
-          materialData.stage_id = form.stage_id;
-        }
-
-        return materialData;
-      });
+      // Shared row builder (also used by autosave) so the two paths can never
+      // write different fields again — the old inline builder here silently
+      // dropped transport_legs, self-grown farm links, the biogenic flag and
+      // the inbound-container fields.
+      const materialsToInsert = validForms.map(form => buildIngredientMaterialData(form, productId));
 
       const { error: insertError } = await supabase
         .from("product_materials")
@@ -904,73 +876,10 @@ export function useRecipeEditor(productId: string, organizationId: string) {
       }
     }
 
-    // Full-row builder: conditional columns get explicit null defaults so
-    // updating an existing row clears stale values exactly like the old
-    // delete-and-reinsert did. Columns this hook never writes (transport_legs,
-    // inbound container, self-grown links) are left untouched on update.
-    const buildMaterialData = (form: IngredientFormData) => {
-      const materialData: any = {
-        product_id: parseInt(productId),
-        material_name: form.name,
-        matched_source_name: form.matched_source_name || null,
-        quantity: Number(form.amount),
-        unit: form.unit,
-        material_type: 'ingredient',
-        match_status: form.match_status ?? null,
-        origin_country: form.origin_country || null,
-        is_organic_certified: form.is_organic_certified || false,
-        data_source: null,
-        data_source_id: null,
-        openlca_database: null,
-        supplier_product_id: null,
-        cached_co2_factor: null,
-        transport_mode: null,
-        distance_km: null,
-        transport_legs: null,
-        origin_lat: null,
-        origin_lng: null,
-        origin_address: null,
-        origin_country_code: null,
-      };
-
-      if (form.data_source === 'openlca' && form.data_source_id) {
-        materialData.data_source = 'openlca';
-        materialData.data_source_id = form.data_source_id;
-        if (form.openlca_database) {
-          materialData.openlca_database = form.openlca_database;
-        }
-      } else if (form.data_source === 'supplier' && form.supplier_product_id) {
-        materialData.data_source = 'supplier';
-        materialData.supplier_product_id = form.supplier_product_id;
-      }
-
-      // Transport — prefer the multi-leg JSONB, falling back to the legacy
-      // single mode/distance. Must mirror buildPackagingMaterialData: the
-      // calculator prefers transport_legs over transport_mode, so omitting legs
-      // here left the calculator reading a stale leg (e.g. a road leg the user
-      // had since changed to sea freight).
-      if (form.transport_legs && form.transport_legs.length > 0) {
-        materialData.transport_legs = form.transport_legs;
-        materialData.transport_mode = form.transport_legs[0].transportMode;
-        materialData.distance_km = form.transport_legs[0].distanceKm;
-      } else if (form.transport_mode && form.distance_km) {
-        materialData.transport_mode = form.transport_mode;
-        materialData.distance_km = Number(form.distance_km);
-      }
-
-      if (form.carbon_intensity != null && Number(form.carbon_intensity) > 0) {
-        materialData.cached_co2_factor = Number(form.carbon_intensity);
-      }
-
-      if (form.origin_lat && form.origin_lng) {
-        materialData.origin_lat = form.origin_lat;
-        materialData.origin_lng = form.origin_lng;
-        materialData.origin_address = form.origin_address || null;
-        materialData.origin_country_code = form.origin_country_code || null;
-      }
-
-      return materialData;
-    };
+    // Shared row builder (also used by the manual Save button). Conditional
+    // columns get explicit null defaults so updating an existing row clears
+    // stale values exactly like the old delete-and-reinsert did.
+    const buildMaterialData = (form: IngredientFormData) => buildIngredientMaterialData(form, productId);
 
     for (const form of existingItems) {
       const { error: updateError } = await supabase
