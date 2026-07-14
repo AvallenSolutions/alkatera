@@ -259,6 +259,10 @@ export default function EPRDashboardPage() {
             if (!item.net_weight_g || item.net_weight_g <= 0) missing.push('Net Weight');
             if (!item.epr_packaging_activity) missing.push('Packaging Activity');
             if (!item.epr_uk_nation) missing.push('UK Nation');
+            // Missing/other material type falls to the wrong RPD fee band, so
+            // surface it as a gap the user can fix rather than silently
+            // charging the 'other' rate.
+            if (!item.epr_material_type || item.epr_material_type === 'other') missing.push('Material Type');
 
             const isPrimary = ['container', 'label', 'closure'].includes(item.packaging_category || '');
             if (isPrimary && item.epr_is_household == null) missing.push('Household/Non-household');

@@ -21,6 +21,7 @@ import type {
   RPDNation,
   RPDRecyclabilityRating,
 } from './types';
+import { getMaterialFactorKey } from '@/lib/end-of-life-factors';
 
 // =============================================================================
 // Packaging Activity: Internal → RPD
@@ -219,4 +220,47 @@ const CATEGORY_TO_LEVEL: Record<PackagingCategory, EPRPackagingLevel> = {
 
 export function categoryToPackagingLevel(category: PackagingCategory): EPRPackagingLevel {
   return CATEGORY_TO_LEVEL[category];
+}
+
+// =============================================================================
+// Packaging material → EPR material type
+// =============================================================================
+
+/**
+ * Map an end-of-life factor key (glass/aluminium/steel/paper/pet/hdpe/cork/…)
+ * to the EPR material type used for RPD fee bands. Shared with getMaterialFactorKey
+ * so LCA classification and EPR classification of the same packaging row agree.
+ * Plastics default to rigid (the large-producer split refines it later).
+ */
+const FACTOR_KEY_TO_EPR_MATERIAL: Record<string, EPRMaterialType> = {
+  glass: 'glass',
+  aluminium: 'aluminium',
+  steel: 'steel',
+  paper: 'paper_cardboard',
+  pet: 'plastic_rigid',
+  hdpe: 'plastic_rigid',
+  cork: 'other',
+  organic: 'other',
+  other: 'other',
+};
+
+/**
+ * Derive an EPR material type from a packaging row's material identity. Uses
+ * the same getMaterialFactorKey resolution the EoL engine uses (container
+ * material > name/factor keywords > category), so a normally-created
+ * packaging row gets a real RPD material code instead of defaulting to
+ * 'other' (which carries the wrong fee rate per tonne).
+ */
+export function deriveEprMaterialType(input: {
+  container_material?: string | null;
+  packaging_category?: string | null;
+  material_name?: string | null;
+  matched_source_name?: string | null;
+}): EPRMaterialType {
+  const factorKey = getMaterialFactorKey(
+    input.container_material || input.packaging_category || 'other',
+    input.material_name || undefined,
+    input.matched_source_name || undefined,
+  );
+  return FACTOR_KEY_TO_EPR_MATERIAL[factorKey] ?? 'other';
 }
