@@ -238,11 +238,19 @@ export async function fetchAvailableProductsForMultipack(
   organizationId: string,
   excludeProductId?: string
 ): Promise<Product[]> {
+  // Show the same products the main /products list shows: every real product
+  // in the org. We deliberately do NOT filter on is_draft here — that flag is
+  // overloaded (it doubles as the "archived" flag via the product page's
+  // Archive action) and most products are created as drafts by the import,
+  // Breww, onboarding and outreach flows, so filtering it out hid legitimately
+  // set-up products (e.g. Everleaf's "Marine") from the multipack picker even
+  // though they appear in the product list. product_kind keeps hospitality
+  // meals/drinks/room-nights, which reuse the products table, out of the list.
   let query = supabase
     .from('products')
     .select('*')
     .eq('organization_id', organizationId)
-    .eq('is_draft', false)
+    .eq('product_kind', 'product')
     .order('name', { ascending: true });
 
   // Exclude the current multipack to prevent self-reference
