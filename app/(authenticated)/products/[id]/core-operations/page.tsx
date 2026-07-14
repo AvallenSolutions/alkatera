@@ -246,7 +246,7 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
           For new assessments, please use the <Button
             variant="link"
             className="p-0 h-auto text-amber-900 dark:text-amber-100 underline font-semibold"
-            onClick={() => router.push(`/products/${productId}/lca/initiate`)}
+            onClick={() => router.push(`/products/${productId}/compliance-wizard`)}
           >
             ISO14044 LCA Flow
           </Button>.

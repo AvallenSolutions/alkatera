@@ -944,6 +944,12 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
               `Verify the production run resource data — this likely indicates a facility-period figure ` +
               `entered against a single product run, or an incorrect production volume.`
             );
+            // Also surface to the user: this warning used to die in the console
+            // where nobody would see an implausible figure reaching a report.
+            calculatorWarnings.push(
+              `The ${w.field} for "${allocation.facilityName}" works out to ${w.perUnit} per ${w.denominatorLabel}, which is unusually high. ` +
+              `Check the production run data for this product — a whole-facility figure may have been entered against one batch, or the production volume may be wrong.`
+            );
           }
         }
 

@@ -82,6 +82,7 @@ export default function ProductsPage() {
   const [view, setView] = useState<'list' | 'portfolio'>('list');
   const [matchCount, setMatchCount] = useState(0);
   const [findingMatches, setFindingMatches] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     if (currentOrganization?.id) {
@@ -89,7 +90,7 @@ export default function ProductsPage() {
     } else {
       setLoading(false);
     }
-  }, [currentOrganization?.id]);
+  }, [currentOrganization?.id, showArchived]);
 
   // Tell Rosa what's on this list so she can answer questions like
   // "which of my products don't have an LCA yet?" or "what's my newest
@@ -128,13 +129,16 @@ export default function ProductsPage() {
 
   const fetchProducts = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("products")
         .select("*")
         // Only true products belong in this list — hospitality meals/drinks/room
         // nights reuse the products table but are surfaced under Hospitality.
         .eq("product_kind", "product")
-        .eq("organization_id", currentOrganization!.id)
+        .eq("organization_id", currentOrganization!.id);
+      // Hide archived products by default (archived_at is the real archive flag).
+      if (!showArchived) query = query.is("archived_at", null);
+      const { data, error } = await query
         .order("created_at", { ascending: false })
         .limit(200);
 
@@ -474,6 +478,16 @@ export default function ProductsPage() {
               Portfolio
             </button>
           </div>
+          <button
+            type="button"
+            onClick={() => setShowArchived((v) => !v)}
+            className={cn(
+              'rounded-md border border-border/60 px-3 py-1.5 text-xs font-medium transition-colors',
+              showArchived ? 'bg-[#ccff00]/20 text-foreground' : 'text-muted-foreground',
+            )}
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
+          </button>
         </div>
       )}
 
@@ -572,7 +586,12 @@ export default function ProductsPage() {
                     </div>
                   )}
                   <div className="space-y-1">
-                    <CardTitle className="line-clamp-2">{product.name}</CardTitle>
+                    <div className="flex items-start gap-2">
+                      <CardTitle className="line-clamp-2">{product.name}</CardTitle>
+                      {(product as any).archived_at && (
+                        <Badge variant="secondary" className="shrink-0 text-xs">Archived</Badge>
+                      )}
+                    </div>
                     <CardDescription className="line-clamp-2">
                       {product.product_description || "No description provided"}
                     </CardDescription>

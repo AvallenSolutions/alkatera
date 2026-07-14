@@ -346,6 +346,9 @@ export async function fetchAvailableProductsForMultipack(
     .select('*')
     .eq('organization_id', organizationId)
     .eq('product_kind', 'product')
+    // Archived products (archived_at set) are excluded — they should not be
+    // pickable as new multipack components, matching the default product list.
+    .is('archived_at', null)
     .order('name', { ascending: true });
 
   // Exclude the current multipack to prevent self-reference

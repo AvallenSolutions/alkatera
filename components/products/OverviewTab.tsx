@@ -147,6 +147,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           <MultipackContentsCard
             productId={String(product.id)}
             productName={product.name}
+            onEdit={onEditMultipack}
           />
         )}
 
