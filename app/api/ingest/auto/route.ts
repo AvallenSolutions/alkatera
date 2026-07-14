@@ -4,6 +4,8 @@ import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
 import { createClient } from '@supabase/supabase-js'
 import { classifyDocument, shapeIngestResult } from '@/lib/ingest/classify-document'
 import { buildIngestOrgContext } from '@/lib/ingest/org-context'
+import { userHasOrgAccess } from '@/lib/supabase/verify-org-access'
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access'
 import type { ExtractedBillData } from '@/app/api/utilities/import-from-pdf/route'
 import type {
   ExtractedFacilityBillData,
@@ -383,13 +385,18 @@ export async function POST(request: NextRequest) {
     }
 
     const serviceClient = createClient(supabaseUrl, serviceRoleKey)
-    const { data: membership } = await serviceClient
-      .from('organization_members')
-      .select('id')
-      .eq('organization_id', organizationId)
-      .eq('user_id', user.id)
-      .maybeSingle()
-    if (!membership) return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+
+    // Access check: members AND active advisors (read or write) may reach an
+    // org's data. This route runs on the service-role client which bypasses
+    // RLS, so org scoping is enforced here in application code.
+    const hasAccess = await userHasOrgAccess(serviceClient, user.id, organizationId)
+    if (!hasAccess) return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+
+    // Smart upload writes into the org (stashed file + ingest job that seeds
+    // org data), so read-only advisors are blocked here even though they can
+    // reach the org for reads.
+    const denied = await denyReadOnlyAdvisor(serviceClient, user, organizationId)
+    if (denied) return denied
 
     const rate = checkRateLimit(organizationId)
     if (!rate.allowed) {
