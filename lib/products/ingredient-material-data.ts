@@ -34,6 +34,15 @@ export function buildIngredientMaterialData(
     is_organic_certified: form.is_organic_certified || false,
     stage_id: form.stage_id || null,
 
+    // Emission-factor quality metadata (drives the quality tooltip and the
+    // count-vs-mass unit-mismatch check). Previously unpersisted, so both
+    // emptied/disarmed on reload.
+    ef_source: (form as any).ef_source || null,
+    ef_source_type: (form as any).ef_source_type || null,
+    ef_data_quality_grade: (form as any).ef_data_quality_grade || null,
+    ef_uncertainty_percent: (form as any).ef_uncertainty_percent ?? null,
+    ef_reference_unit: (form as any).ef_reference_unit || null,
+
     // Emission-factor source (set below when valid).
     data_source: null,
     data_source_id: null,
