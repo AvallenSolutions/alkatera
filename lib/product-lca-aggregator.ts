@@ -1546,6 +1546,9 @@ export async function aggregateProductImpacts(
       bulk_volume_per_functional_unit: bulkVolumePerUnit,
       volume_unit: 'L',
       status: 'completed',
+      // Persist the input fingerprint (computed in the calculator) so
+      // staleness can be detected server-side without recalculating.
+      ...(calculationFingerprint ? { calculation_fingerprint: calculationFingerprint } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq('id', productCarbonFootprintId);

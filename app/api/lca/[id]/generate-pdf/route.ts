@@ -24,6 +24,7 @@ import { renderLcaReportHtml } from '@/lib/pdf/render-lca-html';
 import { convertHtmlToPdf } from '@/lib/pdf/pdfshift-client';
 import { generateNarratives, type LcaContext } from '@/lib/claude/lca-assistant';
 import { enforceExportAllowed } from '@/middleware/subscription-check';
+import { computeLcaStaleness } from '@/lib/lca/staleness';
 
 // ============================================================================
 // TYPES
@@ -133,28 +134,37 @@ export async function POST(
     // tell the caller to recalculate (unless they explicitly opt to proceed).
     const allowStale = (body as { allowStale?: boolean })?.allowStale === true;
     if (!allowStale && pcf.product_id) {
-      const { data: latestMat } = await supabase
-        .from('product_materials')
-        .select('updated_at')
-        .eq('product_id', pcf.product_id)
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // Uses the SAME shared staleness helper as the product banner, so the
+      // report guard now covers maturation, facility utility data and (for a
+      // multipack) component recalculations, not just recipe/packaging edits.
       const snapshotTime = (materials ?? []).reduce((max: number, m: any) => {
         const t = m.created_at ? new Date(m.created_at).getTime() : 0;
         return t > max ? t : max;
       }, 0);
-      const editTime = latestMat?.updated_at ? new Date(latestMat.updated_at).getTime() : 0;
-      if (editTime > 0 && snapshotTime > 0 && editTime > snapshotTime) {
-        const staleMessage =
-          'The recipe has changed since this LCA was last calculated. Recalculate the LCA to include your latest ingredient and packaging edits, then generate the report.';
-        return NextResponse.json(
-          // `message` carries the friendly text for callers that special-case the
-          // code; `details` mirrors it so generic error UIs (which surface
-          // details || error) show the message rather than the bare code.
-          { error: 'stale_inputs', message: staleMessage, details: staleMessage },
-          { status: 409 },
+      if (snapshotTime > 0) {
+        const { data: prod } = await supabase
+          .from('products')
+          .select('is_multipack')
+          .eq('id', pcf.product_id)
+          .maybeSingle();
+        const { stale, reasons } = await computeLcaStaleness(
+          supabase,
+          Number(pcf.product_id),
+          snapshotTime,
+          { isMultipack: !!prod?.is_multipack },
         );
+        if (stale) {
+          const staleMessage =
+            `This LCA is out of date. Changes to ${reasons.join(', ')} have not been included yet. ` +
+            'Recalculate the LCA, then generate the report.';
+          return NextResponse.json(
+            // `message` carries the friendly text for callers that special-case
+            // the code; `details` mirrors it so generic error UIs (which surface
+            // details || error) show the message rather than the bare code.
+            { error: 'stale_inputs', message: staleMessage, details: staleMessage },
+            { status: 409 },
+          );
+        }
       }
     }
 
