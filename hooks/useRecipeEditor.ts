@@ -723,12 +723,17 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         }
       }
 
-      // Save components
+      // Save EPR material components. product_materials.id (and therefore the
+      // packaging_material_components.product_material_id FK) is a uuid: for an
+      // existing row it IS form.tempId, for a new row it's the uuid returned by
+      // the insert. The old code ran parseInt() over it, which yielded NaN (so
+      // the components were silently dropped and "blanked out" on reload) or a
+      // wrong integer (which the uuid column rejected). Use the uuid directly.
       for (const form of validForms) {
         if (form.has_component_breakdown && form.components && form.components.length > 0) {
-          let materialId: number | null = null;
+          let materialId: string | null = null;
           if (!form.tempId.startsWith('temp-')) {
-            materialId = parseInt(form.tempId);
+            materialId = form.tempId;
           } else {
             const insertedItem = insertedData.find((d: any) =>
               d.material_name === form.name && d.packaging_category === form.packaging_category
@@ -737,10 +742,11 @@ export function useRecipeEditor(productId: string, organizationId: string) {
           }
 
           if (materialId) {
-            await supabase
+            const { error: delErr } = await supabase
               .from('packaging_material_components')
               .delete()
               .eq('product_material_id', materialId);
+            if (delErr) throw new Error(`Failed to update EPR materials: ${delErr.message}`);
 
             const componentsToInsert = form.components.map(comp => ({
               product_material_id: materialId,
@@ -751,9 +757,10 @@ export function useRecipeEditor(productId: string, organizationId: string) {
               is_recyclable: comp.is_recyclable !== undefined ? comp.is_recyclable : true,
             }));
 
-            await supabase
+            const { error: compErr } = await supabase
               .from('packaging_material_components')
               .insert(componentsToInsert);
+            if (compErr) throw new Error(`Failed to save EPR materials: ${compErr.message}`);
           }
         }
       }
@@ -1059,10 +1066,12 @@ export function useRecipeEditor(productId: string, organizationId: string) {
       }
     }
 
-    // Save components for existing items
+    // Save components for existing items. product_material_id is a uuid — it is
+    // form.tempId verbatim, NOT parseInt(form.tempId) (which produced NaN/wrong
+    // ints and silently dropped EPR material breakdowns on autosave).
     for (const form of existingItems) {
       if (form.has_component_breakdown && form.components && form.components.length > 0) {
-        const materialId = parseInt(form.tempId);
+        const materialId = form.tempId;
         if (materialId) {
           await supabase.from('packaging_material_components').delete().eq('product_material_id', materialId);
           const componentsToInsert = form.components.map(comp => ({
