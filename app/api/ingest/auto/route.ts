@@ -227,6 +227,7 @@ export interface IngestResponse {
       name?: string
       quantity?: number
       unit?: string
+      quantity_basis?: 'per_litre' | 'per_hectolitre' | 'per_unit'
       type?: 'ingredient' | 'packaging'
     }>
   }

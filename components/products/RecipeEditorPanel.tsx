@@ -25,6 +25,8 @@ import { toast } from "sonner";
 import { IngredientFormCard } from "@/components/products/IngredientFormCard";
 import { PackagingFormCard } from "@/components/products/PackagingFormCard";
 import { BOMImportFlow } from "@/components/products/BOMImportFlow";
+import { stashedLineItemsToExtracted } from "@/lib/bom/parser";
+import type { ExtractedBOMItem } from "@/lib/bom/types";
 import { MaturationProfileCard } from "@/components/products/MaturationProfileCard";
 import { SearchGuidePanel } from "@/components/products/SearchGuidePanel";
 import { RecipeChecklist } from "@/components/products/RecipeChecklist";
@@ -99,9 +101,16 @@ export function RecipeEditorPanel({
     !onboardingLoading && !onboardingState.recipeSidebarTourCompleted && activeTab === "ingredients";
   const [tourStep, setTourStep] = useState<TourStep>("basics");
   const [initialBomFile, setInitialBomFile] = useState<File | null>(null);
+  const [initialBomItems, setInitialBomItems] = useState<ExtractedBOMItem[] | null>(null);
 
   // Pick up BOM files stashed by the Universal Dropzone (header upload button).
-  useIngestStash('bom', (file) => {
+  // Prefer the classifier's pre-extracted line items (correct for xlsx and
+  // per-litre dosages); fall back to re-parsing the raw file when absent.
+  useIngestStash('bom', (file, meta) => {
+    const lineItems = meta?.bom?.line_items;
+    setInitialBomItems(
+      lineItems && lineItems.length > 0 ? stashedLineItemsToExtracted(lineItems) : null,
+    );
     setInitialBomFile(file);
     setShowBOMImport(true);
   });
@@ -893,11 +902,16 @@ export function RecipeEditorPanel({
         open={showBOMImport}
         onOpenChange={(next) => {
           setShowBOMImport(next);
-          if (!next) setInitialBomFile(null);
+          if (!next) {
+            setInitialBomFile(null);
+            setInitialBomItems(null);
+          }
         }}
         onImportComplete={handleBOMImportComplete}
         organizationId={organizationId}
         initialFile={initialBomFile}
+        initialItems={initialBomItems}
+        productUnitSizeMl={unitSizeToMl(product?.unit_size_value, product?.unit_size_unit)}
       />
 
       <PackagingTemplateDialog

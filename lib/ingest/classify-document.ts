@@ -629,7 +629,7 @@ async function callClassifier(params: CallClassifierParams): Promise<ClassifierR
       {
         name: 'identify_bom',
         description:
-          'Use for bills of materials (BOM), ingredient lists, or formulation sheets tied to a product. Includes spreadsheet recipe/formulation workbooks: rows of ingredients or packaging components with quantity-per-unit columns such as g/Litre, kg/hL or per-bottle dosages, even when the sheet name is generic (e.g. Sheet1). Capture the product header metadata AND the ingredient / packaging lines (name, quantity, unit) when they are visible, so the recipe can be pre-filled.',
+          'Use for bills of materials (BOM), ingredient lists, or formulation sheets tied to a product. Includes spreadsheet recipe/formulation workbooks: rows of ingredients or packaging components with quantity-per-unit columns such as g/Litre, kg/hL or per-bottle dosages, even when the sheet name is generic (e.g. Sheet1). Capture the product header metadata AND the ingredient / packaging lines (name, quantity, unit) when they are visible, so the recipe can be pre-filled. Report each dosage exactly as written with its quantity_basis (e.g. a "g/L" column is quantity + unit "g" + quantity_basis "per_litre"); never pre-divide a per-litre dosage down to a per-bottle amount yourself, the app does that from the product size.',
         input_schema: {
           type: 'object',
           properties: {
@@ -651,8 +651,13 @@ async function callClassifier(params: CallClassifierParams): Promise<ClassifierR
                 type: 'object',
                 properties: {
                   name: { type: 'string', description: 'Ingredient or packaging component name.' },
-                  quantity: { type: 'number', description: 'Amount per unit of product, if stated.' },
-                  unit: { type: 'string', description: 'Unit, e.g. kg, g, L, ml, units.' },
+                  quantity: { type: 'number', description: 'The number in the amount/dosage column, exactly as written. Do NOT rescale it yourself; report quantity_basis instead so the app can convert.' },
+                  unit: { type: 'string', description: 'The base mass or volume unit only, e.g. kg, g, mg, L, ml, units. If the column header is a dosage like "g/L" or "kg/hL", put just the numerator here ("g", "kg") and set quantity_basis.' },
+                  quantity_basis: {
+                    type: 'string',
+                    enum: ['per_litre', 'per_hectolitre', 'per_unit'],
+                    description: 'What the quantity is measured against. Dosage columns like g/L, ml/L, mg/L -> "per_litre". kg/hL, g/hL -> "per_hectolitre". An absolute amount per finished bottle/can, and EVERY packaging component (the can, bottle, cap, label), -> "per_unit". Default to "per_unit" only when there is no per-volume basis.',
+                  },
                   type: {
                     type: 'string',
                     enum: ['ingredient', 'packaging'],

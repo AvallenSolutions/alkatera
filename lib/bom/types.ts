@@ -1,3 +1,5 @@
+import type { QuantityBasis } from './basis';
+
 export interface ExtractedBOMItem {
   rawName: string;
   cleanName: string;
@@ -6,6 +8,12 @@ export interface ExtractedBOMItem {
   itemType: 'ingredient' | 'packaging';
   unitCost: number | null;
   totalCost: number | null;
+  /**
+   * What `quantity` is measured against. Recipe dosage columns (g/L, kg/hL)
+   * are per-volume and get scaled to per-unit at import time using the
+   * product's finished volume. Absent / 'per_unit' means store as-is.
+   */
+  quantityBasis?: QuantityBasis;
 }
 
 export interface BOMParseResult {

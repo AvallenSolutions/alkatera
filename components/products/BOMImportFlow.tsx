@@ -31,6 +31,17 @@ import {
 } from "@/lib/bulk-import/batch-matcher";
 import { supabase } from "@/lib/supabaseClient";
 import type { ExtractedBOMItem, BOMParseResult } from "@/lib/bom/types";
+import { scaleQuantityToUnit, type QuantityBasis } from "@/lib/bom/basis";
+import { unitSizeToMl, canonicaliseUnit } from "@/lib/constants/material-units";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select as SizeSelect,
+  SelectContent as SizeSelectContent,
+  SelectItem as SizeSelectItem,
+  SelectTrigger as SizeSelectTrigger,
+  SelectValue as SizeSelectValue,
+} from "@/components/ui/select";
 import type { IngredientFormData } from "./IngredientFormCard";
 import type { PackagingFormData } from "./PackagingFormCard";
 import type {
@@ -60,6 +71,21 @@ interface BOMImportFlowProps {
    * dropped in the header.
    */
   initialFile?: File | null;
+  /**
+   * Optional pre-extracted line items (from the smart-upload classifier). When
+   * present these are used directly and the raw file is NOT re-parsed — the
+   * classifier reads recipe workbooks far better than the regex parser, and
+   * only it captures the per-litre/per-hectolitre basis.
+   */
+  initialItems?: ExtractedBOMItem[] | null;
+  /**
+   * The finished product's size in millilitres, when known (attach-to-existing
+   * flows load the product first). Authoritative source for scaling per-litre
+   * dosages to per-unit. When null, the review step asks for it.
+   */
+  productUnitSizeMl?: number | null;
+  /** Hint for the finished-size input when productUnitSizeMl is unknown. */
+  initialUnitSize?: { value?: number | null; unit?: string | null } | null;
 }
 
 export function BOMImportFlow({
@@ -68,13 +94,31 @@ export function BOMImportFlow({
   onImportComplete,
   organizationId,
   initialFile,
+  initialItems,
+  productUnitSizeMl,
+  initialUnitSize,
 }: BOMImportFlowProps) {
   const [step, setStep] = useState<ImportStep>("upload");
   const [reviewItems, setReviewItems] = useState<ReviewableBOMItem[]>([]);
+  const [rawItems, setRawItems] = useState<ExtractedBOMItem[]>([]);
   const [metadata, setMetadata] = useState<BOMParseResult["metadata"]>({});
   const [isImporting, setIsImporting] = useState(false);
   const [autoParseError, setAutoParseError] = useState<string | null>(null);
   const autoParsedRef = useRef(false);
+
+  // Finished-product size used to scale per-litre dosages to per-unit. When the
+  // caller passes productUnitSizeMl (a loaded product), that wins and the input
+  // is locked; otherwise the user sets it in the review step.
+  const [sizeValue, setSizeValue] = useState<string>(
+    initialUnitSize?.value != null ? String(initialUnitSize.value) : "",
+  );
+  const [sizeUnit, setSizeUnit] = useState<string>(
+    (initialUnitSize?.unit || "ml").toLowerCase() === "l" ? "l" : "ml",
+  );
+  const sizeLocked = productUnitSizeMl != null && productUnitSizeMl > 0;
+  const effectiveSizeMl = sizeLocked
+    ? productUnitSizeMl!
+    : unitSizeToMl(sizeValue, sizeUnit);
 
   // Matching state
   const [selectedItems, setSelectedItems] = useState<ReviewableBOMItem[]>([]);
@@ -148,18 +192,46 @@ export function BOMImportFlow({
 
   // ── Step handlers ──────────────────────────────────────────────────
 
+  // Volumetric ingredient dosages only need scaling; packaging is always
+  // per-unit. Used to decide whether to prompt for the finished size.
+  const hasVolumetricItems = rawItems.some(
+    (i) => i.itemType === "ingredient" && i.quantityBasis && i.quantityBasis !== "per_unit",
+  );
+
+  const seedReview = (items: ExtractedBOMItem[], sizeMl: number | null) => {
+    setReviewItems(createReviewableItems(convertItemsToUnit(items, sizeMl)));
+  };
+
   const handleItemsExtracted = (
     items: ExtractedBOMItem[],
     extractedMetadata: BOMParseResult["metadata"]
   ) => {
-    const reviewable = createReviewableItems(items);
-    setReviewItems(reviewable);
+    setRawItems(items);
+    seedReview(items, effectiveSizeMl);
     setMetadata(extractedMetadata);
     setStep("review");
   };
 
-  // Carry-through: when a file is provided externally (e.g. from the
-  // Universal Dropzone), skip the upload step and parse it directly.
+  // Re-scale the review rows when the user changes the finished size (only
+  // matters while there are volumetric dosages and the size isn't locked).
+  useEffect(() => {
+    if (!rawItems.length || sizeLocked || !hasVolumetricItems) return;
+    seedReview(rawItems, effectiveSizeMl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveSizeMl]);
+
+  // Carry-through (preferred): when the smart-upload classifier already
+  // extracted line items, use them directly and skip the raw-file re-parse.
+  useEffect(() => {
+    if (!open || autoParsedRef.current) return;
+    if (!initialItems || initialItems.length === 0) return;
+    autoParsedRef.current = true;
+    handleItemsExtracted(initialItems, {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialItems]);
+
+  // Carry-through (fallback): when only a file is provided (e.g. a manually
+  // uploaded BOM), skip the upload step and parse it directly.
   useEffect(() => {
     if (!open) {
       autoParsedRef.current = false;
@@ -326,7 +398,7 @@ export function BOMImportFlow({
             matched_source_name: selectedResult?.name,
             carbon_intensity: selectedResult?.co2_factor ?? undefined,
             amount: item.quantity ?? 0,
-            unit: mapUnit(item.unit),
+            unit: canonicaliseUnit(item.unit) ?? "kg",
             origin_country: "",
             is_organic_certified: false,
             transport_mode: "truck",
@@ -346,7 +418,7 @@ export function BOMImportFlow({
             matched_source_name: selectedResult?.name,
             carbon_intensity: selectedResult?.co2_factor ?? undefined,
             amount: item.quantity ?? 0,
-            unit: mapUnit(item.unit),
+            unit: canonicaliseUnit(item.unit) ?? "kg",
             packaging_category: detectPackagingCategory(item.cleanName),
             recycled_content_percentage: 0,
             printing_process: "standard_ink",
@@ -386,6 +458,7 @@ export function BOMImportFlow({
   const handleClose = () => {
     setStep("upload");
     setReviewItems([]);
+    setRawItems([]);
     setSelectedItems([]);
     setMetadata({});
     setMatchStates({});
@@ -493,6 +566,55 @@ export function BOMImportFlow({
               emission factor databases.
             </DialogDescription>
           </DialogHeader>
+
+          {hasVolumetricItems && (
+            <div className="rounded-lg border border-[#8da300]/40 bg-[#ccff00]/5 p-3 space-y-2">
+              <p className="text-sm">
+                This recipe is dosed per litre. Amounts are scaled to your finished
+                product size so they save as the amount in one unit.
+              </p>
+              {sizeLocked ? (
+                <p className="text-xs text-muted-foreground">
+                  Using the product&apos;s size:{" "}
+                  <strong>{effectiveSizeMl} ml</strong>. The quantities below are
+                  per unit.
+                </p>
+              ) : (
+                <div className="flex items-end gap-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="bom-finished-size" className="text-xs">
+                      Finished product size
+                    </Label>
+                    <Input
+                      id="bom-finished-size"
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.01"
+                      className="h-8 w-28"
+                      placeholder="250"
+                      value={sizeValue}
+                      onChange={(e) => setSizeValue(e.target.value)}
+                    />
+                  </div>
+                  <SizeSelect value={sizeUnit} onValueChange={setSizeUnit}>
+                    <SizeSelectTrigger className="h-8 w-20">
+                      <SizeSelectValue />
+                    </SizeSelectTrigger>
+                    <SizeSelectContent>
+                      <SizeSelectItem value="ml">ml</SizeSelectItem>
+                      <SizeSelectItem value="l">L</SizeSelectItem>
+                    </SizeSelectContent>
+                  </SizeSelect>
+                  {!effectiveSizeMl && (
+                    <p className="text-xs text-amber-600 pb-1.5">
+                      Set a size to scale the per-litre amounts.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           <BOMReviewTable
             items={reviewItems}
@@ -742,20 +864,24 @@ export function BOMImportFlow({
   );
 }
 
-function mapUnit(unit: string | null): string {
-  if (!unit) return "kg";
-
-  const unitMap: Record<string, string> = {
-    kg: "kg",
-    g: "g",
-    L: "l",
-    l: "l",
-    ml: "ml",
-    m: "unit",
-    unit: "unit",
-  };
-
-  return unitMap[unit] || "kg";
+/**
+ * Convert extracted items to per-unit amounts. Ingredient dosages carrying a
+ * per-litre / per-hectolitre basis are scaled by the product's finished size;
+ * packaging and already-per-unit amounts pass through untouched. After this
+ * every item's quantity is per finished unit, so the review table shows and
+ * saves the right number.
+ */
+function convertItemsToUnit(
+  items: ExtractedBOMItem[],
+  sizeMl: number | null,
+): ExtractedBOMItem[] {
+  return items.map((item) => {
+    const basis: QuantityBasis | undefined =
+      item.itemType === "packaging" ? "per_unit" : item.quantityBasis;
+    if (!basis || basis === "per_unit") return { ...item, quantityBasis: "per_unit" };
+    const { amount } = scaleQuantityToUnit(item.quantity, basis, sizeMl);
+    return { ...item, quantity: amount, quantityBasis: "per_unit" };
+  });
 }
 
 function detectPackagingCategory(
