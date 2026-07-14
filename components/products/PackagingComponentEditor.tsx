@@ -299,10 +299,15 @@ export function PackagingComponentEditor({
                     step="1"
                     min="0"
                     max="100"
-                    value={component.recycled_content_percentage || ""}
-                    onChange={(e) =>
-                      updateComponent(index, { recycled_content_percentage: parseFloat(e.target.value) || 0 })
-                    }
+                    // ?? (not ||) so an explicit 0% shows and sticks — `0 || ""`
+                    // blanked the field and users couldn't record 0% recycled.
+                    value={component.recycled_content_percentage ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      updateComponent(index, {
+                        recycled_content_percentage: v === "" ? undefined : Math.max(0, Math.min(100, parseFloat(v) || 0)),
+                      });
+                    }}
                     className="h-8 text-xs"
                     disabled={disabled}
                   />
