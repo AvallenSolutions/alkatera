@@ -21,6 +21,28 @@ export function isSharedPackagingCategory(category?: string | null): boolean {
 }
 
 /**
+ * The UK EPR packaging level implied by a packaging_category. Deterministic:
+ * the three primary categories are level 'primary'; secondary/shipment/tertiary
+ * map to themselves. Returns null for an unknown/absent category.
+ */
+export function eprLevelForCategory(category?: string | null): string | null {
+  switch (category) {
+    case 'container':
+    case 'label':
+    case 'closure':
+      return 'primary';
+    case 'secondary':
+      return 'secondary';
+    case 'shipment':
+      return 'shipment';
+    case 'tertiary':
+      return 'tertiary';
+    default:
+      return null;
+  }
+}
+
+/**
  * Plain-language problems preventing this row from being saved.
  * Empty array means the row is saveable.
  */
@@ -112,7 +134,12 @@ export function buildPackagingMaterialData(form: PackagingFormData, productId: s
 
   // EPR compliance fields
   materialData.has_component_breakdown = form.has_component_breakdown || false;
-  if (form.epr_packaging_level) materialData.epr_packaging_level = form.epr_packaging_level;
+  // epr_packaging_level is deterministic from the packaging_category, but the
+  // UI only ever used it for a badge and never persisted it, so EPR reporting
+  // had to re-derive it. Persist it here (honouring an explicit override) so
+  // the level is set on every packaging row for single SKUs and multipacks.
+  materialData.epr_packaging_level =
+    form.epr_packaging_level || eprLevelForCategory(form.packaging_category) || null;
   if (form.epr_packaging_activity) materialData.epr_packaging_activity = form.epr_packaging_activity;
   materialData.epr_is_household = form.epr_is_household !== undefined ? form.epr_is_household : true;
   if (form.epr_ram_rating) materialData.epr_ram_rating = form.epr_ram_rating;
