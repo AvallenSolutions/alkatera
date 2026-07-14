@@ -11,6 +11,7 @@
 
 import type { IngredientFormData } from "@/components/products/IngredientFormCard";
 import type { PackagingFormData } from "@/components/products/PackagingFormCard";
+import type { PackagingMaterialComponent } from "@/lib/types/lca";
 
 export type SectionStatus = "empty" | "incomplete" | "complete" | "n/a";
 
@@ -110,7 +111,7 @@ function packagingComponentsStatus(p: PackagingFormData): SectionStatus {
   const components = p.components ?? [];
   if (components.length === 0) return "empty";
   const totalWeight = components.reduce(
-    (acc, c: any) => acc + (Number(c.weight_g) || 0),
+    (acc, c: PackagingMaterialComponent) => acc + (Number(c.weight_grams) || 0),
     0,
   );
   if (totalWeight <= 0) return "incomplete";
