@@ -71,6 +71,7 @@ export function WebsiteImportFlow({
   const [url, setUrl] = useState('')
   const [pagesAnalyzed, setPagesAnalyzed] = useState(0)
   const [products, setProducts] = useState<ExtractedProduct[]>([])
+  const [createdCount, setCreatedCount] = useState(0)
   const [isConfirming, setIsConfirming] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [orgData, setOrgData] = useState<{ certifications: string[]; description: string | null } | null>(null)
@@ -97,6 +98,7 @@ export function WebsiteImportFlow({
     setStage('url-entry')
     setUrl('')
     setProducts([])
+    setCreatedCount(0)
     setError(null)
     setOrgData(null)
     setBrandMetadata(null)
@@ -131,23 +133,49 @@ export function WebsiteImportFlow({
       }
 
       const jobId = startData.jobId as string
-      // Poll every 2s for up to ~3 minutes. The work itself runs in a Netlify
-      // background function so it is not bound by serverless timeout limits.
-      const deadline = Date.now() + 3 * 60 * 1000
+      // Poll every 2s for up to ~16 minutes. The work itself runs in a Netlify
+      // background function with a ~15 minute budget, and the poll route's
+      // janitor terminally fails anything stuck beyond 20 minutes, so the
+      // client can rely on a status of 'failed' rather than timing out early.
+      const deadline = Date.now() + 16 * 60 * 1000
+      // Tolerate transient network blips: only give up after 3 consecutive
+      // failed or non-OK polls. A single bad poll while the job is healthy
+      // must not drop the user back to URL entry.
+      let consecutiveFailures = 0
       while (Date.now() < deadline) {
         await new Promise((r) => setTimeout(r, 2000))
         if (abort.signal.aborted) return
 
-        const statusRes = await fetch(`/api/products/import-from-url/${jobId}`, {
-          signal: abort.signal,
-        })
-        if (!statusRes.ok) {
-          setError('Lost contact with the import job. Please try again.')
-          setStage('url-entry')
-          return
+        let statusRes: Response
+        try {
+          statusRes = await fetch(`/api/products/import-from-url/${jobId}`, {
+            signal: abort.signal,
+          })
+        } catch (pollErr: any) {
+          if (pollErr?.name === 'AbortError') return
+          consecutiveFailures++
+          if (consecutiveFailures >= 3) {
+            setError('Lost contact with the import job. Please try again.')
+            setStage('url-entry')
+            return
+          }
+          continue
         }
+        if (!statusRes.ok) {
+          consecutiveFailures++
+          if (consecutiveFailures >= 3) {
+            setError('Lost contact with the import job. Please try again.')
+            setStage('url-entry')
+            return
+          }
+          continue
+        }
+        consecutiveFailures = 0
         const statusData = await statusRes.json()
         if (statusData.phaseMessage) setScanPhase(statusData.phaseMessage)
+        if (typeof statusData.pagesAnalyzed === 'number' && statusData.pagesAnalyzed > 0) {
+          setPagesAnalyzed(statusData.pagesAnalyzed)
+        }
 
         if (statusData.status === 'failed') {
           setError(statusData.error || 'Import failed')
@@ -179,6 +207,12 @@ export function WebsiteImportFlow({
           }
           if (statusData.brandMetadata && Object.keys(statusData.brandMetadata).length > 0) {
             setBrandMetadata(statusData.brandMetadata)
+          }
+          // A completed job may still carry a phaseMessage when the catalogue
+          // was too large to read in full — surface it so the user knows some
+          // products need adding manually.
+          if (statusData.phaseMessage) {
+            toast.warning(statusData.phaseMessage)
           }
           setStage('review')
           return
@@ -219,8 +253,10 @@ export function WebsiteImportFlow({
         return
       }
 
+      const created = typeof data.created === 'number' ? data.created : selected.length
+      setCreatedCount(created)
       setStage('success')
-      onSuccess(data.created, orgData ?? undefined)
+      onSuccess(created, orgData ?? undefined)
     } catch {
       toast.error('Something went wrong creating products')
     } finally {
@@ -338,8 +374,13 @@ export function WebsiteImportFlow({
               <div className="text-center space-y-1">
                 <p className="font-medium">Scanning {url}</p>
                 <p className="text-sm text-muted-foreground">{scanPhase}</p>
+                {pagesAnalyzed > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {pagesAnalyzed} page{pagesAnalyzed !== 1 ? 's' : ''} analysed so far
+                  </p>
+                )}
                 <p className="text-xs text-muted-foreground">
-                  Large catalogues can take up to a minute.
+                  This can take a few minutes for large sites. You can keep this open.
                 </p>
               </div>
             </div>
@@ -561,7 +602,7 @@ export function WebsiteImportFlow({
               </div>
               <div className="space-y-1">
                 <p className="text-lg font-semibold">
-                  {selectedCount} product{selectedCount !== 1 ? 's' : ''} created as drafts
+                  {createdCount} product{createdCount !== 1 ? 's' : ''} created as drafts
                 </p>
                 <p className="text-sm text-muted-foreground">
                   You can now add ingredient and packaging data to each product.
