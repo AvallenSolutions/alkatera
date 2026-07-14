@@ -60,7 +60,7 @@ interface Facility {
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024
 const ACCEPT =
-  '.pdf,.xlsx,.xls,image/jpeg,image/png,image/webp,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel'
+  '.pdf,.xlsx,.xls,.csv,image/jpeg,image/png,image/webp,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel'
 
 interface UniversalDropzoneProps {
   /** Click target that opens the dialog. Optional when driven by `file`. */
@@ -183,6 +183,8 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pollAbortRef = useRef<{ cancelled: boolean } | null>(null)
   const externalFileRef = useRef<File | null>(null)
+  // Guards the "files still waiting" warning so it fires at most once per job.
+  const handoffWarnedRef = useRef<string | null>(null)
 
   const reset = useCallback(() => {
     if (pollAbortRef.current) pollAbortRef.current.cancelled = true
@@ -348,6 +350,36 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
     processFile(next)
     return true
   }, [queue, processFile])
+
+  // Batch safety net: a handoff type (BOM, menu, spray diary, product workbook,
+  // POS export, accounts export, soil-carbon evidence, unsupported) navigates
+  // away and reset() clears the queue, so any files queued behind it would be
+  // dropped silently. We can't carry the queue across the navigation from here,
+  // so at minimum tell the user which files still need attention. The toast
+  // survives the SPA navigation (sonner is mounted app-wide), so the message
+  // stays visible after the handoff page loads.
+  useEffect(() => {
+    if (
+      step !== 'review' ||
+      !result ||
+      !jobId ||
+      queue.length === 0 ||
+      !HANDOFF_TYPES.has(result.type) ||
+      handoffWarnedRef.current === jobId
+    ) {
+      return
+    }
+    handoffWarnedRef.current = jobId
+    const names = queue.map((f) => f.name)
+    const shown = names.slice(0, 3).join(', ')
+    const extra = names.length > 3 ? ` and ${names.length - 3} more` : ''
+    const plural = queue.length === 1 ? 'file is' : 'files are'
+    const them = queue.length === 1 ? 'it' : 'them'
+    toast.info(
+      `${queue.length} more ${plural} waiting: ${shown}${extra}. Deal with this one first, then upload ${them} again.`,
+      { duration: 8000 },
+    )
+  }, [step, result, jobId, queue])
 
   // Externally-fed file (e.g. from the Rosa drawer): open the dialog and run
   // it through the same classify → review flow as a manual drop. Guarded by a
@@ -595,7 +627,7 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
               <div className="text-center">
                 <p className="font-medium text-sm">Drop files here or click to browse</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  PDF, image, or Excel · up to 20MB each · multiple files supported
+                  PDF, image, Excel, or CSV · up to 20MB each · multiple files supported
                 </p>
               </div>
             </button>
@@ -2135,6 +2167,7 @@ function SupplierInvoicePanel({
   onClose: () => void
   onSaved?: ReviewPanelProps['onSaved']
 }) {
+  const { currentOrganization } = useOrganization()
   const [supplierName] = useState(invoice?.supplier_name || '')
   const [invoiceDate, setInvoiceDate] = useState(invoice?.invoice_date || '')
   const [currency, setCurrency] = useState<string>(
@@ -2181,6 +2214,9 @@ function SupplierInvoicePanel({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          // Save to the org the user is working in, not the caller's metadata
+          // org (the route verifies access before honouring it).
+          organizationId: currentOrganization?.id,
           supplier_name: supplierName,
           invoice_date: invoiceDate || null,
           currency,

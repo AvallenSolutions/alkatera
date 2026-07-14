@@ -261,16 +261,34 @@ export function detectFileKind(fileName: string, fileMime: string): ClassifierFi
   return 'other';
 }
 
+type AnthropicImageMediaType = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+
 type ClassifierContentBlock =
   | { type: 'document'; source: { type: 'base64'; media_type: 'application/pdf'; data: string } }
   | {
       type: 'image';
-      source: { type: 'base64'; media_type: 'image/jpeg' | 'image/png' | 'image/webp'; data: string };
+      source: { type: 'base64'; media_type: AnthropicImageMediaType; data: string };
     }
   | { type: 'text'; text: string };
 
 const UNSUPPORTED_REASON =
   'Unsupported file type. Upload a PDF, image (JPEG/PNG/WebP), spreadsheet or CSV.';
+
+// The only image media types the Anthropic vision API accepts. An HEIC phone
+// photo, TIFF, BMP etc. detects as image/* but would 400 the API, so we guard
+// early with a friendly message instead of letting the raw error through.
+const SUPPORTED_IMAGE_MIMES = new Set<string>([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+]);
+
+/** Friendly, user-facing reason for an image format we cannot send to Claude. */
+function unsupportedImageReason(fileMime: string): string {
+  const label = (fileMime.split('/')[1] || 'this format').toUpperCase();
+  return `This image format (${label}) isn't supported yet. Please convert it to JPEG or PNG and try again.`;
+}
 
 /**
  * Build the content block Claude reads. PDFs and images go as native binary
@@ -297,7 +315,7 @@ export function buildClassifierContent(
           type: 'image',
           source: {
             type: 'base64',
-            media_type: fileMime as 'image/jpeg' | 'image/png' | 'image/webp',
+            media_type: fileMime as AnthropicImageMediaType,
             data: base64Data,
           },
         };
@@ -332,6 +350,12 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
 
   if (kind === 'other') {
     return { type: 'unsupported', payload: { reason: UNSUPPORTED_REASON } };
+  }
+
+  // Reject image formats the vision API can't read (HEIC, TIFF, etc.) before we
+  // waste a job on a raw 400.
+  if (kind === 'image' && !SUPPORTED_IMAGE_MIMES.has(fileMime.toLowerCase())) {
+    return { type: 'unsupported', payload: { reason: unsupportedImageReason(fileMime) } };
   }
 
   let preparsedWorkbook: XLSX.WorkBook | undefined;
@@ -487,6 +511,13 @@ export async function extractWithForcedTool(
       type: 'unsupported',
       payload: { reason: `Cannot re-read this document as "${targetType}".` },
     };
+  }
+
+  if (
+    detectFileKind(fileName, fileMime) === 'image' &&
+    !SUPPORTED_IMAGE_MIMES.has(fileMime.toLowerCase())
+  ) {
+    return { type: 'unsupported', payload: { reason: unsupportedImageReason(fileMime) } };
   }
 
   const contentBlock = buildClassifierContent(fileBytes, fileName, fileMime);

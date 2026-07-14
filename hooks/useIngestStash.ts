@@ -73,6 +73,16 @@ export function useIngestStash(
         // Fire-and-forget cleanup; the bucket has no TTL, so we delete on
         // successful pickup. If it fails (offline, RLS drift), orphans are
         // harmless — they just cost a few KB until manually cleared.
+        //
+        // KNOWN LIMITATION (deferred): we delete the stash here, on pickup,
+        // BEFORE the downstream wizard (BOM import, growing-profile evidence)
+        // has actually committed the import. If the user cancels that wizard
+        // after the deep link fires, the file is gone and they must re-upload.
+        // The correct fix is to defer this DELETE until the consumer confirms
+        // the import committed, but that needs every consumer page to signal
+        // back (a release callback threaded through onFile), which is a
+        // cross-file change beyond this hook. Do NOT add a TTL cleanup cron as
+        // a shortcut — the fix belongs with the commit, not a sweeper.
         fetch(`/api/ingest/stash?path=${encodeURIComponent(stashId)}`, {
           method: 'DELETE',
         }).catch(() => { /* swallow */ })
