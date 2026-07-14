@@ -103,8 +103,11 @@ export async function POST(request: NextRequest, { params }: { params: { jobId: 
     }
     const fileBytes = new Uint8Array(await blob.arrayBuffer());
     if (fileBytes.byteLength > MAX_RECLASSIFY_BYTES) {
+      // Re-uploading would just re-run the same classifier that misread it, so
+      // don't send the user into a loop. For a large file the honest path is
+      // to correct the extracted fields by hand.
       return NextResponse.json(
-        { error: 'This file is too large to re-read inline. Upload it again and pick the type from the result.' },
+        { error: 'This file is too large to re-read for a type change. Please edit the extracted details directly, or split the file into smaller parts and upload those.' },
         { status: 413 },
       );
     }

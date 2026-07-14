@@ -17,7 +17,30 @@ import type {
 // fails — Claude on a single PDF page typically completes in 5-12s, well
 // under Netlify's 26s sync ceiling.
 const INLINE_FALLBACK_MAX_BYTES = 5 * 1024 * 1024
+// PDFs with more than this many pages routinely blow the 26s inline budget
+// (Claude reads every page), so they go to the background function even when
+// their byte size is small. A 60-page catalogue at 4.8MB used to be classified
+// inline, get the lambda killed mid-await, and leave the job stuck at
+// "extracting" forever.
+const INLINE_MAX_PDF_PAGES = 8
 const TRIGGER_TIMEOUT_MS = 4000
+
+/**
+ * Cheap PDF page-count estimate from the raw bytes (no full parse): count the
+ * "/Type /Page" objects (excluding the "/Pages" tree node). Good enough to
+ * decide inline-vs-background; returns null for non-PDF or unreadable input.
+ */
+function estimatePdfPageCount(bytes: Uint8Array): number | null {
+  try {
+    // Only scan a bounded prefix — page objects are spread through the file,
+    // but for a routing heuristic a generous cap keeps this O(1)-ish.
+    const text = Buffer.from(bytes).toString('latin1')
+    const matches = text.match(/\/Type\s*\/Page[^s]/g)
+    return matches ? matches.length : null
+  } catch {
+    return null
+  }
+}
 
 // On Netlify the lambda freezes the moment the HTTP response is sent, so the
 // inline fallback below MUST be awaited. Bumping maxDuration gives us
@@ -438,10 +461,20 @@ export async function POST(request: NextRequest) {
     // Strategy: classify inline whenever the file fits within the sync
     // budget. The Netlify -background function has been failing to
     // cold-start in production (jobs stuck at "Queued…"), and even when
-    // it works the inline path is faster for typical bills. We only fall
-    // back to the background trigger for large PDFs that wouldn't finish
-    // inside Netlify's 26s sync ceiling.
-    if (file.size <= INLINE_FALLBACK_MAX_BYTES) {
+    // it works the inline path is faster for typical bills. We fall back to
+    // the background trigger for large files AND for multi-page PDFs, which
+    // are slow to read regardless of byte size and would otherwise get the
+    // 26s lambda killed mid-await (leaving the job stuck at "extracting").
+    const isPdf = (file.type || '').includes('pdf') || file.name.toLowerCase().endsWith('.pdf')
+    let inlineEligible = file.size <= INLINE_FALLBACK_MAX_BYTES
+    if (inlineEligible && isPdf) {
+      const pageCount = estimatePdfPageCount(new Uint8Array(await file.arrayBuffer()))
+      if (pageCount != null && pageCount > INLINE_MAX_PDF_PAGES) {
+        inlineEligible = false
+        console.log(`[ingest/auto] PDF has ~${pageCount} pages (> ${INLINE_MAX_PDF_PAGES}); routing to background`)
+      }
+    }
+    if (inlineEligible) {
       await runInlineClassifier(serviceClient, job.id, file, stashPath, organizationId)
       return NextResponse.json({ jobId: job.id }, { status: 202 })
     }

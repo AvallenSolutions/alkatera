@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { guardOrgWrite } from '@/lib/auth/guard-org-write';
 import { buildPackagingMaterialData } from '@/lib/products/packaging-material-data';
 import type { PackagingFormData } from '@/components/products/PackagingFormCard';
 
@@ -33,10 +34,18 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
     }
 
-    const organizationId = await resolveAccessibleOrg(supabase, user);
+    const body = await request.json();
+
+    // Resolve against the org the upload was classified under when the client
+    // sends it, so a multi-org user (or advisor) writes into the intended org
+    // rather than whichever the server-side default resolves to.
+    const organizationId = await resolveAccessibleOrg(supabase, user, body.organizationId);
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
+
+    const denied = await guardOrgWrite(supabase, user, organizationId);
+    if (denied) return denied;
 
     const productId = params.id;
     // Verify the product belongs to the caller's organisation.
@@ -49,7 +58,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
 
-    const body = await request.json();
     const components: ComponentInput[] = Array.isArray(body.components) ? body.components : [];
     const valid = components.filter((c) => c.component_name && Number(c.weight_g) > 0);
     if (valid.length === 0) {
@@ -77,6 +85,24 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       } as unknown as PackagingFormData;
       return buildPackagingMaterialData(form, productId);
     });
+
+    // Idempotent re-upload: this endpoint is append-only, so uploading the
+    // same spec twice used to double every packaging row (and the footprint
+    // and EPR tonnage). Replace any existing packaging rows for this product
+    // that share a name with an incoming row before inserting.
+    const incomingNames = Array.from(new Set(valid.map((c) => c.component_name!.trim())));
+    if (incomingNames.length > 0) {
+      const { error: delError } = await supabase
+        .from('product_materials')
+        .delete()
+        .eq('product_id', productId)
+        .eq('material_type', 'packaging')
+        .in('material_name', incomingNames);
+      if (delError) {
+        console.error('[products/packaging POST] Dedupe delete error:', delError);
+        return NextResponse.json({ error: 'Could not save the packaging components.' }, { status: 500 });
+      }
+    }
 
     const { data, error } = await supabase.from('product_materials').insert(rows).select('id');
     if (error) {

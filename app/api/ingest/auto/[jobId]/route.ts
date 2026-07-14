@@ -20,13 +20,35 @@ export async function GET(
   const { data: job, error } = await (client as any)
     .from('ingest_jobs')
     .select(
-      'id, user_id, status, phase_message, result_type, result_payload, error, created_at, retry_count',
+      'id, user_id, status, phase_message, result_type, result_payload, error, created_at, updated_at, retry_count',
     )
     .eq('id', params.jobId)
     .maybeSingle();
 
   if (error || !job || job.user_id !== user.id) {
     return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+  }
+
+  // Terminal rescue: a lambda killed mid-classification (e.g. a 60-page PDF on
+  // the inline path) leaves the job at 'extracting' forever — the pending
+  // re-fire below doesn't cover it. If it hasn't advanced in 3 minutes, mark
+  // it failed so the client stops polling and can retry.
+  if (
+    job.status === 'extracting' &&
+    Date.now() - new Date(job.updated_at ?? job.created_at).getTime() > 3 * 60 * 1000
+  ) {
+    const failMsg = 'Reading this document took too long and was stopped. Try a smaller or simpler file, or split it into parts.';
+    await (client as any)
+      .from('ingest_jobs')
+      .update({ status: 'failed', error: failMsg, updated_at: new Date().toISOString() })
+      .eq('id', job.id);
+    return NextResponse.json({
+      status: 'failed',
+      phaseMessage: null,
+      resultType: job.result_type,
+      result: job.result_payload ?? null,
+      error: failMsg,
+    });
   }
 
   // If the row is still 'pending' well after enqueue, the background
