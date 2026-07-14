@@ -1634,15 +1634,18 @@ function CircularitySection({
   const applyDefaults = () => {
     const defaults = lookupPackagingDefaults(packaging.name);
     if (!defaults) return;
+    // Only fill fields the user hasn't set. A genuine 0 (e.g. supplier-declared
+    // 0% recycled content) must count as "set" and never be overwritten.
+    const isUnset = (v: unknown) => v === null || v === undefined || v === '';
     const patch: Partial<PackagingFormData> = {};
-    if (defaults.reuse_trips && !packaging.reuse_trips) patch.reuse_trips = defaults.reuse_trips;
-    if (defaults.recycled_content_percentage != null && !packaging.recycled_content_percentage) {
+    if (defaults.reuse_trips != null && isUnset(packaging.reuse_trips)) patch.reuse_trips = defaults.reuse_trips;
+    if (defaults.recycled_content_percentage != null && isUnset(packaging.recycled_content_percentage)) {
       patch.recycled_content_percentage = defaults.recycled_content_percentage;
     }
-    if (defaults.recyclability_percent != null && !packaging.recyclability_percent) {
+    if (defaults.recyclability_percent != null && isUnset(packaging.recyclability_percent)) {
       patch.recyclability_percent = defaults.recyclability_percent;
     }
-    if (defaults.end_of_life_pathway && !packaging.end_of_life_pathway) {
+    if (defaults.end_of_life_pathway && isUnset(packaging.end_of_life_pathway)) {
       patch.end_of_life_pathway = defaults.end_of_life_pathway;
     }
     if (Object.keys(patch).length > 0) onUpdate(packaging.tempId, patch);

@@ -480,14 +480,17 @@ export function IngredientFormCard({
     let warning: string | undefined;
 
     const VOLUME_UNITS = ['l', 'litre', 'litres', 'liter', 'liters', 'ml', 'millilitre', 'millilitres'];
-    const MASS_UNITS   = ['kg', 'kilograms', 'g', 'grams'];
+    const MASS_UNITS   = ['kg', 'kilogram', 'kilograms', 'g', 'gram', 'grams'];
+
+    const MILLILITRE_UNITS = ['ml', 'millilitre', 'millilitres'];
+    const GRAM_UNITS = ['g', 'gram', 'grams'];
 
     let ingredientLitres: number;
     if (VOLUME_UNITS.includes(unit)) {
       // normaliseToKg treats L as 1:1 with kg, so qty is already in "litre-equivalent"
-      ingredientLitres = unit.startsWith('ml') ? qty / 1000 : qty;
+      ingredientLitres = MILLILITRE_UNITS.includes(unit) ? qty / 1000 : qty;
     } else if (MASS_UNITS.includes(unit)) {
-      ingredientLitres = unit === 'g' ? qty / 1000 : qty; // density ≈ 1 kg/L
+      ingredientLitres = GRAM_UNITS.includes(unit) ? qty / 1000 : qty; // density ≈ 1 kg/L
       warning = 'Using 1 kg ≈ 1 L — consider switching to litres for spirits';
     } else {
       return null; // unit type (e.g. "unit") — can't calculate

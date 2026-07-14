@@ -34,6 +34,19 @@ export interface PackagingTemplateItem {
   epr_uk_nation?: string;
   epr_is_drinks_container: boolean;
   units_per_group: number | string;
+  // Circularity + structured identity + factor metadata (round-tripped so a
+  // saved template keeps full fidelity, e.g. a keg's 150 reuse trips and its
+  // already-matched emission factor).
+  reuse_trips?: number | string;
+  recyclability_percent?: number | string;
+  end_of_life_pathway?: PackagingFormData['end_of_life_pathway'];
+  biobased_content_percentage?: number | string;
+  carbon_intensity?: number;
+  match_status?: PackagingFormData['match_status'];
+  container_format?: string | null;
+  container_material?: string | null;
+  container_size_ml?: number | null;
+  transport_legs?: PackagingFormData['transport_legs'];
 }
 
 export interface PackagingTemplate {
@@ -81,6 +94,16 @@ export function packagingToTemplateItem(form: PackagingFormData): PackagingTempl
     epr_uk_nation: form.epr_uk_nation,
     epr_is_drinks_container: form.epr_is_drinks_container,
     units_per_group: form.units_per_group,
+    reuse_trips: form.reuse_trips,
+    recyclability_percent: form.recyclability_percent,
+    end_of_life_pathway: form.end_of_life_pathway,
+    biobased_content_percentage: form.biobased_content_percentage,
+    carbon_intensity: form.carbon_intensity,
+    match_status: form.match_status,
+    container_format: form.container_format,
+    container_material: form.container_material,
+    container_size_ml: form.container_size_ml,
+    transport_legs: form.transport_legs,
   };
 }
 
@@ -119,6 +142,19 @@ export function templateItemToPackagingForm(item: PackagingTemplateItem): Packag
     epr_uk_nation: item.epr_uk_nation as any,
     epr_is_drinks_container: item.epr_is_drinks_container,
     units_per_group: item.units_per_group,
+    // Numeric "unknown" is represented as '' in the packaging form; structured
+    // identity + factor provenance use null. Fall back for older templates
+    // saved before these fields were round-tripped.
+    reuse_trips: item.reuse_trips ?? '',
+    recyclability_percent: item.recyclability_percent ?? '',
+    end_of_life_pathway: item.end_of_life_pathway ?? '',
+    biobased_content_percentage: item.biobased_content_percentage ?? '',
+    carbon_intensity: item.carbon_intensity,
+    match_status: item.match_status ?? null,
+    container_format: item.container_format ?? null,
+    container_material: item.container_material ?? null,
+    container_size_ml: item.container_size_ml ?? null,
+    transport_legs: item.transport_legs ?? null,
   };
 }
 
