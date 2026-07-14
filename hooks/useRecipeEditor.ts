@@ -709,19 +709,30 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         if (updateError) throw new Error(`Failed to update packaging: ${updateError.message}`);
       }
 
-      // Insert new items (guard against quantity <= 0 to satisfy positive_quantity constraint)
+      // Insert new items (guard against quantity <= 0 to satisfy positive_quantity
+      // constraint). Keep each surviving form paired with the row we send so the
+      // returned uuid can be matched back by index — Postgres returns inserted
+      // rows in input order — instead of by name+category, which mis-attaches
+      // EPR components when two new packaging rows share the same name and type.
       let insertedData: any[] = [];
-      if (newItems.length > 0) {
-        const materialsToInsert = newItems.map(buildMaterialData).filter(m => m.quantity > 0 && !isNaN(m.quantity));
-        if (materialsToInsert.length > 0) {
-          const { data, error: insertError } = await supabase
-            .from("product_materials")
-            .insert(materialsToInsert)
-            .select();
-          if (insertError) throw new Error(`Failed to save packaging: ${insertError.message}`);
-          insertedData = data || [];
-        }
+      const builtNewItems = newItems
+        .map(form => ({ form, data: buildMaterialData(form) }))
+        .filter(({ data }) => data.quantity > 0 && !isNaN(data.quantity));
+      if (builtNewItems.length > 0) {
+        const { data, error: insertError } = await supabase
+          .from("product_materials")
+          .insert(builtNewItems.map(b => b.data))
+          .select();
+        if (insertError) throw new Error(`Failed to save packaging: ${insertError.message}`);
+        insertedData = data || [];
       }
+
+      // Pair each new form's tempId to the uuid it was inserted as, by index.
+      const newIdByTempId = new Map<string, string>();
+      builtNewItems.forEach(({ form }, i) => {
+        const row = insertedData[i];
+        if (row?.id) newIdByTempId.set(form.tempId, row.id);
+      });
 
       // Save EPR material components. product_materials.id (and therefore the
       // packaging_material_components.product_material_id FK) is a uuid: for an
@@ -731,15 +742,9 @@ export function useRecipeEditor(productId: string, organizationId: string) {
       // wrong integer (which the uuid column rejected). Use the uuid directly.
       for (const form of validForms) {
         if (form.has_component_breakdown && form.components && form.components.length > 0) {
-          let materialId: string | null = null;
-          if (!form.tempId.startsWith('temp-')) {
-            materialId = form.tempId;
-          } else {
-            const insertedItem = insertedData.find((d: any) =>
-              d.material_name === form.name && d.packaging_category === form.packaging_category
-            );
-            if (insertedItem) materialId = insertedItem.id;
-          }
+          const materialId: string | null = form.tempId.startsWith('temp-')
+            ? (newIdByTempId.get(form.tempId) ?? null)
+            : form.tempId;
 
           if (materialId) {
             const { error: delErr } = await supabase
@@ -1035,33 +1040,34 @@ export function useRecipeEditor(productId: string, organizationId: string) {
       if (updateError) throw new Error(`Autosave packaging failed: ${updateError.message}`);
     }
 
-    if (newItems.length > 0) {
-      const materialsToInsert = newItems.map(buildMaterialData).filter(m => m.quantity > 0 && !isNaN(m.quantity));
-      if (materialsToInsert.length > 0) {
-        const { data, error: insertError } = await supabase
-          .from("product_materials")
-          .insert(materialsToInsert)
-          .select();
-        if (insertError) throw new Error(`Autosave packaging failed: ${insertError.message}`);
+    // Keep each surviving new form paired with the row we send, so the returned
+    // uuid maps back by index (Postgres preserves insert order) rather than by
+    // name+category — which mis-attaches components on duplicate name+type rows.
+    const builtNewItems = newItems
+      .map(form => ({ form, data: buildMaterialData(form) }))
+      .filter(({ data }) => data.quantity > 0 && !isNaN(data.quantity));
+    if (builtNewItems.length > 0) {
+      const { data, error: insertError } = await supabase
+        .from("product_materials")
+        .insert(builtNewItems.map(b => b.data))
+        .select();
+      if (insertError) throw new Error(`Autosave packaging failed: ${insertError.message}`);
 
-        // Save components for newly inserted items
-        for (const form of newItems) {
-          if (form.has_component_breakdown && form.components && form.components.length > 0) {
-            const insertedItem = (data || []).find((d: any) =>
-              d.material_name === form.name && d.packaging_category === form.packaging_category
-            );
-            if (insertedItem) {
-              const componentsToInsert = form.components.map(comp => ({
-                product_material_id: insertedItem.id,
-                epr_material_type: comp.epr_material_type,
-                component_name: comp.component_name,
-                weight_grams: comp.weight_grams,
-                recycled_content_percentage: comp.recycled_content_percentage || 0,
-                is_recyclable: comp.is_recyclable !== undefined ? comp.is_recyclable : true,
-              }));
-              await supabase.from('packaging_material_components').insert(componentsToInsert);
-            }
-          }
+      // Save components for newly inserted items, paired by index.
+      const inserted = data || [];
+      for (let i = 0; i < builtNewItems.length; i++) {
+        const form = builtNewItems[i].form;
+        const insertedItem = inserted[i];
+        if (insertedItem?.id && form.has_component_breakdown && form.components && form.components.length > 0) {
+          const componentsToInsert = form.components.map(comp => ({
+            product_material_id: insertedItem.id,
+            epr_material_type: comp.epr_material_type,
+            component_name: comp.component_name,
+            weight_grams: comp.weight_grams,
+            recycled_content_percentage: comp.recycled_content_percentage || 0,
+            is_recyclable: comp.is_recyclable !== undefined ? comp.is_recyclable : true,
+          }));
+          await supabase.from('packaging_material_components').insert(componentsToInsert);
         }
       }
     }
