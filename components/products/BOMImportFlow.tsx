@@ -104,6 +104,10 @@ export function BOMImportFlow({
   const [metadata, setMetadata] = useState<BOMParseResult["metadata"]>({});
   const [isImporting, setIsImporting] = useState(false);
   const [autoParseError, setAutoParseError] = useState<string | null>(null);
+  // When the classifier's line items look like they hit the per-sheet row cap
+  // (see lib/ingest/spreadsheet-text.ts maxRowsPerSheet), warn the user that
+  // rows near the bottom of a big sheet may have been dropped.
+  const [rowCapNotice, setRowCapNotice] = useState(false);
   const autoParsedRef = useRef(false);
 
   // Finished-product size used to scale per-litre dosages to per-unit. When the
@@ -229,6 +233,11 @@ export function BOMImportFlow({
     if (!open || autoParsedRef.current) return;
     if (!initialItems || initialItems.length === 0) return;
     autoParsedRef.current = true;
+    // Heuristic: the classifier serialises at most 100 rows per sheet, so a
+    // line-item count at or above that threshold is a strong hint the source
+    // file was longer than what the model actually read. Non-blocking notice
+    // only — we can't tell for certain without the raw row count.
+    setRowCapNotice(initialItems.length >= 100);
     handleItemsExtracted(initialItems, {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialItems]);
@@ -393,7 +402,11 @@ export function BOMImportFlow({
 
         if (item.itemType === "ingredient") {
           const ingredientData: IngredientFormData = {
-            tempId: `ing-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            // Must carry the `temp-` prefix: every recipe-editor save path
+            // classifies a row as new-vs-existing on tempId.startsWith('temp-').
+            // A bare `ing-` id is read as an existing DB row and the save tries
+            // .update().eq('id', 'ing-...') against a uuid column, which errors.
+            tempId: `temp-ing-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             name: item.cleanName,
             data_source: match?.data_source ?? null,
             data_source_id: match?.data_source_id ?? undefined,
@@ -413,7 +426,9 @@ export function BOMImportFlow({
           ingredients.push(ingredientData);
         } else {
           const packagingData: PackagingFormData = {
-            tempId: `pkg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            // `temp-` prefix required (see ingredient note above): without it the
+            // save treats this as an existing row and packaging never persists.
+            tempId: `temp-pkg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             name: item.cleanName,
             data_source: match?.data_source ?? null,
             data_source_id: match?.data_source_id ?? undefined,
@@ -466,6 +481,7 @@ export function BOMImportFlow({
     setMetadata({});
     setMatchStates({});
     setMatchProgress({ completed: 0, total: 0 });
+    setRowCapNotice(false);
     abortRef.current = true;
     onOpenChange(false);
   };
@@ -619,12 +635,30 @@ export function BOMImportFlow({
             </div>
           )}
 
+          {rowCapNotice && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              <span>
+                Only the first 100 rows were read from this file; check nothing is
+                missing. If your recipe is longer, add any missing items by hand
+                below.
+              </span>
+            </div>
+          )}
+
           <BOMReviewTable
             items={reviewItems}
             onItemsChange={setReviewItems}
             onImport={handleReviewComplete}
             onCancel={handleCancel}
             isImporting={false}
+            // Hard gate: a per-litre recipe can't be imported until we know the
+            // finished unit size, otherwise dosages would save unscaled.
+            blockImportReason={
+              hasVolumetricItems && !effectiveSizeMl
+                ? "Enter the finished unit size above before importing, so per-litre amounts scale to one unit."
+                : null
+            }
           />
         </DialogContent>
       </Dialog>
@@ -882,7 +916,13 @@ function convertItemsToUnit(
     const basis: QuantityBasis | undefined =
       item.itemType === "packaging" ? "per_unit" : item.quantityBasis;
     if (!basis || basis === "per_unit") return { ...item, quantityBasis: "per_unit" };
-    const { amount } = scaleQuantityToUnit(item.quantity, basis, sizeMl);
+    const { amount, scaled } = scaleQuantityToUnit(item.quantity, basis, sizeMl);
+    // Only relabel to per_unit when we actually converted using a known finished
+    // size. When the size is unknown scaling can't happen, so KEEP the real
+    // per-litre / per-hectolitre basis — relabelling it per_unit here would save
+    // a per-litre dosage as if it were a per-unit amount, and the Import gate
+    // relies on the surviving volumetric basis to know a size is still needed.
+    if (!scaled) return { ...item, quantityBasis: basis };
     return { ...item, quantity: amount, quantityBasis: "per_unit" };
   });
 }
@@ -928,15 +968,22 @@ function detectPackagingCategory(
   return "container";
 }
 
-function convertToGrams(quantity: number | null, unit: string | null): number {
-  if (!quantity) return 0;
+// Only mass units carry a real gram weight. For counts ("unit"), volumes ("ml",
+// "L") or anything unknown we must NOT fabricate a weight — treating "1 unit" as
+// "1 g" silently invents a nonsense net weight. Return '' (unset) so the
+// packaging card shows a blank the user can fill, rather than a fake number.
+function convertToGrams(
+  quantity: number | null,
+  unit: string | null,
+): number | "" {
+  if (!quantity || quantity <= 0) return "";
 
-  switch (unit) {
+  switch (canonicaliseUnit(unit)) {
     case "kg":
       return quantity * 1000;
     case "g":
       return quantity;
     default:
-      return quantity;
+      return "";
   }
 }
