@@ -473,7 +473,7 @@ export function MaterialValidationStep() {
                                   </TooltipTrigger>
                                   <TooltipContent side="right" className="max-w-[220px] text-xs">
                                     <p>
-                                      <strong>Proxy factor</strong> — the closest
+                                      <strong>Proxy factor</strong>: the closest
                                       matching dataset for &ldquo;
                                       {material.material_name}&rdquo; found in the
                                       LCA database. This will be documented in

@@ -63,6 +63,7 @@ import {
   Wine,
   BedDouble,
   Trash2,
+  Inbox,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
@@ -167,6 +168,14 @@ const navigationStructure: NavItem[] = [
         ],
       },
     ],
+  },
+  {
+    // U4: a home for ingest + website-import jobs so nothing is orphaned when a
+    // user closes the dropzone mid-analysis. Seed tier, no milestone gate.
+    name: 'Uploads',
+    href: '/uploads/',
+    icon: Inbox,
+    minTier: 1,
   },
   {
     name: 'Emissions Data',

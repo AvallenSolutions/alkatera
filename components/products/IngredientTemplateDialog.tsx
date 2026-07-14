@@ -273,7 +273,7 @@ export function IngredientTemplateDialog({
               <Label htmlFor="ing-template-name">Template Name</Label>
               <Input
                 id="ing-template-name"
-                placeholder="e.g. 12yr Single Malt — core liquid"
+                placeholder="e.g. 12yr Single Malt, core liquid"
                 value={templateName}
                 onChange={(e) => setTemplateName(e.target.value)}
                 onKeyDown={(e) => {
