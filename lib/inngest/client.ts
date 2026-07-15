@@ -45,6 +45,11 @@ export interface AlkateraEvents {
     data: { submission_id: string; job_id: string };
   };
 
+  // ─────────── Smart-upload: background forced-type reclassify (large files) ───────────
+  'ingest/reclassify.run': {
+    data: { job_id: string; target_type: string };
+  };
+
   // ─────────── Deep enrich ───────────
   'enrich/brand.run': {
     data: { brand_directory_id: string; job_id: string };

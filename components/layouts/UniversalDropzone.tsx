@@ -449,6 +449,8 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
       if (!jobId) return
       setStep('analysing')
       setPhaseMessage(`Re-reading as ${TYPE_LABELS[targetType]?.toLowerCase() ?? 'the chosen type'}…`)
+      const abortFlag = { cancelled: false }
+      pollAbortRef.current = abortFlag
       try {
         const res = await fetch(`/api/ingest/auto/${jobId}/reclassify`, {
           method: 'POST',
@@ -456,8 +458,43 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
           body: JSON.stringify({ targetType }),
         })
         const body = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(body?.error || 'Could not change the document type')
-        const data = body.result as IngestResponse
+        // 202 = the file was too large to re-read inline, so extraction runs in
+        // the background. Poll the job (same endpoint + loop as the upload flow)
+        // until it completes or fails. Anything else non-2xx is a real error.
+        if (!res.ok && res.status !== 202) {
+          throw new Error(body?.error || 'Could not change the document type')
+        }
+
+        let data: IngestResponse
+        if (res.status === 202) {
+          const start = Date.now()
+          const POLL_MS = 2000
+          const TIMEOUT_MS = 3 * 60 * 1000
+          let polled: IngestResponse | null = null
+          while (!abortFlag.cancelled) {
+            if (Date.now() - start > TIMEOUT_MS) {
+              throw new Error('This is taking longer than expected. Please try again.')
+            }
+            await new Promise((r) => setTimeout(r, POLL_MS))
+            if (abortFlag.cancelled) return
+            const pollRes = await fetch(`/api/ingest/auto/${jobId}`)
+            if (!pollRes.ok) continue
+            const job = await pollRes.json()
+            if (job.phaseMessage) setPhaseMessage(job.phaseMessage)
+            if (job.status === 'failed') {
+              throw new Error(job.error || 'Could not change the document type')
+            }
+            if (job.status === 'completed') {
+              polled = job.result as IngestResponse
+              break
+            }
+          }
+          if (abortFlag.cancelled || !polled) return
+          data = polled
+        } else {
+          data = body.result as IngestResponse
+        }
+
         setResult(data)
         // Same bill pre-fill as the classify path.
         const bill =

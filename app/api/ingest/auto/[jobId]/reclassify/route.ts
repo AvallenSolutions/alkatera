@@ -2,16 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access';
 import {
-  extractWithForcedTool,
-  shapeIngestResult,
   RECLASSIFY_TARGETS,
   type ClassifierResultType,
 } from '@/lib/ingest/classify-document';
-import { buildIngestOrgContext } from '@/lib/ingest/org-context';
-import { unwrapResultPayload } from '@/lib/ingest/wire-shape';
-import { docSignature } from '@/lib/ingest/doc-signature';
-import { sanitiseHintValue } from '@/lib/ingest/feedback-hints';
-import { bumpDocumentProfile } from '@/lib/ingest/profile-upsert';
+import {
+  runReclassify,
+  ReclassifyUnsupportedError,
+  MAX_SYNC_RECLASSIFY_BYTES,
+} from '@/lib/ingest/reclassify';
+import { inngest } from '@/lib/inngest/client';
 
 /**
  * POST /api/ingest/auto/[jobId]/reclassify
@@ -24,8 +23,11 @@ import { bumpDocumentProfile } from '@/lib/ingest/profile-upsert';
  * HERE, server-side, so handoff types that never reach a save still teach the
  * system.
  *
- * A single forced-tool call on a ≤5MB file fits comfortably inside Netlify's
- * sync ceiling — the same budget as the inline classify path.
+ * A forced-tool call on a small file fits comfortably inside the sync ceiling,
+ * so those re-read here and return the new result immediately. Larger files
+ * (above MAX_SYNC_RECLASSIFY_BYTES) would blow that budget, so they are handed
+ * to the `ingest/reclassify.run` Inngest background function and the client
+ * polls the job — no more "too large, edit by hand" dead end.
  */
 export const maxDuration = 26;
 
@@ -37,7 +39,6 @@ const VALID_TARGETS = new Set<string>([
   'smart_meter_csv',
 ]);
 
-const MAX_RECLASSIFY_BYTES = 5 * 1024 * 1024;
 const MAX_RECLASSIFIES_PER_JOB = 3;
 
 export async function POST(request: NextRequest, { params }: { params: { jobId: string } }) {
@@ -102,111 +103,54 @@ export async function POST(request: NextRequest, { params }: { params: { jobId: 
       );
     }
     const fileBytes = new Uint8Array(await blob.arrayBuffer());
-    if (fileBytes.byteLength > MAX_RECLASSIFY_BYTES) {
-      // Re-uploading would just re-run the same classifier that misread it, so
-      // don't send the user into a loop. For a large file the honest path is
-      // to correct the extracted fields by hand.
-      return NextResponse.json(
-        { error: 'This file is too large to re-read for a type change. Please edit the extracted details directly, or split the file into smaller parts and upload those.' },
-        { status: 413 },
-      );
+
+    // Large files would blow the sync ceiling on a forced re-extraction. Hand
+    // them to the Inngest background function and let the client poll the job.
+    // Flip status to 'extracting' so the existing poll endpoint + dropzone UI
+    // drive the wait, and so a second concurrent reclassify is blocked (the
+    // 'completed' precondition above) until this one finishes.
+    if (fileBytes.byteLength > MAX_SYNC_RECLASSIFY_BYTES) {
+      const { error: statusErr } = await supabase
+        .from('ingest_jobs')
+        .update({
+          status: 'extracting',
+          phase_message: 'Re-reading the document…',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', job.id);
+      if (statusErr) {
+        console.error('[ingest/reclassify] Could not mark job extracting:', statusErr.message);
+        return NextResponse.json({ error: 'Could not start re-reading this document' }, { status: 500 });
+      }
+      // Fire the background job. Missing Inngest env no-ops the send; the poll
+      // endpoint's terminal-timeout rescue then marks the job failed after 3
+      // minutes rather than leaving it stuck.
+      await inngest.send({
+        name: 'ingest/reclassify.run',
+        data: { job_id: job.id, target_type: targetType },
+      });
+      return NextResponse.json({ jobId: job.id, background: true }, { status: 202 });
     }
 
-    // Org context hints help the forced extraction too; a failure degrades to
-    // extraction without hints, exactly like the classify path.
-    const orgContext = await buildIngestOrgContext(supabase, job.organization_id).catch(() => null);
-
-    const result = await extractWithForcedTool({
-      fileBytes,
-      fileName: job.file_name || 'upload',
-      fileMime: job.file_mime || '',
-      orgContext: orgContext ?? undefined,
-      targetType: targetType as ClassifierResultType,
-    });
-
-    if (result.type === 'unsupported') {
-      // The forced extraction could not read the file as the chosen type
-      // (e.g. smart_meter_csv on a non-meter file). Leave the job untouched.
-      return NextResponse.json(
-        { error: (result.payload as { reason?: string })?.reason || 'Could not re-read the document as that type.' },
-        { status: 422 },
-      );
-    }
-
-    const shaped = shapeIngestResult(result.type, result.payload, job.stash_path, result.meta);
-    const originalType = job.original_result_type ?? job.result_type;
-
-    const { error: updateErr } = await supabase
-      .from('ingest_jobs')
-      .update({
-        result_type: shaped.result_type,
-        result_payload: shaped.result_payload,
-        original_result_type: originalType,
-        reclassify_count: (job.reclassify_count ?? 0) + 1,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', job.id);
-    if (updateErr) {
-      console.error('[ingest/reclassify] Job update failed:', updateErr.message);
-      return NextResponse.json({ error: 'Could not save the new document type' }, { status: 500 });
-    }
-
-    // Record the type correction now, server-side: handoff types never fire a
-    // save, and this signal is the whole point of the flow. A later save on
-    // the same job updates this row with the field-level diff.
-    const correctionRow = {
-      job_id: job.id,
-      organization_id: job.organization_id,
-      user_id: user.id,
-      result_type: originalType,
-      corrected_result_type: shaped.result_type,
-      misclassified: true,
-      classifier_payload: unwrapResultPayload(job.result_type, job.result_payload),
-      saved_payload: {},
-      field_diff: {},
-      context: {},
-    };
-    const { data: existing } = await supabase
-      .from('ingest_feedback')
-      .select('id')
-      .eq('job_id', job.id)
-      .maybeSingle();
-    const { error: feedbackErr } = existing
-      ? await supabase
-          .from('ingest_feedback')
-          .update({
-            result_type: originalType,
-            corrected_result_type: shaped.result_type,
-            misclassified: true,
-          })
-          .eq('id', existing.id)
-      : await supabase.from('ingest_feedback').insert(correctionRow);
-    if (feedbackErr) {
-      // Best-effort: the reclassify itself succeeded.
-      console.error('[ingest/reclassify] Feedback write failed:', feedbackErr.message);
-    }
-
-    // Filename-keyed learning: remember that files named like this are the
-    // corrected type, so the classifier gets it right next time (injected via
-    // org-context's corrected_documents block).
-    const signature = docSignature(job.file_name || '');
-    if (signature) {
-      await bumpDocumentProfile(supabase, {
-        organizationId: job.organization_id,
-        matchKind: 'filename',
-        supplierKey: signature,
+    try {
+      const shaped = await runReclassify({
+        supabase,
+        job,
+        targetType: targetType as ClassifierResultType,
+        fileBytes,
+      });
+      return NextResponse.json({
         resultType: shaped.result_type,
-        hints: {
-          corrected_from: originalType,
-          filename_example: sanitiseHintValue(job.file_name) ?? undefined,
-        },
-      }).catch((err) => console.error('[ingest/reclassify] Profile write failed:', err?.message));
+        result: shaped.result_payload,
+      });
+    } catch (err) {
+      if (err instanceof ReclassifyUnsupportedError) {
+        // The forced extraction could not read the file as the chosen type
+        // (e.g. smart_meter_csv on a non-meter file). Leave the job untouched.
+        return NextResponse.json({ error: err.message }, { status: 422 });
+      }
+      throw err;
     }
-
-    return NextResponse.json({
-      resultType: shaped.result_type,
-      result: shaped.result_payload,
-    });
   } catch (err: any) {
     console.error('[ingest/reclassify] Error:', err);
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 });
