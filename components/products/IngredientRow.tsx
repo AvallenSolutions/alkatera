@@ -122,11 +122,20 @@ export function IngredientRow(props: IngredientRowProps) {
 
   return (
     <Card>
-      {/* Compact summary row */}
-      <button
-        type="button"
+      {/* Compact summary row. A div (not a <button>) because it contains other
+          interactive controls (AskRosaButton, remove) — a button nested in a
+          button is invalid HTML and triggers a hydration warning. */}
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-muted/40 rounded-t-md focus:outline-none focus:ring-2 focus:ring-ring"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setExpanded((v) => !v);
+          }
+        }}
+        className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-muted/40 rounded-t-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
       >
         <div className="flex h-7 w-7 items-center justify-center rounded bg-orange-500 text-white font-medium text-xs flex-shrink-0">
           {index + 1}
@@ -208,7 +217,7 @@ export function IngredientRow(props: IngredientRowProps) {
             <Trash2 className="h-3.5 w-3.5" />
           </span>
         )}
-      </button>
+      </div>
 
       {/* Sectioned editor when expanded */}
       {isExpanded && (

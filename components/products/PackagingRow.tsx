@@ -101,10 +101,20 @@ export function PackagingRow(props: PackagingRowProps) {
 
   return (
     <Card>
-      <button
-        type="button"
+      {/* A div (not a <button>) because it contains another interactive control
+          (the remove button) — nested interactive elements are invalid HTML and
+          trigger a hydration warning. */}
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-muted/40 rounded-t-md focus:outline-none focus:ring-2 focus:ring-ring"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setExpanded(!expanded);
+          }
+        }}
+        className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-muted/40 rounded-t-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
       >
         <div className="flex h-7 w-7 items-center justify-center rounded bg-orange-500 text-white flex-shrink-0">
           <Icon className="h-3.5 w-3.5" />
@@ -162,7 +172,7 @@ export function PackagingRow(props: PackagingRowProps) {
             <Trash2 className="h-3.5 w-3.5" />
           </span>
         )}
-      </button>
+      </div>
 
       {expanded && (
         <div className="border-t px-3 py-3">
