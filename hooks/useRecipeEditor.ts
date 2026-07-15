@@ -76,6 +76,7 @@ const createDefaultPackaging = (): PackagingFormData => ({
   epr_is_household: true,
   epr_ram_rating: undefined,
   epr_uk_nation: undefined,
+  epr_material_type: undefined,
   epr_is_drinks_container: false,
   units_per_group: '',
 });
@@ -373,6 +374,13 @@ export function useRecipeEditor(productId: string, organizationId: string) {
             epr_is_household: item.epr_is_household !== undefined ? item.epr_is_household : true,
             epr_ram_rating: item.epr_ram_rating || undefined,
             epr_uk_nation: item.epr_uk_nation || undefined,
+            // Explicit override loaded so the EPR material-type selector shows
+            // the saved value; 'other' round-trips (it is a real choice), so
+            // only null/'' fall back to Auto.
+            epr_material_type:
+              item.epr_material_type == null || item.epr_material_type === ''
+                ? undefined
+                : item.epr_material_type,
             epr_is_drinks_container: item.epr_is_drinks_container || false,
             // Legacy shared-packaging rows saved without an answer must ask
             // the question again rather than silently showing 1.

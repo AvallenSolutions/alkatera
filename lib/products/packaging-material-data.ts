@@ -156,7 +156,7 @@ export function buildPackagingMaterialData(form: PackagingFormData, productId: s
   // aluminium etc.). Derive it from the row's material identity here, using
   // the SAME resolution the EoL engine uses, honouring an explicit override.
   materialData.epr_material_type =
-    (form as any).epr_material_type ||
+    form.epr_material_type ||
     deriveEprMaterialType({
       container_material: form.container_material,
       packaging_category: form.packaging_category,

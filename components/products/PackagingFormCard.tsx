@@ -46,6 +46,7 @@ import type {
   EPRPackagingActivity,
   EPRRAMRating,
   EPRUKNation,
+  EPRMaterialType,
   PackagingMaterialComponent,
 } from "@/lib/types/lca";
 import { PackagingComponentEditor } from "./PackagingComponentEditor";
@@ -97,6 +98,13 @@ export interface PackagingFormData {
   epr_is_household: boolean;
   epr_ram_rating?: EPRRAMRating;
   epr_uk_nation?: EPRUKNation;
+  /**
+   * Explicit EPR material type. When unset, it is derived from the material at
+   * save time (buildPackagingMaterialData). Setting it here overrides the
+   * derivation, which matters when inference falls to 'other' (wood, foam,
+   * fabric, metal composites) and blocks EPR data completeness.
+   */
+  epr_material_type?: EPRMaterialType;
   epr_is_drinks_container: boolean;
   units_per_group: number | string;
   // Circularity (optional — defaults to '' / null for all construction sites)
@@ -172,6 +180,23 @@ const EPR_RAM_RATINGS = [
   { value: 'red', label: 'Red', description: 'Not recyclable in practice' },
 ] as const;
 
+// EPR material types (the RPD reporting categories). Excludes the
+// sub-component-only materials (adhesive/ink/coating/lacquer) which aren't a
+// packaging item's headline material. Choosing one here overrides the
+// auto-derived type, which is what fixes rows that otherwise fall to 'Other'
+// and can never reach EPR data completeness.
+const EPR_MATERIAL_TYPES = [
+  { value: 'paper_cardboard', label: 'Paper / Cardboard' },
+  { value: 'plastic_rigid', label: 'Plastic (rigid)' },
+  { value: 'plastic_flexible', label: 'Plastic (flexible / film)' },
+  { value: 'glass', label: 'Glass' },
+  { value: 'aluminium', label: 'Aluminium' },
+  { value: 'steel', label: 'Steel' },
+  { value: 'wood', label: 'Wood' },
+  { value: 'fibre_composite', label: 'Fibre composite' },
+  { value: 'other', label: 'Other' },
+] as const;
+
 // EPR Compliance Section Component
 function EPRComplianceSection({
   packaging,
@@ -195,6 +220,32 @@ function EPRComplianceSection({
         </CollapsibleTrigger>
 
         <CollapsibleContent className="mt-3 space-y-4">
+          {/* EPR Material Type — the RPD fee-band material. Left blank we derive
+              it from the material at save; picking one overrides that, which is
+              how a row that would otherwise read as 'Other' reaches EPR data
+              completeness. */}
+          <div>
+            <Label className="text-xs">EPR Material Type</Label>
+            <Select
+              value={packaging.epr_material_type || ''}
+              onValueChange={(value) => onUpdate({ epr_material_type: value as EPRMaterialType })}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Auto (detected from material)" />
+              </SelectTrigger>
+              <SelectContent>
+                {EPR_MATERIAL_TYPES.map((mat) => (
+                  <SelectItem key={mat.value} value={mat.value} className="text-xs">
+                    {mat.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              Sets the EPR fee band. Leave on Auto unless we detect the wrong material.
+            </p>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             {/* Packaging Activity */}
             <div>
