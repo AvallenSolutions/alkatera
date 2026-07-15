@@ -14,6 +14,7 @@ import { OverviewTab } from "@/components/products/OverviewTab";
 import { LcaStalenessBanner } from "@/components/products/LcaStalenessBanner";
 import { SpecificationTab } from "@/components/products/SpecificationTab";
 import { MultipackContentsEditor } from "@/components/products/MultipackContentsEditor";
+import { MultipackPackagingSection } from "@/components/products/MultipackPackagingSection";
 import { FacilitiesTab } from "@/components/products/FacilitiesTab";
 import { SettingsTab } from "@/components/products/SettingsTab";
 import { EditProductForm } from "@/components/products/EditProductForm";
@@ -321,13 +322,21 @@ export default function ProductDashboardPage() {
 
           <TabsContent value="specification" className="space-y-6">
             {product.is_multipack && currentOrganization ? (
-              // A multipack has no single-SKU recipe/packaging of its own to edit
-              // here; its footprint comes from its component products. Show the
-              // contents editor (add/remove products, change quantities) instead.
-              <MultipackContentsEditor
-                productId={productId}
-                organizationId={currentOrganization.id}
-              />
+              // A multipack has no single-SKU recipe of its own to edit here; its
+              // footprint comes from its component products. Show the contents
+              // editor (add/remove products, change quantities) plus an editor for
+              // the pack's OWN transit/grouping packaging (shipper box, shrink
+              // wrap, pallet), which is otherwise only settable at create time.
+              <>
+                <MultipackContentsEditor
+                  productId={productId}
+                  organizationId={currentOrganization.id}
+                />
+                <MultipackPackagingSection
+                  productId={productId}
+                  organizationId={currentOrganization.id}
+                />
+              </>
             ) : (
               <SpecificationTab
                 productId={productId}

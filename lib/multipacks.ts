@@ -106,6 +106,77 @@ export async function fetchMultipackPackagingMaterials(
   return data || [];
 }
 
+/**
+ * Insert new packaging rows for a multipack's own packaging. Each item is built
+ * through buildMultipackPackagingRow so the columns match the CREATE flow and
+ * single-SKU packaging exactly (EPR level, material identity, allocation).
+ */
+export async function insertMultipackPackaging(
+  multipackProductId: string,
+  items: MultipackPackagingInput[],
+): Promise<any[]> {
+  if (items.length === 0) return [];
+  const rows = items.map((item) => buildMultipackPackagingRow(item, multipackProductId));
+  const { data, error } = await supabase
+    .from('product_materials')
+    .insert(rows)
+    .select();
+
+  if (error) {
+    console.error('Error inserting multipack packaging materials:', error);
+    throw new Error(error.message);
+  }
+  return data || [];
+}
+
+/**
+ * Update one existing multipack packaging row. We rebuild the row through the
+ * shared builder (so material identity, EPR level and allocation stay in lockstep
+ * with the CREATE flow) but strip the fields that would clobber choices the user
+ * may have made in the FULL packaging editor:
+ *   - product_id: never move the row to another product.
+ *   - epr_is_household / epr_is_drinks_container: the mini editor doesn't expose
+ *     these, so leave whatever the full editor set.
+ * epr_packaging_activity / epr_uk_nation / epr_ram_rating are absent from the
+ * builder output entirely, so an update never touches them.
+ */
+export async function updateMultipackPackaging(
+  rowId: string,
+  item: MultipackPackagingInput,
+  multipackProductId: string,
+): Promise<void> {
+  const row = buildMultipackPackagingRow(item, multipackProductId);
+  delete row.product_id;
+  delete row.epr_is_household;
+  delete row.epr_is_drinks_container;
+
+  const { error } = await supabase
+    .from('product_materials')
+    .update(row)
+    .eq('id', rowId);
+
+  if (error) {
+    console.error('Error updating multipack packaging material:', error);
+    throw new Error(error.message);
+  }
+}
+
+/**
+ * Delete multipack packaging rows by id.
+ */
+export async function deleteMultipackPackaging(rowIds: string[]): Promise<void> {
+  if (rowIds.length === 0) return;
+  const { error } = await supabase
+    .from('product_materials')
+    .delete()
+    .in('id', rowIds);
+
+  if (error) {
+    console.error('Error deleting multipack packaging materials:', error);
+    throw new Error(error.message);
+  }
+}
+
 // ============================================================================
 // Multipack Component Functions
 // ============================================================================
