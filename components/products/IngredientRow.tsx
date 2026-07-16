@@ -79,15 +79,6 @@ function dataSourceBadge(ingredient: IngredientFormData) {
   return null;
 }
 
-function isRowComplete(ingredient: IngredientFormData): boolean {
-  return Boolean(
-    ingredient.name &&
-    Number(ingredient.amount) > 0 &&
-    ingredient.unit &&
-    (ingredient.is_self_grown || ingredient.data_source),
-  );
-}
-
 export function IngredientRow(props: IngredientRowProps) {
   const {
     ingredient,
@@ -102,7 +93,11 @@ export function IngredientRow(props: IngredientRowProps) {
     onTabChange,
     productionStages,
   } = props;
-  const [expanded, setExpanded] = useState<boolean>(defaultExpanded ?? !isRowComplete(ingredient));
+  // Rows added by the composer arrive collapsed even before their factor
+  // resolves — the full record (IngredientEditorTabs) opens only via the
+  // "Open the full record." row, never automatically, so the composer stays
+  // the only visible add path (tasks/data-revolution-plan.md Pillar 2).
+  const [expanded, setExpanded] = useState<boolean>(defaultExpanded ?? false);
   // The onboarding tour opens the first row so its tabs are visible for the
   // coachmarks, but the user must still be able to collapse it — guide, don't
   // lock. So forceExpanded nudges the row open rather than pinning it.
@@ -193,8 +188,9 @@ export function IngredientRow(props: IngredientRowProps) {
             />
           </span>
         )}
-        <span className="text-muted-foreground flex-shrink-0" aria-hidden>
-          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        <span className="flex items-center gap-1 flex-shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-studio-dim">
+          {isExpanded ? 'Close the full record.' : 'Open the full record.'}
+          {isExpanded ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
         </span>
         {canRemove && (
           <span

@@ -92,6 +92,12 @@ export async function cancelAction(
     .update({ status: 'cancelled', updated_at: new Date().toISOString() })
     .eq('id', actionId);
   if (error) return { ok: false, error: error.message };
+  // Learning capture (Pillar 4 step 1): a cancelled proposal is a "Rosa
+  // guessed wrong" signal, kind-tagged so the curation sweep can spot tools
+  // that keep getting proposed and then rejected. Best-effort.
+  await logRosaTelemetry(supabase, row.organization_id, row.user_id, 'learning.proposal_cancelled', {
+    tool_name: row.tool_name,
+  });
   return { ok: true };
 }
 
@@ -123,6 +129,7 @@ export async function executeAction(
 
   try {
     const result = await dispatchMutation(supabase, row);
+    await stampRosaWrite(supabase, row, result);
     await supabase
       .from('rosa_pending_actions')
       .update({
@@ -144,6 +151,52 @@ export async function executeAction(
       .eq('id', actionId);
     return { ok: false, error };
   }
+}
+
+/**
+ * Which result field holds the written row's id, for the tool_names whose
+ * exec* function writes (or points at) one identifiable record. Deliberately
+ * an explicit allowlist rather than "any *_id field on the result" — several
+ * exec* functions (approve/reject exception, dismiss anomaly, set progress
+ * tracker) touch bulk or non-record state that doesn't map to one row, and
+ * guessing wrong there would mis-tag telemetry. Only listed tools get a
+ * `learning.rosa_wrote` stamp.
+ */
+const ROSA_WRITE_ID_KEY: Partial<Record<string, string>> = {
+  propose_log_utility_entry: 'entry_id',
+  propose_set_target: 'target_id',
+  propose_add_supplier: 'supplier_id',
+  propose_match_emission_factor: 'ingredient_id',
+  propose_apply_proxy: 'ingredient_id',
+  propose_create_lca_draft: 'lca_id',
+  propose_save_bcorp_answer: 'evidence_id',
+  propose_log_service_volume: 'volume_id',
+  propose_log_hospitality_waste: 'waste_id',
+};
+
+/**
+ * Correction-diff groundwork (Pillar 4 step 1 "Capture", data-revolution-plan
+ * Phase C item 3): stamp `table` + `record_id` on rosa_telemetry for every
+ * write with a known origin, so a later Phase D sweep can join subsequent
+ * edits against records Rosa wrote. No edit-diff hooks yet — that's Phase D.
+ * Best-effort: logRosaTelemetry never throws.
+ */
+async function stampRosaWrite(
+  supabase: SupabaseClient,
+  row: PendingAction,
+  result: Record<string, unknown>,
+): Promise<void> {
+  const idKey = ROSA_WRITE_ID_KEY[row.tool_name];
+  if (!idKey) return;
+  const table = result?.table;
+  const recordId = result?.[idKey];
+  if (typeof table !== 'string' || !table) return;
+  if (typeof recordId !== 'string' || !recordId) return;
+  await logRosaTelemetry(supabase, row.organization_id, row.user_id, 'learning.rosa_wrote', {
+    table,
+    record_id: recordId,
+    tool_name: row.tool_name,
+  });
 }
 
 async function dispatchMutation(
@@ -175,7 +228,7 @@ async function dispatchMutation(
     case 'propose_save_bcorp_answer':
       return await execSaveBcorpAnswer(supabase, row.organization_id, p);
     case 'propose_support_ticket':
-      return await execProposeSupportTicket(supabase, row.organization_id, row.user_id, row.conversation_id, p);
+      return await execProposeSupportTicket(supabase, row.organization_id, row.user_id, row.conversation_id, row.created_at, p);
     case 'propose_log_service_volume':
       return await execLogServiceVolume(supabase, row.organization_id, p);
     case 'propose_log_hospitality_waste':
@@ -725,6 +778,7 @@ async function execProposeSupportTicket(
   organizationId: string,
   userId: string,
   conversationId: string | null,
+  proposedAt: string,
   p: any,
 ): Promise<Record<string, unknown>> {
   const subject = String(p.subject ?? '').trim();
@@ -751,11 +805,33 @@ async function execProposeSupportTicket(
     .select('id')
     .single();
   if (error) throw new Error(error.message);
+
+  // Learning capture (Pillar 4 step 1): did Rosa actually try to answer
+  // before escalating, or did this jump straight to a ticket? Compares
+  // against `proposedAt` (when the proposal was queued, i.e. before this
+  // turn's own reply is persisted) rather than "now" (after confirm),
+  // so the current turn's own message never counts as its own "prior
+  // answer". Best-effort, never throws.
+  let afterAnswer = false;
+  if (conversationId) {
+    const { count } = await supabase
+      .from('gaia_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('conversation_id', conversationId)
+      .eq('role', 'assistant')
+      .lt('created_at', proposedAt);
+    afterAnswer = (count ?? 0) > 0;
+  }
+
   // Support-deflection measurement (Phase 4): the escalation actually
   // firing, counted against the in-place resolutions above (search +
   // next-steps) to see how much support genuinely deflects. Best-effort.
+  // `after_answer` is the learning-flywheel signal (Pillar 4 step 1):
+  // true when Rosa had already answered at least once in this
+  // conversation before the ticket was filed.
   await logRosaTelemetry(supabase, organizationId, userId, 'support.ticket_filed', {
     ticket_id: (data as any).id,
+    after_answer: afterAnswer,
   });
   return { ticket_id: (data as any).id, table: 'feedback_tickets' };
 }

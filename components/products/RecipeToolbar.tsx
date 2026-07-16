@@ -12,6 +12,7 @@ import {
   Upload,
   BookmarkPlus,
   ListChecks,
+  Plus,
 } from "lucide-react";
 
 interface RecipeToolbarProps {
@@ -37,15 +38,13 @@ export function RecipeToolbar({
   primaryAddLabel = "Add ingredient",
   importBomLabel = "Import BOM",
 }: RecipeToolbarProps) {
-  // One primary action; every other pathway lives behind a single "More"
-  // menu so an inexperienced user sees one obvious way forward. Actions that
-  // can't do anything yet (save an empty template) don't render at all.
+  // The composer below (IngredientComposer / PackagingComposer) is the only
+  // visible add path now — typing a name is faster than a blank full-record
+  // row, and it auto-matches. A blank row is still one click away for the
+  // rare case the composer can't handle, tucked in "More" rather than
+  // competing with it for attention.
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <PillButton onClick={onAdd} size="sm">
-        {primaryAddLabel}
-      </PillButton>
-
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <PillButton variant="outline" size="sm">
@@ -53,6 +52,10 @@ export function RecipeToolbar({
           </PillButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
+          <DropdownMenuItem onClick={onAdd}>
+            <Plus className="h-4 w-4 mr-2" />
+            {primaryAddLabel} (blank row)
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={onApplyTemplate}>
             <Copy className="h-4 w-4 mr-2" />
             Apply a template

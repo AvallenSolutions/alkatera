@@ -17,6 +17,10 @@ import { toast } from 'sonner';
 import { PillButton } from '@/components/studio/pill-button';
 import { StateChip } from '@/components/studio/state-chip';
 import { TopicHeader, HubSkeleton, Section } from '@/components/social';
+import { QuickAddRow } from '@/components/studio/quick-add-row';
+import { donationQuickAddConfig } from '@/lib/studio/quick-add-configs';
+import { CsvPasteImport } from '@/components/studio/csv-paste-import';
+import { donationCsvAdapter } from '@/lib/studio/csv-import-adapters';
 
 interface Donation {
   id: string;
@@ -46,6 +50,7 @@ function CharitableGivingPageContent() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [open, setOpen] = useState(false);
+  const [showCsvImport, setShowCsvImport] = useState(false);
   const [formData, setFormData] = useState({
     donation_name: '',
     donation_type: '',
@@ -177,8 +182,8 @@ function CharitableGivingPageContent() {
         backHref="/community-impact"
         backLabel="Community impact"
       >
-        <PillButton size="sm" onClick={() => setOpen(true)}>
-          Log donation
+        <PillButton variant="outline" size="sm" onClick={() => setShowCsvImport(true)}>
+          Paste a spreadsheet.
         </PillButton>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogContent className="max-w-lg">
@@ -345,6 +350,19 @@ function CharitableGivingPageContent() {
           </DialogContent>
         </Dialog>
       </TopicHeader>
+
+      <QuickAddRow
+        config={donationQuickAddConfig}
+        onAdded={fetchDonations}
+        onOpenFullRecord={() => setOpen(true)}
+      />
+
+      <CsvPasteImport
+        open={showCsvImport}
+        onOpenChange={setShowCsvImport}
+        adapter={donationCsvAdapter}
+        onImported={fetchDonations}
+      />
 
       <Section label="DONATIONS" blurb="All charitable donations and contributions.">
         {donations.length === 0 ? (

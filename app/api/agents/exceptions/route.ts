@@ -38,7 +38,14 @@ export async function GET(request: NextRequest) {
     .limit(limit)
 
   if (status !== 'all') query = query.eq('status', status)
-  if (kind) query = query.eq('kind', kind)
+  if (kind) {
+    query = query.eq('kind', kind)
+  } else {
+    // 'factor_gap' is alkatera-internal (tasks/data-revolution-plan.md,
+    // Pillar 2: "the user never sees a factor picker") — resolved from
+    // /admin-tools/factor-queue, never the org's own Ask Queue.
+    query = query.neq('kind', 'factor_gap')
+  }
 
   const { data, error } = await query
   if (error) {

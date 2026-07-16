@@ -36,12 +36,15 @@ export function RosaQueue() {
           .from('agent_exceptions')
           .select('id', { count: 'exact', head: true })
           .eq('organization_id', orgId)
-          .eq('status', 'open'),
+          .eq('status', 'open')
+          // 'factor_gap' is alkatera-internal — resolved via /admin-tools/factor-queue, never counted here.
+          .neq('kind', 'factor_gap'),
         supabase
           .from('agent_exceptions')
           .select('id', { count: 'exact', head: true })
           .eq('organization_id', orgId)
           .eq('status', 'approved')
+          .neq('kind', 'factor_gap')
           .gte('reviewed_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
         supabase
           .from('ingest_jobs')

@@ -31,6 +31,7 @@ import { RecipeSidebarTour, type TourStep } from "@/components/products/RecipeSi
 import { RecipeStalenessBanner } from "@/components/products/RecipeStalenessBanner";
 import { RecipeStarterDialog } from "@/components/products/RecipeStarterDialog";
 import { IngredientComposer } from "@/components/products/IngredientComposer";
+import { PackagingComposer } from "@/components/products/PackagingComposer";
 import { ReviewMatchesDialog, type ReviewMatchItem } from "@/components/products/ReviewMatchesDialog";
 import { computeIngredientImpactPreview, computePackagingImpactPreview } from "@/lib/products/impact-preview";
 import { findDuplicateIngredientNames, checkRecipeTotalMass } from "@/lib/products/recipe-checks";
@@ -220,6 +221,37 @@ export function RecipeEditorPanel({
         return;
       }
       updateIngredient(row.tempId, {
+        matched_source_name: match.matched_source_name,
+        data_source: match.data_source as any,
+        data_source_id: match.data_source_id,
+        supplier_product_id: match.supplier_product_id,
+        carbon_intensity: match.carbon_intensity,
+        openlca_database: match.openlca_database,
+        ef_source: match.ef_source,
+        ef_source_type: match.ef_source_type,
+        ef_data_quality_grade: match.ef_data_quality_grade,
+        ef_uncertainty_percent: match.ef_uncertainty_percent,
+        match_status: 'auto_matched',
+      });
+    });
+  };
+
+  /** Composer add: row arrives instantly (catalogue-matched or not); the
+   *  emission factor resolves a moment later, same background pattern as
+   *  the ingredient composer. */
+  const handlePackagingComposerAdd = (row: PackagingFormData, efSearchQuery: string) => {
+    addPackagingRows([row]);
+    void autoMatchEmissionFactor({
+      query: efSearchQuery,
+      organizationId,
+      materialType: 'packaging',
+      packagingCategory: row.packaging_category || undefined,
+    }).then((match) => {
+      if (!match) {
+        updatePackaging(row.tempId, { match_status: 'needs_review' });
+        return;
+      }
+      updatePackaging(row.tempId, {
         matched_source_name: match.matched_source_name,
         data_source: match.data_source as any,
         data_source_id: match.data_source_id,
@@ -715,9 +747,6 @@ export function RecipeEditorPanel({
                       <PillButton type="button" variant="outline" onClick={() => setShowPackagingWizard(true)}>
                         Guided setup
                       </PillButton>
-                      <PillButton type="button" variant="ghost" onClick={addPackaging}>
-                        Add manually
-                      </PillButton>
                     </div>
                   </div>
                 </div>
@@ -731,6 +760,12 @@ export function RecipeEditorPanel({
                   Add packaging with guided setup
                 </PillButton>
               )}
+
+              <PackagingComposer
+                organizationId={organizationId}
+                containerSizeMl={unitSizeToMl(product?.unit_size_value, product?.unit_size_unit)}
+                onAdd={handlePackagingComposerAdd}
+              />
 
               {packagingForms.filter(f => f.match_status === 'auto_matched').length > 0 && (
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[6px] border border-studio-attention/40 bg-card px-4 py-3 text-xs">

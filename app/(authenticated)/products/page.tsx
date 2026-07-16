@@ -44,6 +44,8 @@ import { toast } from "sonner";
 const ProductPortfolioMatrix = dynamic(() => import("@/components/products/ProductPortfolioMatrix").then((m) => m.ProductPortfolioMatrix), { ssr: false });
 import { buildPortfolioPoints, sumFacilityVolume, type PortfolioResult } from "@/lib/products/portfolio";
 import { cn } from "@/lib/utils";
+import { ProvenanceChip } from "@/components/studio/provenance-chip";
+import { provenanceFromPcfStatus } from "@/lib/provenance";
 
 interface ProductCarbonFootprint {
   system_boundary: string | null;
@@ -67,6 +69,8 @@ interface Product {
   dqi_score: number | null;
   /** Per-unit climate footprint (kg CO2e) from the latest completed PCF. */
   footprint_per_unit: number | null;
+  /** Latest PCF's raw status ('draft' | 'estimate' | 'completed' | ...), for the provenance chip. */
+  latest_pcf_status: string | null;
   created_at: string;
 }
 
@@ -168,6 +172,23 @@ export default function ProductsPage() {
         }
       }
 
+      // Latest PCF status per product, regardless of value — feeds the
+      // provenance chip via lib/provenance's provenanceFromPcfStatus.
+      // Separate from dqiData below, which only ever fetches completed PCFs.
+      const { data: pcfStatusData } = productIds.length > 0
+        ? await supabase
+            .from("product_carbon_footprints")
+            .select("product_id, status")
+            .in("product_id", productIds)
+            .order("created_at", { ascending: false })
+        : { data: [] };
+      const pcfStatusMap = new Map<string, string | null>();
+      for (const pcf of pcfStatusData || []) {
+        if (pcf.product_id && !pcfStatusMap.has(String(pcf.product_id))) {
+          pcfStatusMap.set(String(pcf.product_id), pcf.status ?? null);
+        }
+      }
+
       // Fetch each product's data quality score (DQI) from its completed PCF.
       // dqi_score is the impact-weighted confidence across all materials,
       // written by the aggregator on every calculation.
@@ -203,6 +224,7 @@ export default function ProductsPage() {
           : [],
         dqi_score: dqiMap.get(String(p.id)) ?? null,
         footprint_per_unit: perUnitMap.get(String(p.id)) ?? null,
+        latest_pcf_status: pcfStatusMap.get(String(p.id)) ?? null,
       }));
       setProducts(productsWithMeta);
 
@@ -615,7 +637,12 @@ export default function ProductsPage() {
                   </div>
 
                   <div className="mt-4 flex items-center justify-between border-t border-studio-hairline pt-3">
-                    <StateChip tone={status.tone}>{status.label}</StateChip>
+                    <div className="flex items-center gap-2">
+                      <StateChip tone={status.tone}>{status.label}</StateChip>
+                      {product.latest_pcf_status && (
+                        <ProvenanceChip provenance={provenanceFromPcfStatus(product.latest_pcf_status)} compact />
+                      )}
+                    </div>
                     <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
                       {boundaryLabel(getEffectiveBoundary(product))}
                     </span>

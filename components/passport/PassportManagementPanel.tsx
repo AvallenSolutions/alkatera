@@ -10,6 +10,8 @@ import { PillButton } from '@/components/studio/pill-button';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { toast } from 'sonner';
 import QRCodeDisplay from './QRCodeDisplay';
+import { ProvenanceGateDialog } from '@/components/studio/provenance-gate-dialog';
+import type { ProvenanceBlocker } from '@/lib/provenance/gate';
 
 interface PassportSettings {
   hiddenSections?: string[];
@@ -43,12 +45,33 @@ export default function PassportManagementPanel({
   const [passportSettings, setPassportSettings] = useState<PassportSettings>({
     hiddenSections: (initialPassportSettings?.hiddenSections as string[]) || [],
   });
+  const [gateBlockers, setGateBlockers] = useState<ProvenanceBlocker[] | null>(null);
 
   const passportUrl = token
     ? `${window.location.origin}/passport/${token}`
     : '';
 
   const handleTogglePassport = async (enabled: boolean) => {
+    // Publishing is an external artefact: needs enough confirmed product
+    // data first (tasks/data-revolution-plan.md, Pillar 2). Disabling is
+    // always allowed — only turning it ON is gated.
+    if (enabled) {
+      const supabase = getSupabaseBrowserClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      try {
+        const res = await fetch('/api/provenance/gate?scope=products', {
+          headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+        });
+        const gate = await res.json().catch(() => null);
+        if (res.ok && gate && gate.allowed === false) {
+          setGateBlockers(gate.blockers || []);
+          return;
+        }
+      } catch {
+        // Gate check failing shouldn't block publishing outright — fail open.
+      }
+    }
+
     setIsLoading(true);
 
     try {
@@ -319,6 +342,13 @@ export default function PassportManagementPanel({
           </div>
         </section>
       )}
+
+      <ProvenanceGateDialog
+        open={!!gateBlockers}
+        onClose={() => setGateBlockers(null)}
+        subject="This passport"
+        blockers={gateBlockers || []}
+      />
     </div>
   );
 }

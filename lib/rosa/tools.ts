@@ -1628,6 +1628,14 @@ async function toolSearchKnowledgeBank(
     query,
     row_count: data?.length ?? 0,
   });
+  // Learning capture (Pillar 4 step 1): zero results is a wiki/knowledge
+  // gap the weekly curation sweep should look at. Best-effort.
+  if ((data?.length ?? 0) === 0) {
+    await logRosaTelemetry(ctx.supabase, ctx.organizationId, ctx.userId, 'learning.knowledge_miss', {
+      query,
+      tool: 'search_knowledge_bank',
+    });
+  }
   return {
     is_error: false,
     content: JSON.stringify({
@@ -1663,6 +1671,12 @@ async function toolExplainMethodology(
     .order('priority', { ascending: false })
     .limit(3);
   if (!data || data.length === 0) {
+    // Learning capture (Pillar 4 step 1): same knowledge-gap signal as
+    // search_knowledge_bank's zero-result case. Best-effort.
+    await logRosaTelemetry(ctx.supabase, ctx.organizationId, ctx.userId, 'learning.knowledge_miss', {
+      query: term,
+      tool: 'explain_methodology',
+    });
     return {
       is_error: false,
       content: JSON.stringify({ term, entries: [], note: 'No matching methodology found in the knowledge base.' }),

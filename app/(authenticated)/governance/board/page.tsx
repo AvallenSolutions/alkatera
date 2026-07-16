@@ -15,6 +15,10 @@ import { PillButton } from '@/components/studio/pill-button';
 import { TopicHeader, HubSkeleton, ComplianceNote } from '@/components/social';
 import { BoardCompositionChart } from '@/components/governance/BoardCompositionChart';
 import { useBoardComposition, type BoardMember } from '@/hooks/data/useBoardComposition';
+import { QuickAddRow } from '@/components/studio/quick-add-row';
+import { boardQuickAddConfig } from '@/lib/studio/quick-add-configs';
+import { CsvPasteImport } from '@/components/studio/csv-paste-import';
+import { boardCsvAdapter } from '@/lib/studio/csv-import-adapters';
 
 const emptyFormData = {
   member_name: '',
@@ -262,8 +266,15 @@ function BoardMemberFormFields({
   );
 }
 
-function AddBoardMemberDialog({ onSuccess }: { onSuccess: () => void }) {
-  const [open, setOpen] = useState(false);
+function AddBoardMemberDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+}) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<FormData>({ ...emptyFormData });
 
@@ -295,7 +306,7 @@ function AddBoardMemberDialog({ onSuccess }: { onSuccess: () => void }) {
         throw new Error(error.error || 'Failed to add board member');
       }
 
-      setOpen(false);
+      onOpenChange(false);
       setFormData({ ...emptyFormData });
       onSuccess();
     } catch (error) {
@@ -307,32 +318,27 @@ function AddBoardMemberDialog({ onSuccess }: { onSuccess: () => void }) {
   };
 
   return (
-    <>
-      <PillButton size="sm" onClick={() => setOpen(true)}>
-        Add board member
-      </PillButton>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Add Board Member</DialogTitle>
-            <DialogDescription>
-              Add a new board member with diversity information
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit}>
-            <BoardMemberFormFields formData={formData} setFormData={setFormData} />
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Adding…' : 'Add Member'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Add Board Member</DialogTitle>
+          <DialogDescription>
+            Add a new board member with diversity information
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <BoardMemberFormFields formData={formData} setFormData={setFormData} />
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Adding…' : 'Add Member'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -462,6 +468,8 @@ function BoardPageContent() {
   const { members, metrics, loading, refetch, deleteMember } = useBoardComposition();
   const [editingMember, setEditingMember] = useState<BoardMember | null>(null);
   const [deletingMember, setDeletingMember] = useState<BoardMember | null>(null);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showCsvImport, setShowCsvImport] = useState(false);
 
   const handleDelete = async () => {
     if (!deletingMember) return;
@@ -491,7 +499,9 @@ function BoardPageContent() {
           <PillButton variant="outline" size="sm" onClick={() => refetch()}>
             Refresh
           </PillButton>
-          <AddBoardMemberDialog onSuccess={refetch} />
+          <PillButton variant="outline" size="sm" onClick={() => setShowCsvImport(true)}>
+            Paste a spreadsheet.
+          </PillButton>
         </div>
       </TopicHeader>
 
@@ -499,6 +509,25 @@ function BoardPageContent() {
         Track board member diversity, independence, and expertise. Best practice targets include
         &gt;50% independent directors and balanced gender representation (40-60% any gender).
       </ComplianceNote>
+
+      <QuickAddRow
+        config={boardQuickAddConfig}
+        onAdded={refetch}
+        onOpenFullRecord={() => setShowAddDialog(true)}
+      />
+
+      <AddBoardMemberDialog
+        open={showAddDialog}
+        onOpenChange={setShowAddDialog}
+        onSuccess={refetch}
+      />
+
+      <CsvPasteImport
+        open={showCsvImport}
+        onOpenChange={setShowCsvImport}
+        adapter={boardCsvAdapter}
+        onImported={refetch}
+      />
 
       <BoardCompositionChart
         members={members}

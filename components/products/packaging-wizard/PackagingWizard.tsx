@@ -45,6 +45,7 @@ import {
   type AccessoryOption,
 } from "@/lib/constants/packaging-catalogue";
 import { autoMatchEmissionFactor } from "@/lib/products/ef-auto-match";
+import { makePackagingRow, applyPackagingDefaults } from "@/lib/products/packaging-row-builder";
 
 const FORMAT_ICONS: Record<string, typeof Package> = {
   bottle: Wine,
@@ -65,50 +66,9 @@ interface PackagingWizardProps {
   onComplete: (rows: PackagingFormData[]) => void;
 }
 
-let rowSeq = 0;
-const nextTempId = () => `temp-pkg-wizard-${Date.now()}-${rowSeq++}`;
-
-/** Build a complete PackagingFormData row from the few fields the wizard sets. */
-function makeRow(partial: Partial<PackagingFormData> & { name: string; packaging_category: PackagingCategory }): PackagingFormData {
-  return {
-    tempId: nextTempId(),
-    data_source: null,
-    amount: '',
-    unit: 'g',
-    recycled_content_percentage: '',
-    printing_process: 'standard_ink',
-    net_weight_g: '',
-    origin_country: '',
-    transport_mode: 'truck',
-    distance_km: '',
-    has_component_breakdown: false,
-    components: [],
-    epr_is_household: true,
-    epr_is_drinks_container: false,
-    units_per_group: '',
-    reuse_trips: '',
-    recyclability_percent: '',
-    end_of_life_pathway: '',
-    biobased_content_percentage: '',
-    ...partial,
-  };
-}
-
-/** Apply an accessory/catalogue defaults block onto a row. */
-function applyDefaults(row: PackagingFormData, defaults: {
-  recycled_content_percentage?: number;
-  recyclability_percent?: number;
-  reuse_trips?: number;
-  end_of_life_pathway?: string;
-}): PackagingFormData {
-  return {
-    ...row,
-    recycled_content_percentage: defaults.recycled_content_percentage ?? row.recycled_content_percentage,
-    recyclability_percent: defaults.recyclability_percent ?? row.recyclability_percent,
-    reuse_trips: defaults.reuse_trips ?? row.reuse_trips,
-    end_of_life_pathway: (defaults.end_of_life_pathway as PackagingFormData['end_of_life_pathway']) ?? row.end_of_life_pathway,
-  };
-}
+// Row construction (makeRow/applyDefaults) lives in
+// lib/products/packaging-row-builder.ts so PackagingComposer's one-line add
+// builds rows the identical way — see makePackagingRow/applyPackagingDefaults.
 
 export function PackagingWizard({
   open,
@@ -195,7 +155,7 @@ export function PackagingWizard({
     const rows: PackagingFormData[] = [];
 
     const containerName = containerDisplayName(format, material, sizeMl);
-    rows.push(applyDefaults(makeRow({
+    rows.push(applyPackagingDefaults(makePackagingRow({
       name: containerName,
       packaging_category: 'container',
       net_weight_g: effectiveWeight,
@@ -210,7 +170,7 @@ export function PackagingWizard({
 
     if (closure) {
       const w = closureWeightG !== '' ? closureWeightG : String(closure.typicalWeightG.medianG);
-      rows.push(applyDefaults(makeRow({
+      rows.push(applyPackagingDefaults(makePackagingRow({
         name: closure.label,
         packaging_category: 'closure',
         net_weight_g: w,
@@ -224,7 +184,7 @@ export function PackagingWizard({
 
     if (labelOption) {
       const w = labelWeightG !== '' ? labelWeightG : String(labelOption.typicalWeightG.medianG);
-      rows.push(applyDefaults(makeRow({
+      rows.push(applyPackagingDefaults(makePackagingRow({
         name: labelOption.label,
         packaging_category: 'label',
         net_weight_g: w,
@@ -238,7 +198,7 @@ export function PackagingWizard({
 
     if (multipack) {
       const w = multipackWeightG !== '' ? multipackWeightG : String(multipack.typicalWeightG.medianG);
-      rows.push(applyDefaults(makeRow({
+      rows.push(applyPackagingDefaults(makePackagingRow({
         name: multipack.label,
         packaging_category: 'secondary',
         net_weight_g: w,

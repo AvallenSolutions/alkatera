@@ -497,12 +497,15 @@ export async function buildOrgSignalPack(
       .from('agent_exceptions')
       .select('id', { count: 'exact', head: true })
       .eq('organization_id', organizationId)
-      .eq('status', 'open'),
+      .eq('status', 'open')
+      // 'factor_gap' is alkatera-internal (resolved via /admin-tools/factor-queue) — never counted in the org's own queue.
+      .neq('kind', 'factor_gap'),
     service
       .from('agent_exceptions')
       .select('kind')
       .eq('organization_id', organizationId)
       .eq('status', 'open')
+      .neq('kind', 'factor_gap')
       .limit(50),
     service
       .from('dashboard_anomalies')

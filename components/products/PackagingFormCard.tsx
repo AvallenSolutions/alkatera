@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -36,6 +36,10 @@ import {
 } from "@/components/ui/tooltip";
 import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
 import { MatchStatusBadge } from "@/components/products/MatchStatusBadge";
+import { ProvenanceChip } from "@/components/studio/provenance-chip";
+import { provenanceFromEfSourceType } from "@/lib/provenance";
+import { autoMatchEmissionFactor } from "@/lib/products/ef-auto-match";
+import { autoApplyConservativeProxy } from "@/lib/factors/auto-proxy";
 import { LocationPicker, LocationData } from "@/components/shared/LocationPicker";
 import { COUNTRIES } from "@/lib/countries";
 import type {
@@ -472,6 +476,75 @@ export function PackagingFormCard({
   const showCompliance = showAll || sectionFilter === 'compliance';
   const [transportPreview, setTransportPreview] = useState<DistributionResult | null>(null);
   const [transportPreviewLoading, setTransportPreviewLoading] = useState(false);
+
+  // Factor selection abolished as a user task (see IngredientFormCard for the
+  // full rationale): try a confident auto-match first, fall back to a
+  // conservative proxy, so a packaging row always computes without the user
+  // touching the search picker.
+  const autoMatchAttemptedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (packaging.matched_source_name) return;
+    const name = (packaging.name || '').trim();
+    if (name.length < 3) return;
+    if (autoMatchAttemptedRef.current.has(packaging.tempId)) return;
+
+    const timer = setTimeout(async () => {
+      autoMatchAttemptedRef.current.add(packaging.tempId);
+      const confident = await autoMatchEmissionFactor({
+        query: name,
+        organizationId,
+        materialType: 'packaging',
+        packagingCategory: packaging.packaging_category || undefined,
+      });
+      if (confident) {
+        onUpdate(packaging.tempId, {
+          matched_source_name: confident.matched_source_name,
+          data_source: confident.data_source,
+          data_source_id: confident.data_source_id,
+          supplier_product_id: confident.supplier_product_id,
+          carbon_intensity: confident.carbon_intensity,
+          ef_source: confident.ef_source,
+          ef_source_type: confident.ef_source_type,
+          ef_data_quality_grade: confident.ef_data_quality_grade,
+          ef_uncertainty_percent: confident.ef_uncertainty_percent,
+          match_status: 'auto_matched',
+        });
+        return;
+      }
+      const proxy = await autoApplyConservativeProxy({
+        query: name,
+        organizationId,
+        materialType: 'packaging',
+        packagingCategory: packaging.packaging_category || undefined,
+      });
+      onUpdate(packaging.tempId, {
+        matched_source_name: proxy.matched_source_name,
+        data_source: proxy.data_source,
+        data_source_id: proxy.data_source_id,
+        carbon_intensity: proxy.carbon_intensity,
+        ef_source: proxy.ef_source,
+        ef_source_type: proxy.ef_source_type,
+        ef_data_quality_grade: proxy.ef_data_quality_grade,
+        ef_uncertainty_percent: proxy.ef_uncertainty_percent,
+        match_status: 'auto_matched',
+      });
+    }, 900);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [packaging.name, packaging.matched_source_name, packaging.tempId, packaging.packaging_category, organizationId]);
+
+  // Collapsed once something has matched; "Not right? Choose yourself."
+  // reveals the search. See IngredientFormCard for the same pattern.
+  const [factorPickerOpen, setFactorPickerOpen] = useState<boolean>(!packaging.matched_source_name);
+  const factorPickerUserToggledRef = useRef(false);
+  useEffect(() => {
+    if (factorPickerUserToggledRef.current) return;
+    setFactorPickerOpen(!packaging.matched_source_name);
+  }, [packaging.matched_source_name]);
+  const toggleFactorPicker = () => {
+    factorPickerUserToggledRef.current = true;
+    setFactorPickerOpen((v) => !v);
+  };
 
   // ---------------------------------------------------------------------------
   // Multi-modal inbound transport helpers
@@ -1072,7 +1145,24 @@ export function PackagingFormCard({
                     status={packaging.match_status}
                     onConfirm={() => onUpdate(packaging.tempId, { match_status: 'verified' })}
                   />
+                  {packaging.ef_source_type === 'proxy' && (
+                    <ProvenanceChip provenance={provenanceFromEfSourceType(packaging.ef_source_type)} compact />
+                  )}
                 </Label>
+
+                {packaging.matched_source_name && !factorPickerOpen ? (
+                  <div className="flex items-center justify-between gap-2 rounded-[6px] border border-border bg-card px-3 py-2">
+                    <span className="truncate text-sm text-foreground">{packaging.matched_source_name}</span>
+                    <button
+                      type="button"
+                      onClick={toggleFactorPicker}
+                      className="shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-studio-dim underline-offset-2 hover:text-foreground hover:underline"
+                    >
+                      Not right? Choose yourself.
+                    </button>
+                  </div>
+                ) : (
+                <>
                 <InlineIngredientSearch
                   organizationId={organizationId}
                   value={packaging.matched_source_name || ''}
@@ -1085,7 +1175,9 @@ export function PackagingFormCard({
                 <p className="text-xs text-muted-foreground mt-1">
                   Search for the closest matching emission factor from supplier data or global databases
                 </p>
-                {packaging.matched_source_name && packaging.matched_source_name !== packaging.name && packaging.data_source !== 'supplier' && (
+                </>
+                )}
+                {factorPickerOpen && packaging.matched_source_name && packaging.matched_source_name !== packaging.name && packaging.data_source !== 'supplier' && (
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>

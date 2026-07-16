@@ -31,6 +31,8 @@ import { executeTool, ROSA_TOOLS, ACTION_TOOL_NAMES, type ToolContext } from '@/
 import { buildMemoryBlock } from '@/lib/rosa/memory';
 import { loadAttachment } from '@/lib/rosa/document-extraction';
 import { rateLimit } from '@/lib/rate-limit';
+import { logRosaTelemetry } from '@/lib/rosa/budget';
+import { isLikelyRephrase } from '@/lib/rosa/learning-signals';
 import {
   getGeminiClient,
   toGeminiFunctionDeclarations,
@@ -197,10 +199,28 @@ export async function POST(request: NextRequest) {
   // Load prior turns (last 20) for context continuity.
   const { data: history } = await serviceSupabase
     .from('gaia_messages')
-    .select('role, content')
+    .select('role, content, created_at')
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true })
     .limit(20);
+
+  // Implicit learning signal (Pillar 4 step 1 "Capture"): the user asking
+  // essentially the same thing again, soon after, usually means the first
+  // answer didn't land. Best-effort, never blocks the chat.
+  if (userMessage) {
+    const previousUserTurn = [...(history ?? [])].reverse().find(h => h.role === 'user');
+    if (
+      isLikelyRephrase({
+        previousUserMessage: previousUserTurn?.content ?? null,
+        previousUserMessageAt: (previousUserTurn as any)?.created_at ?? null,
+        newUserMessage: userMessage,
+      })
+    ) {
+      await logRosaTelemetry(serviceSupabase, organizationId, user.id, 'learning.rephrase', {
+        query: userMessage,
+      });
+    }
+  }
 
   // Load Rosa's memory for this user + org.
   const memoryBlock = await buildMemoryBlock(serviceSupabase, organizationId, user.id);

@@ -74,18 +74,13 @@ function dataSourceBadge(packaging: PackagingFormData) {
   return null;
 }
 
-function isRowComplete(packaging: PackagingFormData): boolean {
-  return Boolean(
-    packaging.packaging_category &&
-    packaging.name &&
-    Number(packaging.net_weight_g) > 0 &&
-    packaging.data_source,
-  );
-}
-
 export function PackagingRow(props: PackagingRowProps) {
   const { packaging, index, onRemove, onUpdate, canRemove, defaultExpanded } = props;
-  const [expanded, setExpanded] = useState<boolean>(defaultExpanded ?? !isRowComplete(packaging));
+  // Rows added by the composer/wizard arrive collapsed — the full record
+  // (PackagingEditorTabs) opens only via "Open the full record.", never
+  // automatically, so the composer stays the only visible add path
+  // (tasks/data-revolution-plan.md Pillar 2).
+  const [expanded, setExpanded] = useState<boolean>(defaultExpanded ?? false);
 
   const meta = packaging.packaging_category ? TYPE_META[packaging.packaging_category] : null;
   const Icon = meta?.icon ?? Package;
@@ -148,8 +143,9 @@ export function PackagingRow(props: PackagingRowProps) {
             )}
           </div>
         </div>
-        <span className="text-muted-foreground flex-shrink-0" aria-hidden>
-          {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        <span className="flex items-center gap-1 flex-shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-studio-dim">
+          {expanded ? 'Close the full record.' : 'Open the full record.'}
+          {expanded ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
         </span>
         {canRemove && (
           <span

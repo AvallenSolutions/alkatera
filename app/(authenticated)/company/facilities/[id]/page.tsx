@@ -31,6 +31,8 @@ import { FacilityDataSourcingDialog } from "@/components/facilities/FacilityData
 import { FacilityDataDashboard } from "@/components/facilities/FacilityDataDashboard";
 import { UpgradeFacilityDataButton } from "@/components/facilities/UpgradeFacilityDataButton";
 import { UTILITY_TYPES } from "@/lib/constants/utility-types";
+import { ProvenanceChip as SharedProvenanceChip } from "@/components/studio/provenance-chip";
+import { provenanceFromDataQuality } from "@/lib/provenance";
 
 interface Facility {
   id: string;
@@ -153,6 +155,8 @@ export default function FacilityDetailPage() {
   const [editSaving, setEditSaving] = useState(false);
   const [sourcingDialogOpen, setSourcingDialogOpen] = useState(false);
   const [proxyAllocations, setProxyAllocations] = useState<ProxyAllocation[]>([]);
+  const [rolloverCandidates, setRolloverCandidates] = useState<Array<{ utilityType: string }>>([]);
+  const [rolloverBusy, setRolloverBusy] = useState(false);
 
   // Tell Rosa about this facility so questions like "is the data quality
   // good enough for CSRD?" or "what's missing for this site?" can be
@@ -280,6 +284,65 @@ export default function FacilityDetailPage() {
       loadFacilityData();
     }
   }, [facilityId, loadFacilityData]);
+
+  // Estimate-first utilities (Pillar 2): a facility with last year's data
+  // but gaps this year gets a one-click "fill in as estimates" offer,
+  // instead of sitting empty until someone opens the manual rollover dialog.
+  const loadRolloverCandidates = useCallback(async () => {
+    if (!facilityId) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`/api/facilities/${facilityId}/auto-rollover`, {
+        headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+      });
+      const data = await res.json().catch(() => ({}));
+      setRolloverCandidates(res.ok ? (data.candidates || []) : []);
+    } catch {
+      setRolloverCandidates([]);
+    }
+  }, [facilityId]);
+
+  useEffect(() => {
+    loadRolloverCandidates();
+  }, [loadRolloverCandidates]);
+
+  const applyRollover = async () => {
+    setRolloverBusy(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`/api/facilities/${facilityId}/auto-rollover`, {
+        method: 'POST',
+        headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to fill in the estimates');
+      toast.success(`${data.written} ${data.written === 1 ? 'entry' : 'entries'} filled in as estimates`);
+      setRolloverCandidates([]);
+      await loadFacilityData();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to fill in the estimates');
+    } finally {
+      setRolloverBusy(false);
+    }
+  };
+
+  // One-click "Confirm" for an estimated entry: flips data_quality to
+  // 'actual' with the same value — the reading turns out to be right, no
+  // edit needed. "Correct" (the existing pencil icon) opens the full editor
+  // instead, for when the value itself needs to change.
+  const confirmUtilityEntry = async (entryId: string) => {
+    try {
+      const { error } = await supabase
+        .from('utility_data_entries')
+        .update({ data_quality: 'actual' })
+        .eq('id', entryId);
+      if (error) throw error;
+      toast.success('Confirmed');
+      await loadFacilityData();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to confirm');
+    }
+  };
 
   const handleDeleteEntry = async (entryId: string, table: 'utility_data_entries' | 'facility_activity_entries') => {
     if (!confirm('Are you sure you want to delete this entry?')) return;
@@ -419,6 +482,24 @@ export default function FacilityDetailPage() {
         </StateChip>
         <FacilityBrewwLinkBadge facilityId={facility.id} />
       </div>
+
+      {rolloverCandidates.length > 0 && (
+        <Panel className="mb-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0 flex-1 space-y-1">
+              <p className="font-display text-sm font-semibold text-foreground">
+                {rolloverCandidates.length} {rolloverCandidates.length === 1 ? 'month is' : 'months are'} missing this year, but you had them last year.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Fill them in as estimates from last year&apos;s figures — chipped <span className="font-medium">Estimated</span> until you confirm or correct each one.
+              </p>
+            </div>
+            <PillButton size="sm" onClick={applyRollover} disabled={rolloverBusy}>
+              {rolloverBusy ? 'Filling in…' : 'Fill in the estimates'}
+            </PillButton>
+          </div>
+        </Panel>
+      )}
 
       {facility.operational_control === 'third_party' &&
         (!facility.default_data_collection_mode || facility.default_data_collection_mode === 'primary') && (
@@ -657,9 +738,18 @@ export default function FacilityDetailPage() {
                         <StateChip tone="quiet">{entry.calculated_scope || '-'}</StateChip>
                       </TableCell>
                       <TableCell>
-                        <StateChip tone={entry.data_quality === 'actual' ? 'good' : 'attention'}>
-                          {entry.data_quality}
-                        </StateChip>
+                        <div className="flex items-center gap-2">
+                          <SharedProvenanceChip provenance={provenanceFromDataQuality(entry.data_quality)} compact />
+                          {entry.data_quality !== 'actual' && (
+                            <button
+                              type="button"
+                              onClick={() => confirmUtilityEntry(entry.id)}
+                              className="font-mono text-[10px] uppercase tracking-[0.14em] text-studio-dim hover:text-foreground"
+                            >
+                              Confirm
+                            </button>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
@@ -667,6 +757,7 @@ export default function FacilityDetailPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => openEditDialog(entry, 'utility_data_entries')}
+                            title="Correct"
                           >
                             <Pencil className="h-4 w-4 text-muted-foreground" />
                           </Button>

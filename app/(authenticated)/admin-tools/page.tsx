@@ -46,6 +46,12 @@ const GROUPS: { label: string; items: FactRowItem[] }[] = [
         hint: 'Re-run every product LCA in the active organisation after a calculator fix.',
         href: '/admin-tools/recalculate-lca',
       },
+      {
+        id: 'factor-queue',
+        title: 'Factor queue',
+        hint: 'Materials computing with a conservative stand-in, across every organisation.',
+        href: '/admin-tools/factor-queue',
+      },
     ],
   },
   {

@@ -277,6 +277,15 @@ export function useRosaConversation(): UseRosaConversationResult {
             }
           } else if (event.type === 'done') {
             if (event.conversation_id) setConversationId(event.conversation_id)
+            // Swap the client-generated placeholder id for the persisted
+            // gaia_messages id so feedback chips (RosaConversation) can
+            // post against a real message once the turn is settled.
+            if (event.message_id) {
+              const persistedId = event.message_id
+              setTurns(prev =>
+                prev.map(t => (t.id === assistantTurn.id ? { ...t, id: persistedId } : t)),
+              )
+            }
           } else if (event.type === 'error') {
             throw new Error(event.error || 'Rosa hit an error.')
           }

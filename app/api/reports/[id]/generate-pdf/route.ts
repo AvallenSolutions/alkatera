@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { inngest } from '@/lib/inngest/client';
 import { enforceExportAllowed } from '@/middleware/subscription-check';
+import { enforceProvenanceGate } from '@/lib/provenance/gate';
 
 /**
  * Generate Sustainability Report PDF (dispatch only)
@@ -59,6 +60,10 @@ export async function POST(
     // Report PDF generation is a paid feature — blocked on trial / read-only.
     const exportBlocked = await enforceExportAllowed(report.organization_id);
     if (exportBlocked) return exportBlocked;
+
+    // External artefact: needs enough confirmed data across the whole footprint first (Pillar 2).
+    const provenanceBlocked = await enforceProvenanceGate(supabase, report.organization_id, 'overall');
+    if (provenanceBlocked) return provenanceBlocked;
 
     await supabase
       .from('generated_reports')

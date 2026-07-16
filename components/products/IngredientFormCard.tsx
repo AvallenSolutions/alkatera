@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 
 import { Card } from "@/components/ui/card";
@@ -22,6 +22,10 @@ import { Trash2, Building2, Database, Sprout, Info, MapPin, Calculator, Award, L
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
 import { MatchStatusBadge } from "@/components/products/MatchStatusBadge";
+import { ProvenanceChip } from "@/components/studio/provenance-chip";
+import { provenanceFromEfSourceType } from "@/lib/provenance";
+import { autoMatchEmissionFactor } from "@/lib/products/ef-auto-match";
+import { autoApplyConservativeProxy } from "@/lib/factors/auto-proxy";
 import { VineyardSelector, type VineyardOption } from "@/components/vineyards/VineyardSelector";
 import { ArableFieldSelector, type ArableFieldOption } from "@/components/arable-fields/ArableFieldSelector";
 import { OrchardSelector, type OrchardOption } from "@/components/orchards/OrchardSelector";
@@ -407,6 +411,77 @@ export function IngredientFormCard({
       .catch(() => setGrowingProfile(null))
       .finally(() => setLoadingProfile(false));
   }, [ingredient.vineyard_id, ingredient.is_self_grown]);
+
+  // Factor selection abolished as a user task (tasks/data-revolution-plan.md,
+  // Pillar 2): once a name is typed and no factor is attached yet, try a
+  // confident auto-match first (same gate the wizard uses) and fall back to
+  // a conservative proxy so the row always computes — the user is never
+  // required to open the search picker below. Runs once per row (the ref
+  // guards against re-firing while the async match is in flight or after it
+  // resolves) so a later manual pick is never fought.
+  const autoMatchAttemptedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (ingredient.is_self_grown) return;
+    if (ingredient.matched_source_name) return;
+    const name = ingredient.name.trim();
+    if (name.length < 3) return;
+    if (autoMatchAttemptedRef.current.has(ingredient.tempId)) return;
+
+    const timer = setTimeout(async () => {
+      autoMatchAttemptedRef.current.add(ingredient.tempId);
+      const confident = await autoMatchEmissionFactor({ query: name, organizationId, materialType: 'ingredient' });
+      if (confident) {
+        onUpdate(ingredient.tempId, {
+          matched_source_name: confident.matched_source_name,
+          data_source: confident.data_source,
+          data_source_id: confident.data_source_id,
+          supplier_product_id: confident.supplier_product_id,
+          carbon_intensity: confident.carbon_intensity,
+          openlca_database: confident.openlca_database,
+          ef_source: confident.ef_source,
+          ef_source_type: confident.ef_source_type,
+          ef_data_quality_grade: confident.ef_data_quality_grade,
+          ef_uncertainty_percent: confident.ef_uncertainty_percent,
+          match_status: 'auto_matched',
+        });
+        return;
+      }
+      const proxy = await autoApplyConservativeProxy({ query: name, organizationId, materialType: 'ingredient' });
+      onUpdate(ingredient.tempId, {
+        matched_source_name: proxy.matched_source_name,
+        data_source: proxy.data_source,
+        data_source_id: proxy.data_source_id,
+        carbon_intensity: proxy.carbon_intensity,
+        ef_source: proxy.ef_source,
+        ef_source_type: proxy.ef_source_type,
+        ef_data_quality_grade: proxy.ef_data_quality_grade,
+        ef_uncertainty_percent: proxy.ef_uncertainty_percent,
+        // Still 'auto_matched': a proxy is applied automatically just like a
+        // confident match, so it gets the same "please check" badge; the
+        // ProvenanceChip alongside it (ef_source_type === 'proxy') is what
+        // tells the two apart.
+        match_status: 'auto_matched',
+      });
+    }, 900);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ingredient.name, ingredient.is_self_grown, ingredient.matched_source_name, ingredient.tempId, organizationId]);
+
+  // The factor picker is a "full record" workshop control now, not a step
+  // everyone takes: collapsed the moment a factor is attached (auto-matched
+  // or a proxy), open only while nothing has matched yet or the user asks
+  // for it via "Not right? Choose yourself." Once the user has toggled it by
+  // hand, later auto-match results stop moving it.
+  const [factorPickerOpen, setFactorPickerOpen] = useState<boolean>(!ingredient.matched_source_name);
+  const factorPickerUserToggledRef = useRef(false);
+  useEffect(() => {
+    if (factorPickerUserToggledRef.current) return;
+    setFactorPickerOpen(!ingredient.matched_source_name);
+  }, [ingredient.matched_source_name]);
+  const toggleFactorPicker = () => {
+    factorPickerUserToggledRef.current = true;
+    setFactorPickerOpen((v) => !v);
+  };
 
   // Arable field growing profile state
   const [selectedArableField, setSelectedArableField] = useState<ArableFieldOption | null>(null);
@@ -989,7 +1064,27 @@ export function IngredientFormCard({
                 status={ingredient.match_status}
                 onConfirm={() => onUpdate(ingredient.tempId, { match_status: 'verified' })}
               />
+              {ingredient.ef_source_type === 'proxy' && (
+                <ProvenanceChip provenance={provenanceFromEfSourceType(ingredient.ef_source_type)} compact />
+              )}
             </Label>
+
+            {/* Factor selection is a "full record" control, not a step everyone
+                takes: once something has matched, show a quiet summary and hide
+                the search behind a link instead of the picker itself. */}
+            {ingredient.matched_source_name && !factorPickerOpen ? (
+              <div className="flex items-center justify-between gap-2 rounded-[6px] border border-border bg-card px-3 py-2">
+                <span className="truncate text-sm text-foreground">{ingredient.matched_source_name}</span>
+                <button
+                  type="button"
+                  onClick={toggleFactorPicker}
+                  className="shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-studio-dim underline-offset-2 hover:text-foreground hover:underline"
+                >
+                  Not right? Choose yourself.
+                </button>
+              </div>
+            ) : (
+            <>
             <InlineIngredientSearch
               organizationId={organizationId}
               value={ingredient.matched_source_name || ''}
@@ -1000,7 +1095,9 @@ export function IngredientFormCard({
             <p className="text-xs text-muted-foreground mt-1">
               Search for the closest matching emission factor from supplier data or global databases
             </p>
-            {ingredient.matched_source_name && ingredient.matched_source_name !== ingredient.name && ingredient.data_source !== 'supplier' && (
+            </>
+            )}
+            {factorPickerOpen && ingredient.matched_source_name && ingredient.matched_source_name !== ingredient.name && ingredient.data_source !== 'supplier' && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>

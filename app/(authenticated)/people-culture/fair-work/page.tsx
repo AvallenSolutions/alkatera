@@ -23,6 +23,10 @@ import { PillButton } from '@/components/studio/pill-button';
 import { TopicHeader, HubSkeleton, ComplianceNote } from '@/components/social';
 import { FairWorkDashboard } from '@/components/people-culture/FairWorkDashboard';
 import { useFairWorkMetrics, type CompensationRecord } from '@/hooks/data/useFairWorkMetrics';
+import { QuickAddRow } from '@/components/studio/quick-add-row';
+import { compensationQuickAddConfig } from '@/lib/studio/quick-add-configs';
+import { CsvPasteImport } from '@/components/studio/csv-paste-import';
+import { compensationCsvAdapter } from '@/lib/studio/csv-import-adapters';
 
 // ─── Shared form fields ─────────────────────────────────────────────────────
 
@@ -211,8 +215,15 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 
 // ─── Add Compensation Dialog ────────────────────────────────────────────────
 
-function AddCompensationDialog({ onSuccess }: { onSuccess: () => void }) {
-  const [open, setOpen] = useState(false);
+function AddCompensationDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+}) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<CompensationFormData>({ ...emptyForm });
 
@@ -239,7 +250,7 @@ function AddCompensationDialog({ onSuccess }: { onSuccess: () => void }) {
         throw new Error(error.error || 'Failed to add compensation record');
       }
 
-      setOpen(false);
+      onOpenChange(false);
       setFormData({ ...emptyForm });
       toast.success('Compensation record added');
       onSuccess();
@@ -252,11 +263,7 @@ function AddCompensationDialog({ onSuccess }: { onSuccess: () => void }) {
   };
 
   return (
-    <>
-      <PillButton size="sm" onClick={() => setOpen(true)}>
-        Add compensation record
-      </PillButton>
-      <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Add Compensation Record</DialogTitle>
@@ -267,7 +274,7 @@ function AddCompensationDialog({ onSuccess }: { onSuccess: () => void }) {
         <form onSubmit={handleSubmit}>
           <CompensationFormFields formData={formData} setFormData={setFormData} />
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
@@ -276,8 +283,7 @@ function AddCompensationDialog({ onSuccess }: { onSuccess: () => void }) {
           </DialogFooter>
         </form>
       </DialogContent>
-      </Dialog>
-    </>
+    </Dialog>
   );
 }
 
@@ -382,6 +388,8 @@ function FairWorkPageContent() {
   const [editingRecord, setEditingRecord] = useState<CompensationRecord | null>(null);
   const [deletingRecord, setDeletingRecord] = useState<CompensationRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showCsvImport, setShowCsvImport] = useState(false);
 
   const handleDelete = async () => {
     if (!deletingRecord) return;
@@ -430,10 +438,9 @@ function FairWorkPageContent() {
           <PillButton variant="outline" size="sm" onClick={() => refetch()}>
             Refresh
           </PillButton>
-          <PillButton variant="outline" size="sm">
-            Import CSV
+          <PillButton variant="outline" size="sm" onClick={() => setShowCsvImport(true)}>
+            Paste a spreadsheet.
           </PillButton>
-          <AddCompensationDialog onSuccess={refetch} />
         </div>
       </TopicHeader>
 
@@ -441,6 +448,25 @@ function FairWorkPageContent() {
         Track compensation data to analyse living wage compliance, gender pay gaps, and pay ratios.
         Data is anonymised and supports UK Gender Pay Gap Reporting and B Corp Fair Work requirements.
       </ComplianceNote>
+
+      <QuickAddRow
+        config={compensationQuickAddConfig}
+        onAdded={refetch}
+        onOpenFullRecord={() => setShowAddDialog(true)}
+      />
+
+      <AddCompensationDialog
+        open={showAddDialog}
+        onOpenChange={setShowAddDialog}
+        onSuccess={refetch}
+      />
+
+      <CsvPasteImport
+        open={showCsvImport}
+        onOpenChange={setShowCsvImport}
+        adapter={compensationCsvAdapter}
+        onImported={refetch}
+      />
 
       <FairWorkDashboard
         metrics={metrics}

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { Fragment, useEffect, useRef } from 'react'
+import React, { Fragment, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { Dog, RotateCcw, AlertTriangle, Download, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -68,8 +68,8 @@ export function RosaConversation({ turns, isStreaming, error, onReset }: Props) 
       </div>
 
       <div className="space-y-4">
-        {turns.map(turn => (
-          <Turn key={turn.id} turn={turn} />
+        {turns.map((turn, i) => (
+          <Turn key={turn.id} turn={turn} isLast={i === turns.length - 1} />
         ))}
         {error && (
           <div className="rounded-lg border border-studio-stale/30 bg-card p-3 flex items-start gap-2 text-sm text-studio-stale">
@@ -83,7 +83,7 @@ export function RosaConversation({ turns, isStreaming, error, onReset }: Props) 
   )
 }
 
-function Turn({ turn }: { turn: RosaTurn }) {
+function Turn({ turn, isLast }: { turn: RosaTurn; isLast: boolean }) {
   if (turn.role === 'user') {
     return (
       <div className="flex justify-end">
@@ -94,9 +94,14 @@ function Turn({ turn }: { turn: RosaTurn }) {
     )
   }
 
-  // Assistant turn
+  // Assistant turn. Feedback is only offerable once the turn's client-side
+  // placeholder id (`asst-...`, set in useRosaConversation.ts) has been
+  // swapped for the persisted gaia_messages id on the stream's "done"
+  // event -- posting feedback needs a real message to attach to.
+  const canGiveFeedback = !turn.streaming && !turn.errored && !turn.id.startsWith('asst-')
+
   return (
-    <div className="flex gap-3 items-start">
+    <div className="group flex gap-3 items-start">
       <div className="flex-shrink-0 rounded-[6px] bg-secondary p-2 mt-0.5">
         <Dog className="h-5 w-5 text-studio-forest" />
       </div>
@@ -147,7 +152,68 @@ function Turn({ turn }: { turn: RosaTurn }) {
             ))}
           </div>
         )}
+
+        {/* Per-message feedback (Pillar 4 step 1 "Capture"). Quiet by
+            design: always visible on the last message so it's easy to
+            find, otherwise only on hover so the thread doesn't turn into
+            a wall of buttons. */}
+        {canGiveFeedback && (
+          <div
+            className={cn(
+              'pl-1 transition-opacity',
+              isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100',
+            )}
+          >
+            <MessageFeedback messageId={turn.id} />
+          </div>
+        )}
       </div>
+    </div>
+  )
+}
+
+const FEEDBACK_OPTIONS: Array<{ verdict: 'helpful' | 'not_right' | 'too_vague'; label: string }> = [
+  { verdict: 'helpful', label: 'Helpful.' },
+  { verdict: 'not_right', label: 'Not right.' },
+  { verdict: 'too_vague', label: 'Too vague.' },
+]
+
+/**
+ * Three tiny mono verdicts under an assistant message. One tap stores it;
+ * tapping a different option replaces it (POST /api/rosa/feedback upserts
+ * on unique(message_id, user_id)). Fire-and-forget -- a dropped request
+ * just costs one data point, never blocks the chat.
+ */
+function MessageFeedback({ messageId }: { messageId: string }) {
+  const [verdict, setVerdict] = useState<string | null>(null)
+
+  const choose = (next: 'helpful' | 'not_right' | 'too_vague') => {
+    if (next === verdict) return
+    setVerdict(next)
+    fetch('/api/rosa/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message_id: messageId, verdict: next }),
+    }).catch(() => {
+      // Best-effort. Losing an occasional feedback tap is fine.
+    })
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      {FEEDBACK_OPTIONS.map(opt => (
+        <button
+          key={opt.verdict}
+          type="button"
+          onClick={() => choose(opt.verdict)}
+          className={cn(
+            'font-mono text-[10px] uppercase tracking-[0.15em] transition-colors',
+            verdict === opt.verdict ? 'text-studio-forest' : 'text-studio-dim hover:text-foreground',
+          )}
+        >
+          {opt.label}
+        </button>
+      ))}
     </div>
   )
 }

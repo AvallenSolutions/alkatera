@@ -72,6 +72,8 @@ export function useRosaNudges(): UseRosaNudgesResult {
           .eq('organization_id', orgId)
           .eq('status', 'open')
           .lt('created_at', since48h)
+          // 'factor_gap' is alkatera-internal — resolved via /admin-tools/factor-queue, never nudged to the user.
+          .neq('kind', 'factor_gap')
           .order('created_at', { ascending: true })
           .limit(5),
         supabase
