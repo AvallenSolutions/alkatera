@@ -96,7 +96,7 @@ export const xeroOrgSync = inngest.createFunction(
         return;
       }
       const resend = new Resend(resendApiKey);
-      const alertEmail = process.env.ADMIN_ALERT_EMAIL || 'hello@alkatera.com';
+      const alertEmail = process.env.ADMIN_EMAIL || 'hello@alkatera.com';
       try {
         await resend.emails.send({
           from: 'alkatera Sync <alerts@mail.alkatera.com>',

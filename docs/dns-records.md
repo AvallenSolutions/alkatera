@@ -65,7 +65,7 @@ Agribalyse vhost, add `AAAA 2001:1600:13:101::2349` for parity with `openlca`.
 
 - `lib/inngest/functions/dns-health.ts` (`dns-health-monitor`): hourly, resolves the
   critical records over DNS-over-HTTPS, probes both gdt-servers' `/api/version`, and
-  emails `ADMIN_ALERT_EMAIL` via Resend on any failure. Deliberately noisy (every failing
+  emails `ADMIN_EMAIL` via Resend on any failure. Deliberately noisy (every failing
   run) because a missing record is an active outage.
 - `lib/inngest/functions/monitoring.ts` (`openlca-cert-monitor`): daily TLS cert expiry
   check for the same two servers.

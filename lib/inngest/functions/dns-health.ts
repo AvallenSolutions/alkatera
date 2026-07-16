@@ -193,7 +193,7 @@ export const dnsHealthMonitor = inngest.createFunction(
         console.warn('[dns-health] RESEND_API_KEY not set — alert not emailed');
         return { sent: false, reason: 'no-api-key' };
       }
-      const to = process.env.ADMIN_ALERT_EMAIL || 'hello@alkatera.com';
+      const to = process.env.ADMIN_EMAIL || 'hello@alkatera.com';
       const { subject, html } = buildAlertEmail(dnsFailures, endpointFailures);
       const resend = new Resend(resendApiKey);
       await resend.emails.send({
