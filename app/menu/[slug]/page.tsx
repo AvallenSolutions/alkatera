@@ -8,17 +8,22 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { carbonBand, formatFootprint, type CarbonBand } from '@/lib/hospitality/carbon-band';
+import { bandLegend, formatFootprint, type CarbonBand, type CarbonBandLegendEntry } from '@/lib/hospitality/carbon-band';
+import { dietaryLabel, allergenLabel } from '@/lib/hospitality/dietary';
 
 interface PublicItem {
   name: string;
   item_kind: string;
   co2e: number | null;
+  band: CarbonBand | null;
+  dietary_tags?: string[];
+  allergens?: string[];
 }
 interface PublicMenu {
   name: string;
   description: string | null;
   venue_name: string | null;
+  legend?: CarbonBandLegendEntry[];
   items: PublicItem[];
 }
 
@@ -56,6 +61,11 @@ export default function PublicMenuPage() {
       })
       .catch(() => setStatus('notfound'));
   }, [slug]);
+
+  // Legend + band → swatch lookup come from the server payload (org-configurable
+  // thresholds); fall back to the defaults if an older payload omits them.
+  const legend = menu?.legend ?? bandLegend();
+  const bandMeta = Object.fromEntries(legend.map((e) => [e.band, e])) as Record<CarbonBand, CarbonBandLegendEntry>;
 
   return (
     <div style={{ minHeight: '100vh', background: PAPER, color: INK }}>
@@ -116,14 +126,11 @@ export default function PublicMenuPage() {
                 textTransform: 'uppercase',
               }}
             >
-              {(['low', 'medium', 'high'] as CarbonBand[]).map((b) => {
-                const meta = carbonBand(b === 'low' ? 0.5 : b === 'medium' ? 2 : 5)!;
-                return (
-                  <span key={b} style={{ color: BAND_TONE[b] }}>
-                    {meta.label}
-                  </span>
-                );
-              })}
+              {legend.map((entry) => (
+                <span key={entry.band} style={{ color: BAND_TONE[entry.band] }}>
+                  {entry.label}
+                </span>
+              ))}
             </div>
 
             <ul
@@ -138,61 +145,83 @@ export default function PublicMenuPage() {
             >
               {[...menu.items]
                 .sort((a, b) => {
-                  const ba = carbonBand(a.co2e);
-                  const bb = carbonBand(b.co2e);
-                  return (ba ? BAND_ORDER[ba.band] : 9) - (bb ? BAND_ORDER[bb.band] : 9);
+                  return (a.band ? BAND_ORDER[a.band] : 9) - (b.band ? BAND_ORDER[b.band] : 9);
                 })
                 .map((item, i) => {
-                  const meta = carbonBand(item.co2e);
+                  const meta = item.band ? bandMeta[item.band] : null;
+                  const tags = item.dietary_tags ?? [];
+                  const allergens = item.allergens ?? [];
                   return (
                     <li
                       key={i}
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 12,
                         padding: '14px 0',
                         borderTop: i === 0 ? 'none' : `1px solid ${HAIRLINE}`,
                       }}
                     >
-                      <div style={{ minWidth: 0 }}>
-                        <p
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontWeight: 600,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {item.name}
+                          </p>
+                          <p
+                            style={{
+                              margin: '2px 0 0',
+                              fontSize: 9.5,
+                              fontFamily: MONO,
+                              fontWeight: 700,
+                              letterSpacing: '0.2em',
+                              textTransform: 'uppercase',
+                              color: meta ? BAND_TONE[meta.band] : DIM,
+                            }}
+                          >
+                            {meta?.label ?? 'Not calculated'}
+                          </p>
+                        </div>
+                        <span
                           style={{
-                            margin: 0,
-                            fontWeight: 600,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
+                            color: FOREST,
+                            fontSize: 13,
                             whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {item.name}
-                        </p>
-                        <p
-                          style={{
-                            margin: '2px 0 0',
-                            fontSize: 9.5,
                             fontFamily: MONO,
-                            fontWeight: 700,
-                            letterSpacing: '0.2em',
-                            textTransform: 'uppercase',
-                            color: meta ? BAND_TONE[meta.band] : DIM,
+                            fontVariantNumeric: 'tabular-nums',
                           }}
                         >
-                          {meta?.label ?? 'Not calculated'}
-                        </p>
+                          {formatFootprint(item.co2e)}
+                        </span>
                       </div>
-                      <span
-                        style={{
-                          color: FOREST,
-                          fontSize: 13,
-                          whiteSpace: 'nowrap',
-                          fontFamily: MONO,
-                          fontVariantNumeric: 'tabular-nums',
-                        }}
-                      >
-                        {formatFootprint(item.co2e)}
-                      </span>
+                      {tags.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                          {tags.map((t) => (
+                            <span
+                              key={t}
+                              style={{
+                                fontSize: 10.5,
+                                fontFamily: MONO,
+                                color: FOREST,
+                                border: `1px solid ${FOREST}`,
+                                borderRadius: 9999,
+                                padding: '1px 8px',
+                              }}
+                            >
+                              {dietaryLabel(t)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {allergens.length > 0 && (
+                        <p style={{ fontSize: 11, color: DIM, marginTop: 6 }}>
+                          Allergens: {allergens.map(allergenLabel).join(', ')}
+                        </p>
+                      )}
                     </li>
                   );
                 })}

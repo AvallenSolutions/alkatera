@@ -55,14 +55,21 @@ export function PosSalesImportDialog({
   onOpenChange,
   products,
   onComplete,
+  initialStashId,
+  onStashConsumed,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   products: HospitalityProductOption[];
   onComplete: () => void;
+  /** When set, the dialog auto-loads this stashed CSV (from Smart Upload) on open. */
+  initialStashId?: string | null;
+  /** Called once the stashed file has been consumed. */
+  onStashConsumed?: () => void;
 }) {
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
+  const stashLoadedRef = useRef<string | null>(null);
 
   const [phase, setPhase] = useState<'upload' | 'review'>('upload');
   const [start, setStart] = useState('');
@@ -99,18 +106,10 @@ export function PosSalesImportDialog({
 
   const validPeriod = /^\d{4}-\d{2}-\d{2}$/.test(start) && /^\d{4}-\d{2}-\d{2}$/.test(end) && end >= start;
 
-  const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    if (!validPeriod) {
-      setError('Set a valid period (end on or after start) first.');
-      return;
-    }
+  const previewCsv = useCallback(async (csv: string) => {
     setBusy(true);
     setError(null);
     try {
-      const csv = await file.text();
       const res = await fetch('/api/hospitality/volumes/pos-preview', {
         method: 'POST',
         credentials: 'include',
@@ -135,7 +134,48 @@ export function PosSalesImportDialog({
     } finally {
       setBusy(false);
     }
+  }, []);
+
+  const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!validPeriod) {
+      setError('Set a valid period (end on or after start) first.');
+      return;
+    }
+    await previewCsv(await file.text());
   };
+
+  // Smart Upload handoff: when opened with a stashed CSV, fetch and preview it.
+  useEffect(() => {
+    if (!open || !initialStashId) return;
+    if (stashLoadedRef.current === initialStashId) return;
+    stashLoadedRef.current = initialStashId;
+    let cancelled = false;
+    (async () => {
+      setBusy(true);
+      setError(null);
+      try {
+        const meta = await fetch(`/api/ingest/stash?path=${encodeURIComponent(initialStashId)}`, { credentials: 'include' });
+        const metaBody = await meta.json().catch(() => ({}));
+        if (!meta.ok) throw new Error(metaBody?.error || 'Could not load the uploaded file.');
+        const fileRes = await fetch(metaBody.signedUrl);
+        const csv = await fileRes.text();
+        if (!cancelled) await previewCsv(csv);
+        void fetch(`/api/ingest/stash?path=${encodeURIComponent(initialStashId)}`, { method: 'DELETE', credentials: 'include' });
+        onStashConsumed?.();
+      } catch (err: unknown) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Could not load the uploaded file.');
+          setBusy(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, initialStashId, previewCsv, onStashConsumed]);
 
   const commit = async () => {
     if (!preview) return;

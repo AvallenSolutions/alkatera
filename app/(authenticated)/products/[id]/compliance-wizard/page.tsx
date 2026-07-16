@@ -45,16 +45,35 @@ export default function ComplianceWizardPage() {
 
         setProductName(product.name);
 
-        // Optionally find existing PCF (may not exist for new LCAs)
-        const { data: pcf } = await supabase
+        // Decide what the wizard opens. In-progress work (draft/failed)
+        // wins: passing null lets the wizard's own resume logic pick it up.
+        // Otherwise open the latest COMPLETED record by created_at — the
+        // same rule the product page uses. The old query ordered by
+        // updated_at across ALL statuses, which could open an older record
+        // than the one the product page displays (autosave bumps updated_at
+        // on historical rows).
+        const { data: draft } = await supabase
           .from('product_carbon_footprints')
           .select('id')
           .eq('product_id', productId)
+          .in('status', ['draft', 'failed'])
           .order('updated_at', { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        setPcfId(pcf?.id || null);
+        if (draft?.id) {
+          setPcfId(null);
+        } else {
+          const { data: pcf } = await supabase
+            .from('product_carbon_footprints')
+            .select('id')
+            .eq('product_id', productId)
+            .eq('status', 'completed')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          setPcfId(pcf?.id || null);
+        }
       } catch (err: any) {
         console.error('[ComplianceWizardPage] Error:', err);
         setError(err.message || 'Failed to load product data');

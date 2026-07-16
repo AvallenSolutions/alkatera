@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+import { userHasOrgAccess } from '@/lib/supabase/verify-org-access';
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access';
 
 async function getAuthenticatedSupabase() {
   const cookieStore = cookies();
@@ -113,6 +115,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'products array is required' }, { status: 400 });
     }
 
+    // SECURITY: organizationId comes from the body and gates service-role
+    // seed writes further down (organization_certifications,
+    // agent_exceptions, ingest_jobs). The product insert below is only
+    // accidentally safe (cookie client + RLS); validate membership
+    // explicitly so a refactor to the service-role pattern used by sibling
+    // routes can never open a cross-org write. Read-only advisors are
+    // blocked from what is a bulk write.
+    {
+      const accessClient = getServiceClient();
+      const hasAccess = await userHasOrgAccess(accessClient, userId, organizationId);
+      if (!hasAccess) {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      }
+      const denied = await denyReadOnlyAdvisor(accessClient, { id: userId }, organizationId);
+      if (denied) return denied;
+    }
+
     // Map original (full-array) index → included-array index so the client's
     // multipack_components references survive the `included` filter.
     const originalIdxToIncludedIdx = new Map<number, number>();
@@ -128,6 +147,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No products selected for import' }, { status: 400 });
     }
 
+    // Enforce the org's product limit BEFORE inserting (the old code inserted
+    // everything, then called increment_product_count per product and
+    // discarded its {allowed} result, so a trial org could import 100 products
+    // in one click). Cap the batch to the remaining allowance and tell the
+    // user what was left out; a null max_count means unlimited.
+    let capNotice: string | null = null;
+    try {
+      const { data: limit } = await supabase.rpc('check_product_limit', {
+        p_organization_id: organizationId,
+      });
+      const isUnlimited = !!(limit && (limit as any).is_unlimited);
+      const maxCount = limit && (limit as any).max_count != null ? Number((limit as any).max_count) : null;
+      const currentCount = limit && (limit as any).current_count != null ? Number((limit as any).current_count) : null;
+      if (!isUnlimited && maxCount != null && currentCount != null) {
+        const remaining = Math.max(0, maxCount - currentCount);
+        if (remaining <= 0) {
+          return NextResponse.json(
+            { error: `You have reached your plan's product limit (${maxCount}). Upgrade your plan or remove products to import more.` },
+            { status: 403 }
+          );
+        }
+        if (includedProducts.length > remaining) {
+          const dropped = includedProducts.length - remaining;
+          includedProducts.length = remaining; // keep the first `remaining`
+          capNotice = `Your plan allows ${maxCount} products, so ${remaining} ${remaining === 1 ? 'was' : 'were'} imported and ${dropped} ${dropped === 1 ? 'was' : 'were'} left out. Upgrade your plan to import the rest.`;
+        }
+      }
+    } catch (limitErr) {
+      // If the limit check fails, fall through and import (fail-open matches
+      // the codebase's soft-enforcement stance elsewhere).
+      console.error('[import-from-url/confirm] product limit check failed (importing anyway):', limitErr);
+    }
+
     // Insert all selected products as drafts
     const rows = includedProducts.map(p => ({
       organization_id: organizationId,
@@ -137,6 +189,13 @@ export async function POST(request: NextRequest) {
       unit_size_value: p.unit_size_value,
       unit_size_unit: p.unit_size_unit,
       product_category: p.product_category,
+      // Map the extracted ABV (shown as a badge in the review dialog) so the
+      // user does not have to re-type it on every product page. Clamp to the
+      // column's 0-100 CHECK.
+      alcohol_content_abv:
+        typeof p.abv === 'number' && Number.isFinite(p.abv)
+          ? Math.max(0, Math.min(100, p.abv))
+          : null,
       is_draft: true,
       is_multipack: p.is_multipack === true,
       certifications: p.certifications?.length
@@ -194,10 +253,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Increment product count for subscription tracking (once per product created)
-    for (let i = 0; i < includedProducts.length; i++) {
+    // Increment product count for subscription tracking (once per product
+    // created). Pass p_user_id so the usage log isn't attributed to NULL.
+    for (let i = 0; i < createdIds.length; i++) {
       await supabase.rpc('increment_product_count', {
         p_organization_id: organizationId,
+        p_user_id: userId,
       });
     }
 
@@ -241,13 +302,19 @@ export async function POST(request: NextRequest) {
 
         const packagingTypeId = packagingTypeCache[packagingKey];
         if (packagingTypeId) {
-          await supabase.from('product_materials').insert({
+          // unit is REQUIRED by product_materials_unit_check: a NULL unit
+          // coalesces to '' which is not in the vocabulary, so the whole
+          // insert was silently rejected and every imported product landed
+          // with no packaging. 'unit' is the correct discrete vocabulary term.
+          const { error: pkgErr } = await supabase.from('product_materials').insert({
             product_id: productId,
             material_name: packagingName,
             material_type: 'packaging',
             material_id: packagingTypeId,
             quantity: 1,
+            unit: 'unit',
           });
+          if (pkgErr) console.error('[import-from-url/confirm] packaging insert failed:', pkgErr.message);
         }
       }
 
@@ -257,15 +324,20 @@ export async function POST(request: NextRequest) {
         if (!ingredientName.trim()) continue;
         const name = ingredientName.trim();
 
-        // Check if ingredient already exists for this org
-        const { data: existingIng } = await supabase
+        // Check if ingredient already exists for this org. Escape LIKE
+        // wildcards in the name (`%`/`_`) so "100% agave" does not match any
+        // ingredient, and take the first row rather than maybeSingle() (which
+        // errors when case-insensitive duplicates already exist, silently
+        // creating yet another duplicate on every import).
+        const escapedName = name.replace(/[\\%_]/g, (m) => `\\${m}`);
+        const { data: existingIngs } = await supabase
           .from('ingredients')
           .select('id')
           .eq('organization_id', organizationId)
-          .ilike('name', name)
-          .maybeSingle();
+          .ilike('name', escapedName)
+          .limit(1);
 
-        let ingredientId: string | null = existingIng?.id ?? null;
+        let ingredientId: string | null = existingIngs?.[0]?.id ?? null;
 
         if (!ingredientId) {
           const { data: newIng } = await supabase
@@ -277,13 +349,15 @@ export async function POST(request: NextRequest) {
         }
 
         if (ingredientId) {
-          await supabase.from('product_materials').insert({
+          const { error: ingErr } = await supabase.from('product_materials').insert({
             product_id: productId,
             material_name: name,
             material_type: 'ingredient',
             material_id: ingredientId,
             quantity: 1,
+            unit: 'unit', // REQUIRED by product_materials_unit_check (see packaging note above)
           });
+          if (ingErr) console.error('[import-from-url/confirm] ingredient insert failed:', ingErr.message);
         }
       }
     }
@@ -385,32 +459,40 @@ export async function POST(request: NextRequest) {
           await service.from('agent_exceptions').insert(allExceptions);
         }
 
-        // Emit one ingest_jobs row so RecentlyFromRosa shows "Read your website"
-        // when the user lands on /rosa/. stash_path is a synthetic identifier
-        // since this ingestion is from a URL, not a real file in storage.
-        await service.from('ingest_jobs').insert({
-          user_id: userId,
-          organization_id: organizationId,
-          status: 'completed',
-          stash_path: `website-import/${organizationId}/${Date.now()}.json`,
-          file_name: 'Your website',
-          file_mime: 'text/html',
-          result_type: 'website_import',
-          result_payload: {
-            products_created: createdIds.length,
-            certifications_found: seedCerts.length,
-            suppliers_proposed: seedSuppliers.length,
-            production_locations_proposed: seedProductionLocations.length,
-          },
-        });
       } catch (seedErr: any) {
         console.error('[import-from-url/confirm] seed writes failed (non-fatal):', seedErr);
       }
     }
 
+    // Emit one ingest_jobs row so RecentlyFromRosa shows "Read your website"
+    // when the user lands on /rosa/. This must fire for EVERY import, not just
+    // ones that also found certs/suppliers — a products-only import does
+    // exactly the advertised work and used to leave no Rosa activity at all.
+    try {
+      const service = getServiceClient();
+      await service.from('ingest_jobs').insert({
+        user_id: userId,
+        organization_id: organizationId,
+        status: 'completed',
+        stash_path: `website-import/${organizationId}/${Date.now()}.json`,
+        file_name: 'Your website',
+        file_mime: 'text/html',
+        result_type: 'website_import',
+        result_payload: {
+          products_created: createdIds.length,
+          certifications_found: (orgCertifications ?? []).length,
+          suppliers_proposed: (brandMetadata?.suppliers ?? []).length,
+          production_locations_proposed: (brandMetadata?.production_locations ?? []).length,
+        },
+      });
+    } catch (rosaErr: any) {
+      console.error('[import-from-url/confirm] Rosa activity row failed (non-fatal):', rosaErr);
+    }
+
     return NextResponse.json({
       created: createdIds.length,
       productIds: createdIds,
+      notice: capNotice,
     });
   } catch (error: any) {
     console.error('[import-from-url/confirm] Error:', error);

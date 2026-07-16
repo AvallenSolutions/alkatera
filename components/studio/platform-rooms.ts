@@ -85,6 +85,7 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
       { label: 'Orchards', href: '/orchards/' },
       { label: 'Arable fields', href: '/arable-fields/' },
       { label: 'Hospitality', href: '/hospitality/' },
+      { label: 'Uploads', href: '/uploads/' },
     ],
   },
   cellar: {
@@ -223,6 +224,7 @@ const ROOM_PREFIXES: Array<[prefix: string, room: PlatformRoomKey]> = [
   ['/orchards', 'workbench'],
   ['/arable-fields', 'workbench'],
   ['/hospitality', 'workbench'],
+  ['/uploads', 'workbench'],
   // the cellar (footprints being made)
   ['/cellar', 'cellar'],
   ['/products', 'cellar'],

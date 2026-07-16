@@ -13,20 +13,21 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { ChevronLeft, Plus, Trash2, Calculator, Leaf, Droplets, Trees, Sparkles } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { calculateProductLCA } from '@/lib/product-lca-calculator';
 import { autoMatchEmissionFactor, type EmissionFactorMatch } from '@/lib/products/ef-auto-match';
+import { IngredientFactorPicker } from '@/components/hospitality/IngredientFactorPicker';
+import { COOKING_METHOD_OPTIONS } from '@/lib/hospitality/cooking-energy';
+import { DIETARY_TAGS, ALLERGENS, dietaryLabel, allergenLabel } from '@/lib/hospitality/dietary';
 import { useOrganization } from '@/lib/organizationContext';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Statement } from '@/components/studio/statement';
-import { Eyebrow } from '@/components/studio/eyebrow';
-import { BigNumber } from '@/components/studio/big-number';
-import { PillButton } from '@/components/studio/pill-button';
-import { StateChip } from '@/components/studio/state-chip';
 import {
   Dialog,
   DialogContent,
@@ -55,6 +56,8 @@ interface Row extends MealIngredient {
   /** undefined = not checked yet, null = checked but no factor found. */
   match?: EmissionFactorMatch | null;
   matching?: boolean;
+  /** True once the user has manually picked a factor — auto-match must not overwrite it. */
+  matchLocked?: boolean;
 }
 
 let rowSeq = 0;
@@ -68,18 +71,24 @@ function newRow(partial?: Partial<MealIngredient>): Row {
   };
 }
 
-type MatchTone = 'good' | 'attention' | 'quiet';
-/** Map a row's factor-match state to a typographic state chip. */
-function matchStatus(row: Row): { label: string; tone: MatchTone } | null {
-  if (row.matching) return { label: 'Checking factor…', tone: 'quiet' };
+type BadgeTone = 'ok' | 'warn' | 'muted';
+/** Map a row's factor-match state to a small status badge. */
+function matchStatus(row: Row): { label: string; tone: BadgeTone } | null {
+  if (row.matching) return { label: 'Checking factor…', tone: 'muted' };
   if (row.match === undefined) return null;
-  if (row.match === null) return { label: 'No factor match', tone: 'attention' };
+  if (row.match === null) return { label: 'No factor match', tone: 'warn' };
   const grade = row.match.ef_data_quality_grade;
   const source = row.match.ef_source_type;
-  if (source === 'primary' || grade === 'HIGH') return { label: 'Factor matched', tone: 'good' };
-  if (grade === 'LOW') return { label: 'Approximate factor', tone: 'attention' };
-  return { label: 'Factor matched', tone: 'good' };
+  if (source === 'primary' || grade === 'HIGH') return { label: 'Factor matched', tone: 'ok' };
+  if (grade === 'LOW') return { label: 'Approximate factor', tone: 'warn' };
+  return { label: 'Factor matched', tone: 'ok' };
 }
+
+const TONE_CLASS: Record<BadgeTone, string> = {
+  ok: 'border-transparent bg-primary/15 text-primary',
+  warn: 'border-transparent bg-amber-500/15 text-amber-600 dark:text-amber-400',
+  muted: 'text-muted-foreground',
+};
 
 function fmt(n: number, digits = 2): string {
   return n.toLocaleString('en-GB', { maximumFractionDigits: digits });
@@ -105,9 +114,20 @@ export function RecipeEditor({
   const portion = cfg.portionWord;
   const portionTitle = `${portion[0].toUpperCase()}${portion.slice(1)}`;
 
+  const COOKING_NONE = '__none__';
+  const canCook = cfg.kind === 'meal';
+
   const [recipe, setRecipe] = useState<HospitalityMealDetail | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [covers, setCovers] = useState('1');
+  const [prepWaste, setPrepWaste] = useState('0');
+  const [cookingMethod, setCookingMethod] = useState<string>(COOKING_NONE);
+  const [cookingMinutes, setCookingMinutes] = useState('');
+  const [dietaryTags, setDietaryTags] = useState<string[]>([]);
+  const [allergens, setAllergens] = useState<string[]>([]);
+  const canTag = cfg.kind !== 'room_night';
+  const toggle = (list: string[], setter: (v: string[]) => void, value: string) =>
+    setter(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [calcError, setCalcError] = useState<string | null>(null);
@@ -128,6 +148,14 @@ export function RecipeEditor({
   const matchRow = useCallback(
     async (key: string, name: string) => {
       const q = name.trim();
+      // A user-picked factor is authoritative — never let an auto-match overwrite it.
+      let locked = false;
+      setRows((prev) => {
+        const row = prev.find((r) => r.key === key);
+        locked = !!row?.matchLocked;
+        return prev;
+      });
+      if (locked) return;
       if (!orgId || !q) {
         setRows((prev) => prev.map((r) => (r.key === key ? { ...r, match: undefined, matching: false } : r)));
         return;
@@ -157,6 +185,11 @@ export function RecipeEditor({
       const m: HospitalityMealDetail = body.recipe;
       setRecipe(m);
       setCovers(String(m.covers));
+      setPrepWaste(String(m.prep_waste_pct ?? 0));
+      setCookingMethod(m.cooking_method ?? COOKING_NONE);
+      setCookingMinutes(m.cooking_minutes != null ? String(m.cooking_minutes) : '');
+      setDietaryTags(Array.isArray(m.dietary_tags) ? m.dietary_tags : []);
+      setAllergens(Array.isArray(m.allergens) ? m.allergens : []);
       const loaded = m.ingredients.length ? m.ingredients.map((i) => newRow(i)) : [newRow()];
       setRows(loaded);
       // Rebuild factor-match badges for the loaded ingredients.
@@ -242,11 +275,23 @@ export function RecipeEditor({
       return false;
     }
 
+    // Saving real quantities clears any import-placeholder / AI-estimate flag.
+    const patchBody: Record<string, unknown> = { covers: coversNum, quantities_status: 'confirmed' };
+    const prepPct = Number(prepWaste);
+    patchBody.prep_waste_pct = Number.isFinite(prepPct) ? Math.min(100, Math.max(0, prepPct)) : 0;
+    if (canCook) {
+      patchBody.cooking_method = cookingMethod === COOKING_NONE ? null : cookingMethod;
+      patchBody.cooking_minutes = cookingMinutes === '' ? null : Number(cookingMinutes);
+    }
+    if (canTag) {
+      patchBody.dietary_tags = dietaryTags;
+      patchBody.allergens = allergens;
+    }
     const patchRes = await fetch(`${cfg.apiBase}/${recipeId}`, {
       method: 'PATCH',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ covers: coversNum }),
+      body: JSON.stringify(patchBody),
     });
     if (!patchRes.ok) {
       const body = await patchRes.json().catch(() => ({}));
@@ -298,7 +343,7 @@ export function RecipeEditor({
       }
     }
     return true;
-  }, [covers, rows, recipeId, cfg.apiBase, portion, portionTitle]);
+  }, [covers, rows, recipeId, cfg.apiBase, portion, portionTitle, prepWaste, cookingMethod, cookingMinutes, canCook, COOKING_NONE, canTag, dietaryTags, allergens]);
 
   const saveRecipe = async () => {
     setBusy('save');
@@ -338,80 +383,192 @@ export function RecipeEditor({
     }
   };
 
-  const backLink = (
-    <Link
-      href={`${cfg.basePath}/`}
-      className="inline-flex font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground transition-colors hover:text-foreground"
-    >
-      ← {cfg.labelPlural}
-    </Link>
-  );
-
   if (loading) {
     return (
-      <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
+      <div className="mx-auto max-w-4xl space-y-4 p-4 sm:p-6">
         <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-64 w-full rounded-[6px]" />
+        <Skeleton className="h-64 w-full rounded-lg" />
       </div>
     );
   }
 
   if (loadError || !recipe) {
     return (
-      <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
-        {backLink}
-        <p className="text-sm text-studio-stale">{loadError || `${cfg.label} not found`}</p>
+      <div className="mx-auto max-w-4xl space-y-4 p-4 sm:p-6">
+        <Link href={`${cfg.basePath}/`} className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
+          <ChevronLeft className="mr-1 h-4 w-4" />
+          {cfg.labelPlural}
+        </Link>
+        <p className="text-sm text-destructive">{loadError || `${cfg.label} not found`}</p>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 p-4 sm:p-6">
-      {backLink}
+    <div className="mx-auto max-w-4xl space-y-5 p-4 sm:p-6">
+      <Link href={`${cfg.basePath}/`} className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
+        <ChevronLeft className="mr-1 h-4 w-4" />
+        {cfg.labelPlural}
+      </Link>
 
-      <div className="min-w-0">
-        <Statement
-          eyebrow={`THE WORKBENCH · ${cfg.labelPlural.toUpperCase()}`}
-          headline={recipe.name.endsWith('.') ? recipe.name : `${recipe.name}.`}
-        >
-          {recipe.impact && (
-            <>
-              <BigNumber
-                size="display"
-                value={fmt(recipe.impact.per_cover_co2e)}
-                label={`KG CO₂E / ${portion.toUpperCase()}`}
-              />
-              <BigNumber
-                size="display"
-                value={fmt(recipe.impact.per_cover_water)}
-                label={`M³ WATER / ${portion.toUpperCase()}`}
-              />
-              <BigNumber
-                size="display"
-                value={fmt(recipe.impact.per_cover_land)}
-                label={`M² LAND / ${portion.toUpperCase()}`}
-              />
-            </>
-          )}
-        </Statement>
-        <p className="mt-3 max-w-xl text-sm text-muted-foreground">
+      <div>
+        <h1 className="text-2xl font-semibold">{recipe.name}</h1>
+        <p className="text-sm text-muted-foreground">
           Add the ingredients in this {cfg.label.toLowerCase()}, then calculate its impact.
         </p>
       </div>
 
-      <section className="border-t border-border pt-5">
-        <Eyebrow className="mb-4">{ingredientLabel ?? 'Recipe'}</Eyebrow>
-        <div className="space-y-3">
-          <div className="w-40 space-y-1">
-            <Label htmlFor="recipe-covers">{portionTitle}s</Label>
-            <Input
-              id="recipe-covers"
-              type="number"
-              min="1"
-              step="1"
-              value={covers}
-              onChange={(e) => setCovers(e.target.value)}
-            />
+      {recipe.quantities_status === 'unconfirmed' && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
+          This {cfg.label.toLowerCase()} was imported with placeholder quantities of 1 g/ml. Set the real
+          amounts and save the recipe before calculating its impact.
+        </div>
+      )}
+
+      {recipe.impact && (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
+              <Leaf className="h-4 w-4 text-primary" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Carbon / {portion}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-semibold">{fmt(recipe.impact.per_cover_display_co2e)}</p>
+              <p className="text-xs text-muted-foreground">kg CO₂e</p>
+              {recipe.impact.per_cover_cooking_co2e > 0 && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  incl. {Math.round(recipe.impact.per_cover_cooking_co2e * 1000)} g cooking energy
+                </p>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
+              <Droplets className="h-4 w-4 text-primary" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Water / {portion}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-semibold">{fmt(recipe.impact.per_cover_water)}</p>
+              <p className="text-xs text-muted-foreground">m³</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
+              <Trees className="h-4 w-4 text-primary" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Land / {portion}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-semibold">{fmt(recipe.impact.per_cover_land)}</p>
+              <p className="text-xs text-muted-foreground">m²</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {recipe.impact && (
+        <p className="text-xs text-muted-foreground">
+          Covers ingredient production from farm to kitchen{canCook ? ', plus cooking energy' : ''}. Your venue&apos;s
+          heating, lighting and waste are tracked separately in your facility figures, so they are not added again here.
+        </p>
+      )}
+
+      {recipe.nature_score && recipe.nature_score.ratings.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
+            <Trees className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-medium">Nature &amp; sourcing</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <span>
+                Plant-forward: <span className="font-semibold">{recipe.nature_score.plant_forward_pct}%</span>
+              </span>
+              <Badge
+                variant="outline"
+                className={
+                  recipe.nature_score.risk_level === 'high'
+                    ? 'border-red-500/50 text-red-600 dark:text-red-400'
+                    : recipe.nature_score.risk_level === 'medium'
+                      ? 'border-amber-500/50 text-amber-600 dark:text-amber-400'
+                      : 'border-primary/40 text-primary'
+                }
+              >
+                {recipe.nature_score.risk_level} nature risk
+              </Badge>
+            </div>
+            {recipe.nature_score.high_risk.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Hot-spots: {recipe.nature_score.high_risk.map((h) => `${h.name} (${h.note})`).join('; ')}.
+                Swapping or certifying these lowers the recipe&apos;s land and biodiversity pressure.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{ingredientLabel ?? 'Recipe'}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap gap-3">
+            <div className="w-32 space-y-1">
+              <Label htmlFor="recipe-covers">{portionTitle}s</Label>
+              <Input
+                id="recipe-covers"
+                type="number"
+                min="1"
+                step="1"
+                value={covers}
+                onChange={(e) => setCovers(e.target.value)}
+              />
+            </div>
+            <div className="w-32 space-y-1">
+              <Label htmlFor="recipe-prep-waste">Prep waste %</Label>
+              <Input
+                id="recipe-prep-waste"
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={prepWaste}
+                onChange={(e) => setPrepWaste(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">Trim, peel and spoilage bought beyond what is served.</p>
+            </div>
+            {canCook && (
+              <>
+                <div className="w-44 space-y-1">
+                  <Label htmlFor="recipe-cooking-method">Cooking method</Label>
+                  <Select value={cookingMethod} onValueChange={setCookingMethod}>
+                    <SelectTrigger id="recipe-cooking-method">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={COOKING_NONE}>Not set</SelectItem>
+                      {COOKING_METHOD_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="w-32 space-y-1">
+                  <Label htmlFor="recipe-cooking-minutes">Cooking mins</Label>
+                  <Input
+                    id="recipe-cooking-minutes"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="0"
+                    value={cookingMinutes}
+                    onChange={(e) => setCookingMinutes(e.target.value)}
+                    disabled={cookingMethod === COOKING_NONE || cookingMethod === 'no_cook'}
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           <datalist id="hospitality-known-ingredients">
@@ -436,13 +593,33 @@ export function RecipeEditor({
                       cfg.kind === 'drink' ? 'e.g. Gin' : cfg.kind === 'room_night' ? 'e.g. Bread (breakfast)' : 'e.g. Beef mince'
                     }
                     value={row.material_name}
-                    onChange={(e) => updateRow(row.key, { material_name: e.target.value, match: undefined })}
+                    onChange={(e) => updateRow(row.key, { material_name: e.target.value, match: undefined, matchLocked: false })}
                     onBlur={() => matchRow(row.key, row.material_name)}
                   />
                   {(() => {
                     const status = matchStatus(row);
-                    if (!status) return null;
-                    return <StateChip tone={status.tone}>{status.label}</StateChip>;
+                    const showPicker =
+                      orgId &&
+                      row.material_name.trim().length > 0 &&
+                      (row.matchLocked || (row.match !== undefined && !row.matching));
+                    if (!status && !showPicker) return null;
+                    return (
+                      <div className="flex flex-wrap items-center gap-1">
+                        {status && (
+                          <Badge variant="outline" className={`text-[10px] font-normal ${TONE_CLASS[status.tone]}`}>
+                            {status.label}
+                          </Badge>
+                        )}
+                        {showPicker && (
+                          <IngredientFactorPicker
+                            organizationId={orgId}
+                            ingredientName={row.material_name}
+                            label={row.matchLocked || row.match ? 'Change factor' : 'Pick factor'}
+                            onPicked={(m) => updateRow(row.key, { match: m, matchLocked: true, matching: false })}
+                          />
+                        )}
+                      </div>
+                    );
                   })()}
                 </div>
                 <Input
@@ -465,39 +642,89 @@ export function RecipeEditor({
                     ))}
                   </SelectContent>
                 </Select>
-                <button
-                  type="button"
-                  aria-label="Remove ingredient"
-                  className="justify-self-start rounded px-2 py-2 text-base leading-none text-muted-foreground transition-colors duration-150 hover:text-studio-stale sm:justify-self-auto"
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-destructive"
                   onClick={() => removeRow(row.key)}
+                  aria-label="Remove ingredient"
                 >
-                  &times;
-                </button>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
             ))}
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <PillButton variant="ghost" size="sm" onClick={addRow}>
+            <Button variant="outline" size="sm" onClick={addRow}>
+              <Plus className="mr-2 h-4 w-4" />
               Add ingredient
-            </PillButton>
-            <PillButton variant="ghost" size="sm" onClick={() => { setAiError(null); setAiOpen(true); }}>
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => { setAiError(null); setAiOpen(true); }}>
+              <Sparkles className="mr-2 h-4 w-4" />
               Paste &amp; AI-fill
-            </PillButton>
+            </Button>
           </div>
 
-          {calcError && <p className="text-sm text-studio-stale">{calcError}</p>}
+          {calcError && <p className="text-sm text-destructive">{calcError}</p>}
           {progress && <p className="text-sm text-muted-foreground">{progress}…</p>}
-        </div>
-      </section>
+        </CardContent>
+      </Card>
+
+      {canTag && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Dietary &amp; allergens</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Dietary labels (shown on the public menu)</Label>
+              <div className="flex flex-wrap gap-2">
+                {DIETARY_TAGS.map((t) => {
+                  const on = dietaryTags.includes(t);
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => toggle(dietaryTags, setDietaryTags, t)}
+                      className={`rounded-full border px-3 py-1 text-xs transition-colors ${on ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground hover:bg-accent'}`}
+                    >
+                      {dietaryLabel(t)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Allergens present (14 UK/EU declarable)</Label>
+              <div className="flex flex-wrap gap-2">
+                {ALLERGENS.map((a) => {
+                  const on = allergens.includes(a);
+                  return (
+                    <button
+                      key={a}
+                      type="button"
+                      onClick={() => toggle(allergens, setAllergens, a)}
+                      className={`rounded-full border px-3 py-1 text-xs transition-colors ${on ? 'border-amber-500/60 bg-amber-500/15 text-amber-700 dark:text-amber-400' : 'border-border text-muted-foreground hover:bg-accent'}`}
+                    >
+                      {allergenLabel(a)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex items-center gap-2">
-        <PillButton variant="outline" onClick={saveRecipe} disabled={busy !== null}>
+        <Button variant="outline" onClick={saveRecipe} disabled={busy !== null}>
           {busy === 'save' ? 'Saving…' : 'Save recipe'}
-        </PillButton>
-        <PillButton variant="room" onClick={calculate} disabled={busy !== null}>
+        </Button>
+        <Button onClick={calculate} disabled={busy !== null || recipe.quantities_status === 'unconfirmed'}>
+          <Calculator className="mr-2 h-4 w-4" />
           {busy === 'calculate' ? 'Calculating…' : 'Calculate impact'}
-        </PillButton>
+        </Button>
       </div>
 
       {renderExtra && renderExtra(recipe)}
@@ -523,6 +750,7 @@ export function RecipeEditor({
               Cancel
             </Button>
             <Button onClick={aiExtract} disabled={aiBusy || !aiText.trim()}>
+              <Sparkles className="mr-2 h-4 w-4" />
               {aiBusy ? 'Extracting…' : 'Extract ingredients'}
             </Button>
           </DialogFooter>

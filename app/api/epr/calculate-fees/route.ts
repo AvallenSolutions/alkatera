@@ -5,6 +5,7 @@ import { cookies } from 'next/headers'
 import { mapMaterialToRPD } from '@/lib/epr/mappings'
 import { calculateLineFee, getApplicableRate, findFeeRate } from '@/lib/epr/fee-calculator'
 import { isDRSExcluded } from '@/lib/epr/drinks-container-rules'
+import { getPackagingUnitsPerGroup } from '@/lib/end-of-life-factors'
 import type { EPRFeeRate, RPDMaterialCode, EPRFeeCalculationResult, EPRMaterialFeeBreakdown, EPRProductFeeBreakdown, EPRPackagingItemFee } from '@/lib/epr/types'
 import type { EPRMaterialType, EPRRAMRating } from '@/lib/types/lca'
 import { RPD_MATERIAL_NAMES } from '@/lib/epr/constants'
@@ -110,6 +111,8 @@ export async function POST(request: NextRequest) {
         material_name,
         net_weight_g,
         packaging_category,
+        material_type,
+        units_per_group,
         epr_material_type,
         epr_is_drinks_container,
         epr_is_household,
@@ -149,7 +152,11 @@ export async function POST(request: NextRequest) {
 
       if (totalUnits <= 0) continue
 
-      const weightPerUnitKg = material.net_weight_g / 1000
+      // Shared packaging (a 24-bottle trade case) is one physical item per
+      // units_per_group product units — same divisor as the LCA. Counting
+      // the full case weight once per bottle over-declared tonnage and fees
+      // by the pack factor.
+      const weightPerUnitKg = material.net_weight_g / 1000 / getPackagingUnitsPerGroup(material as any)
       const totalWeightKg = weightPerUnitKg * totalUnits
 
       // Map material type to RPD code

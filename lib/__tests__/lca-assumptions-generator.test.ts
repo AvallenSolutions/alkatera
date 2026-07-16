@@ -331,17 +331,21 @@ describe('generateAssumptions', () => {
       expect(hasPackagingEol).toBe(true);
     });
 
-    it('includes ingredient waste EoL when hasIngredients=true', () => {
+    it('states ingredients are excluded from end-of-life when hasIngredients=true', () => {
+      // Ingredients become the consumed product, not disposed waste, so they
+      // carry no EoL pathway (the aggregator's EoL loop skips ingredient rows).
+      // The generated assumption must state that exclusion, not an
+      // "ingredient/organic waste" disposal row (dropped in f0f100c6).
       const ctx = makeContext({
         systemBoundary: 'cradle-to-grave',
         hasIngredients: true,
         eolConfig: { region: 'uk', pathways: {} },
       });
       const assumptions = generateAssumptions(ctx);
-      const hasIngredientEol = assumptions.some(
-        (a) => a.includes('Ingredient waste') || a.includes('organic waste'),
+      const statesExclusion = assumptions.some(
+        (a) => a.includes('Ingredients are excluded from the end-of-life'),
       );
-      expect(hasIngredientEol).toBe(true);
+      expect(statesExclusion).toBe(true);
     });
 
     it('does not include EoL detail without eolConfig even for grave boundary', () => {

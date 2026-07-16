@@ -11,10 +11,10 @@
  *   → { created: number, skipped: string[], menu_id?: string }
  *
  * Batch-creates each meal/drink as a recipe (reusing createRecipe), seeds its
- * ingredient names into product_materials with a 0 quantity so they appear in
- * the recipe editor ready for the user to fill in, and — when create_menu is on
- * — assembles them into a new menu. Best-effort: a single bad row is skipped,
- * not fatal.
+ * ingredient names into product_materials with a placeholder quantity of 1 (the
+ * quantity > 0 CHECK forbids a truly blank amount) so they appear in the recipe
+ * editor ready for the user to fill in, and — when create_menu is on — assembles
+ * them into a new menu. Best-effort: a single bad row is skipped, not fatal.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -104,6 +104,13 @@ export async function POST(request: NextRequest) {
       if (insErr) {
         // The recipe itself is fine; just note the ingredient names were dropped.
         skipped.push(`${name} (ingredients)`)
+      } else {
+        // Mark the recipe as holding placeholder quantities so the UI can badge it,
+        // block a misleading Calculate, and surface it in the bulk-quantity grid.
+        await db
+          .from('hospitality_meal_meta')
+          .update({ quantities_status: 'unconfirmed' })
+          .eq('product_id', productId)
       }
     }
 

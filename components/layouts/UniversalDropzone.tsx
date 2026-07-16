@@ -38,6 +38,7 @@ import {
   ClipboardList,
   Package,
   ScrollText,
+  BookOpen,
 } from 'lucide-react'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
@@ -46,7 +47,7 @@ import {
   saveWaterBill,
   saveWasteBill,
 } from '@/lib/ingest/save-extracted'
-import type { IngestResponse } from '@/app/api/ingest/auto/route'
+import type { IngestResponse, IngestResultType } from '@/app/api/ingest/auto/route'
 import type { ExtractedBillData } from '@/app/api/utilities/import-from-pdf/route'
 
 type Step = 'upload' | 'analysing' | 'review' | 'saving' | 'saved'
@@ -58,7 +59,7 @@ interface Facility {
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024
 const ACCEPT =
-  '.pdf,.xlsx,.xls,image/jpeg,image/png,image/webp,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel'
+  '.pdf,.xlsx,.xls,.csv,image/jpeg,image/png,image/webp,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel'
 
 interface UniversalDropzoneProps {
   /** Click target that opens the dialog. Optional when driven by `file`. */
@@ -70,6 +71,88 @@ interface UniversalDropzoneProps {
   /** Fired once the supplied `file` has been picked up, so the parent can
    *  clear its own state and avoid re-processing the same file. */
   onFileConsumed?: () => void
+}
+
+// Types whose review panel is a handoff (navigate elsewhere to finish), not a
+// save. Closing the dialog on these is part of the happy path, so it must not
+// be recorded as a dismissal.
+const HANDOFF_TYPES = new Set<IngestResultType>([
+  'spray_diary',
+  'bom',
+  'soil_carbon_evidence',
+  'bulk_xlsx',
+  'accounts_csv',
+  'hospitality_menu',
+  'pos_sales_export',
+  'unsupported',
+])
+
+// Plain-language labels for every document type the user can correct to.
+// Mirrors VALID_TARGETS on /api/ingest/auto/[jobId]/reclassify.
+const TYPE_LABELS: Partial<Record<IngestResultType, string>> = {
+  utility_bill: 'Energy bill',
+  water_bill: 'Water bill',
+  waste_bill: 'Waste invoice',
+  supplier_invoice: 'Supplier invoice',
+  freight_invoice: 'Freight invoice',
+  refrigerant_service: 'Refrigerant service record',
+  packaging_spec: 'Packaging specification',
+  supplier_coa: 'Supplier certificate or spec sheet',
+  certification: 'Certification',
+  soil_carbon_lab: 'Soil lab report',
+  soil_carbon_evidence: 'Soil carbon evidence',
+  bom: 'Product recipe (BOM)',
+  spray_diary: 'Spray diary',
+  bulk_xlsx: 'Product import workbook',
+  accounts_csv: 'Accounts export',
+  smart_meter_csv: 'Smart-meter data',
+  historical_sustainability_report: 'Past sustainability report',
+  historical_lca_report: 'Past LCA report',
+  hospitality_menu: 'Menu',
+  pos_sales_export: 'POS sales export',
+}
+
+/**
+ * "Wrong document type?" affordance shown above every review panel. Picking a
+ * type re-runs extraction on the stashed file with that type forced, and the
+ * correction is recorded so the classifier learns from it.
+ */
+function ChangeTypeMenu({
+  currentType,
+  onReclassify,
+}: {
+  currentType: IngestResultType
+  onReclassify: (t: IngestResultType) => void
+}) {
+  const currentLabel = TYPE_LABELS[currentType]
+  const options = (Object.keys(TYPE_LABELS) as IngestResultType[]).filter(
+    (t) => t !== currentType,
+  )
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-md border border-dashed px-3 py-1.5">
+      <span className="text-xs text-muted-foreground">
+        {currentLabel ? (
+          <>
+            Read as <span className="font-medium text-foreground">{currentLabel}</span>. Not right?
+          </>
+        ) : (
+          'Know what this document is?'
+        )}
+      </span>
+      <Select onValueChange={(v) => onReclassify(v as IngestResultType)}>
+        <SelectTrigger className="h-7 w-auto gap-1 border-none text-xs text-primary shadow-none">
+          <SelectValue placeholder="Change document type" />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((t) => (
+            <SelectItem key={t} value={t}>
+              {TYPE_LABELS[t]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
 }
 
 export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDropzoneProps) {
@@ -99,6 +182,8 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pollAbortRef = useRef<{ cancelled: boolean } | null>(null)
   const externalFileRef = useRef<File | null>(null)
+  // Guards the "files still waiting" warning so it fires at most once per job.
+  const handoffWarnedRef = useRef<string | null>(null)
 
   const reset = useCallback(() => {
     if (pollAbortRef.current) pollAbortRef.current.cancelled = true
@@ -137,6 +222,13 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
   }, [open, orgId])
 
   const handleOpenChange = (next: boolean) => {
+    // Weak learning signal, metrics only: the user closed a review panel
+    // without saving or correcting it. Handoff types are excluded — their
+    // panels close the dialog as part of a successful navigation — so a
+    // dismissal here means a save-type panel was abandoned.
+    if (!next && step === 'review' && jobId && result && !HANDOFF_TYPES.has(result.type)) {
+      recordFeedback({}, { dismissed: true })
+    }
     setOpen(next)
     if (!next) reset()
   }
@@ -258,6 +350,36 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
     return true
   }, [queue, processFile])
 
+  // Batch safety net: a handoff type (BOM, menu, spray diary, product workbook,
+  // POS export, accounts export, soil-carbon evidence, unsupported) navigates
+  // away and reset() clears the queue, so any files queued behind it would be
+  // dropped silently. We can't carry the queue across the navigation from here,
+  // so at minimum tell the user which files still need attention. The toast
+  // survives the SPA navigation (sonner is mounted app-wide), so the message
+  // stays visible after the handoff page loads.
+  useEffect(() => {
+    if (
+      step !== 'review' ||
+      !result ||
+      !jobId ||
+      queue.length === 0 ||
+      !HANDOFF_TYPES.has(result.type) ||
+      handoffWarnedRef.current === jobId
+    ) {
+      return
+    }
+    handoffWarnedRef.current = jobId
+    const names = queue.map((f) => f.name)
+    const shown = names.slice(0, 3).join(', ')
+    const extra = names.length > 3 ? ` and ${names.length - 3} more` : ''
+    const plural = queue.length === 1 ? 'file is' : 'files are'
+    const them = queue.length === 1 ? 'it' : 'them'
+    toast.info(
+      `${queue.length} more ${plural} waiting: ${shown}${extra}. Deal with this one first, then upload ${them} again.`,
+      { duration: 8000 },
+    )
+  }, [step, result, jobId, queue])
+
   // Externally-fed file (e.g. from the Rosa drawer): open the dialog and run
   // it through the same classify → review flow as a manual drop. Guarded by a
   // ref so the same File object is never processed twice.
@@ -302,14 +424,99 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
     (savedPayload: Record<string, unknown>, context?: Record<string, unknown>) => {
       if (!jobId) return
       try {
+        // Ride the classifier's self-reported confidence along so the admin
+        // page can chart confidence against the correction rate.
+        const meta = result?.classifierMeta
+        const fullContext = meta ? { ...context, classifier_meta: meta } : context
         void fetch('/api/ingest/feedback', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           keepalive: true,
-          body: JSON.stringify({ jobId, savedPayload, context }),
+          body: JSON.stringify({ jobId, savedPayload, context: fullContext }),
         }).catch(() => {})
       } catch {
         // never surface
+      }
+    },
+    [jobId, result],
+  )
+
+  // "Change document type": re-run extraction with the user's chosen type
+  // forced. On failure the previous result stays on screen.
+  const handleReclassify = useCallback(
+    async (targetType: IngestResultType) => {
+      if (!jobId) return
+      setStep('analysing')
+      setPhaseMessage(`Re-reading as ${TYPE_LABELS[targetType]?.toLowerCase() ?? 'the chosen type'}…`)
+      const abortFlag = { cancelled: false }
+      pollAbortRef.current = abortFlag
+      try {
+        const res = await fetch(`/api/ingest/auto/${jobId}/reclassify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetType }),
+        })
+        const body = await res.json().catch(() => ({}))
+        // 202 = the file was too large to re-read inline, so extraction runs in
+        // the background. Poll the job (same endpoint + loop as the upload flow)
+        // until it completes or fails. Anything else non-2xx is a real error.
+        if (!res.ok && res.status !== 202) {
+          throw new Error(body?.error || 'Could not change the document type')
+        }
+
+        let data: IngestResponse
+        if (res.status === 202) {
+          const start = Date.now()
+          const POLL_MS = 2000
+          const TIMEOUT_MS = 3 * 60 * 1000
+          let polled: IngestResponse | null = null
+          while (!abortFlag.cancelled) {
+            if (Date.now() - start > TIMEOUT_MS) {
+              throw new Error('This is taking longer than expected. Please try again.')
+            }
+            await new Promise((r) => setTimeout(r, POLL_MS))
+            if (abortFlag.cancelled) return
+            const pollRes = await fetch(`/api/ingest/auto/${jobId}`)
+            if (!pollRes.ok) continue
+            const job = await pollRes.json()
+            if (job.phaseMessage) setPhaseMessage(job.phaseMessage)
+            if (job.status === 'failed') {
+              throw new Error(job.error || 'Could not change the document type')
+            }
+            if (job.status === 'completed') {
+              polled = job.result as IngestResponse
+              break
+            }
+          }
+          if (abortFlag.cancelled || !polled) return
+          data = polled
+        } else {
+          data = body.result as IngestResponse
+        }
+
+        setResult(data)
+        // Same bill pre-fill as the classify path.
+        const bill =
+          data.type === 'utility_bill'
+            ? data.utilityBill
+            : data.type === 'water_bill'
+              ? data.waterBill
+              : data.type === 'waste_bill'
+                ? data.wasteBill
+                : null
+        if (bill) {
+          setPeriodStart(bill.period_start ?? '')
+          setPeriodEnd(bill.period_end ?? '')
+          if (bill.supplier_name) {
+            setBillName(
+              `${bill.supplier_name} ${bill.period_start ?? ''} to ${bill.period_end ?? ''}`.trim(),
+            )
+          }
+        }
+        setStep('review')
+      } catch (err: any) {
+        toast.error(err.message || 'Could not change the document type')
+        setStep('review')
       }
     },
     [jobId],
@@ -410,7 +617,7 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-room-accent" />
@@ -456,7 +663,7 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
               <div className="text-center">
                 <p className="font-medium text-sm">Drop files here or click to browse</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  PDF, image, or Excel · up to 20MB each · multiple files supported
+                  PDF, image, Excel, or CSV · up to 20MB each · multiple files supported
                 </p>
               </div>
             </button>
@@ -478,6 +685,8 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
         )}
 
         {step === 'review' && result && (
+          <div className="space-y-3">
+          {jobId && <ChangeTypeMenu currentType={result.type} onReclassify={handleReclassify} />}
           <ReviewPanel
             result={result}
             facilities={facilities}
@@ -499,6 +708,7 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
             onClose={() => handleOpenChange(false)}
             onSaved={recordFeedback}
           />
+          </div>
         )}
 
         {step === 'saving' && (
@@ -766,6 +976,56 @@ function ReviewPanel(props: ReviewPanelProps) {
   if (result.type === 'historical_lca_report') {
     return (
       <HistoricalLcaPanel result={result} onClose={props.onClose} onSaved={props.onSaved} />
+    )
+  }
+
+  if (result.type === 'hospitality_menu') {
+    const stashId = result.hospitalityMenu?.stashId
+    const href = stashId
+      ? `/hospitality/menus?${new URLSearchParams({ stash_id: stashId, stash_kind: 'hospitality_menu' }).toString()}`
+      : '/hospitality/menus'
+    return (
+      <div className="space-y-3">
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+          <BookOpen className="h-4 w-4 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-medium">This looks like a menu.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              We&apos;ll open the menu importer with this file so you can turn it into meals and drinks.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <Button asChild size="sm">
+            <Link href={href} onClick={props.onClose}>Import menu</Link>
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (result.type === 'pos_sales_export') {
+    const stashId = result.posSalesExport?.stashId
+    const href = stashId
+      ? `/hospitality/sales?${new URLSearchParams({ stash_id: stashId, stash_kind: 'pos_sales' }).toString()}`
+      : '/hospitality/sales'
+    return (
+      <div className="space-y-3">
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+          <FileSpreadsheet className="h-4 w-4 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-medium">This looks like a POS sales export.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              We&apos;ll open hospitality sales with this file so you can import how many of each item sold.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <Button asChild size="sm">
+            <Link href={href} onClick={props.onClose}>Import sales</Link>
+          </Button>
+        </div>
+      </div>
     )
   }
 
@@ -1384,8 +1644,10 @@ function BomHandoffPanel({ bom, onClose }: { bom?: BomPayload; onClose: () => vo
           <ul className="space-y-0.5 text-xs">
             {bom.line_items.slice(0, 6).map((li, i) => (
               <li key={i} className="flex items-center justify-between gap-2">
-                <span className="truncate">{li.name}</span>
-                <span className="shrink-0 text-muted-foreground">
+                {/* min-w-0 lets truncate actually kick in; without it a long
+                    ingredient name forces the whole dialog to scroll sideways. */}
+                <span className="truncate min-w-0">{li.name}</span>
+                <span className="shrink-0 text-muted-foreground whitespace-nowrap">
                   {li.quantity != null ? `${li.quantity} ${li.unit || ''}`.trim() : ''}
                   {li.type ? ` · ${li.type}` : ''}
                 </span>
@@ -1939,6 +2201,7 @@ function SupplierInvoicePanel({
   onClose: () => void
   onSaved?: ReviewPanelProps['onSaved']
 }) {
+  const { currentOrganization } = useOrganization()
   const [supplierName] = useState(invoice?.supplier_name || '')
   const [invoiceDate, setInvoiceDate] = useState(invoice?.invoice_date || '')
   const [currency, setCurrency] = useState<string>(
@@ -1985,6 +2248,9 @@ function SupplierInvoicePanel({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          // Save to the org the user is working in, not the caller's metadata
+          // org (the route verifies access before honouring it).
+          organizationId: currentOrganization?.id,
           supplier_name: supplierName,
           invoice_date: invoiceDate || null,
           currency,
@@ -2228,8 +2494,11 @@ function PackagingSpecPanel({
             material: r.material || null,
             role: r.role,
             weight_g: Number(r.weight_g),
-            recycled_content_pct: r.recycled_content_pct ? Number(r.recycled_content_pct) : null,
-            recyclability_pct: r.recyclability_pct ? Number(r.recyclability_pct) : null,
+            // Explicit empty-string checks: these are string fields today so a
+            // truthy gate happens to keep "0", but one type change would
+            // silently collapse a declared 0% to null. Blank = unknown (null).
+            recycled_content_pct: r.recycled_content_pct.trim() === '' ? null : Number(r.recycled_content_pct),
+            recyclability_pct: r.recyclability_pct.trim() === '' ? null : Number(r.recyclability_pct),
           })),
         }),
       })
@@ -2244,8 +2513,11 @@ function PackagingSpecPanel({
             material: r.material || null,
             role: r.role,
             weight_g: Number(r.weight_g),
-            recycled_content_pct: r.recycled_content_pct ? Number(r.recycled_content_pct) : null,
-            recyclability_pct: r.recyclability_pct ? Number(r.recyclability_pct) : null,
+            // Explicit empty-string checks: these are string fields today so a
+            // truthy gate happens to keep "0", but one type change would
+            // silently collapse a declared 0% to null. Blank = unknown (null).
+            recycled_content_pct: r.recycled_content_pct.trim() === '' ? null : Number(r.recycled_content_pct),
+            recyclability_pct: r.recyclability_pct.trim() === '' ? null : Number(r.recyclability_pct),
           })),
         },
         {

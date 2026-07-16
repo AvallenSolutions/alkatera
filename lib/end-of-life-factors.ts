@@ -352,7 +352,13 @@ const MATERIAL_TYPE_MAP: Record<string, string> = {
  * Checked in order — first match wins. More specific patterns come first to
  * avoid false positives (e.g. "aluminium" before generic "can").
  */
-const MATERIAL_NAME_KEYWORDS: [RegExp, string][] = [
+/**
+ * Explicit material words. When one of these appears in the material or factor
+ * name it is stronger evidence than any role-derived default (a category of
+ * 'label' maps to paper, but a name of "PP Label" IS plastic), so these are
+ * checked BEFORE the category map.
+ */
+const SPECIFIC_MATERIAL_KEYWORDS: [RegExp, string][] = [
   // Glass — "flint" is the glass-industry term for clear glass; "cullet" is
   // recycled glass. Both appear in dataset/product names that omit "glass".
   [/\b(glass|flint|cullet)\b/i, 'glass'],
@@ -361,21 +367,40 @@ const MATERIAL_NAME_KEYWORDS: [RegExp, string][] = [
   [/\b(aluminium|aluminum|alu|ropp)\b/i, 'aluminium'],
   // Specific plastics before generic "plastic"
   [/\b(hdpe|high.?density.?poly)\b/i, 'hdpe'],
-  [/\bpet\b/i, 'pet'],
-  [/\bplastic\b/i, 'pet'], // Default plastic → PET (most common in drinks)
-  // Paper / Cardboard. Secondary/transit packaging in drinks is corrugated
-  // cardboard, often named "trade case", "shipper", "case" or just "box"
-  // (e.g. "500ml box", "4 × 420ml box" — the multipack carton).
-  [/\b(cardboard|carton|corrugated)\b/i, 'paper'],
-  [/\b(trade.?cases?|shippers?|outer.?cases?|cases?|box(es)?)\b/i, 'paper'],
-  [/\b(paper|label)\b/i, 'paper'],
+  [/\b(pp|polypropylene|shrink.?wrap|stretch.?wrap|(?:plastic|poly)\s*film)\b/i, 'hdpe'],
+  // "Pet Nat" / "pétillant naturel" is a wine style, not the plastic
+  [/\bpet\b(?!\s*[- ]?nat)/i, 'pet'],
+  [/\b(cardboard|corrugated)\b/i, 'paper'],
   // Steel / Metal
   [/\bsteel\b/i, 'steel'],
   [/\b(crown.?cap|metal.?cap|tin.?can)\b/i, 'steel'],
   // Cork
   [/\bcork\b/i, 'cork'],
+];
+
+/**
+ * Weaker name heuristics, checked only after the category map has had its
+ * chance: role-ish words that usually indicate a material but can be wrong.
+ */
+const GENERIC_NAME_KEYWORDS: [RegExp, string][] = [
+  [/\bplastic\b/i, 'pet'], // Default plastic → PET (most common in drinks)
+  // Paper / Cardboard. Secondary/transit packaging in drinks is corrugated
+  // cardboard, often named "trade case", "shipper", "case" or just "box"
+  // (e.g. "500ml box", "4 × 420ml box" — the multipack carton).
+  [/\b(carton|trade.?cases?|shippers?|outer.?cases?|cases?|box(es)?)\b/i, 'paper'],
+  [/\b(paper|label)\b/i, 'paper'],
+  // Generic "can" AFTER the tin-can→steel rule above: drinks cans are
+  // aluminium ("330ml Can" used to fall through to 'other' and its harsh
+  // 1.5 kg CO2e/kg incineration factor)
+  [/\bcans?\b/i, 'aluminium'],
   // Organic / Ingredients
   [/\b(organic|ingredient|food)\b/i, 'organic'],
+];
+
+/** Combined list, kept for callers that want a single pass. */
+const MATERIAL_NAME_KEYWORDS: [RegExp, string][] = [
+  ...SPECIFIC_MATERIAL_KEYWORDS,
+  ...GENERIC_NAME_KEYWORDS,
 ];
 
 /**
@@ -402,20 +427,30 @@ export function getMaterialFactorKey(
   materialName?: string,
   factorName?: string
 ): string {
-  // 1. Try exact map lookup on packaging category
-  const normalized = (packagingCategory || '').toLowerCase().trim().replace(/\s+/g, '_');
-  const mapped = MATERIAL_TYPE_MAP[normalized];
-  if (mapped) return mapped;
-
-  // 2. Try keyword detection across the material name and the resolved factor name
   const haystack = [materialName, factorName].filter(Boolean).join(' ');
+
+  // 1. Explicit material words in the name/factor beat any category mapping:
+  //    a category of 'label' defaults to paper, but a name of "PP Label" is
+  //    unambiguously plastic.
   if (haystack) {
-    for (const [pattern, factorKey] of MATERIAL_NAME_KEYWORDS) {
+    for (const [pattern, factorKey] of SPECIFIC_MATERIAL_KEYWORDS) {
       if (pattern.test(haystack)) return factorKey;
     }
   }
 
-  // 3. Fallback
+  // 2. Exact map lookup on packaging category
+  const normalized = (packagingCategory || '').toLowerCase().trim().replace(/\s+/g, '_');
+  const mapped = MATERIAL_TYPE_MAP[normalized];
+  if (mapped) return mapped;
+
+  // 3. Weaker name heuristics (role-ish words: case, box, label, can, …)
+  if (haystack) {
+    for (const [pattern, factorKey] of GENERIC_NAME_KEYWORDS) {
+      if (pattern.test(haystack)) return factorKey;
+    }
+  }
+
+  // 4. Fallback
   return 'other';
 }
 

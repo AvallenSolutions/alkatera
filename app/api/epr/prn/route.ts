@@ -4,6 +4,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { calculateObligationTonnage, determinePRNStatus, calculatePRNCost, totalPRNSpend, overallFulfilmentPct, buildPRNObligations } from '@/lib/epr/prn-calculator'
 import { mapMaterialToRPD } from '@/lib/epr/mappings'
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access'
 import type { EPRMaterialType } from '@/lib/types/lca'
 import type { EPRPRNTarget } from '@/lib/epr/types'
 
@@ -167,6 +168,11 @@ export async function POST(request: NextRequest) {
     if (!authorized) return NextResponse.json({ error: 'Access denied' }, { status: 403 })
 
     const supabase = getServiceClient()
+
+    // Writes require more than advisor read access (house rule: every
+    // service-role write goes through denyReadOnlyAdvisor).
+    const denied = await denyReadOnlyAdvisor(supabase, user, organizationId)
+    if (denied) return denied
 
     // Fetch existing obligation
     const { data: existing, error: fetchError } = await supabase

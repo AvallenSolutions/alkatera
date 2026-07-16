@@ -7,6 +7,7 @@ import {
   packagingFormErrors,
 } from '@/lib/products/packaging-material-data';
 import { autoMatchEmissionFactor } from '@/lib/products/ef-auto-match';
+import { buildIngredientMaterialData } from '@/lib/products/ingredient-material-data';
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { useAutoSave } from "@/hooks/useAutoSave";
@@ -75,31 +76,43 @@ const createDefaultPackaging = (): PackagingFormData => ({
   epr_is_household: true,
   epr_ram_rating: undefined,
   epr_uk_nation: undefined,
+  epr_material_type: undefined,
   epr_is_drinks_container: false,
   units_per_group: '',
 });
 
-// Fingerprint for comparing form states (ignores tempId and complex nested objects)
+// Fingerprint for comparing form states (ignores tempId only). Must include
+// EVERY field the save builders persist: the previous hand-picked list
+// omitted self-grown links, biogenic flag, inbound-container fields, transport
+// legs, stage, EPR fields, factor swaps that keep the same status, and the
+// packaging circularity fields — so editing any of those never marked the form
+// dirty, never scheduled autosave and never warned on navigate-away. The save
+// path is lossless; these edits simply never reached it. Serialising the
+// whole form (minus the volatile tempId) guarantees any persisted change is
+// seen; fields absent on one form type serialise as undefined for both.
 function formFingerprint(forms: Array<{ [key: string]: any }>): string {
-  return JSON.stringify(forms.map(f => ({
-    name: f.name || '',
-    amount: String(f.amount || ''),
-    unit: f.unit || '',
-    origin_country: f.origin_country || '',
-    origin_address: f.origin_address || '',
-    origin_lat: f.origin_lat || '',
-    origin_lng: f.origin_lng || '',
-    data_source: f.data_source || null,
-    transport_mode: f.transport_mode || '',
-    distance_km: String(f.distance_km || ''),
-    packaging_category: f.packaging_category || '',
-    net_weight_g: String(f.net_weight_g || ''),
-    units_per_group: String(f.units_per_group || ''),
-    match_status: f.match_status || '',
-    recycled_content_percentage: String(f.recycled_content_percentage || ''),
-    printing_process: f.printing_process || '',
-    is_organic_certified: f.is_organic_certified || false,
-  })));
+  return JSON.stringify(
+    forms.map((f) => {
+      const { tempId, ...rest } = f;
+      // Normalise numeric-ish fields to strings so 5 and '5' compare equal
+      // (the form stores some as strings from inputs, some as numbers from
+      // the DB load), and sort keys for a stable, order-independent digest.
+      const normalised: Record<string, unknown> = {};
+      for (const key of Object.keys(rest).sort()) {
+        const v = (rest as any)[key];
+        if (v === null || v === undefined) {
+          normalised[key] = null;
+        } else if (typeof v === 'number') {
+          normalised[key] = String(v);
+        } else if (typeof v === 'object') {
+          normalised[key] = JSON.stringify(v);
+        } else {
+          normalised[key] = v;
+        }
+      }
+      return normalised;
+    })
+  );
 }
 
 export function useRecipeEditor(productId: string, organizationId: string) {
@@ -134,6 +147,14 @@ export function useRecipeEditor(productId: string, organizationId: string) {
   useEffect(() => { packagingFormsRef.current = packagingForms; }, [packagingForms]);
   const savingRef = useRef(false);
   useEffect(() => { savingRef.current = saving; }, [saving]);
+
+  // Monotonic epoch bumped synchronously when a manual save starts. An
+  // autosave that is already past useAutoSave's debounce guard (so cancel()
+  // can't stop it) checks this before its DB writes and bails, closing the
+  // race where an in-flight autosave re-inserted rows after a manual save had
+  // already deleted-and-reinserted them (a fresh route to duplicate rows).
+  const saveEpochRef = useRef(0);
+  const bumpSaveEpoch = useCallback(() => { saveEpochRef.current += 1; }, []);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
   const fetchProductData = useCallback(async () => {
@@ -263,6 +284,28 @@ export function useRecipeEditor(productId: string, organizationId: string) {
           carbon_intensity: item.cached_co2_factor || undefined,
           openlca_database: item.openlca_database || undefined,
           stage_id: item.stage_id || undefined,
+          // Multi-leg transport + self-grown / biogenic / inbound-container
+          // fields — without these the form reloaded blank and the next save
+          // wiped them from the row.
+          transport_legs: item.transport_legs ?? undefined,
+          is_self_grown: item.is_self_grown || false,
+          vineyard_id: item.vineyard_id || null,
+          arable_field_id: item.arable_field_id || null,
+          orchard_id: item.orchard_id || null,
+          is_biogenic_carbon: item.is_biogenic_carbon || false,
+          inbound_container_type: item.inbound_container_type || null,
+          inbound_container_volume_l: item.inbound_container_volume_l ?? null,
+          inbound_container_tare_kg: item.inbound_container_tare_kg ?? null,
+          inbound_container_reuse_cycles: item.inbound_container_reuse_cycles ?? null,
+          inbound_container_ef: item.inbound_container_ef ?? null,
+          inbound_container_material: item.inbound_container_material || null,
+          // EF quality metadata — restores the quality tooltip and re-arms
+          // the count-vs-mass unit-mismatch check after reload.
+          ef_source: item.ef_source || undefined,
+          ef_source_type: item.ef_source_type || undefined,
+          ef_data_quality_grade: item.ef_data_quality_grade || undefined,
+          ef_uncertainty_percent: item.ef_uncertainty_percent ?? undefined,
+          ef_reference_unit: item.ef_reference_unit || undefined,
         }));
         setIngredientForms(mappedIngredients);
         savedIngredientSnapshot.current = formFingerprint(mappedIngredients);
@@ -309,9 +352,14 @@ export function useRecipeEditor(productId: string, organizationId: string) {
             amount: item.quantity,
             unit: item.unit || 'g',
             packaging_category: item.packaging_category || (categoryMatch ? categoryMatch[1] : 'container'),
-            recycled_content_percentage: item.recycled_content_percentage || '',
+            // ?? '' not || '': a stored 0 is a DECLARED zero recycled content
+            // and must round-trip, not display as blank ("unknown").
+            recycled_content_percentage: item.recycled_content_percentage ?? '',
             printing_process: item.printing_process || 'standard_ink',
-            net_weight_g: item.net_weight_g || item.quantity || '',
+            // net_weight_g is in GRAMS. Only fall back to quantity when the
+            // row's unit is grams; a kg-unit quantity would load 1000x too
+            // small into a grams field.
+            net_weight_g: item.net_weight_g ?? ((item.unit || 'g').toLowerCase() === 'g' ? item.quantity : '') ?? '',
             origin_country: item.origin_country || '',
             origin_address: item.origin_address || '',
             origin_lat: item.origin_lat || undefined,
@@ -326,6 +374,13 @@ export function useRecipeEditor(productId: string, organizationId: string) {
             epr_is_household: item.epr_is_household !== undefined ? item.epr_is_household : true,
             epr_ram_rating: item.epr_ram_rating || undefined,
             epr_uk_nation: item.epr_uk_nation || undefined,
+            // Explicit override loaded so the EPR material-type selector shows
+            // the saved value; 'other' round-trips (it is a real choice), so
+            // only null/'' fall back to Auto.
+            epr_material_type:
+              item.epr_material_type == null || item.epr_material_type === ''
+                ? undefined
+                : item.epr_material_type,
             epr_is_drinks_container: item.epr_is_drinks_container || false,
             // Legacy shared-packaging rows saved without an answer must ask
             // the question again rather than silently showing 1.
@@ -543,100 +598,98 @@ export function useRecipeEditor(productId: string, organizationId: string) {
 
   // Save operations
   const saveIngredients = async () => {
-    cancelAutoSave(); // Prevent autosave from racing with manual save
+    bumpSaveEpoch(); // Invalidate any autosave already past its debounce
+    cancelAutoSave(); // and cancel any still pending
     const validForms = ingredientForms.filter(f => f.name && f.amount && Number(f.amount) > 0);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (validForms.length === 0) {
-      toast.error("Please add at least one valid ingredient");
-      return;
-    }
     if (!organizationId) {
       toast.error("No organization selected");
       return;
     }
 
+    // Warn (once) when a previously saved row has had its amount cleared and
+    // will be skipped, mirroring the packaging path — "skipped" must never
+    // silently mean "deleted".
+    if (validForms.length < ingredientForms.length && ingredientForms.some(f => f.name && !(Number(f.amount) > 0))) {
+      const skipped = ingredientForms.length - validForms.length;
+      toast.warning(`${skipped} incomplete ingredient${skipped > 1 ? 's' : ''} will be skipped`);
+    }
+
+    savingRef.current = true; // synchronous; the state-synced ref is a render behind
     setSaving(true);
-    toast.info(`Saving ${validForms.length} ingredient${validForms.length === 1 ? '' : 's'}...`, { id: "save-ingredients" });
+    toast.info(
+      validForms.length === 0 ? 'Saving recipe...' : `Saving ${validForms.length} ingredient${validForms.length === 1 ? '' : 's'}...`,
+      { id: "save-ingredients" }
+    );
 
     try {
-      const { error: deleteError } = await supabase
+      // Keep-ids upsert (same model as packaging and autosave): update rows
+      // that still exist, insert new ones, delete only the rows the user
+      // actually removed. The old wipe-then-write deleted the whole recipe
+      // BEFORE the insert, so a single constraint violation on any row left
+      // the product with no ingredients at all.
+      const existingItems = validForms.filter(f => !f.tempId.startsWith('temp-'));
+      const newItems = validForms.filter(f => f.tempId.startsWith('temp-'));
+      // Keep every row still present in the form, including ones temporarily
+      // invalid mid-edit, so a cleared amount is never silently deleted.
+      const idsToKeep = ingredientForms.filter(f => !f.tempId.startsWith('temp-')).map(f => f.tempId);
+
+      const { data: currentIngredients } = await supabase
         .from("product_materials")
-        .delete()
+        .select("id")
         .eq("product_id", productId)
         .eq("material_type", "ingredient");
 
-      if (deleteError) throw new Error(`Failed to clear existing ingredients: ${deleteError.message}`);
-
-      const materialsToInsert = validForms.map(form => {
-        const materialData: any = {
-          product_id: parseInt(productId),
-          material_name: form.name,
-          matched_source_name: form.matched_source_name || null,
-          quantity: Number(form.amount),
-          unit: form.unit,
-          material_type: 'ingredient',
-          match_status: form.match_status ?? null,
-          origin_country: form.origin_country || null,
-          is_organic_certified: form.is_organic_certified || false,
-        };
-
-        if (form.data_source === 'openlca' && form.data_source_id) {
-          materialData.data_source = 'openlca';
-          materialData.data_source_id = form.data_source_id;
-          if (form.openlca_database) {
-            materialData.openlca_database = form.openlca_database;
-          }
-        } else if (form.data_source === 'supplier' && form.supplier_product_id) {
-          materialData.data_source = 'supplier';
-          materialData.supplier_product_id = form.supplier_product_id;
+      if (currentIngredients && currentIngredients.length > 0) {
+        const idsToDelete = currentIngredients
+          .map(i => i.id)
+          .filter(id => !idsToKeep.includes(id.toString()));
+        if (idsToDelete.length > 0) {
+          const { error: deleteError } = await supabase
+            .from("product_materials")
+            .delete()
+            .in("id", idsToDelete);
+          if (deleteError) throw new Error(`Failed to remove ingredients: ${deleteError.message}`);
         }
+      }
 
-        // Cache the emission factor value so the LCA calculator has a local
-        // fallback when the original data source (e.g. OpenLCA API) is
-        // unavailable at calculation time.
-        if (form.carbon_intensity != null && Number(form.carbon_intensity) > 0) {
-          materialData.cached_co2_factor = Number(form.carbon_intensity);
-        }
+      // Shared row builder (also used by autosave) so the two paths can never
+      // write different fields again.
+      const buildMaterialData = (form: IngredientFormData) => buildIngredientMaterialData(form, productId);
 
-        if (form.transport_mode && form.distance_km) {
-          materialData.transport_mode = form.transport_mode;
-          materialData.distance_km = Number(form.distance_km);
-        }
+      for (const form of existingItems) {
+        const { error: updateError } = await supabase
+          .from("product_materials")
+          .update(buildMaterialData(form))
+          .eq("id", form.tempId);
+        if (updateError) throw new Error(`Failed to update ingredients: ${updateError.message}`);
+      }
 
-        if (form.origin_lat && form.origin_lng) {
-          materialData.origin_lat = form.origin_lat;
-          materialData.origin_lng = form.origin_lng;
-          materialData.origin_address = form.origin_address || null;
-          materialData.origin_country_code = form.origin_country_code || null;
-        }
+      if (newItems.length > 0) {
+        const { error: insertError } = await supabase
+          .from("product_materials")
+          .insert(newItems.map(buildMaterialData))
+          .select();
+        if (insertError) throw new Error(`Failed to save ingredients: ${insertError.message}`);
+      }
 
-        if (form.stage_id) {
-          materialData.stage_id = form.stage_id;
-        }
-
-        return materialData;
-      });
-
-      const { error: insertError } = await supabase
-        .from("product_materials")
-        .insert(materialsToInsert)
-        .select();
-
-      if (insertError) throw new Error(`Failed to save ingredients: ${insertError.message}`);
-
-      toast.success(`${validForms.length} ingredient${validForms.length === 1 ? '' : 's'} saved successfully`, { id: "save-ingredients" });
+      toast.success(
+        validForms.length === 0 ? 'Recipe saved' : `${validForms.length} ingredient${validForms.length === 1 ? '' : 's'} saved successfully`,
+        { id: "save-ingredients" }
+      );
       await fetchProductData();
     } catch (error: any) {
       console.error("Save ingredients error:", error);
       toast.error(error.message || "Failed to save ingredients", { id: "save-ingredients" });
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
 
   const savePackaging = async () => {
-    cancelAutoSave(); // Prevent autosave from racing with manual save
+    bumpSaveEpoch(); // Invalidate any autosave already past its debounce
+    cancelAutoSave(); // and cancel any still pending
     // Shared with autosave so the two paths can never accept different rows
     const validationErrors: string[] = [];
     packagingForms.forEach((form, idx) => {
@@ -665,6 +718,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
       return;
     }
 
+    savingRef.current = true; // synchronous; the state-synced ref is a render behind
     setSaving(true);
     toast.info(`Saving ${validForms.length} packaging item${validForms.length === 1 ? '' : 's'}...`, { id: "save-packaging" });
 
@@ -709,52 +763,69 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         if (updateError) throw new Error(`Failed to update packaging: ${updateError.message}`);
       }
 
-      // Insert new items (guard against quantity <= 0 to satisfy positive_quantity constraint)
+      // Insert new items (guard against quantity <= 0 to satisfy positive_quantity
+      // constraint). Keep each surviving form paired with the row we send so the
+      // returned uuid can be matched back by index — Postgres returns inserted
+      // rows in input order — instead of by name+category, which mis-attaches
+      // EPR components when two new packaging rows share the same name and type.
       let insertedData: any[] = [];
-      if (newItems.length > 0) {
-        const materialsToInsert = newItems.map(buildMaterialData).filter(m => m.quantity > 0 && !isNaN(m.quantity));
-        if (materialsToInsert.length > 0) {
-          const { data, error: insertError } = await supabase
-            .from("product_materials")
-            .insert(materialsToInsert)
-            .select();
-          if (insertError) throw new Error(`Failed to save packaging: ${insertError.message}`);
-          insertedData = data || [];
-        }
+      const builtNewItems = newItems
+        .map(form => ({ form, data: buildMaterialData(form) }))
+        .filter(({ data }) => data.quantity > 0 && !isNaN(data.quantity));
+      if (builtNewItems.length > 0) {
+        const { data, error: insertError } = await supabase
+          .from("product_materials")
+          .insert(builtNewItems.map(b => b.data))
+          .select();
+        if (insertError) throw new Error(`Failed to save packaging: ${insertError.message}`);
+        insertedData = data || [];
       }
 
-      // Save components
+      // Pair each new form's tempId to the uuid it was inserted as, by index.
+      const newIdByTempId = new Map<string, string>();
+      builtNewItems.forEach(({ form }, i) => {
+        const row = insertedData[i];
+        if (row?.id) newIdByTempId.set(form.tempId, row.id);
+      });
+
+      // Save EPR material components. product_materials.id (and therefore the
+      // packaging_material_components.product_material_id FK) is a uuid: for an
+      // existing row it IS form.tempId, for a new row it's the uuid returned by
+      // the insert. The old code ran parseInt() over it, which yielded NaN (so
+      // the components were silently dropped and "blanked out" on reload) or a
+      // wrong integer (which the uuid column rejected). Use the uuid directly.
       for (const form of validForms) {
+        const materialId: string | null = form.tempId.startsWith('temp-')
+          ? (newIdByTempId.get(form.tempId) ?? null)
+          : form.tempId;
+        if (!materialId) continue;
+
+        // Always clear first, so removing all components or unticking
+        // "component breakdown" deletes the orphaned child rows (they used to
+        // survive and reappear on reload).
+        const { error: delErr } = await supabase
+          .from('packaging_material_components')
+          .delete()
+          .eq('product_material_id', materialId);
+        if (delErr) throw new Error(`Failed to update EPR materials: ${delErr.message}`);
+
         if (form.has_component_breakdown && form.components && form.components.length > 0) {
-          let materialId: number | null = null;
-          if (!form.tempId.startsWith('temp-')) {
-            materialId = parseInt(form.tempId);
-          } else {
-            const insertedItem = insertedData.find((d: any) =>
-              d.material_name === form.name && d.packaging_category === form.packaging_category
-            );
-            if (insertedItem) materialId = insertedItem.id;
-          }
+          const componentsToInsert = form.components.map(comp => ({
+            product_material_id: materialId,
+            epr_material_type: comp.epr_material_type,
+            component_name: comp.component_name,
+            weight_grams: comp.weight_grams,
+            recycled_content_percentage:
+              // undefined = unknown (null); 0 is a declared zero — the old `|| 0`
+              // stamped a declared 0% onto every component with no data.
+              comp.recycled_content_percentage ?? null,
+            is_recyclable: comp.is_recyclable !== undefined ? comp.is_recyclable : true,
+          }));
 
-          if (materialId) {
-            await supabase
-              .from('packaging_material_components')
-              .delete()
-              .eq('product_material_id', materialId);
-
-            const componentsToInsert = form.components.map(comp => ({
-              product_material_id: materialId,
-              epr_material_type: comp.epr_material_type,
-              component_name: comp.component_name,
-              weight_grams: comp.weight_grams,
-              recycled_content_percentage: comp.recycled_content_percentage || 0,
-              is_recyclable: comp.is_recyclable !== undefined ? comp.is_recyclable : true,
-            }));
-
-            await supabase
-              .from('packaging_material_components')
-              .insert(componentsToInsert);
-          }
+          const { error: compErr } = await supabase
+            .from('packaging_material_components')
+            .insert(componentsToInsert);
+          if (compErr) throw new Error(`Failed to save EPR materials: ${compErr.message}`);
         }
       }
 
@@ -764,6 +835,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
       console.error("Save packaging error:", error);
       toast.error(`Failed to save packaging: ${error.message || 'Unknown error'}`, { id: "save-packaging" });
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -790,7 +862,10 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         barrel_type: profile.barrel_type,
         barrel_volume_litres: profile.barrel_volume_litres,
         barrel_use_number: profile.barrel_use_number,
-        barrel_co2e_new: profile.barrel_co2e_new || null,
+        // ?? not ||: an explicit 0 override is a legitimate value (e.g. a
+        // supplier-verified zero-burden reconditioned cask) and must not be
+        // coerced back to the 40-65 kg default.
+        barrel_co2e_new: profile.barrel_co2e_new ?? null,
         aging_duration_months: profile.aging_duration_months,
         angel_share_percent_per_year: profile.angel_share_percent_per_year,
         climate_zone: profile.climate_zone,
@@ -892,73 +967,10 @@ export function useRecipeEditor(productId: string, organizationId: string) {
       }
     }
 
-    // Full-row builder: conditional columns get explicit null defaults so
-    // updating an existing row clears stale values exactly like the old
-    // delete-and-reinsert did. Columns this hook never writes (transport_legs,
-    // inbound container, self-grown links) are left untouched on update.
-    const buildMaterialData = (form: IngredientFormData) => {
-      const materialData: any = {
-        product_id: parseInt(productId),
-        material_name: form.name,
-        matched_source_name: form.matched_source_name || null,
-        quantity: Number(form.amount),
-        unit: form.unit,
-        material_type: 'ingredient',
-        match_status: form.match_status ?? null,
-        origin_country: form.origin_country || null,
-        is_organic_certified: form.is_organic_certified || false,
-        data_source: null,
-        data_source_id: null,
-        openlca_database: null,
-        supplier_product_id: null,
-        cached_co2_factor: null,
-        transport_mode: null,
-        distance_km: null,
-        transport_legs: null,
-        origin_lat: null,
-        origin_lng: null,
-        origin_address: null,
-        origin_country_code: null,
-      };
-
-      if (form.data_source === 'openlca' && form.data_source_id) {
-        materialData.data_source = 'openlca';
-        materialData.data_source_id = form.data_source_id;
-        if (form.openlca_database) {
-          materialData.openlca_database = form.openlca_database;
-        }
-      } else if (form.data_source === 'supplier' && form.supplier_product_id) {
-        materialData.data_source = 'supplier';
-        materialData.supplier_product_id = form.supplier_product_id;
-      }
-
-      // Transport — prefer the multi-leg JSONB, falling back to the legacy
-      // single mode/distance. Must mirror buildPackagingMaterialData: the
-      // calculator prefers transport_legs over transport_mode, so omitting legs
-      // here left the calculator reading a stale leg (e.g. a road leg the user
-      // had since changed to sea freight).
-      if (form.transport_legs && form.transport_legs.length > 0) {
-        materialData.transport_legs = form.transport_legs;
-        materialData.transport_mode = form.transport_legs[0].transportMode;
-        materialData.distance_km = form.transport_legs[0].distanceKm;
-      } else if (form.transport_mode && form.distance_km) {
-        materialData.transport_mode = form.transport_mode;
-        materialData.distance_km = Number(form.distance_km);
-      }
-
-      if (form.carbon_intensity != null && Number(form.carbon_intensity) > 0) {
-        materialData.cached_co2_factor = Number(form.carbon_intensity);
-      }
-
-      if (form.origin_lat && form.origin_lng) {
-        materialData.origin_lat = form.origin_lat;
-        materialData.origin_lng = form.origin_lng;
-        materialData.origin_address = form.origin_address || null;
-        materialData.origin_country_code = form.origin_country_code || null;
-      }
-
-      return materialData;
-    };
+    // Shared row builder (also used by the manual Save button). Conditional
+    // columns get explicit null defaults so updating an existing row clears
+    // stale values exactly like the old delete-and-reinsert did.
+    const buildMaterialData = (form: IngredientFormData) => buildIngredientMaterialData(form, productId);
 
     for (const form of existingItems) {
       const { error: updateError } = await supabase
@@ -1028,57 +1040,79 @@ export function useRecipeEditor(productId: string, organizationId: string) {
       if (updateError) throw new Error(`Autosave packaging failed: ${updateError.message}`);
     }
 
-    if (newItems.length > 0) {
-      const materialsToInsert = newItems.map(buildMaterialData).filter(m => m.quantity > 0 && !isNaN(m.quantity));
-      if (materialsToInsert.length > 0) {
-        const { data, error: insertError } = await supabase
-          .from("product_materials")
-          .insert(materialsToInsert)
-          .select();
-        if (insertError) throw new Error(`Autosave packaging failed: ${insertError.message}`);
+    // Keep each surviving new form paired with the row we send, so the returned
+    // uuid maps back by index (Postgres preserves insert order) rather than by
+    // name+category — which mis-attaches components on duplicate name+type rows.
+    const builtNewItems = newItems
+      .map(form => ({ form, data: buildMaterialData(form) }))
+      .filter(({ data }) => data.quantity > 0 && !isNaN(data.quantity));
+    if (builtNewItems.length > 0) {
+      const { data, error: insertError } = await supabase
+        .from("product_materials")
+        .insert(builtNewItems.map(b => b.data))
+        .select();
+      if (insertError) throw new Error(`Autosave packaging failed: ${insertError.message}`);
 
-        // Save components for newly inserted items
-        for (const form of newItems) {
-          if (form.has_component_breakdown && form.components && form.components.length > 0) {
-            const insertedItem = (data || []).find((d: any) =>
-              d.material_name === form.name && d.packaging_category === form.packaging_category
-            );
-            if (insertedItem) {
-              const componentsToInsert = form.components.map(comp => ({
-                product_material_id: insertedItem.id,
-                epr_material_type: comp.epr_material_type,
-                component_name: comp.component_name,
-                weight_grams: comp.weight_grams,
-                recycled_content_percentage: comp.recycled_content_percentage || 0,
-                is_recyclable: comp.is_recyclable !== undefined ? comp.is_recyclable : true,
-              }));
-              await supabase.from('packaging_material_components').insert(componentsToInsert);
-            }
-          }
-        }
-      }
-    }
-
-    // Save components for existing items
-    for (const form of existingItems) {
-      if (form.has_component_breakdown && form.components && form.components.length > 0) {
-        const materialId = parseInt(form.tempId);
-        if (materialId) {
-          await supabase.from('packaging_material_components').delete().eq('product_material_id', materialId);
+      // Save components for newly inserted items, paired by index.
+      const inserted = data || [];
+      for (let i = 0; i < builtNewItems.length; i++) {
+        const form = builtNewItems[i].form;
+        const insertedItem = inserted[i];
+        if (insertedItem?.id && form.has_component_breakdown && form.components && form.components.length > 0) {
           const componentsToInsert = form.components.map(comp => ({
-            product_material_id: materialId,
+            product_material_id: insertedItem.id,
             epr_material_type: comp.epr_material_type,
             component_name: comp.component_name,
             weight_grams: comp.weight_grams,
-            recycled_content_percentage: comp.recycled_content_percentage || 0,
+            recycled_content_percentage:
+              // undefined = unknown (null); 0 is a declared zero — the old `|| 0`
+              // stamped a declared 0% onto every component with no data.
+              comp.recycled_content_percentage ?? null,
             is_recyclable: comp.is_recyclable !== undefined ? comp.is_recyclable : true,
           }));
-          await supabase.from('packaging_material_components').insert(componentsToInsert);
+          // Errors here must not pass silently: a swallowed failure was the
+          // old "EPR breakdown blanks out" bug via a new path.
+          const { error: compErr } = await supabase.from('packaging_material_components').insert(componentsToInsert);
+          if (compErr) throw new Error(`Autosave packaging components failed: ${compErr.message}`);
         }
       }
     }
 
-    // Update snapshot without refetching
+    // Rewrite components for existing items. product_material_id is a uuid — it
+    // is form.tempId verbatim, NOT parseInt(form.tempId) (which produced
+    // NaN/wrong ints and silently dropped EPR breakdowns on autosave). We
+    // ALWAYS clear then re-insert so that removing every component or unticking
+    // "component breakdown" deletes the orphaned child rows (they used to
+    // survive and reappear on reload); and delete/insert errors are checked so
+    // a failed insert after a successful delete can't blank the breakdown.
+    for (const form of existingItems) {
+      const materialId = form.tempId;
+      if (!materialId) continue;
+      const wantsComponents = !!form.has_component_breakdown && !!form.components && form.components.length > 0;
+      const { error: delErr } = await supabase
+        .from('packaging_material_components')
+        .delete()
+        .eq('product_material_id', materialId);
+      if (delErr) throw new Error(`Autosave packaging components failed: ${delErr.message}`);
+      if (wantsComponents) {
+        const componentsToInsert = form.components!.map(comp => ({
+          product_material_id: materialId,
+          epr_material_type: comp.epr_material_type,
+          component_name: comp.component_name,
+          weight_grams: comp.weight_grams,
+          recycled_content_percentage:
+              // undefined = unknown (null); 0 is a declared zero — the old `|| 0`
+              // stamped a declared 0% onto every component with no data.
+              comp.recycled_content_percentage ?? null,
+          is_recyclable: comp.is_recyclable !== undefined ? comp.is_recyclable : true,
+        }));
+        const { error: insErr } = await supabase.from('packaging_material_components').insert(componentsToInsert);
+        if (insErr) throw new Error(`Autosave packaging components failed: ${insErr.message}`);
+      }
+    }
+
+    // Update snapshot without refetching (respecting the epoch: if a manual
+    // save started mid-flight, don't stamp a snapshot from stale forms).
     savedPackagingSnapshot.current = formFingerprint(forms);
   }, [productId, organizationId]);
 
@@ -1086,6 +1120,10 @@ export function useRecipeEditor(productId: string, organizationId: string) {
   const performAutoSave = useCallback(async () => {
     // Don't autosave while a manual save is in progress
     if (savingRef.current) return;
+    // Snapshot the epoch: if a manual save starts while we're awaiting a DB
+    // write below, the epoch changes and we abort before committing more.
+    const epoch = saveEpochRef.current;
+    const superseded = () => savingRef.current || saveEpochRef.current !== epoch;
 
     const currentIngredients = ingredientFormsRef.current;
     const currentPackaging = packagingFormsRef.current;
@@ -1097,9 +1135,11 @@ export function useRecipeEditor(productId: string, organizationId: string) {
 
     try {
       if (ingredientsDirty) {
+        if (superseded()) return;
         await autoSaveIngredients(currentIngredients);
       }
       if (packagingDirty) {
+        if (superseded()) return;
         await autoSavePackaging(currentPackaging);
       }
       setLastSavedAt(new Date());
@@ -1323,15 +1363,26 @@ export function useRecipeEditor(productId: string, organizationId: string) {
     batch_yield_unit: string | null;
   }) => {
     if (!product) return;
-    setProduct({ ...product, ...input });
 
     const isIncompleteBatch =
       input.recipe_scale_mode === 'per_batch' &&
       (!input.batch_yield_value || input.batch_yield_value <= 0 || !input.batch_yield_unit);
     if (isIncompleteBatch) {
-      // Skip the DB write — wait for the user to provide a yield value first.
+      // Keep the yield fields the user is typing, but do NOT flip the effective
+      // recipe_scale_mode to per_batch until it is actually persisted. Flipping
+      // it locally made the impact preview divide by a batch factor while the
+      // (still per_unit) saved calculation did not, and a reload silently
+      // reverted the toggle. Preview and calculation now stay in step.
+      setProduct({
+        ...product,
+        recipe_scale_mode: product.recipe_scale_mode ?? 'per_unit',
+        batch_yield_value: input.batch_yield_value,
+        batch_yield_unit: input.batch_yield_unit,
+      });
       return;
     }
+
+    setProduct({ ...product, ...input });
 
     const { error } = await supabase
       .from('products')

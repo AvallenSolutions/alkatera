@@ -13,10 +13,38 @@ import { CoachmarkBody } from "@/components/studio/coachmark";
  *  - the user has not yet dismissed it (`factorInfoHintCompleted` is false)
  *  - the search results dropdown is open and contains at least one result
  *  - the [data-tour-anchor="factor-info-icon"] element is mounted
+ *
+ * Dismissal is per-USER, not per-org: `factorInfoHintCompleted` lives in
+ * onboarding_state which is keyed (organization_id, user_id), so on its own
+ * the hint would reappear in every other organisation the user opens. The
+ * localStorage flag makes one "Got it" stick across org switches; the
+ * onboarding-state write keeps it hidden on other devices for orgs where it
+ * was dismissed.
  */
+const HINT_DISMISSED_LS_KEY = "alkatera-factor-info-hint-dismissed";
+
+function readLocalDismissed(): boolean {
+  try {
+    return typeof window !== "undefined" && window.localStorage.getItem(HINT_DISMISSED_LS_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 export function FactorInfoHint({ active }: { active: boolean }) {
   const { state, isLoading, markFactorInfoHintCompleted } = useOnboarding();
-  const alreadyDone = !!state.factorInfoHintCompleted;
+  const [localDismissed, setLocalDismissed] = useState(readLocalDismissed);
+  const alreadyDone = !!state.factorInfoHintCompleted || localDismissed;
+
+  const dismiss = () => {
+    try {
+      window.localStorage.setItem(HINT_DISMISSED_LS_KEY, "1");
+    } catch {
+      // localStorage unavailable (private mode) — org-level persistence still applies
+    }
+    setLocalDismissed(true);
+    markFactorInfoHintCompleted();
+  };
 
   const [rect, setRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -79,7 +107,7 @@ export function FactorInfoHint({ active }: { active: boolean }) {
         ariaLabel="Tip: hover the info icon"
         title="New"
         body="Hover the info icon on any result for a quick summary, or click it to see what the factor covers, when it's a good match, and a glossary for any jargon."
-        onDismiss={markFactorInfoHintCompleted}
+        onDismiss={dismiss}
         className="fixed z-[61]"
         style={{ top, left, width: POPOVER_WIDTH }}
       />

@@ -281,7 +281,9 @@ export async function POST(
         epr_material_type: comp.material,
         component_name: comp.name,
         weight_grams: comp.weight_g ?? 0,
-        recycled_content_percentage: comp.recycled_pct ?? 0,
+        // A blank spreadsheet cell is unknown (null); `?? 0` recorded it as a
+        // declared 0% recycled, indistinguishable from a confirmed zero.
+        recycled_content_percentage: comp.recycled_pct ?? null,
         is_recyclable: true,
       }));
 

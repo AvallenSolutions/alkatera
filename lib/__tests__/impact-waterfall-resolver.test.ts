@@ -470,10 +470,11 @@ describe('validateMaterialsBeforeCalculation', () => {
 describe('resolveImpactFactors', () => {
 
   describe('self-grown materials', () => {
-    it('returns zero impacts for self-grown ingredients', async () => {
+    it('returns zero impacts for self-grown ingredients linked to a farm record', async () => {
       const material = createMaterial({
         material_name: 'Pinot Noir grapes',
         is_self_grown: true,
+        vineyard_id: 'vineyard-001',
       });
 
       const result = await resolveImpactFactors(material, 100, 'org-001');
@@ -483,6 +484,22 @@ describe('resolveImpactFactors', () => {
       expect(result.impact_land).toBe(0);
       expect(result.data_priority).toBe(1);
       expect(result.gwp_data_source).toBe('viticulture_primary');
+    });
+
+    it('resolves self-grown ingredients WITHOUT a farm link through the normal waterfall', async () => {
+      // No vineyard_id/orchard_id/arable_field_id: the calculator injects
+      // nothing for this row, so the zero-shortcut would silently drop the
+      // ingredient from the footprint. It must fall through and resolve
+      // (here: nothing matches, so the waterfall throws its no-factor error
+      // rather than returning zeros).
+      const material = createMaterial({
+        material_name: 'Pinot Noir grapes',
+        is_self_grown: true,
+      });
+
+      await expect(resolveImpactFactors(material, 100, 'org-001')).rejects.toThrow(
+        /No emission factor found/
+      );
     });
   });
 

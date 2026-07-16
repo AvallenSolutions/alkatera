@@ -111,11 +111,15 @@ export function LogProductionModal({
     try {
       const supabase = getSupabaseBrowserClient();
 
+      // Show every real product (match the /products list). is_draft is
+      // overloaded (draft AND archived) and most products are created as
+      // drafts by the import/Breww/onboarding flows, so filtering is_draft=false
+      // here left orgs unable to log production against their own products.
       const { data, error } = await supabase
         .from("products")
         .select("id, name, sku")
         .eq("organization_id", organizationId)
-        .eq("is_draft", false)
+        .eq("product_kind", "product")
         .order("name");
 
       if (error) throw error;

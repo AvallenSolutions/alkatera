@@ -50,6 +50,20 @@ interface BOMReviewTableProps {
   onImport: (items: ReviewableBOMItem[]) => void;
   onCancel: () => void;
   isImporting?: boolean;
+  /**
+   * When set, Import is disabled and this message is shown inline. Used to hard
+   * gate per-litre recipes until the caller knows the finished unit size.
+   */
+  blockImportReason?: string | null;
+}
+
+/**
+ * A selected item with no usable quantity would be silently dropped at save
+ * (the save filters on amount > 0), turning "9 imported" into "7 saved" with no
+ * explanation. We surface these as a distinct "needs quantity" state instead.
+ */
+function isMissingQuantity(item: ReviewableBOMItem): boolean {
+  return item.quantity == null || !(item.quantity > 0);
 }
 
 const UNITS = [
@@ -67,6 +81,7 @@ export function BOMReviewTable({
   onImport,
   onCancel,
   isImporting = false,
+  blockImportReason = null,
 }: BOMReviewTableProps) {
   const [selectAll, setSelectAll] = useState(true);
 
@@ -101,9 +116,20 @@ export function BOMReviewTable({
   const ingredientCount = selectedItems.filter(item => item.itemType === 'ingredient').length;
   const packagingCount = selectedItems.filter(item => item.itemType === 'packaging').length;
   const hasErrors = items.some(item => item.selected && item.hasError);
+  const needsQuantityCount = selectedItems.filter(isMissingQuantity).length;
+
+  // Block import while any selected row still needs a quantity: the user must
+  // either fill it in or untick the row to exclude it, rather than have it
+  // vanish at save time.
+  const importDisabled =
+    selectedItems.length === 0 ||
+    hasErrors ||
+    isImporting ||
+    needsQuantityCount > 0 ||
+    Boolean(blockImportReason);
 
   const handleImport = () => {
-    if (hasErrors) return;
+    if (importDisabled) return;
     onImport(selectedItems);
   };
 
@@ -196,18 +222,33 @@ export function BOMReviewTable({
                 </TableCell>
 
                 <TableCell>
-                  <Input
-                    type="number"
-                    step="0.0001"
-                    value={item.quantity ?? ''}
-                    onChange={(e) =>
-                      updateItem(item.id, {
-                        quantity: e.target.value ? parseFloat(e.target.value) : null,
-                      })
-                    }
-                    placeholder="0"
-                    className="w-24"
-                  />
+                  <div className="space-y-1">
+                    <Input
+                      type="number"
+                      step="0.0001"
+                      value={item.quantity ?? ''}
+                      onChange={(e) =>
+                        updateItem(item.id, {
+                          quantity: e.target.value ? parseFloat(e.target.value) : null,
+                        })
+                      }
+                      placeholder="0"
+                      className={
+                        isMissingQuantity(item) && item.selected
+                          ? 'w-24 border-amber-500'
+                          : 'w-24'
+                      }
+                    />
+                    {isMissingQuantity(item) && item.selected && (
+                      <Badge
+                        variant="outline"
+                        className="gap-1 border-amber-300 text-amber-700 dark:text-amber-300"
+                      >
+                        <AlertCircle className="h-3 w-3" />
+                        Needs quantity
+                      </Badge>
+                    )}
+                  </div>
                 </TableCell>
 
                 <TableCell>
@@ -279,28 +320,43 @@ export function BOMReviewTable({
         </Table>
       </div>
 
-      <div className="flex items-center justify-between pt-4 border-t">
-        <p className="text-sm text-muted-foreground">
-          {selectedItems.length} of {items.length} items selected for import
-        </p>
+      <div className="space-y-2 pt-4 border-t">
+        {needsQuantityCount > 0 && (
+          <p className="flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-300">
+            <AlertCircle className="h-4 w-4 flex-shrink-0" />
+            {needsQuantityCount} item{needsQuantityCount !== 1 ? 's need' : ' needs'} a
+            quantity. Add {needsQuantityCount !== 1 ? 'them' : 'it'} or untick the
+            row{needsQuantityCount !== 1 ? 's' : ''} to leave{' '}
+            {needsQuantityCount !== 1 ? 'them' : 'it'} out.
+          </p>
+        )}
+        {blockImportReason && (
+          <p className="flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-300">
+            <AlertCircle className="h-4 w-4 flex-shrink-0" />
+            {blockImportReason}
+          </p>
+        )}
 
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={onCancel} disabled={isImporting}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleImport}
-            disabled={selectedItems.length === 0 || hasErrors || isImporting}
-          >
-            {isImporting ? (
-              <>Importing...</>
-            ) : (
-              <>
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                Import {selectedItems.length} Item{selectedItems.length !== 1 ? 's' : ''}
-              </>
-            )}
-          </Button>
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            {selectedItems.length} of {items.length} items selected for import
+          </p>
+
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={onCancel} disabled={isImporting}>
+              Cancel
+            </Button>
+            <Button onClick={handleImport} disabled={importDisabled}>
+              {isImporting ? (
+                <>Importing...</>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Import {selectedItems.length} Item{selectedItems.length !== 1 ? 's' : ''}
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

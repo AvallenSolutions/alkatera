@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 // Round 4 (auto-research): import wizard is a modal (open-gated), so defer it.
 const WebsiteImportFlow = dynamic(() => import("@/components/products/WebsiteImportFlow").then((m) => m.WebsiteImportFlow), { ssr: false });
-import { Trash2, MoreVertical, Search, Copy } from "lucide-react";
+import { Trash2, MoreVertical, Search, Copy, Loader2, Sparkles } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { duplicateProduct } from "@/lib/products";
 import { useRouter } from "next/navigation";
@@ -85,6 +85,8 @@ export default function ProductsPage() {
   const [portfolio, setPortfolio] = useState<PortfolioResult | null>(null);
   const [view, setView] = useState<'list' | 'portfolio'>('list');
   const [matchCount, setMatchCount] = useState(0);
+  const [findingMatches, setFindingMatches] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     if (currentOrganization?.id) {
@@ -92,7 +94,7 @@ export default function ProductsPage() {
     } else {
       setLoading(false);
     }
-  }, [currentOrganization?.id]);
+  }, [currentOrganization?.id, showArchived]);
 
   // Tell Rosa what's on this list so she can answer questions like
   // "which of my products don't have an LCA yet?" or "what's my newest
@@ -131,13 +133,16 @@ export default function ProductsPage() {
 
   const fetchProducts = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("products")
         .select("*")
         // Only true products belong in this list — hospitality meals/drinks/room
         // nights reuse the products table but are surfaced under Hospitality.
         .eq("product_kind", "product")
-        .eq("organization_id", currentOrganization!.id)
+        .eq("organization_id", currentOrganization!.id);
+      // Hide archived products by default (archived_at is the real archive flag).
+      if (!showArchived) query = query.is("archived_at", null);
+      const { data, error } = await query
         .order("created_at", { ascending: false })
         .limit(200);
 
@@ -237,6 +242,33 @@ export default function ProductsPage() {
     loadMatchCount();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentOrganization?.id]);
+
+  const findSupplierMatches = async () => {
+    if (!currentOrganization?.id) return;
+    setFindingMatches(true);
+    try {
+      const res = await fetch('/api/products/ingredient-matches/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organization_id: currentOrganization.id }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) {
+        await loadMatchCount();
+        if ((body.created ?? 0) > 0) {
+          router.push('/products/supplier-matches');
+        } else {
+          toast.success('No new supplier matches found. Connect more suppliers or add supplier products.');
+        }
+      } else {
+        toast.error(body.error ?? 'Could not look for matches');
+      }
+    } catch {
+      toast.error('Could not look for matches');
+    } finally {
+      setFindingMatches(false);
+    }
+  };
 
   const formatFunctionalUnit = (product: Product) => {
     // Prefer the structured unit_size fields (updated by the edit form)
@@ -412,6 +444,12 @@ export default function ProductsPage() {
                 </Link>
               </PopoverContent>
             </Popover>
+            {products.length > 0 && (
+              <PillButton variant="outline" onClick={findSupplierMatches} disabled={findingMatches}>
+                {findingMatches ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                Find supplier matches
+              </PillButton>
+            )}
             {addProduct}
           </div>
         </div>
@@ -462,6 +500,16 @@ export default function ProductsPage() {
               </button>
             ))}
           </div>
+          <button
+            type="button"
+            onClick={() => setShowArchived((v) => !v)}
+            className={cn(
+              'rounded-md border border-border/60 px-3 py-1.5 text-xs font-medium transition-colors',
+              showArchived ? 'bg-[#ccff00]/20 text-foreground' : 'text-muted-foreground',
+            )}
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
+          </button>
         </div>
       )}
 
@@ -544,9 +592,12 @@ export default function ProductsPage() {
                     </div>
                   )}
 
-                  <h3 className="line-clamp-2 font-display text-[15px] font-semibold text-foreground">
-                    {product.name}
-                  </h3>
+                  <div className="flex items-start gap-2">
+                    <h3 className="line-clamp-2 font-display text-[15px] font-semibold text-foreground">
+                      {product.name}
+                    </h3>
+                    {(product as any).archived_at && <StateChip tone="quiet">Archived</StateChip>}
+                  </div>
                   <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
                     {formatFunctionalUnit(product)}
                   </p>

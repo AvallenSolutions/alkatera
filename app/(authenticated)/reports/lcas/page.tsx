@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/lib/organizationContext';
 import { VerificationCard } from '@/components/partners/VerificationCard';
+import { HOSPITALITY_KINDS } from '@/lib/hospitality/constants';
 import { Eyebrow, StateChip, Statement, BigNumber, Panel, PillButton } from '@/components/studio';
 import type { WorkingTone } from '@/components/studio';
 
@@ -14,6 +15,7 @@ interface LCAReport {
   product_id: number | null;
   product_name: string;
   title: string;
+  version: string;
   status: 'completed' | 'draft' | 'in_progress';
   dqi_score: number;
   system_boundary: string;
@@ -64,8 +66,26 @@ export default function LcasPage() {
         return;
       }
 
+      // Hospitality meals/drinks/rooms are `product_carbon_footprints` rows too,
+      // but they belong on the hospitality surfaces, not the product-LCA list —
+      // exclude them so they don't pollute the drinks LCA reports.
+      const { data: hospProducts } = await supabase
+        .from('products')
+        .select('id')
+        .eq('organization_id', currentOrganization!.id)
+        .in('product_kind', HOSPITALITY_KINDS as unknown as string[]);
+      const hospitalityProductIds = new Set((hospProducts ?? []).map((p: any) => Number(p.id)));
+      const visibleLcas = lcas.filter(
+        (lca: any) => lca.product_id == null || !hospitalityProductIds.has(Number(lca.product_id)),
+      );
+
+      if (visibleLcas.length === 0) {
+        setReports([]);
+        return;
+      }
+
       // Transform the data - single source of truth: aggregated_impacts.climate_change_gwp100
-      const transformedReports: LCAReport[] = lcas.map((lca: any) => {
+      const transformedReports: LCAReport[] = visibleLcas.map((lca: any) => {
         // Get total GHG emissions from aggregated_impacts JSONB field (single source of truth)
         const totalCO2e = lca.aggregated_impacts?.climate_change_gwp100 || 0;
 
@@ -77,15 +97,13 @@ export default function LcasPage() {
 
         const productName = lca.product_name || 'Unknown Product';
         const functionalUnit = lca.functional_unit || 'per unit';
-        const year = new Date(lca.created_at).getFullYear();
 
         return {
           id: lca.id,
           product_id: lca.product_id,
           product_name: productName,
-          // No stored title exists on the record; describe it honestly by the
-          // year it was assessed rather than claiming a formal "study".
-          title: `${year} life cycle assessment`,
+          title: `${new Date(lca.created_at).getFullYear()} LCA Study`,
+          version: '1.0',
           status: lca.status as 'completed' | 'draft' | 'in_progress',
           dqi_score: dqiScore,
           system_boundary: lca.system_boundary || 'cradle-to-gate',
@@ -256,6 +274,9 @@ export default function LcasPage() {
                             {report.product_name}
                           </h2>
                           <StateChip tone={statusChip.tone}>{statusChip.label}</StateChip>
+                          <span className="font-mono text-[9.5px] uppercase tracking-[0.2em] text-studio-dim">
+                            v{report.version}
+                          </span>
                         </div>
                         <p className="text-sm text-muted-foreground">{report.title}</p>
                         <p className="text-xs text-muted-foreground">

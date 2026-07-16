@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parseCSV, parseBOMFromPDFText } from '@/lib/bom/parser';
 import type { BOMParseResult } from '@/lib/bom/types';
 import pdfParse from 'pdf-parse';
+import * as XLSX from 'xlsx';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,10 +17,24 @@ export async function POST(request: NextRequest) {
     }
 
     const fileName = file.name.toLowerCase();
-    const fileType = fileName.endsWith('.pdf') ? 'pdf' : 'csv';
+    const isPdf = fileName.endsWith('.pdf');
+    const isSpreadsheet =
+      fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.xlsm');
+    const fileType = isPdf ? 'pdf' : isSpreadsheet ? 'xlsx' : 'csv';
     let result: BOMParseResult;
 
-    if (fileType === 'csv') {
+    if (fileType === 'xlsx') {
+      // xlsx is a zip binary — file.text() yields garbage, so convert the
+      // largest sheet to CSV via SheetJS and run the same CSV parser.
+      const arrayBuffer = await file.arrayBuffer();
+      const wb = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+      const sheetName =
+        wb.SheetNames.slice()
+          .map((n) => ({ n, rows: (wb.Sheets[n]?.['!ref'] ? XLSX.utils.decode_range(wb.Sheets[n]['!ref'] as string).e.r : 0) }))
+          .sort((a, b) => b.rows - a.rows)[0]?.n || wb.SheetNames[0];
+      const csv = sheetName ? XLSX.utils.sheet_to_csv(wb.Sheets[sheetName]) : '';
+      result = parseCSV(csv, ',');
+    } else if (fileType === 'csv') {
       const text = await file.text();
       const delimiter = text.includes('\t') ? '\t' : ',';
       result = parseCSV(text, delimiter);

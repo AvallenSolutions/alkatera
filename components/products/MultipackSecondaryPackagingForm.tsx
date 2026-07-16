@@ -26,11 +26,25 @@ export interface SecondaryPackagingItem {
   id: string;
   material_name: string;
   material_type: string;
+  /** Packaging role for the multipack's own packaging. shipment = courier /
+   *  transit (the DTC default), secondary = retail grouping, tertiary = pallet. */
+  packaging_category: "secondary" | "shipment" | "tertiary";
   weight_grams: number;
   is_recyclable: boolean;
-  recycled_content_percentage: number;
+  /** Empty string = unknown (saves as null). An explicit 0 is a DECLARED zero
+   *  (virgin material) and must round-trip — never coalesce with `||`. */
+  recycled_content_percentage: number | "";
   notes: string;
 }
+
+// The packaging ROLE (distinct from the material). A courier shipper is
+// transit packaging (shipment); a retail gift pack is grouping (secondary); a
+// pallet/stretch wrap is tertiary. Default to shipment for DTC.
+const PACKAGING_ROLES = [
+  { value: "shipment", label: "Shipment (courier / transit)" },
+  { value: "secondary", label: "Secondary (retail grouping)" },
+  { value: "tertiary", label: "Tertiary (pallet / bulk)" },
+] as const;
 
 const MATERIAL_TYPES = [
   { value: "cardboard", label: "Cardboard" },
@@ -69,9 +83,10 @@ export function MultipackSecondaryPackagingForm({
   const [newItem, setNewItem] = useState<Omit<SecondaryPackagingItem, "id">>({
     material_name: "",
     material_type: "cardboard",
+    packaging_category: "shipment",
     weight_grams: 0,
     is_recyclable: true,
-    recycled_content_percentage: 0,
+    recycled_content_percentage: "",
     notes: "",
   });
 
@@ -89,6 +104,7 @@ export function MultipackSecondaryPackagingForm({
     setNewItem({
       material_name: "",
       material_type: "cardboard",
+      packaging_category: "shipment",
       weight_grams: 0,
       is_recyclable: true,
       recycled_content_percentage: 0,
@@ -158,7 +174,7 @@ export function MultipackSecondaryPackagingForm({
           </div>
         )}
 
-        {/* Existing Packaging Items */}
+        {/* Existing Packaging Items — editable inline */}
         {packagingItems.length > 0 && (
           <div className="space-y-3">
             {packagingItems.map((item) => (
@@ -166,23 +182,108 @@ export function MultipackSecondaryPackagingForm({
                 key={item.id}
                 className="flex items-start gap-3 p-3 border rounded-lg bg-card"
               >
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{item.material_name}</span>
-                    <span className="text-sm text-muted-foreground">
-                      ({MATERIAL_TYPES.find((t) => t.value === item.material_type)?.label || item.material_type})
-                    </span>
+                <div className="flex-1 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Packaging name</Label>
+                      <Input
+                        value={item.material_name}
+                        onChange={(e) =>
+                          handleUpdateItem(item.id, { material_name: e.target.value })
+                        }
+                        disabled={disabled}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Material type</Label>
+                      <Select
+                        value={item.material_type}
+                        onValueChange={(value) =>
+                          handleUpdateItem(item.id, { material_type: value })
+                        }
+                        disabled={disabled}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {MATERIAL_TYPES.map((type) => (
+                            <SelectItem key={type.value} value={type.value}>
+                              {type.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4 text-sm">
-                    <span>{item.weight_grams}g</span>
-                    {item.is_recyclable && (
-                      <span className="text-green-600">Recyclable</span>
-                    )}
-                    {item.recycled_content_percentage > 0 && (
-                      <span className="text-blue-600">
-                        {item.recycled_content_percentage}% recycled content
-                      </span>
-                    )}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Packaging role</Label>
+                      <Select
+                        value={item.packaging_category}
+                        onValueChange={(value) =>
+                          handleUpdateItem(item.id, {
+                            packaging_category: value as SecondaryPackagingItem["packaging_category"],
+                          })
+                        }
+                        disabled={disabled}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PACKAGING_ROLES.map((role) => (
+                            <SelectItem key={role.value} value={role.value}>
+                              {role.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Weight (g)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={item.weight_grams || ""}
+                        onChange={(e) =>
+                          handleUpdateItem(item.id, {
+                            weight_grams: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                        disabled={disabled}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Recycled (%)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={item.recycled_content_percentage}
+                        onChange={(e) =>
+                          handleUpdateItem(item.id, {
+                            // "" = unknown; 0 is a declared zero and must stick.
+                            recycled_content_percentage:
+                              e.target.value === ""
+                                ? ""
+                                : Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)),
+                          })
+                        }
+                        disabled={disabled}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={item.is_recyclable}
+                      onCheckedChange={(checked) =>
+                        handleUpdateItem(item.id, { is_recyclable: checked })
+                      }
+                      disabled={disabled}
+                    />
+                    <Label className="text-sm">Recyclable</Label>
                   </div>
                 </div>
                 <Button
@@ -238,6 +339,46 @@ export function MultipackSecondaryPackagingForm({
               </div>
             </div>
 
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="packaging_role">Packaging Role *</Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>
+                        Shipment = courier / transit packaging (the default for direct-to-consumer).
+                        Secondary = retail grouping (a gift pack). Tertiary = pallet or bulk wrap.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <Select
+                value={newItem.packaging_category}
+                onValueChange={(value) =>
+                  setNewItem({
+                    ...newItem,
+                    packaging_category: value as SecondaryPackagingItem["packaging_category"],
+                  })
+                }
+                disabled={disabled}
+              >
+                <SelectTrigger id="packaging_role">
+                  <SelectValue placeholder="Select packaging role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PACKAGING_ROLES.map((role) => (
+                    <SelectItem key={role.value} value={role.value}>
+                      {role.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
@@ -289,11 +430,15 @@ export function MultipackSecondaryPackagingForm({
                   min="0"
                   max="100"
                   placeholder="0"
-                  value={newItem.recycled_content_percentage || ""}
+                  value={newItem.recycled_content_percentage}
                   onChange={(e) =>
                     setNewItem({
                       ...newItem,
-                      recycled_content_percentage: parseFloat(e.target.value) || 0,
+                      // "" = unknown; 0 is a declared zero and must stick.
+                      recycled_content_percentage:
+                        e.target.value === ""
+                          ? ""
+                          : Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)),
                     })
                   }
                   disabled={disabled}
@@ -344,6 +489,7 @@ export function MultipackSecondaryPackagingForm({
                   setNewItem({
                     material_name: "",
                     material_type: "cardboard",
+                    packaging_category: "shipment",
                     weight_grams: 0,
                     is_recyclable: true,
                     recycled_content_percentage: 0,

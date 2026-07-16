@@ -14,6 +14,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Trash2, Wine, Info, Calculator, Lock, Unlock, ChevronDown, ChevronRight } from "lucide-react";
 import { calculateMaturationImpacts } from "@/lib/maturation-calculator";
 import type { MaturationProfile } from "@/lib/types/maturation";
@@ -24,6 +34,7 @@ import {
   CLIMATE_ZONE_LABELS,
   ENERGY_SOURCE_LABELS,
   getSpiritTypeDefaults,
+  resolveMaturationAbv,
   type BarrelType,
   type ClimateZone,
   type EnergySource,
@@ -133,6 +144,7 @@ export function MaturationProfileCard({
 
   const [form, setForm] = useState<MaturationFormData>(buildInitialForm);
   const [showForm, setShowForm] = useState(!!profile);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [angelShareLocked, setAngelShareLocked] = useState(false);
 
   // Advanced section auto-opens only when an existing profile relies on batch
@@ -242,16 +254,25 @@ export function MaturationProfileCard({
     );
   }
 
-  // Preview derivations for the per-bottle copy
+  // Preview derivations for the per-bottle copy. ABV fallbacks come from the
+  // SAME helper the persisted calculator uses (resolveMaturationAbv), and the
+  // bottle count derives from the FILL volume, not the barrel capacity — a
+  // partially filled barrel yields fewer bottles, and using capacity made the
+  // card's per-bottle figures diverge from the saved calculation.
   const bottleSizeMl = productBottleSizeMl ?? 700;
   const bottleSizeLitres = bottleSizeMl / 1000;
-  const caskAbv = form.cask_fill_abv_percent ?? 63;
-  const bottleAbv = productAbvPercent ?? caskAbv;
+  const previewAbv = resolveMaturationAbv({
+    profileCaskFillAbvPercent: form.cask_fill_abv_percent,
+    productCategory,
+    productAbvPercent,
+  });
+  const caskAbv = previewAbv.caskFillAbvPercent;
+  const bottleAbv = previewAbv.bottleAbvPercent;
   const retention = Math.pow(1 - form.angel_share_percent_per_year / 100, form.aging_duration_months / 12);
   const dilution = bottleAbv > 0 ? caskAbv / bottleAbv : 1;
   const bottlesPerBarrel =
     bottleSizeLitres > 0
-      ? (form.barrel_volume_litres * retention * dilution) / bottleSizeLitres
+      ? (form.fill_volume_litres * retention * dilution) / bottleSizeLitres
       : 0;
   const batchTotalBottles = bottlesPerBarrel * form.number_of_barrels;
   const perBottleBarrel =
@@ -287,13 +308,33 @@ export function MaturationProfileCard({
               variant="ghost"
               size="sm"
               className="text-destructive hover:text-destructive"
-              onClick={() => {
-                setShowForm(false);
-                onRemove();
-              }}
+              onClick={() => setShowDeleteConfirm(true)}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
+            <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Remove maturation profile?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This permanently deletes the whole maturation profile (barrel type, ageing time, angel's share, warehouse energy and the rest). You would need to enter it again from scratch.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep profile</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={() => {
+                      setShowDeleteConfirm(false);
+                      setShowForm(false);
+                      onRemove();
+                    }}
+                  >
+                    Remove profile
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">

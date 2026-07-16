@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { guardOrgWrite } from '@/lib/auth/guard-org-write';
 import { getOrCreateCorporateReport, deriveReportingYear } from '@/lib/xero/report-helper';
 import { getSpendFactor, calculateSpendBasedEmissions } from '@/lib/xero/spend-factors';
 import { warmFactorCache } from '@/lib/external-data/cache';
@@ -13,9 +14,14 @@ import { warmFactorCache } from '@/lib/external-data/cache';
  * item, with a DEFRA spend-based emission factor (Tier 4) the user can later
  * upgrade to activity data.
  *
- * Runs as the authenticated user (not service-role), so the org-scoped RLS on
- * corporate_reports / corporate_overheads is the access backstop.
+ * Uses the service-role client (getSupabaseAPIClient bypasses RLS), so org
+ * access, read-only-advisor and write-access are enforced in application code
+ * via resolveAccessibleOrg + guardOrgWrite.
  */
+
+// A single invoice cannot realistically have thousands of line items; cap to
+// avoid a request fanning into unbounded corporate_overheads inserts.
+const MAX_LINE_ITEMS = 500;
 
 // corporate_overheads.category is CHECK-constrained; this subset is what a
 // supplier invoice realistically maps to.
@@ -51,12 +57,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
     }
 
-    const organizationId = await resolveAccessibleOrg(supabase, user);
+    const body = await request.json();
+
+    // Honour the org the client classified/uploaded under (the dropzone panel
+    // sends the currently-selected organisation). resolveAccessibleOrg verifies
+    // the caller has access before returning it, so this is safe; without it an
+    // advisor or multi-org user could silently save to their metadata org
+    // rather than the org they were working in.
+    const requestedOrgId: string | undefined =
+      typeof body.organizationId === 'string' ? body.organizationId : undefined;
+
+    const organizationId = await resolveAccessibleOrg(supabase, user, requestedOrgId);
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
 
-    const body = await request.json();
+    const denied = await guardOrgWrite(supabase, user, organizationId);
+    if (denied) return denied;
+
     const supplierName: string = (body.supplier_name || '').toString().trim();
     const invoiceDate: string | undefined = body.invoice_date || undefined;
 
@@ -68,6 +86,12 @@ export async function POST(request: NextRequest) {
       : 'GBP';
 
     const rawLines: InvoiceLine[] = Array.isArray(body.line_items) ? body.line_items : [];
+    if (rawLines.length > MAX_LINE_ITEMS) {
+      return NextResponse.json(
+        { error: `Too many line items (max ${MAX_LINE_ITEMS}).` },
+        { status: 400 }
+      );
+    }
     const lines = rawLines
       .map((l) => ({ description: (l.description || '').toString().trim(), amount: Number(l.amount) }))
       .filter((l) => Number.isFinite(l.amount) && l.amount > 0);

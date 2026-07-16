@@ -373,6 +373,26 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // SECURITY: organization_id comes from the query string and gates
+    // service-role reads of that org's linked suppliers, product names and
+    // factor usage below. Without a membership check, any authenticated user
+    // could enumerate another organisation's supplier relationships by
+    // passing a foreign org id. Advisors with access to the org pass too.
+    if (organizationId) {
+      const { userHasOrgAccess } = await import('@/lib/supabase/verify-org-access');
+      const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (!supabaseServiceKey) {
+        return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+      }
+      const accessClient = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: { persistSession: false },
+      });
+      const hasAccess = await userHasOrgAccess(accessClient, user.user.id, organizationId);
+      if (!hasAccess) {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      }
+    }
+
     // Collect results from ALL sources in parallel
     let allResults: SearchResult[] = [];
 
@@ -476,7 +496,9 @@ export async function GET(request: NextRequest) {
                 epr_material_type: comp.epr_material_type,
                 component_name: comp.component_name,
                 weight_grams: comp.weight_grams,
-                recycled_content_percentage: comp.recycled_content_pct || 0,
+                // null = unknown; 0 = supplier-declared zero. `|| 0` presented
+                // every unknown as a declared 0% that then saved as such.
+                recycled_content_percentage: comp.recycled_content_pct ?? null,
                 is_recyclable: comp.is_recyclable,
               });
             }

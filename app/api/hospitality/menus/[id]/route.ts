@@ -1,7 +1,7 @@
 /**
  * Hospitality menu detail + update + delete.
  * GET    /api/hospitality/menus/[id]  — menu + items with LIVE per-serving impact + aggregate.
- * PATCH  /api/hospitality/menus/[id]  — update name / description / venue.
+ * PATCH  /api/hospitality/menus/[id]  — update name / description / venue / status (active|archived).
  * DELETE /api/hospitality/menus/[id]  — delete the menu (items cascade).
  */
 

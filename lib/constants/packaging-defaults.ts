@@ -54,6 +54,30 @@ export function lookupPackagingDefaults(name: string | null | undefined): Packag
 
 // Default "credit" applied to recycled content in the calc: recycled inputs
 // typically carry ~50% of virgin-material footprint (PAS 2050 / GHG Protocol
-// Product Standard Cut-Off method). Override per material once we wire up a
-// material-specific table.
+// Product Standard Cut-Off method). Used only when the material cannot be
+// identified; identified materials use RECYCLED_CONTENT_DISPLACEMENT below.
 export const DEFAULT_RECYCLED_CONTENT_CREDIT = 0.5
+
+// Material-specific displacement: the share of the virgin-production footprint
+// avoided per unit of recycled input. A flat 0.5 badly understated aluminium
+// (remelting is ~5% of smelting energy) and overstated glass (~25% saving from
+// cullet). Keys are getMaterialFactorKey() outputs (lib/end-of-life-factors.ts).
+// Sources: IAI (aluminium remelt ~5% of primary energy), FEVE/British Glass
+// (cullet ~25% energy saving), Plastics Europe rPET/rHDPE cradle-to-gate vs
+// virgin (~55%), CEPI recycled fibre (~35%), worldsteel EAF vs BF-BOF (~60%).
+export const RECYCLED_CONTENT_DISPLACEMENT: Record<string, number> = {
+  aluminium: 0.95,
+  glass: 0.25,
+  pet: 0.55,
+  hdpe: 0.55,
+  paper: 0.35,
+  steel: 0.6,
+  cork: 0.5,
+  organic: 0.5,
+  other: DEFAULT_RECYCLED_CONTENT_CREDIT,
+}
+
+// Detects factor/dataset names that already embed recycled content (e.g.
+// ecoinvent "packaging glass, 60% cullet" or a supplier PCF for rPET) so the
+// calculator does not apply the recycled-content credit a second time.
+export const FACTOR_EMBEDS_RECYCLED_CONTENT = /recycl|cullet|\br-?(pet|hdpe)\b|\b\d{1,3}\s*%\s*(rec\b|recycled|cullet)/i

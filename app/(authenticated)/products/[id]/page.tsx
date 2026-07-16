@@ -15,7 +15,10 @@ import { Panel } from "@/components/studio/panel";
 import { BrewwLinkBadge } from "@/components/products/BrewwLinkBadge";
 import { BrewwSuggestionBanner } from "@/components/products/BrewwSuggestionBanner";
 import { OverviewTab } from "@/components/products/OverviewTab";
+import { LcaStalenessBanner } from "@/components/products/LcaStalenessBanner";
 import { SpecificationTab } from "@/components/products/SpecificationTab";
+import { MultipackContentsEditor } from "@/components/products/MultipackContentsEditor";
+import { MultipackPackagingSection } from "@/components/products/MultipackPackagingSection";
 import { FacilitiesTab } from "@/components/products/FacilitiesTab";
 import { SettingsTab } from "@/components/products/SettingsTab";
 import { EditProductForm } from "@/components/products/EditProductForm";
@@ -128,7 +131,11 @@ export default function ProductDashboardPage() {
 
   const handleCalculate = () => {
     if (!isHealthy) {
-      toast.error("Please add ingredients and packaging before calculating");
+      toast.error(
+        product?.is_multipack
+          ? "Add the products this multipack contains before calculating its LCA"
+          : "Please add ingredients and packaging before calculating"
+      );
       return;
     }
     router.push(`/products/${productId}/compliance-wizard`);
@@ -138,14 +145,17 @@ export default function ProductDashboardPage() {
     try {
       const supabase = getSupabaseBrowserClient();
 
+      // Use archived_at, NOT is_draft: is_draft is overloaded (most products
+      // are drafts) and nothing surfaced it, so archiving via is_draft did
+      // nothing visible. archived_at drives the list filter and badge.
       const { error } = await supabase
         .from("products")
-        .update({ is_draft: true })
+        .update({ archived_at: new Date().toISOString() })
         .eq("id", productId);
 
       if (error) throw error;
 
-      toast.success("Product archived successfully");
+      toast.success("Product archived");
       router.push("/products");
     } catch (error: any) {
       console.error("Archive error:", error);
@@ -157,6 +167,26 @@ export default function ProductDashboardPage() {
   const handleDelete = async () => {
     try {
       const supabase = getSupabaseBrowserClient();
+
+      // Guard against a silent cascade: multipack_components.component_product_id
+      // is ON DELETE CASCADE, so deleting a product would quietly remove it from
+      // every multipack that contains it (and leave those multipacks with a
+      // stale total). Block the delete and tell the user which multipacks to fix
+      // first.
+      const { data: memberships } = await supabase
+        .from("multipack_components")
+        .select("multipack:products!multipack_product_id(name)")
+        .eq("component_product_id", productId);
+      if (memberships && memberships.length > 0) {
+        const names = memberships
+          .map((m: any) => m.multipack?.name)
+          .filter(Boolean);
+        const list = names.length > 0 ? `: ${names.join(", ")}` : "";
+        toast.error(
+          `This product is part of ${memberships.length} multipack${memberships.length === 1 ? "" : "s"}${list}. Remove it from ${memberships.length === 1 ? "that multipack" : "those multipacks"} before deleting it.`,
+        );
+        throw new Error("Product is in use by a multipack");
+      }
 
       // Delete materials first
       await supabase
@@ -325,6 +355,13 @@ export default function ProductDashboardPage() {
         </TabsList>
 
         <TabsContent value="overview" data-guide="product-overview" className="space-y-8">
+          {currentOrganization && (
+            <LcaStalenessBanner
+              productId={productId}
+              organizationId={currentOrganization.id}
+              onRecalculated={() => window.location.reload()}
+            />
+          )}
           <OverviewTab
             product={product}
             ingredients={ingredients}
@@ -336,13 +373,31 @@ export default function ProductDashboardPage() {
         </TabsContent>
 
         <TabsContent value="specification" className="space-y-8">
-          <SpecificationTab
-            productId={productId}
-            ingredients={ingredients}
-            packaging={packaging}
-            productCategory={product?.product_category ?? null}
-            productAbvPercent={product?.alcohol_content_abv ?? null}
-          />
+          {product.is_multipack && currentOrganization ? (
+            // A multipack has no single-SKU recipe of its own to edit here; its
+            // footprint comes from its component products. Show the contents
+            // editor (add/remove products, change quantities) plus an editor for
+            // the pack's OWN transit/grouping packaging (shipper box, shrink
+            // wrap, pallet), which is otherwise only settable at create time.
+            <>
+              <MultipackContentsEditor
+                productId={productId}
+                organizationId={currentOrganization.id}
+              />
+              <MultipackPackagingSection
+                productId={productId}
+                organizationId={currentOrganization.id}
+              />
+            </>
+          ) : (
+            <SpecificationTab
+              productId={productId}
+              ingredients={ingredients}
+              packaging={packaging}
+              productCategory={product?.product_category ?? null}
+              productAbvPercent={product?.alcohol_content_abv ?? null}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="facilities" className="space-y-8">

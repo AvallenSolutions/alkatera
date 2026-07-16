@@ -15,6 +15,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { isReadOnlyAdvisor } from '@/lib/auth/advisor-access';
 import { findSmartMeterOverlap } from '@/lib/energy/smart-meter-conflict';
 import { logRosaTelemetry } from './budget';
+import { createVolume } from '@/lib/hospitality/volume-service';
+import { createWaste } from '@/lib/hospitality/waste-service';
 
 export interface ProposeInput {
   organizationId: string;
@@ -173,6 +175,10 @@ async function dispatchMutation(
       return await execSaveBcorpAnswer(supabase, row.organization_id, p);
     case 'propose_support_ticket':
       return await execProposeSupportTicket(supabase, row.organization_id, row.user_id, row.conversation_id, p);
+    case 'propose_log_service_volume':
+      return await execLogServiceVolume(supabase, row.organization_id, p);
+    case 'propose_log_hospitality_waste':
+      return await execLogHospitalityWaste(supabase, row.organization_id, p);
     default:
       throw new Error(`Unsupported action tool: ${row.tool_name}`);
   }
@@ -308,6 +314,40 @@ async function execSaveBcorpAnswer(
     verification_status: 'pending',
     table: 'certification_evidence_links',
   };
+}
+
+async function execLogServiceVolume(
+  supabase: SupabaseClient,
+  organizationId: string,
+  p: any,
+): Promise<Record<string, unknown>> {
+  const res = await createVolume(supabase as any, organizationId, {
+    product_id: p.product_id,
+    units_sold: p.units_sold,
+    period_start: p.period_start,
+    period_end: p.period_end,
+    note: p.note,
+  });
+  if (!res.ok) throw new Error(res.error);
+  return { volume_id: res.data.id, table: 'hospitality_service_volumes' };
+}
+
+async function execLogHospitalityWaste(
+  supabase: SupabaseClient,
+  organizationId: string,
+  p: any,
+): Promise<Record<string, unknown>> {
+  const res = await createWaste(supabase as any, organizationId, {
+    waste_stream: p.waste_stream,
+    treatment_method: p.treatment_method,
+    mass_kg: p.mass_kg,
+    period_start: p.period_start,
+    period_end: p.period_end,
+    venue_id: p.venue_id,
+    note: p.note,
+  });
+  if (!res.ok) throw new Error(res.error);
+  return { waste_id: res.data.id, table: 'hospitality_waste' };
 }
 
 async function execLogUtilityEntry(

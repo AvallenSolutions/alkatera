@@ -16,6 +16,7 @@ import { Plus, FileText, Calendar, AlertCircle, BarChart3, Loader2 } from "lucid
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
 import { toast } from "sonner";
+import { HOSPITALITY_KINDS } from "@/lib/hospitality/constants";
 
 interface ProductLCA {
   id: string;
@@ -70,7 +71,20 @@ export default function ProductLCAReportsPage() {
 
       if (error) throw error;
 
-      setLcas(data || []);
+      // Exclude hospitality meals/drinks/rooms — they are PCF rows too, but belong
+      // on the hospitality surfaces, not the product-LCA list.
+      const { data: hospProducts } = await supabase
+        .from("products")
+        .select("id")
+        .eq("organization_id", currentOrganization!.id)
+        .in("product_kind", HOSPITALITY_KINDS as unknown as string[]);
+      const hospitalityProductIds = new Set((hospProducts ?? []).map((p: any) => Number(p.id)));
+
+      setLcas(
+        (data || []).filter(
+          (lca: any) => lca.product_id == null || !hospitalityProductIds.has(Number(lca.product_id)),
+        ),
+      );
     } catch (error) {
       console.error("Error fetching LCAs:", error);
       toast.error("Failed to load LCAs");

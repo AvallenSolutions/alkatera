@@ -750,4 +750,233 @@ describe('calculateProductCarbonFootprint', () => {
       warnSpy.mockRestore();
     });
   });
+
+  // --------------------------------------------------------------------------
+  // SHARED HELPERS FOR THE REGRESSION TESTS BELOW
+  // --------------------------------------------------------------------------
+
+  // Layer per-table overrides on top of whatever `from` implementation is
+  // currently active, so the default table mocks keep working.
+  function overrideTables(overrides: Record<string, () => unknown>) {
+    const defaultImpl = mockSupabaseClient.from.getMockImplementation()!;
+    mockSupabaseClient.from.mockImplementation((table: string) =>
+      overrides[table] ? overrides[table]() : defaultImpl(table),
+    );
+  }
+
+  // Capture every row inserted into product_carbon_footprint_materials.
+  function captureMaterialsInsert() {
+    const inserted: Record<string, unknown>[] = [];
+    overrideTables({
+      product_carbon_footprint_materials: () => {
+        const mock = createQueryMock({ data: null, error: null }) as Record<string, unknown>;
+        mock.insert = vi.fn((rows: unknown) => {
+          inserted.push(...(Array.isArray(rows) ? rows : [rows]));
+          return mock;
+        });
+        return mock;
+      },
+    });
+    return inserted;
+  }
+
+  // --------------------------------------------------------------------------
+  // BATCH DIVISOR SCOPING (allocationDivisorFor)
+  // --------------------------------------------------------------------------
+  //
+  // Regression: the per-batch divisor (bottlesPerBatch) allocates BATCH-scoped
+  // ingredient quantities to one functional unit. Packaging quantities are
+  // entered per unit, so dividing them too collapsed every packaging impact
+  // towards zero for per_batch and production-chain products.
+
+  describe('Batch divisor scoping (ingredients only, never packaging)', () => {
+    it('divides ingredient quantities by bottlesPerBatch but leaves packaging per-unit', async () => {
+      // per_batch with a yield of 1000 bottles: computeBottlesPerBatch = 1000
+      const batchProduct = {
+        ...MOCK_PRODUCT,
+        recipe_scale_mode: 'per_batch',
+        batch_yield_value: 1000,
+        batch_yield_unit: 'bottles',
+      };
+      // 500 kg of malt per batch and one 0.5 kg glass bottle per unit
+      const batchMalt = {
+        ...MOCK_MATERIAL_MALT,
+        id: 'mat-malt-batch',
+        quantity: 500,
+        unit: 'kg',
+        transport_mode: null,
+        distance_km: null,
+      };
+      const glassBottle = {
+        ...MOCK_MATERIAL_CAN,
+        id: 'mat-glass',
+        material_name: 'Glass Bottle',
+        material_type: 'packaging',
+        packaging_category: 'primary',
+        quantity: 0.5,
+        unit: 'kg',
+      };
+
+      overrideTables({
+        products: () => createQueryMock({ data: batchProduct, error: null }),
+        product_materials: () => createQueryMock({ data: [batchMalt, glassBottle], error: null }),
+      });
+
+      const result = await calculateProductCarbonFootprint({ productId: 'prod-001' });
+      expect(result.success).toBe(true);
+
+      const callFor = (id: string) =>
+        mockResolveImpactFactors.mock.calls.find(
+          (c) => (c[0] as { id: string }).id === id,
+        );
+
+      // Ingredient: 500 kg per batch / 1000 bottles = 0.5 kg per unit
+      expect(callFor('mat-malt-batch')?.[1]).toBe(0.5);
+      // Packaging: already per unit, so the divisor must NOT apply (not 0.0005)
+      expect(callFor('mat-glass')?.[1]).toBe(0.5);
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // DUPLICATE-NAME KEYING (resolvedFactors keyed by row id)
+  // --------------------------------------------------------------------------
+  //
+  // Regression: the resolved-factor map used to be keyed by material_name, so
+  // two rows with the same name (e.g. the same ingredient from two suppliers
+  // at different quantities) overwrote each other, booking one row's
+  // quantity-scaled impact twice. The map is now keyed by String(m.id).
+
+  describe('Duplicate-name materials keep their own impacts', () => {
+    it('persists a distinct impact for each of two same-named rows with different quantities', async () => {
+      const sugarLarge = {
+        ...MOCK_MATERIAL_MALT,
+        id: 'mat-sugar-large',
+        material_name: 'Cane Sugar',
+        quantity: 0.3,
+        unit: 'kg',
+        transport_mode: null,
+        distance_km: null,
+      };
+      const sugarSmall = {
+        ...sugarLarge,
+        id: 'mat-sugar-small',
+        quantity: 0.02,
+      };
+
+      overrideTables({
+        product_materials: () => createQueryMock({ data: [sugarLarge, sugarSmall], error: null }),
+      });
+      const inserted = captureMaterialsInsert();
+
+      // Impact proportional to the quantity the resolver was called with, and a
+      // fresh object per call (the calculator mutates results in place).
+      mockResolveImpactFactors.mockImplementation(async (_m: unknown, quantityKg: unknown) => ({
+        ...RESOLVED_IMPACT,
+        impact_climate: (quantityKg as number) * 10,
+      }));
+
+      const result = await calculateProductCarbonFootprint({ productId: 'prod-001' });
+      expect(result.success).toBe(true);
+
+      const rowLarge = inserted.find((r) => r.source_material_id === 'mat-sugar-large');
+      const rowSmall = inserted.find((r) => r.source_material_id === 'mat-sugar-small');
+      expect(rowLarge).toBeDefined();
+      expect(rowSmall).toBeDefined();
+
+      // Each row's impact must match its own quantity, not the other row's
+      expect(rowLarge!.impact_climate).toBeCloseTo(3.0, 10);
+      expect(rowSmall!.impact_climate).toBeCloseTo(0.2, 10);
+      expect(rowLarge!.impact_climate).not.toBe(rowSmall!.impact_climate);
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // PROJECTION COLUMNS ON PERSISTED PCF MATERIALS
+  // --------------------------------------------------------------------------
+  //
+  // Regression: the aggregator's end-of-life loop reads circularity/identity
+  // fields off PCF material rows, so every inserted row must project them
+  // from the source product_materials row.
+
+  describe('Circularity/identity projection columns', () => {
+    it('copies source_material_id, reuse_trips, recyclability, EoL pathway, container material and matched source name onto the inserted row', async () => {
+      const steelKeg = {
+        ...MOCK_MATERIAL_CAN,
+        id: 'mat-keg',
+        material_name: 'Steel Keg',
+        material_type: 'packaging',
+        packaging_category: 'primary',
+        quantity: 9,
+        unit: 'kg',
+        reuse_trips: 100,
+        recyclability_percent: 95,
+        end_of_life_pathway: 'reuse',
+        container_material: 'steel',
+        matched_source_name: 'steel keg dataset',
+      };
+
+      overrideTables({
+        product_materials: () => createQueryMock({ data: [steelKeg], error: null }),
+      });
+      const inserted = captureMaterialsInsert();
+
+      // Fresh result object per call: reuse amortisation divides the resolved
+      // impacts in place, and must not mutate the shared fixture.
+      mockResolveImpactFactors.mockImplementation(async () => ({ ...RESOLVED_IMPACT }));
+
+      const result = await calculateProductCarbonFootprint({ productId: 'prod-001' });
+      expect(result.success).toBe(true);
+
+      const kegRow = inserted.find((r) => r.material_name === 'Steel Keg');
+      expect(kegRow).toBeDefined();
+      expect(kegRow).toEqual(expect.objectContaining({
+        source_material_id: 'mat-keg',
+        reuse_trips: 100,
+        recyclability_percent: 95,
+        end_of_life_pathway: 'reuse',
+        container_material: 'steel',
+        matched_source_name: 'steel keg dataset',
+      }));
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // FAILED CALCULATION PRESERVES THE DRAFT PCF
+  // --------------------------------------------------------------------------
+  //
+  // Regression: the PCF row is (or was promoted from) the wizard's autosaved
+  // draft. Deleting it on a transient resolver failure destroyed the user's
+  // goal/scope text, ISO fields and facility allocations. The calculator must
+  // mark it failed instead so the wizard can resume it.
+
+  describe('Failed calculation preserves the draft PCF', () => {
+    it('marks the PCF as failed with an error message and never deletes it', async () => {
+      const pcfUpdateSpy = vi.fn();
+      const pcfDeleteSpy = vi.fn();
+      overrideTables({
+        product_carbon_footprints: () => {
+          const mock = createQueryMock({ data: MOCK_LCA_RECORD, error: null }) as Record<string, unknown>;
+          mock.update = vi.fn((payload: unknown) => { pcfUpdateSpy(payload); return mock; });
+          mock.delete = vi.fn(() => { pcfDeleteSpy(); return mock; });
+          return mock;
+        },
+      });
+
+      // Reject every attempt (parallel pre-resolution AND the serial fallback)
+      mockResolveImpactFactors.mockRejectedValue(new Error('Factor not found'));
+
+      const result = await calculateProductCarbonFootprint({ productId: 'prod-001' });
+      expect(result.success).toBe(false);
+
+      // The PCF row must be updated to failed, carrying the error message
+      const failedUpdate = pcfUpdateSpy.mock.calls
+        .map((c) => c[0] as Record<string, unknown>)
+        .find((p) => p.status === 'failed');
+      expect(failedUpdate).toBeDefined();
+      expect(failedUpdate!.error_message).toContain('Missing emission data');
+
+      // ...and must never be deleted
+      expect(pcfDeleteSpy).not.toHaveBeenCalled();
+    });
+  });
 });

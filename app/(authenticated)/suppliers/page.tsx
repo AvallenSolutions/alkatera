@@ -292,6 +292,8 @@ export default function SuppliersPage() {
       console.error('Error adding supplier:', error);
       if (error.code === '23505') {
         toast.error('This supplier is already in your organisation');
+      } else if (error.code === '42501') {
+        toast.error('You do not have permission to add suppliers to this organisation');
       } else {
         toast.error('Failed to add supplier');
       }

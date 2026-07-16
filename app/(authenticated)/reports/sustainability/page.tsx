@@ -166,12 +166,14 @@ function SustainabilityReportsHub() {
         .maybeSingle()
         .then(({ data }) => setTransitionPlan(data as TransitionPlan | null)),
 
-      // LCA count
+      // LCA count (drinks products only — hospitality meals/drinks/rooms are PCF
+      // rows too but belong to the hospitality module, not the LCA count).
       supabase
         .from('product_carbon_footprints')
-        .select('id', { count: 'exact', head: true })
+        .select('id, products!inner(product_kind)', { count: 'exact', head: true })
         .eq('organization_id', orgId)
         .eq('status', 'completed')
+        .eq('products.product_kind', 'product')
         .then(({ count }) => setLcaCount(count ?? 0)),
     ])
 

@@ -8,6 +8,7 @@ import type {
   PackagingCategory,
   PackagingMaterialComponent,
 } from '../types/lca';
+import { eprLevelForCategory } from '../products/packaging-material-data';
 
 // ============================================================================
 // EPR TYPE VALIDATION TESTS
@@ -143,32 +144,29 @@ describe('UK EPR Type Definitions', () => {
 // ============================================================================
 
 describe('EPR Packaging Level Mapping', () => {
-  // These mappings should match the PACKAGING_TYPES constant in PackagingFormCard.tsx
-  const CATEGORY_TO_EPR_LEVEL: Record<PackagingCategory, EPRPackagingLevel> = {
-    container: 'primary',
-    label: 'primary',
-    closure: 'primary',
-    secondary: 'secondary',
-    shipment: 'shipment',
-    tertiary: 'tertiary',
-  };
-
+  // Test the real source-of-truth helper, not a local copy of the mapping.
   it('should map container, label, closure to primary packaging', () => {
-    expect(CATEGORY_TO_EPR_LEVEL.container).toBe('primary');
-    expect(CATEGORY_TO_EPR_LEVEL.label).toBe('primary');
-    expect(CATEGORY_TO_EPR_LEVEL.closure).toBe('primary');
+    expect(eprLevelForCategory('container')).toBe('primary');
+    expect(eprLevelForCategory('label')).toBe('primary');
+    expect(eprLevelForCategory('closure')).toBe('primary');
   });
 
   it('should map secondary to secondary packaging', () => {
-    expect(CATEGORY_TO_EPR_LEVEL.secondary).toBe('secondary');
+    expect(eprLevelForCategory('secondary')).toBe('secondary');
   });
 
   it('should map shipment to shipment packaging', () => {
-    expect(CATEGORY_TO_EPR_LEVEL.shipment).toBe('shipment');
+    expect(eprLevelForCategory('shipment')).toBe('shipment');
   });
 
   it('should map tertiary to tertiary packaging', () => {
-    expect(CATEGORY_TO_EPR_LEVEL.tertiary).toBe('tertiary');
+    expect(eprLevelForCategory('tertiary')).toBe('tertiary');
+  });
+
+  it('returns null for an unknown/absent category', () => {
+    expect(eprLevelForCategory(null)).toBeNull();
+    expect(eprLevelForCategory(undefined)).toBeNull();
+    expect(eprLevelForCategory('nonsense')).toBeNull();
   });
 });
 

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { checkObligation } from '@/lib/epr/obligation-checker'
+import { getPackagingUnitsPerGroup } from '@/lib/end-of-life-factors'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -88,6 +89,8 @@ export async function GET(request: NextRequest) {
         id,
         net_weight_g,
         packaging_category,
+        material_type,
+        units_per_group,
         products!inner (
           id,
           organization_id,
@@ -104,7 +107,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch packaging data' }, { status: 500 })
     }
 
-    // Calculate total packaging tonnage
+    // Calculate total packaging tonnage.
+    // Shared packaging (a 24-bottle trade case) is one physical item per
+    // units_per_group product units — the same divisor the LCA applies.
+    // Counting the full case weight once per bottle over-declared tonnage
+    // (and so fees) by the pack factor.
     let totalWeightKg = 0
     let totalItems = 0
 
@@ -117,7 +124,8 @@ export async function GET(request: NextRequest) {
       const totalUnits = logs.reduce((sum: number, log: any) => sum + (log.units_produced || 0), 0)
 
       if (totalUnits > 0) {
-        totalWeightKg += (material.net_weight_g / 1000) * totalUnits
+        const unitsPerGroup = getPackagingUnitsPerGroup(material as any)
+        totalWeightKg += (material.net_weight_g / 1000 / unitsPerGroup) * totalUnits
       }
     }
 

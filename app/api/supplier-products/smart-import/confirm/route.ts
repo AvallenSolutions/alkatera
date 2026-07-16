@@ -67,6 +67,18 @@ export async function POST(request: NextRequest) {
     // the supplier-portal detail page so the smart-import path can't slip
     // bad rows through.
     const errors: string[] = [];
+    // Unwrap the {value, source_quote} numeric fields, dropping any whose
+    // source_quote is empty (extra hallucination guard on top of the
+    // extractor's). Used by BOTH validation and the insert below — they must
+    // apply the same rule, otherwise a value that passes validation (e.g. a
+    // declared 0% recycled with a blank quote) is silently inserted as null,
+    // violating the very invariant validation just enforced.
+    const numeric = (f: any) => {
+      if (!f || typeof f !== 'object') return null;
+      if (f.source_quote == null || !String(f.source_quote).trim()) return null;
+      return typeof f.value === 'number' ? f.value : null;
+    };
+
     products.forEach((p, idx) => {
       if (!p.name || !p.name.trim()) {
         errors.push(`Row ${idx + 1}: name is required`);
@@ -78,12 +90,15 @@ export async function POST(request: NextRequest) {
         if (!p.packaging_category) {
           errors.push(`Row ${idx + 1} ("${p.name}"): packaging_category is required for packaging`);
         }
-        const weight = p.weight_g?.value;
-        if (weight === null || weight === undefined || weight <= 0) {
+        const weight = numeric(p.weight_g);
+        if (weight === null || weight <= 0) {
           errors.push(`Row ${idx + 1} ("${p.name}"): weight per unit (g) is required for packaging and must be > 0`);
         }
-        const rec = p.recycled_content_pct?.value;
-        if (rec === null || rec === undefined) {
+        // numeric() so a value without a source quote fails HERE with a clear
+        // message instead of passing validation and inserting as null. An
+        // explicit 0 with a quote passes — 0 is a declared zero, not "unset".
+        const rec = numeric(p.recycled_content_pct);
+        if (rec === null) {
           errors.push(`Row ${idx + 1} ("${p.name}"): recycled content (%) is required for packaging — enter 0 if none`);
         }
       }
@@ -91,15 +106,6 @@ export async function POST(request: NextRequest) {
     if (errors.length > 0) {
       return NextResponse.json({ error: 'Validation failed', issues: errors }, { status: 400 });
     }
-
-    // Map to supplier_products rows. We unwrap the {value, source_quote}
-    // numeric fields, drop any whose source_quote is empty (extra hallucination
-    // guard on top of the extractor's), and let the DB defaults handle the rest.
-    const numeric = (f: any) => {
-      if (!f || typeof f !== 'object') return null;
-      if (f.source_quote == null || !String(f.source_quote).trim()) return null;
-      return typeof f.value === 'number' ? f.value : null;
-    };
 
     const rows = products.map(p => {
       const isPackaging = p.product_type === 'packaging';

@@ -11,7 +11,7 @@ import type { MaturationProfile } from "@/lib/types/maturation";
 import {
   BARREL_TYPE_LABELS,
   CLIMATE_ZONE_LABELS,
-  getSpiritTypeDefaults,
+  resolveMaturationAbv,
 } from "@/lib/types/maturation";
 import { calculateMaturationImpacts } from "@/lib/maturation-calculator";
 
@@ -63,15 +63,15 @@ export function SpecificationTab({
 
   const maturationImpacts = maturationProfile
     ? (() => {
-        const defaults = getSpiritTypeDefaults(productCategory);
-        const caskAbv =
-          (maturationProfile.cask_fill_abv_percent as number | null) ??
-          defaults.cask_fill_abv_percent;
-        const bottleAbv = productAbvPercent ?? defaults.bottle_abv_percent;
+        const abv = resolveMaturationAbv({
+          profileCaskFillAbvPercent: maturationProfile.cask_fill_abv_percent as number | null,
+          productCategory,
+          productAbvPercent,
+        });
         return calculateMaturationImpacts(maturationProfile, {
           warehouseCountryCode: maturationProfile.warehouse_country_code ?? null,
-          caskFillAbvPercent: caskAbv,
-          bottleAbvPercent: bottleAbv,
+          caskFillAbvPercent: abv.caskFillAbvPercent,
+          bottleAbvPercent: abv.bottleAbvPercent,
         });
       })()
     : null;

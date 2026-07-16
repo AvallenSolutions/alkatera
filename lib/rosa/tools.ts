@@ -50,6 +50,8 @@ export const ACTION_TOOL_NAMES = [
   'propose_set_progress_tracker',
   'propose_save_bcorp_answer',
   'propose_support_ticket',
+  'propose_log_service_volume',
+  'propose_log_hospitality_waste',
 ] as const;
 export type ActionToolName = typeof ACTION_TOOL_NAMES[number];
 
@@ -639,6 +641,56 @@ export const ROSA_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'get_hospitality_summary',
+    description:
+      "Returns a compact snapshot of the organisation's hospitality operations: venue count, how many meals/drinks/rooms exist, how many have a calculated footprint, the latest service-volume period, and whether hospitality counts toward the company total. Call this for questions about the restaurant/bar/rooms side of the business before proposing hospitality actions.",
+    input_schema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'list_hospitality_products',
+    description:
+      "Lists the organisation's hospitality recipes (meals, made-drinks and room-nights) with id, name and kind. Use to resolve a recipe name the user mentions to its product id before proposing a service-volume entry.",
+    input_schema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'propose_log_service_volume',
+    description:
+      "Propose recording how many of a hospitality meal/drink/room were sold in a period — the throughput that scales its per-serving footprint into the company total. Use when the user says e.g. 'we sold 320 beef ragùs in October'. Resolve the recipe to a product_id via list_hospitality_products first. The user MUST confirm before the row is written.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        product_id: { type: 'number', description: 'Hospitality product id (from list_hospitality_products).' },
+        units_sold: { type: 'number', description: 'Number of individual servings/covers/room-nights sold in the period.' },
+        period_start: { type: 'string', description: 'ISO date (YYYY-MM-DD) start of the period.' },
+        period_end: { type: 'string', description: 'ISO date (YYYY-MM-DD) end of the period.' },
+        note: { type: 'string', description: 'Optional free-text note.' },
+      },
+      required: ['product_id', 'units_sold', 'period_start', 'period_end'],
+    },
+  },
+  {
+    name: 'propose_log_hospitality_waste',
+    description:
+      "Propose logging a hospitality food/dry waste entry (mass + treatment route) for a period. Feeds Scope 3 Category 5. Use when the user reports kitchen or bar waste. The user MUST confirm before the row is written.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        waste_stream: { type: 'string', enum: ['food', 'dry'], description: 'food or dry.' },
+        treatment_method: {
+          type: 'string',
+          enum: ['composting', 'anaerobic_digestion', 'recycling', 'reuse', 'incineration_with_recovery', 'incineration_without_recovery', 'landfill'],
+          description: 'How the waste was treated.',
+        },
+        mass_kg: { type: 'number', description: 'Mass in kilograms.' },
+        period_start: { type: 'string', description: 'ISO date (YYYY-MM-DD) start of the period.' },
+        period_end: { type: 'string', description: 'ISO date (YYYY-MM-DD) end of the period.' },
+        venue_id: { type: 'string', description: 'Optional venue UUID.' },
+        note: { type: 'string', description: 'Optional free-text note.' },
+      },
+      required: ['waste_stream', 'treatment_method', 'mass_kg', 'period_start', 'period_end'],
+    },
+  },
+  {
     name: 'generate_export',
     description:
       "Generates a CSV the user can download from inside the chat. Use when they ask for a list, a CSV, a download, or to send something to a colleague. Read-only, no side effects: returns a download URL the chat renders as a clickable chip. Pick the kind that fits the user's question.",
@@ -681,6 +733,10 @@ export async function executeTool(
         return await toolListFacilities(ctx);
       case 'list_products':
         return await toolListProducts(ctx, input as { only_with_lca?: boolean; limit?: number });
+      case 'get_hospitality_summary':
+        return await toolGetHospitalitySummary(ctx);
+      case 'list_hospitality_products':
+        return await toolListHospitalityProducts(ctx);
       case 'query_pulse_metrics':
         return await toolQueryPulseMetrics(
           ctx,
@@ -740,6 +796,8 @@ export async function executeTool(
       case 'propose_set_progress_tracker':
       case 'propose_save_bcorp_answer':
       case 'propose_support_ticket':
+      case 'propose_log_service_volume':
+      case 'propose_log_hospitality_waste':
         return await toolProposeAction(ctx, name as ActionToolName, input as Record<string, unknown>);
       case 'extract_from_document':
         return await toolExtractFromDocument(ctx, input as { file_id: string; fields?: string[]; document_kind?: string });
@@ -1018,6 +1076,94 @@ async function toolListProducts(
     is_error: false,
     content: JSON.stringify(rows),
     audit: { tool: 'list_products', row_count: rows.length, filtered: Boolean(input?.only_with_lca) },
+  };
+}
+
+const HOSPITALITY_PRODUCT_KINDS = ['hospitality_meal', 'hospitality_drink', 'hospitality_room_night'];
+const HOSPITALITY_KIND_LABEL: Record<string, string> = {
+  hospitality_meal: 'meal',
+  hospitality_drink: 'drink',
+  hospitality_room_night: 'room',
+};
+
+async function toolListHospitalityProducts(ctx: ToolContext): Promise<ToolResult> {
+  const { data, error } = await ctx.supabase
+    .from('products')
+    .select('id, name, product_kind')
+    .eq('organization_id', ctx.organizationId)
+    .in('product_kind', HOSPITALITY_PRODUCT_KINDS)
+    .order('name', { ascending: true });
+  if (error) {
+    return { is_error: true, content: error.message, audit: { tool: 'list_hospitality_products', error: error.message } };
+  }
+  const rows = (data ?? []).map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    kind: HOSPITALITY_KIND_LABEL[p.product_kind] ?? p.product_kind,
+  }));
+  return {
+    is_error: false,
+    content: JSON.stringify(rows),
+    audit: { tool: 'list_hospitality_products', row_count: rows.length },
+  };
+}
+
+async function toolGetHospitalitySummary(ctx: ToolContext): Promise<ToolResult> {
+  const { count: venueCount } = await ctx.supabase
+    .from('hospitality_venues')
+    .select('id', { count: 'exact', head: true })
+    .eq('organization_id', ctx.organizationId)
+    .eq('status', 'active');
+
+  const { data: products } = await ctx.supabase
+    .from('products')
+    .select('id, product_kind')
+    .eq('organization_id', ctx.organizationId)
+    .in('product_kind', HOSPITALITY_PRODUCT_KINDS);
+  const productList = products ?? [];
+  const byKind: Record<string, number> = { meal: 0, drink: 0, room: 0 };
+  for (const p of productList) {
+    const label = HOSPITALITY_KIND_LABEL[(p as any).product_kind];
+    if (label) byKind[label] = (byKind[label] ?? 0) + 1;
+  }
+  const productIds = productList.map((p: any) => p.id);
+
+  let recipesWithImpact = 0;
+  if (productIds.length > 0) {
+    const { data: pcfs } = await ctx.supabase
+      .from('product_carbon_footprints')
+      .select('product_id')
+      .in('product_id', productIds)
+      .eq('status', 'completed');
+    recipesWithImpact = new Set((pcfs ?? []).map((r: any) => r.product_id)).size;
+  }
+
+  const { data: latestVol } = await ctx.supabase
+    .from('hospitality_service_volumes')
+    .select('period_start, period_end')
+    .eq('organization_id', ctx.organizationId)
+    .order('period_end', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data: org } = await ctx.supabase
+    .from('organizations')
+    .select('report_defaults')
+    .eq('id', ctx.organizationId)
+    .maybeSingle();
+  const includedInTotal = (org?.report_defaults as any)?.include_hospitality !== false;
+
+  const summary = {
+    venues: venueCount ?? 0,
+    recipes: { total: productList.length, ...byKind },
+    recipes_with_impact: recipesWithImpact,
+    latest_volume_period: latestVol ? { start: latestVol.period_start, end: latestVol.period_end } : null,
+    counts_toward_company_total: includedInTotal,
+  };
+  return {
+    is_error: false,
+    content: JSON.stringify(summary),
+    audit: { tool: 'get_hospitality_summary', venues: summary.venues, recipes: productList.length },
   };
 }
 
@@ -1758,6 +1904,12 @@ function buildActionPreview(toolName: ActionToolName, p: Record<string, unknown>
     case 'propose_support_ticket': {
       return `File a support ticket: "${p.subject}". ${p.summary_of_issue}`;
     }
+    case 'propose_log_service_volume': {
+      return `Record ${p.units_sold} servings sold for the period ${p.period_start} to ${p.period_end}.`;
+    }
+    case 'propose_log_hospitality_waste': {
+      return `Log ${p.mass_kg} kg of ${p.waste_stream} waste (${p.treatment_method}) for ${p.period_start} to ${p.period_end}.`;
+    }
     default:
       return `Perform action: ${toolName}`;
   }
@@ -1903,6 +2055,8 @@ function validateActionInput(toolName: ActionToolName, input: Record<string, unk
     propose_set_progress_tracker: ['tracker_id'],
     propose_save_bcorp_answer: ['requirement_code', 'answer'],
     propose_support_ticket: ['subject', 'summary_of_issue'],
+    propose_log_service_volume: ['product_id', 'units_sold', 'period_start', 'period_end'],
+    propose_log_hospitality_waste: ['waste_stream', 'treatment_method', 'mass_kg', 'period_start', 'period_end'],
   };
   const missing: string[] = [];
   for (const f of required[toolName]) {

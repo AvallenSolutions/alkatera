@@ -15,11 +15,25 @@ import { toast } from 'sonner'
  * File, then cleans up the stash and clears the URL params.
  *
  * @param kind     the stash_kind this page is responsible for
- * @param onFile   called once, with the resolved File, when the stash is ready
+ * @param onFile   called once, with the resolved File (and, for BOMs, the
+ *                 classifier's pre-extracted recipe), when the stash is ready
  */
+export interface StashedBom {
+  line_items: Array<{
+    name?: string
+    quantity?: number
+    unit?: string
+    quantity_basis?: 'per_litre' | 'per_hectolitre' | 'per_unit'
+    type?: 'ingredient' | 'packaging'
+  }>
+  unit_size_value: number | null
+  unit_size_unit: string | null
+  product_name: string | null
+}
+
 export function useIngestStash(
   kind: 'spray' | 'evidence' | 'bom',
-  onFile: (file: File) => void | Promise<void>,
+  onFile: (file: File, meta?: { bom?: StashedBom | null }) => void | Promise<void>,
 ) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -43,9 +57,10 @@ export function useIngestStash(
           const body = await res.json().catch(() => ({}))
           throw new Error(body.error || 'Stashed file not found')
         }
-        const { signedUrl, fileName } = (await res.json()) as {
+        const { signedUrl, fileName, bom } = (await res.json()) as {
           signedUrl: string
           fileName: string
+          bom?: StashedBom | null
         }
         const fileRes = await fetch(signedUrl)
         if (!fileRes.ok) throw new Error('Failed to download stashed file')
@@ -53,11 +68,21 @@ export function useIngestStash(
         const file = new File([blob], fileName, { type: blob.type })
         if (cancelled) return
 
-        await onFile(file)
+        await onFile(file, { bom })
 
         // Fire-and-forget cleanup; the bucket has no TTL, so we delete on
         // successful pickup. If it fails (offline, RLS drift), orphans are
         // harmless — they just cost a few KB until manually cleared.
+        //
+        // KNOWN LIMITATION (deferred): we delete the stash here, on pickup,
+        // BEFORE the downstream wizard (BOM import, growing-profile evidence)
+        // has actually committed the import. If the user cancels that wizard
+        // after the deep link fires, the file is gone and they must re-upload.
+        // The correct fix is to defer this DELETE until the consumer confirms
+        // the import committed, but that needs every consumer page to signal
+        // back (a release callback threaded through onFile), which is a
+        // cross-file change beyond this hook. Do NOT add a TTL cleanup cron as
+        // a shortcut — the fix belongs with the commit, not a sweeper.
         fetch(`/api/ingest/stash?path=${encodeURIComponent(stashId)}`, {
           method: 'DELETE',
         }).catch(() => { /* swallow */ })

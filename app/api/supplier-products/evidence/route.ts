@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { guardOrgWrite } from '@/lib/auth/guard-org-write';
 
 /**
  * POST /api/supplier-products/evidence
@@ -28,6 +29,9 @@ export async function POST(request: NextRequest) {
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
+
+    const denied = await guardOrgWrite(supabase, user, organizationId);
+    if (denied) return denied;
 
     const body = await request.json();
     const supplierProductId: string | undefined = body.supplier_product_id;
@@ -77,7 +81,15 @@ export async function POST(request: NextRequest) {
           storagePath = target;
           fileSize = buffer.length;
           mimeType = blob.type || null;
-          documentUrl = service.storage.from(EVIDENCE_BUCKET).getPublicUrl(target).data.publicUrl;
+          // Signed URL, not getPublicUrl: CoAs and spec sheets are
+          // commercially sensitive, and a public URL would make them
+          // world-readable if the bucket is (or ever becomes) public.
+          // Consumers should re-sign from storage_object_path when the link
+          // expires; one year keeps existing display code working meanwhile.
+          const { data: signed } = await service.storage
+            .from(EVIDENCE_BUCKET)
+            .createSignedUrl(target, 60 * 60 * 24 * 365);
+          documentUrl = signed?.signedUrl ?? null;
           // Tidy up the stash once it has been copied.
           await service.storage.from(STASH_BUCKET).remove([stashId]).catch(() => {});
         }

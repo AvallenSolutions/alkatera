@@ -350,7 +350,7 @@ export function BoundaryStep() {
                     <div className="flex items-center gap-2">
                       <p className="font-medium">{option.label}</p>
                       <span className="text-xs text-muted-foreground">
-                        — {option.subtitle}
+                        {option.subtitle}
                       </span>
                       {isLocked && (
                         <Badge variant="secondary" className="text-xs font-normal gap-1">
@@ -623,7 +623,7 @@ export function BoundaryStep() {
             <ul className="mt-1.5 list-inside list-disc space-y-1 text-sm">
               {boundaryNeedsUsePhase(formData.systemBoundary) && (
                 <li>
-                  <strong>Use Phase</strong> — you will need to configure refrigeration
+                  <strong>Use Phase</strong>: you will need to configure refrigeration
                   and carbonation assumptions for your product. These will appear as an
                   extra step after this one. The wizard auto-detects defaults from your
                   product category, but you must confirm them before the calculation is
@@ -633,7 +633,7 @@ export function BoundaryStep() {
               )}
               {boundaryNeedsEndOfLife(formData.systemBoundary) && (
                 <li>
-                  <strong>End of Life</strong> — you will need to select the disposal
+                  <strong>End of Life</strong>: you will need to select the disposal
                   region (EU / UK / US) and can optionally specify recycling pathway
                   percentages per packaging material. Recycling credits can make a
                   significant difference to the total (e.g. aluminium gives a large

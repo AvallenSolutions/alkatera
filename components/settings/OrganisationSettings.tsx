@@ -12,6 +12,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { Eyebrow, Panel } from "@/components/studio";
+import { useSubscription } from "@/hooks/useSubscription";
+import { HospitalityFootprintToggle } from "@/components/hospitality/HospitalityFootprintToggle";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -84,6 +86,7 @@ interface OrganisationSettingsProps {
 
 export function OrganisationSettings({ showHeader = true }: OrganisationSettingsProps) {
   const { currentOrganization, refreshOrganizations, userRole } = useOrganization();
+  const { hasFeature } = useSubscription();
   const router = useRouter();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -688,6 +691,13 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
                   Suggested period when entering facility data. Can be changed per entry.
                 </p>
               </div>
+
+              {hasFeature('hospitality_beta' as any) && (
+                <div className="space-y-2">
+                  <Label>Hospitality in the company total</Label>
+                  <HospitalityFootprintToggle />
+                </div>
+              )}
             </div>
           </Panel>
         </div>

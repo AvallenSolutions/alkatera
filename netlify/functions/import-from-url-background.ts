@@ -111,21 +111,43 @@ function parseSizeFromText(text: string): { value: number; unit: 'ml' | 'cl' | '
   return { value, unit };
 }
 
-function categoriseShopifyProduct(
-  p: ShopifyProduct,
-): 'Spirits' | 'Beer & Cider' | 'Wine' | 'Ready-to-Drink & Cocktails' | 'Non-Alcoholic' {
-  const haystack = [
+function shopifyHaystack(p: ShopifyProduct): string {
+  return [
     p.product_type || '',
     Array.isArray(p.tags) ? p.tags.join(' ') : (p.tags || ''),
     p.title,
   ]
     .join(' ')
     .toLowerCase();
-  if (/alcohol[- ]?free|non[- ]?alcoholic|0\s*%/.test(haystack)) return 'Non-Alcoholic';
-  if (/\b(beer|lager|ale|ipa|stout|cider)\b/.test(haystack)) return 'Beer & Cider';
-  if (/\b(wine|champagne|prosecco|rose|sparkling)\b/.test(haystack)) return 'Wine';
-  if (/\b(rtd|ready[- ]to[- ]drink|cocktail|spritz|hard seltzer)\b/.test(haystack)) return 'Ready-to-Drink & Cocktails';
-  // Default to Spirits — the overwhelming majority of Shopify drinks brands.
+}
+
+/**
+ * Should this Shopify item be skipped as obvious non-drink / merchandise?
+ *
+ * The Claude path is prompted to exclude gift sets, merchandise and
+ * accessories; the fast path used to import EVERYTHING. This keeps the two
+ * paths consistent. Be conservative — only skip clear non-products so we
+ * never drop a real drink. A drinks keyword in the haystack overrides the
+ * merch match (e.g. "Gin Gift Set" of actual bottles is still ambiguous, but
+ * a plain "Gift Card" or "Branded Glassware" is not a drink).
+ */
+function isNonDrinkShopifyProduct(p: ShopifyProduct): boolean {
+  const haystack = shopifyHaystack(p);
+  const MERCH = /\b(gift\s?card|e[- ]?gift|voucher|gift\s?set|tasting\s?set|gift\s?box|bundle|merch(?:andise)?|glassware|glasses|glass(?:es)?\b|tumbler|tote|t[- ]?shirt|tshirt|hoodie|sweatshirt|jumper|cap|hat|beanie|apron|sticker|pin\s?badge|keyring|coaster|book|candle|accessor(?:y|ies)|bar\s?kit|jigger|strainer|opener|corkscrew|subscription)\b/;
+  return MERCH.test(haystack);
+}
+
+function categoriseShopifyProduct(
+  p: ShopifyProduct,
+): 'Spirits' | 'Beer & Cider' | 'Wine' | 'Ready-to-Drink & Cocktails' | 'Non-Alcoholic' {
+  const haystack = shopifyHaystack(p);
+  if (/alcohol[- ]?free|non[- ]?alcoholic|0\s*%|\bsoft drink\b/.test(haystack)) return 'Non-Alcoholic';
+  if (/\b(beer|lager|ale|ipa|stout|porter|cider)\b/.test(haystack)) return 'Beer & Cider';
+  if (/\b(wine|champagne|prosecco|rose|rosé|sparkling|merlot|chardonnay|sauvignon|pinot)\b/.test(haystack)) return 'Wine';
+  if (/\b(rtd|ready[- ]to[- ]drink|canned cocktail|cocktail|spritz|hard seltzer|seltzer)\b/.test(haystack)) return 'Ready-to-Drink & Cocktails';
+  if (/\b(gin|whisky|whiskey|bourbon|rum|vodka|tequila|mezcal|brandy|cognac|calvados|liqueur|aperitif|vermouth|absinthe|spirit)\b/.test(haystack)) return 'Spirits';
+  // Nothing matched — fall back to Spirits (the overwhelming majority of
+  // Shopify drinks brands on this platform), mirroring the Claude default.
   return 'Spirits';
 }
 
@@ -333,7 +355,12 @@ interface ExtractedProductShape {
 
 function mapShopifyToExtracted(products: ShopifyProduct[]): ExtractedProductShape[] {
   const out: ExtractedProductShape[] = [];
+  let skipped = 0;
   for (const p of products) {
+    if (isNonDrinkShopifyProduct(p)) {
+      skipped++;
+      continue;
+    }
     const plainBody = stripHtml(p.body_html || '');
     const bodyAbv = parseAbvFromText(plainBody + ' ' + p.title);
     const category = categoriseShopifyProduct(p);
@@ -385,6 +412,9 @@ function mapShopifyToExtracted(products: ShopifyProduct[]): ExtractedProductShap
         certifications: tagsArr.filter((t) => /organic|b[- ]?corp|soil association|vegan|fair ?trade|rainforest/i.test(t)),
       });
     }
+  }
+  if (skipped > 0) {
+    console.log(`[import-from-url-background] Shopify path skipped ${skipped} non-drink/merchandise item${skipped !== 1 ? 's' : ''}`);
   }
   return out;
 }
@@ -693,7 +723,11 @@ export const handler = async (event: { body?: string | null; headers: Record<str
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
+      // Large catalogues (40+ products) overflow a 4096 cap and truncate the
+      // forced tool call mid-JSON, producing an opaque parse error or silently
+      // dropped products. 8192 gives comfortable headroom; the truncation guard
+      // below still catches anything that exceeds even this.
+      max_tokens: 8192,
       tools: [
         {
           name: 'extract_products',
@@ -844,18 +878,52 @@ Important:
       return { statusCode: 200, body: 'ok' };
     }
 
-    const toolInput = toolUse.input as {
+    // ── Truncation guard ─────────────────────────────────────────────────────
+    // With a forced tool call, running out of output tokens leaves the tool
+    // input as partial JSON. The SDK may throw when accessing it, or hand back
+    // an object whose `products` array is missing/incomplete. Wrap the read so
+    // a large catalogue degrades gracefully with a clear message instead of an
+    // opaque failure.
+    let toolInput: {
       products: unknown[];
       org_certifications?: string[];
       org_description?: string | null;
       brand_metadata?: BrandMetadata;
     };
+    try {
+      toolInput = toolUse.input as {
+        products: unknown[];
+        org_certifications?: string[];
+        org_description?: string | null;
+        brand_metadata?: BrandMetadata;
+      };
+      if (!Array.isArray(toolInput.products)) {
+        throw new Error('tool input did not contain a products array');
+      }
+    } catch (parseErr) {
+      console.error('[import-from-url-background] Tool input parse failed (likely truncated):', parseErr);
+      await updateJob({
+        status: 'failed',
+        error:
+          'This catalogue is very large and could not be read in full. Please link directly to a specific product or shop page, then add any remaining products manually.',
+      });
+      return { statusCode: 200, body: 'ok' };
+    }
+
+    const products = toolInput.products ?? [];
+    const truncated = response.stop_reason === 'max_tokens';
+    const truncationWarning = truncated
+      ? `Only the first ${products.length} products could be read from this large catalogue. Import them, then add the rest manually.`
+      : null;
+    if (truncated) {
+      console.warn(`[import-from-url-background] Extraction hit max_tokens; returning ${products.length} partial products`);
+    }
 
     await updateJob({
       status: 'completed',
-      phase_message: null,
+      phase_message: truncationWarning,
       pages_analyzed: visitedUrls.size,
-      products: toolInput.products ?? [],
+      products,
       org_certifications: toolInput.org_certifications ?? [],
       org_description: toolInput.org_description ?? null,
       brand_metadata: mergeBrandMetadata(toolInput.brand_metadata, htmlBrandMetadata),

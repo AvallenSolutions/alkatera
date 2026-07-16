@@ -65,6 +65,80 @@ describe('formatIngestOrgContext', () => {
     expect(json.suppliers.length).toBeLessThanOrEqual(30);
   });
 
+  it('renders filename-keyed profiles as corrected_documents', () => {
+    const out = formatIngestOrgContext(
+      base({
+        profiles: [
+          {
+            supplier: 'bev ecm tobyco recipe # v#',
+            doc_type: 'bom',
+            times_seen: 3,
+            hints: { corrected_from: 'spray_diary', filename_example: 'BEV_ECM_TobyCo_Recipe_2025_v3.xlsx' },
+            match_kind: 'filename',
+          },
+          { supplier: 'biffa', doc_type: 'waste_bill', times_seen: 5, hints: {}, match_kind: 'supplier' },
+        ],
+      }),
+    );
+    expect(out).toContain('prefer the corrected type when the uploaded file name matches');
+    const json = JSON.parse(out!.split('<org_context>\n')[1].split('\n</org_context>')[0]);
+    expect(json.corrected_documents).toEqual([
+      {
+        filename_pattern: 'bev ecm tobyco recipe # v#',
+        previously_misread_as: 'spray_diary',
+        actually_is: 'bom',
+        times_corrected: 3,
+      },
+    ]);
+    // Filename profiles never leak into known_documents, and vice versa.
+    expect(json.known_documents).toHaveLength(1);
+    expect(json.known_documents[0].supplier).toBe('biffa');
+  });
+
+  it('caps corrected_documents at 10, keeping the most-corrected', () => {
+    const out = formatIngestOrgContext(
+      base({
+        profiles: Array.from({ length: 15 }, (_, i) => ({
+          supplier: `pattern number ${String.fromCharCode(97 + i)} #`,
+          doc_type: 'bom',
+          times_seen: i + 1,
+          hints: { corrected_from: 'spray_diary' },
+          match_kind: 'filename',
+        })),
+      }),
+    );
+    const json = JSON.parse(out!.split('<org_context>\n')[1].split('\n</org_context>')[0]);
+    expect(json.corrected_documents).toHaveLength(10);
+    expect(json.corrected_documents[0].times_corrected).toBe(15);
+  });
+
+  it('keeps corrected_documents when other sections are shed for budget', () => {
+    const out = formatIngestOrgContext(
+      base({
+        products: Array.from({ length: 30 }, (_, i) => `Product with a rather long descriptive name ${i} Reserve`),
+        suppliers: Array.from({ length: 30 }, (_, i) => `Supplier with an unusually verbose trading name ${i}`),
+        profiles: [
+          ...Array.from({ length: 40 }, (_, i) => ({
+            supplier: `supplier with an unusually verbose trading name ${i}`,
+            doc_type: 'supplier_invoice',
+            times_seen: i + 100,
+            hints: { category: 'purchased_services', currency: 'GBP' },
+          })),
+          {
+            supplier: 'bev recipe #',
+            doc_type: 'bom',
+            times_seen: 2,
+            hints: { corrected_from: 'spray_diary' },
+            match_kind: 'filename',
+          },
+        ],
+      }),
+    );
+    const json = JSON.parse(out!.split('<org_context>\n')[1].split('\n</org_context>')[0]);
+    expect(json.corrected_documents).toBeDefined();
+    expect(json.corrected_documents[0].filename_pattern).toBe('bev recipe #');
+  });
+
   it('sheds sections rather than truncating JSON when over the char budget', () => {
     const long = (i: number) => `Product with a rather long descriptive name number ${i} Reserve Edition`;
     const out = formatIngestOrgContext(

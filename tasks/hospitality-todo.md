@@ -301,9 +301,22 @@
 ## Module complete — prod rollout checklist
 
 All six phases shipped behind `hospitality_beta`. To go live:
-1. Run the 6 migrations in order (posted in chat): `20260619140000` (foundation),
-   `150000` (meals), `160000` (menus), `170000` (rooms), `180000` (service volumes).
-   (`140000` adds `product_kind`/`serves_per_container` + venues.)
+1. Run the migrations in order (posted in chat):
+   - `20260619140000` (foundation: `product_kind`/`serves_per_container` + venues)
+   - `20260619150000` (meals meta)
+   - `20260619160000` (menus + menu items)
+   - `20260619170000` (rooms allocation)
+   - `20260619180000` (service volumes)
+   - `20260620100000` (hospitality settings)
+   - `20260620110000` (waste)
+   - `20260621100000` (facility water `meter_purpose` split)
+   Improvements programme (2026-07) adds:
+   - `20260712100000` (`hospitality_meal_meta.quantities_status` — import finish-line)
+   - `20260712110000` (`hospitality_meal_meta.cooking_method` + `cooking_minutes` — cooking energy)
+   - `20260712120000` (`hospitality_meal_meta.dietary_tags` + `allergens` — Tier 2)
+   - `20260712130000` (`hospitality_operating_periods` — covers + revenue for intensity KPIs)
+   - `20260712140000` (`hospitality_events` + venue_type 'events' — Tier 3 events)
+   - `20260712150000` (`hospitality_room_allocation.laundry_kwh` — Tier 3 hotel)
 2. Run **Admin → Agribalyse Factors → Run backfill** (needs the Agribalyse server +
    `INNGEST_EVENT_KEY`) to populate food factors.
 3. Enable `hospitality_beta` per trial org via **Admin → Beta Access**.

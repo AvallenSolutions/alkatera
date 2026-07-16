@@ -11,8 +11,10 @@ import type { InngestFunction } from 'inngest';
 import { scrapingQueueTick, scrapingBrandRun } from './scraping';
 import { enrichBrandRun } from './enrich';
 import { documentsQueueTick, documentsProcessOne } from './documents';
+import { ingestReclassifyRun } from './ingest-reclassify';
 import { matchingSweepRun } from './matching';
 import { openlcaCertMonitor } from './monitoring';
+import { dnsHealthMonitor } from './dns-health';
 import { xeroSyncTick, xeroOrgSync } from './xero';
 import { reportPdfGenerate } from './reports';
 import { ingredientMatchSuggest } from './ingredient-match';
@@ -30,8 +32,10 @@ export const allFunctions: InngestFunction.Any[] = [
   enrichBrandRun,
   documentsQueueTick,
   documentsProcessOne,
+  ingestReclassifyRun,
   matchingSweepRun,
   openlcaCertMonitor,
+  dnsHealthMonitor,
   xeroSyncTick,
   xeroOrgSync,
   reportPdfGenerate,

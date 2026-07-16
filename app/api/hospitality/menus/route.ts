@@ -1,6 +1,6 @@
 /**
  * Hospitality menus list + create.
- * GET  /api/hospitality/menus   — list menus with item count + average per-cover carbon.
+ * GET  /api/hospitality/menus   — list menus with item count + average per-cover carbon. ?status=all|active|archived (default active).
  * POST /api/hospitality/menus   — create a menu.
  */
 
@@ -12,13 +12,14 @@ import { listMenus, createMenu } from '@/lib/hospitality/menu-service'
 
 export const runtime = 'nodejs'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const { client, user, error: authError } = await getSupabaseAPIClient()
   if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const organizationId = await resolveAccessibleOrg(client as any, user)
   if (!organizationId) return NextResponse.json({ error: 'No organisation' }, { status: 403 })
 
-  const r = await listMenus(client as any, organizationId)
+  const status = new URL(request.url).searchParams.get('status') || 'active'
+  const r = await listMenus(client as any, organizationId, status)
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status })
   return NextResponse.json({ menus: r.data }, { headers: { 'Cache-Control': 'no-store' } })
 }

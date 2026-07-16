@@ -32,6 +32,10 @@ export function useScope3Emissions(
     upstream_transport: 0,    // Category 4: Upstream Transportation
     downstream_transport: 0,  // Category 9: Downstream Transportation
     use_phase: 0,             // Category 11: Use of Sold Products
+    hospitality: 0,           // Category 1: hospitality throughput
+    hospitality_food: 0,
+    hospitality_supplies: 0,
+    hospitality_waste: 0,
     // UI-friendly aliases
     logistics: 0,
     waste: 0,

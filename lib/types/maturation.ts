@@ -337,3 +337,29 @@ export function getSpiritTypeDefaults(productCategory?: string | null): SpiritTy
   const match = SPIRIT_DEFAULT_RULES.find(([re]) => re.test(productCategory));
   return match ? match[1] : SPIRIT_DEFAULT_FALLBACK;
 }
+
+/**
+ * Single ABV-fallback rule shared by the maturation preview (SpecificationTab,
+ * MaturationProfileCard) and the persisted LCA calculator. The two previously
+ * disagreed (preview fell back to the category-default bottle ABV, persisted
+ * assumed no dilution), which made per-bottle maturation CO2e differ by up to
+ * 75% between what the card showed and what was saved.
+ *
+ * Rule: cask ABV = profile value, else category default. Bottle ABV = the
+ * product's actual ABV when set, else category default, else cask (no dilution).
+ */
+export function resolveMaturationAbv(input: {
+  profileCaskFillAbvPercent?: number | null;
+  productCategory?: string | null;
+  productAbvPercent?: number | null;
+}): { caskFillAbvPercent: number; bottleAbvPercent: number } {
+  const defaults = getSpiritTypeDefaults(input.productCategory);
+  const caskFillAbvPercent =
+    input.profileCaskFillAbvPercent ?? defaults.cask_fill_abv_percent;
+  const productAbv = Number(input.productAbvPercent);
+  const bottleAbvPercent =
+    Number.isFinite(productAbv) && productAbv > 0
+      ? productAbv
+      : defaults.bottle_abv_percent ?? caskFillAbvPercent;
+  return { caskFillAbvPercent, bottleAbvPercent };
+}

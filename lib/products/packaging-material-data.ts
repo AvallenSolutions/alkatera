@@ -7,6 +7,7 @@
 // path happened to run last. Both paths now build rows through this module.
 
 import type { PackagingFormData } from '@/components/products/PackagingFormCard';
+import { deriveEprMaterialType } from '@/lib/epr/mappings';
 
 /**
  * Packaging roles shared across several product units (a case, a pallet...).
@@ -18,6 +19,28 @@ export const SHARED_PACKAGING_CATEGORIES = ['secondary', 'shipment', 'tertiary']
 
 export function isSharedPackagingCategory(category?: string | null): boolean {
   return !!category && SHARED_PACKAGING_CATEGORIES.includes(category);
+}
+
+/**
+ * The UK EPR packaging level implied by a packaging_category. Deterministic:
+ * the three primary categories are level 'primary'; secondary/shipment/tertiary
+ * map to themselves. Returns null for an unknown/absent category.
+ */
+export function eprLevelForCategory(category?: string | null): string | null {
+  switch (category) {
+    case 'container':
+    case 'label':
+    case 'closure':
+      return 'primary';
+    case 'secondary':
+      return 'secondary';
+    case 'shipment':
+      return 'shipment';
+    case 'tertiary':
+      return 'tertiary';
+    default:
+      return null;
+  }
 }
 
 /**
@@ -69,7 +92,16 @@ export function buildPackagingMaterialData(form: PackagingFormData, productId: s
     packaging_category: form.packaging_category || null,
     origin_country: form.origin_country || null,
     net_weight_g: Number(form.net_weight_g) || null,
-    recycled_content_percentage: form.recycled_content_percentage ? Number(form.recycled_content_percentage) : null,
+    // '' / null / undefined mean "unknown"; an explicit 0 is a DECLARED zero
+    // (e.g. a supplier-confirmed virgin material) and must round-trip. The
+    // old truthy check collapsed 0 to null on every save.
+    recycled_content_percentage:
+      form.recycled_content_percentage === '' ||
+      form.recycled_content_percentage === null ||
+      form.recycled_content_percentage === undefined ||
+      isNaN(Number(form.recycled_content_percentage))
+        ? null
+        : Number(form.recycled_content_percentage),
     printing_process: form.printing_process || null,
   };
 
@@ -112,8 +144,25 @@ export function buildPackagingMaterialData(form: PackagingFormData, productId: s
 
   // EPR compliance fields
   materialData.has_component_breakdown = form.has_component_breakdown || false;
-  if (form.epr_packaging_level) materialData.epr_packaging_level = form.epr_packaging_level;
+  // epr_packaging_level is deterministic from the packaging_category, but the
+  // UI only ever used it for a badge and never persisted it, so EPR reporting
+  // had to re-derive it. Persist it here (honouring an explicit override) so
+  // the level is set on every packaging row for single SKUs and multipacks.
+  materialData.epr_packaging_level =
+    form.epr_packaging_level || eprLevelForCategory(form.packaging_category) || null;
   if (form.epr_packaging_activity) materialData.epr_packaging_activity = form.epr_packaging_activity;
+  // epr_material_type drives the RPD fee band. Only bulk-import used to set
+  // it, so normally-created rows fell to 'other' (the wrong rate for glass,
+  // aluminium etc.). Derive it from the row's material identity here, using
+  // the SAME resolution the EoL engine uses, honouring an explicit override.
+  materialData.epr_material_type =
+    form.epr_material_type ||
+    deriveEprMaterialType({
+      container_material: form.container_material,
+      packaging_category: form.packaging_category,
+      material_name: form.name,
+      matched_source_name: form.matched_source_name,
+    });
   materialData.epr_is_household = form.epr_is_household !== undefined ? form.epr_is_household : true;
   if (form.epr_ram_rating) materialData.epr_ram_rating = form.epr_ram_rating;
   if (form.epr_uk_nation) materialData.epr_uk_nation = form.epr_uk_nation;

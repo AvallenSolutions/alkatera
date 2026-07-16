@@ -1,4 +1,5 @@
 import type { ExtractedBOMItem, BOMParseResult } from './types';
+import { detectBasisFromUnit, type QuantityBasis } from './basis';
 
 const PACKAGING_KEYWORDS = [
   'bottle', 'glass', 'label', 'cap', 'caps', 'closure', 'capsule', 'cork',
@@ -66,6 +67,73 @@ export function normalizeUnit(unit: string | null): string | null {
 
   const trimmed = unit.trim();
   return UNIT_MAPPING[trimmed] || trimmed.toLowerCase();
+}
+
+/**
+ * Normalise a raw unit string while also inferring the quantity basis. A
+ * dosage unit like "g/L" or "kg/hL" yields the clean base unit ("g", "kg")
+ * plus a per-volume basis; a plain unit yields per_unit. This is how the
+ * regex/CSV parser preserves per-litre semantics the old normalizeUnit threw
+ * away (it collapsed "g/L" to "g/l" and the import mapped it to "kg").
+ */
+export function normalizeUnitWithBasis(
+  unit: string | null,
+): { unit: string | null; quantityBasis: QuantityBasis } {
+  const { basis, baseUnit } = detectBasisFromUnit(unit);
+  return { unit: normalizeUnit(baseUnit), quantityBasis: basis };
+}
+
+/**
+ * Pull a per-volume basis out of a column header that may carry extra words,
+ * e.g. "Dosage g/L" or "Amount (kg/hL)". Tries the whole header first, then
+ * its last whitespace token. Returns null when no per-volume basis is present
+ * so the caller keeps its default.
+ */
+function bestBasisFromHeader(
+  header: string | null | undefined,
+): { unit: string | null; quantityBasis: QuantityBasis } | null {
+  if (!header) return null;
+  const candidates = [header.trim(), header.trim().split(/\s+/).pop() || '']
+    .map((c) => c.replace(/[()]/g, ''))
+    .filter(Boolean);
+  for (const c of candidates) {
+    const res = normalizeUnitWithBasis(c);
+    if (res.quantityBasis !== 'per_unit') return res;
+  }
+  return null;
+}
+
+/**
+ * Map the smart-upload classifier's BOM line items to the ExtractedBOMItem
+ * shape the import flow consumes. The classifier already reports a clean base
+ * unit plus an explicit quantity_basis, so this just normalises names/units and
+ * falls back to keyword detection when a line's type is missing.
+ */
+export function stashedLineItemsToExtracted(
+  lineItems: Array<{
+    name?: string;
+    quantity?: number;
+    unit?: string;
+    quantity_basis?: QuantityBasis;
+    type?: 'ingredient' | 'packaging';
+  }>,
+): ExtractedBOMItem[] {
+  return (lineItems || [])
+    .filter((li) => (li?.name || '').trim().length > 0)
+    .map((li) => {
+      const rawName = li.name!.trim();
+      const cleanName = cleanMaterialName(rawName);
+      return {
+        rawName,
+        cleanName,
+        quantity: typeof li.quantity === 'number' ? li.quantity : null,
+        unit: normalizeUnit(li.unit ?? null),
+        itemType: li.type || detectItemType(cleanName),
+        unitCost: null,
+        totalCost: null,
+        quantityBasis: li.quantity_basis || 'per_unit',
+      };
+    });
 }
 
 export function parseQuantity(value: string | null): number | null {
@@ -166,15 +234,17 @@ function extractComponentFromLine(line: string): ExtractedBOMItem | null {
       const quantity = parseQuantity(match[pattern.groups.quantity]);
       const unitCost = parseQuantity(match[pattern.groups.unitCost]);
       const totalCost = parseQuantity(match[pattern.groups.totalCost]);
+      const { unit: cleanUnit, quantityBasis } = normalizeUnitWithBasis(unit);
 
       return {
         rawName,
         cleanName,
         quantity,
-        unit: normalizeUnit(unit),
+        unit: cleanUnit,
         itemType: detectItemType(cleanName),
         unitCost,
         totalCost,
+        quantityBasis,
       };
     }
   }
@@ -202,7 +272,8 @@ export function parseCSV(content: string, delimiter: string = ','): BOMParseResu
 
   const columnMap = detectColumnMapping(headers);
 
-  if (!columnMap.name) {
+  // Guard on null explicitly: a name column at index 0 is valid but falsy.
+  if (columnMap.name === null) {
     result.errors.push('Could not identify a name/description column in the CSV');
     return result;
   }
@@ -218,7 +289,20 @@ export function parseCSV(content: string, delimiter: string = ','): BOMParseResu
 
     const cleanName = cleanMaterialName(rawName);
     const quantity = columnMap.quantity !== null ? parseQuantity(values[columnMap.quantity]) : null;
-    const unit = columnMap.unit !== null ? normalizeUnit(values[columnMap.unit]) : null;
+    const rawUnit = columnMap.unit !== null ? values[columnMap.unit] : null;
+    const fromUnit = normalizeUnitWithBasis(rawUnit);
+    // When there is no dedicated unit column, the basis is often baked into the
+    // quantity column header ("g/L", "Dosage g/L"). Try the header and its last
+    // whitespace token so both "g/L" and "Dosage g/L" resolve.
+    const headerFallback =
+      columnMap.unit === null && columnMap.quantity !== null
+        ? bestBasisFromHeader(headers[columnMap.quantity])
+        : null;
+    const unit = fromUnit.unit ?? headerFallback?.unit ?? null;
+    const quantityBasis =
+      fromUnit.quantityBasis !== 'per_unit'
+        ? fromUnit.quantityBasis
+        : headerFallback?.quantityBasis ?? 'per_unit';
     const unitCost = columnMap.unitCost !== null ? parseQuantity(values[columnMap.unitCost]) : null;
     const totalCost = columnMap.totalCost !== null ? parseQuantity(values[columnMap.totalCost]) : null;
 
@@ -230,6 +314,7 @@ export function parseCSV(content: string, delimiter: string = ','): BOMParseResu
       itemType: detectItemType(cleanName),
       unitCost,
       totalCost,
+      quantityBasis,
     });
   }
 
@@ -287,8 +372,8 @@ function detectColumnMapping(headers: string[]): ColumnMapping {
     totalCost: null,
   };
 
-  const namePatterns = ['name', 'description', 'component', 'product', 'material', 'item'];
-  const quantityPatterns = ['quantity', 'qty', 'amount', 'vol', 'weight'];
+  const namePatterns = ['name', 'description', 'component', 'ingredient', 'product', 'material', 'item'];
+  const quantityPatterns = ['quantity', 'qty', 'amount', 'dosage', 'dose', 'vol', 'weight'];
   const unitPatterns = ['unit', 'units', 'uom'];
   const unitCostPatterns = ['unit cost', 'unit_cost', 'unitcost', 'price'];
   const totalCostPatterns = ['total cost', 'total_cost', 'totalcost', 'total', 'cost'];
@@ -296,19 +381,21 @@ function detectColumnMapping(headers: string[]): ColumnMapping {
   headers.forEach((header, index) => {
     const h = header.toLowerCase();
 
-    if (!mapping.name && namePatterns.some(p => h.includes(p))) {
+    // Guard on null (not falsiness): a valid match at index 0 must not be
+    // overwritten by a later column that also matches the pattern list.
+    if (mapping.name === null && namePatterns.some(p => h.includes(p))) {
       mapping.name = index;
     }
-    if (!mapping.quantity && quantityPatterns.some(p => h.includes(p))) {
+    if (mapping.quantity === null && quantityPatterns.some(p => h.includes(p))) {
       mapping.quantity = index;
     }
-    if (!mapping.unit && unitPatterns.some(p => h === p || h.startsWith(p + ' '))) {
+    if (mapping.unit === null && unitPatterns.some(p => h === p || h.startsWith(p + ' '))) {
       mapping.unit = index;
     }
-    if (!mapping.unitCost && unitCostPatterns.some(p => h.includes(p))) {
+    if (mapping.unitCost === null && unitCostPatterns.some(p => h.includes(p))) {
       mapping.unitCost = index;
     }
-    if (!mapping.totalCost && totalCostPatterns.some(p => h.includes(p))) {
+    if (mapping.totalCost === null && totalCostPatterns.some(p => h.includes(p))) {
       if (!unitCostPatterns.some(p => h.includes(p))) {
         mapping.totalCost = index;
       }

@@ -38,7 +38,7 @@ export const STEP_HELP: Record<string, { tips: string[]; terms: TermExplanation[
       'You can skip this guide in future by ticking the checkbox below',
     ],
     terms: [
-      { term: 'LCA', explanation: 'Lifecycle Assessment, a standardised method (ISO 14040/14044) for measuring the environmental impact of a product across its entire life' },
+      { term: 'LCA', explanation: 'Lifecycle Assessment: a standardised method (ISO 14040/14044) for measuring the environmental impact of a product across its entire life' },
       { term: 'ISO 14044', explanation: 'The international standard specifying the requirements and guidelines for lifecycle assessment studies' },
       { term: 'ISO 14067', explanation: 'The standard for quantifying and reporting the carbon footprint of products, based on the LCA methodology' },
       { term: 'Functional Unit', explanation: 'A quantified description of the product function (e.g., "1 litre of beer at 5% ABV delivered to retailer")' },
@@ -103,8 +103,8 @@ export const STEP_HELP: Record<string, { tips: string[]; terms: TermExplanation[
     tips: [
       'Select a scenario preset to auto-fill typical distribution routes',
       'Add multiple transport legs for multi-stage distribution (e.g. factory to warehouse, then warehouse to retail)',
-      'Product weight is auto-calculated from your materials, adjust if the total shipped weight differs',
-      'Use Ship mode for intercontinental routes, using Truck overestimates emissions by ~6×',
+      'Product weight is auto-calculated from your materials; adjust if the total shipped weight differs',
+      'Use Ship mode for intercontinental routes; using Truck overestimates emissions by ~6×',
     ],
     terms: [
       { term: 'Distribution Leg', explanation: 'A single segment of the outbound transport chain, defined by transport mode (truck, train, ship, air) and distance' },

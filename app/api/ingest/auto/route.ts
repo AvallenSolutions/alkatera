@@ -4,6 +4,8 @@ import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
 import { createClient } from '@supabase/supabase-js'
 import { classifyDocument, shapeIngestResult } from '@/lib/ingest/classify-document'
 import { buildIngestOrgContext } from '@/lib/ingest/org-context'
+import { userHasOrgAccess } from '@/lib/supabase/verify-org-access'
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access'
 import type { ExtractedBillData } from '@/app/api/utilities/import-from-pdf/route'
 import type {
   ExtractedFacilityBillData,
@@ -15,7 +17,30 @@ import type {
 // fails — Claude on a single PDF page typically completes in 5-12s, well
 // under Netlify's 26s sync ceiling.
 const INLINE_FALLBACK_MAX_BYTES = 5 * 1024 * 1024
+// PDFs with more than this many pages routinely blow the 26s inline budget
+// (Claude reads every page), so they go to the background function even when
+// their byte size is small. A 60-page catalogue at 4.8MB used to be classified
+// inline, get the lambda killed mid-await, and leave the job stuck at
+// "extracting" forever.
+const INLINE_MAX_PDF_PAGES = 8
 const TRIGGER_TIMEOUT_MS = 4000
+
+/**
+ * Cheap PDF page-count estimate from the raw bytes (no full parse): count the
+ * "/Type /Page" objects (excluding the "/Pages" tree node). Good enough to
+ * decide inline-vs-background; returns null for non-PDF or unreadable input.
+ */
+function estimatePdfPageCount(bytes: Uint8Array): number | null {
+  try {
+    // Only scan a bounded prefix — page objects are spread through the file,
+    // but for a routing heuristic a generous cap keeps this O(1)-ish.
+    const text = Buffer.from(bytes).toString('latin1')
+    const matches = text.match(/\/Type\s*\/Page[^s]/g)
+    return matches ? matches.length : null
+  } catch {
+    return null
+  }
+}
 
 // On Netlify the lambda freezes the moment the HTTP response is sent, so the
 // inline fallback below MUST be awaited. Bumping maxDuration gives us
@@ -123,7 +148,7 @@ async function runInlineClassifier(
     // path too. Without it, historical-report source PDFs are never preserved
     // and the bom / spray_diary / soil_carbon_evidence handoffs silently
     // degrade to "re-upload the file" for every file under the inline ceiling.
-    const shaped = shapeIngestResult(result.type, result.payload, stashPath)
+    const shaped = shapeIngestResult(result.type, result.payload, stashPath, result.meta)
     await updateJob({
       status: 'completed',
       phase_message: null,
@@ -186,10 +211,14 @@ export type IngestResultType =
   | 'smart_meter_csv'
   | 'historical_sustainability_report'
   | 'historical_lca_report'
+  | 'hospitality_menu'
+  | 'pos_sales_export'
   | 'unsupported'
 
 export interface IngestResponse {
   type: IngestResultType
+  /** Classifier's self-reported confidence; captured for the learning loop. */
+  classifierMeta?: { confidence?: 'high' | 'medium' | 'low'; alternate?: string }
   utilityBill?: ExtractedBillData
   smartMeter?: {
     format: 'long' | 'wide'
@@ -221,6 +250,7 @@ export interface IngestResponse {
       name?: string
       quantity?: number
       unit?: string
+      quantity_basis?: 'per_litre' | 'per_hectolitre' | 'per_unit'
       type?: 'ingredient' | 'packaging'
     }>
   }
@@ -339,6 +369,15 @@ export interface IngestResponse {
     study_commissioned_by?: string
     stashId?: string
   }
+  hospitalityMenu?: {
+    looks_like?: 'food_menu' | 'drinks_menu' | 'mixed_menu'
+    approx_item_count?: number
+    stashId?: string
+  }
+  posSalesExport?: {
+    pos_hint?: string
+    stashId?: string
+  }
   reason?: string
 }
 
@@ -372,13 +411,18 @@ export async function POST(request: NextRequest) {
     }
 
     const serviceClient = createClient(supabaseUrl, serviceRoleKey)
-    const { data: membership } = await serviceClient
-      .from('organization_members')
-      .select('id')
-      .eq('organization_id', organizationId)
-      .eq('user_id', user.id)
-      .maybeSingle()
-    if (!membership) return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+
+    // Access check: members AND active advisors (read or write) may reach an
+    // org's data. This route runs on the service-role client which bypasses
+    // RLS, so org scoping is enforced here in application code.
+    const hasAccess = await userHasOrgAccess(serviceClient, user.id, organizationId)
+    if (!hasAccess) return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+
+    // Smart upload writes into the org (stashed file + ingest job that seeds
+    // org data), so read-only advisors are blocked here even though they can
+    // reach the org for reads.
+    const denied = await denyReadOnlyAdvisor(serviceClient, user, organizationId)
+    if (denied) return denied
 
     const rate = checkRateLimit(organizationId)
     if (!rate.allowed) {
@@ -417,10 +461,20 @@ export async function POST(request: NextRequest) {
     // Strategy: classify inline whenever the file fits within the sync
     // budget. The Netlify -background function has been failing to
     // cold-start in production (jobs stuck at "Queued…"), and even when
-    // it works the inline path is faster for typical bills. We only fall
-    // back to the background trigger for large PDFs that wouldn't finish
-    // inside Netlify's 26s sync ceiling.
-    if (file.size <= INLINE_FALLBACK_MAX_BYTES) {
+    // it works the inline path is faster for typical bills. We fall back to
+    // the background trigger for large files AND for multi-page PDFs, which
+    // are slow to read regardless of byte size and would otherwise get the
+    // 26s lambda killed mid-await (leaving the job stuck at "extracting").
+    const isPdf = (file.type || '').includes('pdf') || file.name.toLowerCase().endsWith('.pdf')
+    let inlineEligible = file.size <= INLINE_FALLBACK_MAX_BYTES
+    if (inlineEligible && isPdf) {
+      const pageCount = estimatePdfPageCount(new Uint8Array(await file.arrayBuffer()))
+      if (pageCount != null && pageCount > INLINE_MAX_PDF_PAGES) {
+        inlineEligible = false
+        console.log(`[ingest/auto] PDF has ~${pageCount} pages (> ${INLINE_MAX_PDF_PAGES}); routing to background`)
+      }
+    }
+    if (inlineEligible) {
       await runInlineClassifier(serviceClient, job.id, file, stashPath, organizationId)
       return NextResponse.json({ jobId: job.id }, { status: 202 })
     }

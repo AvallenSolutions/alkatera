@@ -1,5 +1,8 @@
 import { supabase } from './supabaseClient';
 import { boundaryToDbEnum } from './system-boundaries';
+import { buildPackagingMaterialData } from './products/packaging-material-data';
+import type { PackagingFormData } from '@/components/products/PackagingFormCard';
+import type { PackagingCategory } from './types/lca';
 import type {
   MultipackComponent,
   MultipackSecondaryPackaging,
@@ -10,6 +13,170 @@ import type {
   MultipackAggregatedData,
   Product,
 } from './types/products';
+
+// ============================================================================
+// Multipack packaging → product_materials
+// ============================================================================
+// A multipack's own transit/grouping packaging lives on product_materials as
+// ordinary packaging rows on the multipack product, exactly like a single SKU.
+// That makes it visible to the Specification tab, the LCA calculator and EPR,
+// and editable through the same machinery. (It used to live in the parallel,
+// impoverished multipack_secondary_packaging table, read only by the Overview
+// card.) These helpers build and read those rows.
+
+export interface MultipackPackagingInput {
+  material_name: string;
+  material_type: string;
+  /** Packaging role: the multipack's own packaging is transit/grouping, so
+   *  shipment (courier), secondary (retail grouping) or tertiary (pallet). */
+  packaging_category?: string;
+  weight_grams: number;
+  is_recyclable?: boolean;
+  /** Empty string / undefined = unknown (saved as null); 0 = declared zero. */
+  recycled_content_percentage?: number | "";
+  notes?: string;
+}
+
+/**
+ * Build a product_materials packaging row for one item of a multipack's own
+ * packaging, reusing the single-SKU mapping (buildPackagingMaterialData) so
+ * EPR level, allocation and circularity fields are populated identically.
+ *
+ * A multipack's own packaging is 1 per multipack unit, so units_per_group=1
+ * (the multipack IS the sellable unit; its transit packaging is not shared
+ * across several multipacks). Shared categories require units_per_group≥1 or
+ * packagingFormErrors blocks the row — 1 satisfies that and is correct here.
+ */
+export function buildMultipackPackagingRow(
+  pkg: MultipackPackagingInput,
+  multipackProductId: string | number,
+): Record<string, any> {
+  const category = (pkg.packaging_category || 'shipment') as PackagingCategory;
+  const form: PackagingFormData = {
+    tempId: `mp-pkg-${multipackProductId}-${pkg.material_name}`,
+    name: pkg.material_name,
+    data_source: null,
+    amount: '',
+    unit: 'g',
+    packaging_category: category,
+    // Unknown stays unknown (null); an explicit 0 is a declared zero.
+    recycled_content_percentage: pkg.recycled_content_percentage ?? '',
+    printing_process: '',
+    net_weight_g: pkg.weight_grams,
+    origin_country: '',
+    transport_mode: 'truck',
+    distance_km: '',
+    has_component_breakdown: false,
+    components: [],
+    epr_is_household: true,
+    epr_is_drinks_container: false,
+    units_per_group: 1,
+    // The material the user picked ("Cardboard", "Plastic Film", "Wood") is
+    // the row's material identity — dropping it forced end-of-life
+    // classification back onto name inference ("Shrink Wrap" → 'other').
+    container_material: pkg.material_type || null,
+    // is_recyclable → recyclability_percent (all-or-nothing until the user
+    // refines it in the packaging editor).
+    recyclability_percent: (pkg.is_recyclable ?? true) ? 100 : 0,
+  };
+  const row = buildPackagingMaterialData(form, String(multipackProductId));
+  // The builder has no notes mapping; carry the user's note onto the row.
+  if (pkg.notes) row.notes = pkg.notes;
+  return row;
+}
+
+/**
+ * Fetch a multipack's own packaging as product_materials rows (material_type
+ * 'packaging'). Used by the Overview card so Overview and Specification agree.
+ */
+export async function fetchMultipackPackagingMaterials(
+  multipackProductId: string,
+): Promise<any[]> {
+  const { data, error } = await supabase
+    .from('product_materials')
+    .select('*')
+    .eq('product_id', multipackProductId)
+    .eq('material_type', 'packaging')
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching multipack packaging materials:', error);
+    throw new Error(error.message);
+  }
+
+  return data || [];
+}
+
+/**
+ * Insert new packaging rows for a multipack's own packaging. Each item is built
+ * through buildMultipackPackagingRow so the columns match the CREATE flow and
+ * single-SKU packaging exactly (EPR level, material identity, allocation).
+ */
+export async function insertMultipackPackaging(
+  multipackProductId: string,
+  items: MultipackPackagingInput[],
+): Promise<any[]> {
+  if (items.length === 0) return [];
+  const rows = items.map((item) => buildMultipackPackagingRow(item, multipackProductId));
+  const { data, error } = await supabase
+    .from('product_materials')
+    .insert(rows)
+    .select();
+
+  if (error) {
+    console.error('Error inserting multipack packaging materials:', error);
+    throw new Error(error.message);
+  }
+  return data || [];
+}
+
+/**
+ * Update one existing multipack packaging row. We rebuild the row through the
+ * shared builder (so material identity, EPR level and allocation stay in lockstep
+ * with the CREATE flow) but strip the fields that would clobber choices the user
+ * may have made in the FULL packaging editor:
+ *   - product_id: never move the row to another product.
+ *   - epr_is_household / epr_is_drinks_container: the mini editor doesn't expose
+ *     these, so leave whatever the full editor set.
+ * epr_packaging_activity / epr_uk_nation / epr_ram_rating are absent from the
+ * builder output entirely, so an update never touches them.
+ */
+export async function updateMultipackPackaging(
+  rowId: string,
+  item: MultipackPackagingInput,
+  multipackProductId: string,
+): Promise<void> {
+  const row = buildMultipackPackagingRow(item, multipackProductId);
+  delete row.product_id;
+  delete row.epr_is_household;
+  delete row.epr_is_drinks_container;
+
+  const { error } = await supabase
+    .from('product_materials')
+    .update(row)
+    .eq('id', rowId);
+
+  if (error) {
+    console.error('Error updating multipack packaging material:', error);
+    throw new Error(error.message);
+  }
+}
+
+/**
+ * Delete multipack packaging rows by id.
+ */
+export async function deleteMultipackPackaging(rowIds: string[]): Promise<void> {
+  if (rowIds.length === 0) return;
+  const { error } = await supabase
+    .from('product_materials')
+    .delete()
+    .in('id', rowIds);
+
+  if (error) {
+    console.error('Error deleting multipack packaging materials:', error);
+    throw new Error(error.message);
+  }
+}
 
 // ============================================================================
 // Multipack Component Functions
@@ -162,7 +329,11 @@ export async function addMultipackSecondaryPackaging(
       material_type: input.material_type,
       weight_grams: input.weight_grams,
       is_recyclable: input.is_recyclable ?? true,
-      recycled_content_percentage: input.recycled_content_percentage ?? 0,
+      // Unknown stays null; the old `?? 0` recorded a declared 0% for unknowns.
+      recycled_content_percentage:
+        input.recycled_content_percentage == null || input.recycled_content_percentage === ''
+          ? null
+          : input.recycled_content_percentage,
       notes: input.notes || null,
     })
     .select()
@@ -238,11 +409,22 @@ export async function fetchAvailableProductsForMultipack(
   organizationId: string,
   excludeProductId?: string
 ): Promise<Product[]> {
+  // Show the same products the main /products list shows: every real product
+  // in the org. We deliberately do NOT filter on is_draft here — that flag is
+  // overloaded (it doubles as the "archived" flag via the product page's
+  // Archive action) and most products are created as drafts by the import,
+  // Breww, onboarding and outreach flows, so filtering it out hid legitimately
+  // set-up products (e.g. Everleaf's "Marine") from the multipack picker even
+  // though they appear in the product list. product_kind keeps hospitality
+  // meals/drinks/room-nights, which reuse the products table, out of the list.
   let query = supabase
     .from('products')
     .select('*')
     .eq('organization_id', organizationId)
-    .eq('is_draft', false)
+    .eq('product_kind', 'product')
+    // Archived products (archived_at set) are excluded — they should not be
+    // pickable as new multipack components, matching the default product list.
+    .is('archived_at', null)
     .order('name', { ascending: true });
 
   // Exclude the current multipack to prevent self-reference
@@ -276,23 +458,39 @@ export interface CreateCompleteMultipackInput {
     component_product_id: string;
     quantity: number;
   }>;
-  secondaryPackaging?: Array<{
-    material_name: string;
-    material_type: string;
-    weight_grams: number;
-    is_recyclable?: boolean;
-    recycled_content_percentage?: number;
-    notes?: string;
-  }>;
+  secondaryPackaging?: MultipackPackagingInput[];
 }
 
 export async function createCompleteMultipack(
   input: CreateCompleteMultipackInput
-): Promise<{ product: Product; components: MultipackComponent[]; packaging: MultipackSecondaryPackaging[] }> {
+): Promise<{ product: Product; components: MultipackComponent[]; packaging: any[] }> {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
     throw new Error('User not authenticated');
+  }
+
+  // Every component must belong to the same organisation as the multipack.
+  // Product ids are sequential integers, so without this check (and the
+  // matching RLS component-org check) a crafted request could fold another
+  // organisation's product name and footprint into this multipack.
+  const componentIds = input.components.map((c) => c.component_product_id);
+  if (componentIds.length > 0) {
+    const { data: componentOrgs, error: componentOrgsError } = await supabase
+      .from('products')
+      .select('id, organization_id')
+      .in('id', componentIds);
+    if (componentOrgsError) {
+      throw new Error(componentOrgsError.message);
+    }
+    const foundIds = new Set((componentOrgs || []).map((p) => p.id));
+    const wrongOrg = (componentOrgs || []).filter(
+      (p) => p.organization_id !== input.organizationId
+    );
+    const missing = componentIds.filter((id) => !foundIds.has(id));
+    if (wrongOrg.length > 0 || missing.length > 0) {
+      throw new Error('One or more selected products are not available to this organisation.');
+    }
   }
 
   // First, create the multipack product
@@ -354,30 +552,32 @@ export async function createCompleteMultipack(
     throw new Error(componentsError.message);
   }
 
-  // Add secondary packaging if provided
-  let packaging: MultipackSecondaryPackaging[] = [];
+  // Add the multipack's own transit/grouping packaging as product_materials
+  // packaging rows on the multipack product. This unifies multipacks with
+  // single SKUs: the packaging is now visible to the Specification tab, the
+  // LCA calculator and EPR, and editable through the same machinery.
+  let packaging: any[] = [];
   if (input.secondaryPackaging && input.secondaryPackaging.length > 0) {
-    const packagingToInsert = input.secondaryPackaging.map((pkg) => ({
-      multipack_product_id: product.id,
-      material_name: pkg.material_name,
-      material_type: pkg.material_type,
-      weight_grams: pkg.weight_grams,
-      is_recyclable: pkg.is_recyclable ?? true,
-      recycled_content_percentage: pkg.recycled_content_percentage ?? 0,
-      notes: pkg.notes || null,
-    }));
+    const packagingToInsert = input.secondaryPackaging.map((pkg) =>
+      buildMultipackPackagingRow(pkg, product.id)
+    );
 
     const { data: packagingData, error: packagingError } = await supabase
-      .from('multipack_secondary_packaging')
+      .from('product_materials')
       .insert(packagingToInsert)
       .select();
 
     if (packagingError) {
-      console.error('Error adding multipack secondary packaging:', packagingError);
-      // Continue without packaging - not critical
-    } else {
-      packaging = packagingData || [];
+      // The packaging the user just described MUST reach the database — a
+      // swallowed failure meant "Multipack created successfully" while the
+      // shipper box was silently missing from the footprint. Roll back the
+      // half-created multipack so the user can retry cleanly.
+      console.error('Error adding multipack packaging materials:', packagingError);
+      await supabase.from('multipack_components').delete().eq('multipack_product_id', product.id);
+      await supabase.from('products').delete().eq('id', product.id);
+      throw new Error(`Could not save the multipack's packaging: ${packagingError.message}`);
     }
+    packaging = packagingData || [];
   }
 
   // Increment product count

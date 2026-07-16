@@ -266,7 +266,7 @@ export function GuideStep({ skipGuide, onToggleSkip }: GuideStepProps) {
         </div>
         <p className="text-sm text-muted-foreground leading-relaxed">
           A Lifecycle Assessment (LCA) is a standardised method for measuring the
-          environmental impact of a product across its entire life &mdash; from raw
+          environmental impact of a product across its entire life, from raw
           material extraction to end-of-life disposal. It follows the
           international standards <strong>ISO 14040</strong> and{' '}
           <strong>ISO 14044</strong>, and for carbon footprints specifically,{' '}

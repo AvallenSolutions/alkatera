@@ -6,6 +6,8 @@ import { mapActivityToRPD, mapMaterialToRPD, mapNationToRPD, mapRAMRatingToRPD, 
 import { calculateLineFee, getApplicableRate, findFeeRate } from '@/lib/epr/fee-calculator'
 import { isDRSExcluded, isGlassDrinksContainer, processContainerComponents, extractComponentWeights } from '@/lib/epr/drinks-container-rules'
 import { FEE_YEARS, RPD_MATERIAL_NAMES } from '@/lib/epr/constants'
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access'
+import { getPackagingUnitsPerGroup } from '@/lib/end-of-life-factors'
 import type { EPRFeeRate, RPDMaterialCode, RPDOrganisationSize } from '@/lib/epr/types'
 import type { EPRMaterialType, EPRPackagingActivity, EPRPackagingLevel, EPRRAMRating, EPRUKNation, PackagingCategory } from '@/lib/types/lca'
 
@@ -84,6 +86,11 @@ export async function POST(request: NextRequest) {
 
     const supabase = getServiceClient()
 
+    // Generating a submission writes rows; advisor read access is not enough
+    // (house rule: every service-role write goes through denyReadOnlyAdvisor).
+    const denied = await denyReadOnlyAdvisor(supabase, user, organizationId)
+    if (denied) return denied
+
     // Fetch EPR settings
     const { data: settings } = await supabase
       .from('epr_organization_settings')
@@ -117,6 +124,8 @@ export async function POST(request: NextRequest) {
         material_name,
         net_weight_g,
         packaging_category,
+        material_type,
+        units_per_group,
         epr_material_type,
         epr_packaging_activity,
         epr_packaging_level,
@@ -147,6 +156,24 @@ export async function POST(request: NextRequest) {
     if (packagingError) {
       console.error('Error fetching packaging data:', packagingError)
       return NextResponse.json({ error: 'Failed to fetch packaging data' }, { status: 500 })
+    }
+
+    // Fetch the modern component breakdown (packaging_material_components).
+    // The recipe editor's EPR Material Breakdown writes here, but this route
+    // only ever read the legacy component_*_weight columns (set by bulk-import
+    // alone), so diligently-entered per-component data was ignored and glass
+    // drinks containers missed their mandated per-component RPD lines.
+    const materialIds = (packagingData || []).map((m: any) => m.id)
+    const componentsByMaterial: Record<string, any[]> = {}
+    if (materialIds.length > 0) {
+      const { data: childComponents } = await supabase
+        .from('packaging_material_components')
+        .select('product_material_id, epr_material_type, component_name, weight_grams')
+        .in('product_material_id', materialIds)
+      for (const c of childComponents || []) {
+        const key = String((c as any).product_material_id)
+        ;(componentsByMaterial[key] ||= []).push(c)
+      }
     }
 
     const warnings: string[] = []
@@ -195,15 +222,35 @@ export async function POST(request: NextRequest) {
 
       const drsExcluded = (settings.drs_applies ?? true) && isDRSExcluded(isDrinksContainer, unitSizeML, materialType, fee_year)
 
-      // Handle drinks container component rules
-      const components = extractComponentWeights(material)
+      // Handle drinks container component rules. Prefer the modern child
+      // table (packaging_material_components); fall back to the legacy
+      // component_*_weight columns for rows created by bulk-import.
+      const childRows = componentsByMaterial[String(material.id)] || []
+      const components = childRows.length > 0
+        ? childRows
+            .filter((c: any) => Number(c.weight_grams) > 0)
+            .map((c: any) => {
+              const mt = (c.epr_material_type || 'other') as EPRMaterialType
+              return {
+                material_type: mt,
+                rpd_material_code: mapMaterialToRPD(mt),
+                component_name: c.component_name || 'Component',
+                weight_grams: Number(c.weight_grams),
+              }
+            })
+        : extractComponentWeights(material)
       const processedComponents = processContainerComponents(isDrinksContainer, materialType, components, material.net_weight_g)
 
       // For glass drinks containers, each component becomes a separate line
       // For aggregated containers, all components merge into one line
+      // Shared packaging (a 24-bottle case) is one physical item per
+      // units_per_group units — same divisor as the LCA. Counting the full
+      // case weight once per bottle over-declared submission tonnage by the
+      // pack factor.
+      const unitsPerGroup = getPackagingUnitsPerGroup(material as any)
       for (const component of processedComponents) {
         const componentMaterialCode = component.rpd_material_code
-        const totalWeightKg = (component.weight_grams / 1000) * totalUnits
+        const totalWeightKg = (component.weight_grams / 1000 / unitsPerGroup) * totalUnits
 
         // RPD field derivation
         const rpdActivity = mapActivityToRPD(activity)

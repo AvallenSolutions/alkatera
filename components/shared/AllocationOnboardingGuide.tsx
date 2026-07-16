@@ -51,11 +51,14 @@ export function AllocationOnboardingGuide({
             .select("id", { count: "exact", head: true })
             .eq("organization_id", organizationId),
 
+          // Count every real product. is_draft is overloaded and most products
+          // are created as drafts, so filtering is_draft=false told orgs with an
+          // imported/onboarded catalogue they had "no products yet".
           supabase
             .from("products")
             .select("id", { count: "exact", head: true })
             .eq("organization_id", organizationId)
-            .eq("is_draft", false),
+            .eq("product_kind", "product"),
 
           supabase
             .from("facility_product_assignments")

@@ -24,7 +24,7 @@ import { checkCertExpiry, parseHostPort, type CertExpiry } from '@/lib/openlca/c
  *                            openlcaCertMonitor
  *                            - reads cert notAfter for each configured server
  *                            - logs status every run
- *                            - emails ADMIN_ALERT_EMAIL on threshold days
+ *                            - emails ADMIN_EMAIL on threshold days
  *                              (and daily once expired / unreadable)
  *
  * The check is also exposed on-demand at GET /api/admin/openlca/cert-check.
@@ -136,7 +136,7 @@ export const openlcaCertMonitor = inngest.createFunction(
         console.warn('[openlca-cert-monitor] RESEND_API_KEY not set — alert not emailed');
         return { sent: false, reason: 'no-api-key' };
       }
-      const to = process.env.ADMIN_ALERT_EMAIL || 'hello@alkatera.com';
+      const to = process.env.ADMIN_EMAIL || 'hello@alkatera.com';
       const { subject, html } = buildEmail(alerting);
       const resend = new Resend(resendApiKey);
       await resend.emails.send({

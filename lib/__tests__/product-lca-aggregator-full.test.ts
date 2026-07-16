@@ -946,7 +946,10 @@ describe('Product LCA Aggregator', () => {
       expect(scopes.scope2).toBe(0);
     });
 
-    it('facility with productVolume=0 uses 1 as fallback (no division by zero)', async () => {
+    it('facility with productVolume=0 is excluded with a visible warning (never divided by 1)', async () => {
+      // Regression: the old fallback divided by 1, booking the WHOLE run's
+      // allocated emissions (here 500 kg) against a single unit. The facility
+      // must now be skipped and the user told to fix the production volume.
       const facility = createMockFacilityEmissions({
         allocatedEmissions: 500,
         productVolume: 0,
@@ -960,9 +963,14 @@ describe('Product LCA Aggregator', () => {
         'cradle-to-gate',
       );
 
-      // Should use 1 as divisor, not crash
       expect(result.success).toBe(true);
-      expect(result.impacts.breakdown.by_lifecycle_stage.processing).toBeCloseTo(500, 0);
+      expect(result.impacts.breakdown.by_lifecycle_stage.processing).toBeCloseTo(0, 3);
+      const warnings: string[] = result.impacts.calculation_warnings || [];
+      expect(warnings.some((w) => w.includes('no valid production volume'))).toBe(true);
+      // The facility still appears in the report detail, flagged as excluded
+      const detail = result.impacts.facility_detail?.[0];
+      expect(detail?.excluded_invalid_volume).toBe(true);
+      expect(detail?.per_unit_total).toBe(0);
     });
   });
 

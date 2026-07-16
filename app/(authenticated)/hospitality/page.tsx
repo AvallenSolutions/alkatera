@@ -21,6 +21,8 @@ import {
   type HospitalityCounts,
 } from '@/components/hospitality/dashboard/HospitalityOverview';
 import { HospitalityFootprintToggle } from '@/components/hospitality/HospitalityFootprintToggle';
+import { HospitalityBandThresholds } from '@/components/hospitality/HospitalityBandThresholds';
+import { ComplianceExports } from '@/components/hospitality/ComplianceExports';
 import { useHospitalitySettings } from '@/hooks/data/useHospitalitySettings';
 import { hospitalitySectionFromHref, isHospitalitySectionEnabled } from '@/lib/hospitality/settings';
 
@@ -32,6 +34,9 @@ const SECTIONS = [
   { href: '/hospitality/rooms/', title: 'The rooms', hint: 'Per-room-night impact: purchased consumables plus allocated energy and water', countKey: 'rooms', unit: ['ROOM', 'ROOMS'] },
   { href: '/hospitality/sales/', title: 'The sales', hint: 'Covers, drinks and room nights served; this drives your company total', countKey: null, unit: null },
   { href: '/hospitality/waste/', title: 'The waste', hint: 'Food and dry waste with how it is treated; tracked separately and added to your footprint', countKey: null, unit: null },
+  { href: '/hospitality/events/', title: 'The events', hint: 'Weddings, festivals and functions: attendee travel, temporary power and catering in one per-event footprint', countKey: null, unit: null },
+  { href: '/hospitality/marketplace/', title: 'The marketplace', hint: 'Find producers whose verified drinks LCAs you can pull into your menus, and list your own org for venues to find', countKey: null, unit: null },
+  { href: '/hospitality/integrations/', title: 'The integrations', hint: 'Connect your POS, property, procurement and waste systems to pull data automatically', countKey: null, unit: null },
 ] as const;
 
 export default function HospitalityDashboard() {
@@ -106,7 +111,12 @@ export default function HospitalityDashboard() {
 
       <HospitalityOverview onCounts={setCounts} />
 
-      <HospitalityFootprintToggle />
+      <div className="grid gap-3 lg:grid-cols-2">
+        <HospitalityFootprintToggle />
+        <HospitalityBandThresholds />
+      </div>
+
+      <ComplianceExports />
 
       <section>
         <Eyebrow className="mb-3">Manage</Eyebrow>

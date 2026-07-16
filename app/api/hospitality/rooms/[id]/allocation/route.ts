@@ -33,7 +33,7 @@ async function ctx(productId: string) {
   return { db, organizationId, productId: Number(productId), userId: user.id }
 }
 
-function withImpact(row: { occupancy: number; electricity_kwh: number; gas_kwh: number; water_litres: number; country: string }) {
+function withImpact(row: { occupancy: number; electricity_kwh: number; gas_kwh: number; water_litres: number; laundry_kwh: number; country: string }) {
   return { allocation: row, impact: computeAllocatedImpact(row) }
 }
 
@@ -42,7 +42,7 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
   if ('error' in c) return c.error
   const { data } = await c.db
     .from('hospitality_room_allocation')
-    .select('occupancy, electricity_kwh, gas_kwh, water_litres, country')
+    .select('occupancy, electricity_kwh, gas_kwh, water_litres, laundry_kwh, country')
     .eq('product_id', c.productId)
     .maybeSingle()
   const row = data
@@ -51,6 +51,7 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
         electricity_kwh: Number(data.electricity_kwh),
         gas_kwh: Number(data.gas_kwh),
         water_litres: Number(data.water_litres),
+        laundry_kwh: Number(data.laundry_kwh ?? 0),
         country: data.country,
       }
     : { ...DEFAULT_ROOM_ALLOCATION }
@@ -75,7 +76,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     return NextResponse.json({ error: 'occupancy must be greater than 0' }, { status: 400 })
   }
   const nums: Record<string, number> = {}
-  for (const f of ['electricity_kwh', 'gas_kwh', 'water_litres']) {
+  for (const f of ['electricity_kwh', 'gas_kwh', 'water_litres', 'laundry_kwh']) {
     const v = Number(body?.[f] ?? 0)
     if (!Number.isFinite(v) || v < 0) return NextResponse.json({ error: `${f} must be 0 or more` }, { status: 400 })
     nums[f] = v
@@ -87,6 +88,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     electricity_kwh: nums.electricity_kwh,
     gas_kwh: nums.gas_kwh,
     water_litres: nums.water_litres,
+    laundry_kwh: nums.laundry_kwh,
     country,
   }
 

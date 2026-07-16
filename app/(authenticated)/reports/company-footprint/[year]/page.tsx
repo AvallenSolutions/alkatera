@@ -656,6 +656,21 @@ export default function FootprintBuilderPage() {
                     isLoading={isLoadingScope3}
                   />
                 </div>
+                {(scope3Emissions.hospitality ?? 0) > 0 && (
+                  <div id="footprint-card-hospitality" className="border-l-4 border-emerald-500/20 rounded-lg border bg-card p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-semibold">Hospitality service</span>
+                      <StateChip className="text-xs">Category 1</StateChip>
+                    </div>
+                    <p className="mt-1 text-2xl font-semibold">
+                      {formatEmissions(scope3Emissions.hospitality ?? 0)} CO₂e
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Meals, drinks and room-nights served, plus hospitality waste. Manage this in{' '}
+                      <a href="/hospitality" className="underline">Hospitality</a>.
+                    </p>
+                  </div>
+                )}
                 {report && currentOrganization && (
                   <div id="footprint-card-upstream_transport">
                     <UpstreamTransportCard

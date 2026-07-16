@@ -3,7 +3,10 @@ import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access';
 import { applyFieldAliases, computeFieldDiff } from '@/lib/ingest/feedback-diff';
 import { supplierKeyForResult } from '@/lib/ingest/supplier-key';
-import { deriveHints } from '@/lib/ingest/feedback-hints';
+import { deriveHints, sanitiseHintValue } from '@/lib/ingest/feedback-hints';
+import { unwrapResultPayload } from '@/lib/ingest/wire-shape';
+import { docSignature } from '@/lib/ingest/doc-signature';
+import { bumpDocumentProfile } from '@/lib/ingest/profile-upsert';
 
 /**
  * POST /api/ingest/feedback
@@ -43,23 +46,6 @@ const LEARNABLE_TYPES = new Set([
   'historical_lca_report',
 ]);
 
-// result_payload on the job row is the shaped wire format from
-// shapeIngestResult(): { type, <wrapperKey>: payload }. Unwrap before diffing.
-const WRAPPER_KEYS: Record<string, string> = {
-  utility_bill: 'utilityBill',
-  water_bill: 'waterBill',
-  waste_bill: 'wasteBill',
-  supplier_invoice: 'supplierInvoice',
-  freight_invoice: 'freightInvoice',
-  refrigerant_service: 'refrigerantService',
-  packaging_spec: 'packagingSpec',
-  supplier_coa: 'supplierCoa',
-  certification: 'certification',
-  soil_carbon_lab: 'soilCarbonLab',
-  historical_sustainability_report: 'historicalSustainabilityReport',
-  historical_lca_report: 'historicalLcaReport',
-};
-
 const MAX_SAVED_PAYLOAD_BYTES = 100 * 1024;
 
 export async function POST(request: NextRequest) {
@@ -84,7 +70,9 @@ export async function POST(request: NextRequest) {
 
     const { data: job } = await supabase
       .from('ingest_jobs')
-      .select('id, user_id, organization_id, status, result_type, result_payload')
+      .select(
+        'id, user_id, organization_id, status, result_type, result_payload, original_result_type, file_name',
+      )
       .eq('id', jobId)
       .maybeSingle();
 
@@ -100,26 +88,57 @@ export async function POST(request: NextRequest) {
     if (job.status !== 'completed' || !job.result_type) {
       return NextResponse.json({ skipped: true, reason: 'job not completed' });
     }
-    if (!LEARNABLE_TYPES.has(job.result_type)) {
+
+    // A reclassified job carries the classifier's first answer in
+    // original_result_type; result_type is the final (user-confirmed) type.
+    const originalType: string = job.original_result_type ?? job.result_type;
+    const wasCorrected = !!job.original_result_type && job.original_result_type !== job.result_type;
+
+    // Dismiss-without-save: a weak, metrics-only signal (admin dismiss rate).
+    // Insert-only — it must never overwrite a confirmed save or touch the
+    // document profiles, and it is never injected into classifier prompts.
+    const dismissed = context.dismissed === true && Object.keys(savedPayloadRaw).length === 0;
+    if (dismissed) {
+      const { data: existingRow } = await supabase
+        .from('ingest_feedback')
+        .select('id')
+        .eq('job_id', jobId)
+        .maybeSingle();
+      if (!existingRow) {
+        await supabase.from('ingest_feedback').insert({
+          job_id: jobId,
+          organization_id: job.organization_id,
+          user_id: user.id,
+          result_type: originalType,
+          corrected_result_type: wasCorrected ? job.result_type : null,
+          misclassified: wasCorrected,
+          supplier_key: null,
+          classifier_payload: unwrapResultPayload(job.result_type, job.result_payload),
+          saved_payload: {},
+          field_diff: {},
+          context,
+        });
+      }
+      return NextResponse.json({ ok: true, dismissed: true });
+    }
+
+    // Corrections are always recorded, even for handoff types with no field
+    // review — the type-level signal is the point.
+    if (!LEARNABLE_TYPES.has(job.result_type) && !wasCorrected) {
       return NextResponse.json({ skipped: true, reason: 'result type not learnable' });
     }
 
-    const wrapperKey = WRAPPER_KEYS[job.result_type];
-    const classifierPayload: Record<string, unknown> =
-      (job.result_payload as Record<string, unknown> | null)?.[wrapperKey] &&
-      typeof (job.result_payload as Record<string, unknown>)[wrapperKey] === 'object'
-        ? ((job.result_payload as Record<string, unknown>)[wrapperKey] as Record<string, unknown>)
-        : {};
+    const classifierPayload = unwrapResultPayload(job.result_type, job.result_payload);
 
     const savedPayload = applyFieldAliases(job.result_type, savedPayloadRaw as Record<string, unknown>);
     const fieldDiff = computeFieldDiff(classifierPayload, savedPayload);
     const supplierKey = supplierKeyForResult(job.result_type, savedPayload, classifierPayload);
 
     // Idempotent on job_id: a retry updates the correction, but only the
-    // first insert bumps the document profile.
+    // first save bumps the document profile.
     const { data: existing } = await supabase
       .from('ingest_feedback')
-      .select('id')
+      .select('id, saved_payload')
       .eq('job_id', jobId)
       .maybeSingle();
 
@@ -127,7 +146,11 @@ export async function POST(request: NextRequest) {
       job_id: jobId,
       organization_id: job.organization_id,
       user_id: user.id,
-      result_type: job.result_type,
+      // result_type keeps the classifier's ORIGINAL answer; the corrected
+      // type (when the user changed it) lives in corrected_result_type.
+      result_type: originalType,
+      corrected_result_type: wasCorrected ? job.result_type : null,
+      misclassified: wasCorrected,
       supplier_key: supplierKey,
       classifier_payload: classifierPayload,
       saved_payload: savedPayload,
@@ -135,73 +158,56 @@ export async function POST(request: NextRequest) {
       context,
     };
 
+    // A row can already exist for two reasons: a client retry of this save
+    // (saved_payload populated — update it, but never double-bump profiles),
+    // or a reclassify correction recorded server-side before the save
+    // (saved_payload empty — this IS the first save, so the profile writes
+    // below still run).
+    const isRetriedSave =
+      !!existing &&
+      !!existing.saved_payload &&
+      Object.keys(existing.saved_payload as Record<string, unknown>).length > 0;
+
     if (existing) {
       await supabase.from('ingest_feedback').update(feedbackRow).eq('id', existing.id);
-      return NextResponse.json({ ok: true, edited: fieldDiff.edited, repeat: true });
-    }
-
-    const { error: insertErr } = await supabase.from('ingest_feedback').insert(feedbackRow);
-    if (insertErr) {
-      console.error('[ingest/feedback] Insert failed:', insertErr.message);
-      return NextResponse.json({ error: 'Could not record feedback' }, { status: 500 });
+      if (isRetriedSave) {
+        return NextResponse.json({ ok: true, edited: fieldDiff.edited, repeat: true });
+      }
+    } else {
+      const { error: insertErr } = await supabase.from('ingest_feedback').insert(feedbackRow);
+      if (insertErr) {
+        console.error('[ingest/feedback] Insert failed:', insertErr.message);
+        return NextResponse.json({ error: 'Could not record feedback' }, { status: 500 });
+      }
     }
 
     if (supplierKey) {
       const hints = deriveHints(job.result_type, savedPayload, context);
-      // Read-then-write is fine here (low contention, single user confirming
-      // one upload); the unique constraint is the backstop.
-      const { data: profile } = await supabase
-        .from('ingest_document_profiles')
-        .select('id, times_seen, hints')
-        .eq('organization_id', job.organization_id)
-        .eq('supplier_key', supplierKey)
-        .eq('result_type', job.result_type)
-        .maybeSingle();
+      await bumpDocumentProfile(supabase, {
+        organizationId: job.organization_id,
+        matchKind: 'supplier',
+        supplierKey,
+        resultType: job.result_type,
+        hints,
+        lastConfirmedPayload: savedPayload,
+      });
+    }
 
-      if (profile) {
-        await supabase
-          .from('ingest_document_profiles')
-          .update({
-            times_seen: (profile.times_seen ?? 1) + 1,
-            hints: { ...(profile.hints as Record<string, unknown>), ...hints },
-            last_confirmed_payload: savedPayload,
-            last_seen_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', profile.id);
-      } else {
-        const { error: profileErr } = await supabase.from('ingest_document_profiles').insert({
-          organization_id: job.organization_id,
-          supplier_key: supplierKey,
-          result_type: job.result_type,
-          times_seen: 1,
-          hints,
-          last_confirmed_payload: savedPayload,
+    // A confirmed save after a type correction also reinforces the
+    // filename-keyed memory: files named like this are <corrected type>.
+    if (wasCorrected) {
+      const signature = docSignature(job.file_name || '');
+      if (signature) {
+        await bumpDocumentProfile(supabase, {
+          organizationId: job.organization_id,
+          matchKind: 'filename',
+          supplierKey: signature,
+          resultType: job.result_type,
+          hints: {
+            corrected_from: originalType,
+            filename_example: sanitiseHintValue(job.file_name) ?? undefined,
+          },
         });
-        if (profileErr && profileErr.code === '23505') {
-          // Lost a race with a concurrent confirm — bump the winner instead.
-          const { data: winner } = await supabase
-            .from('ingest_document_profiles')
-            .select('id, times_seen, hints')
-            .eq('organization_id', job.organization_id)
-            .eq('supplier_key', supplierKey)
-            .eq('result_type', job.result_type)
-            .maybeSingle();
-          if (winner) {
-            await supabase
-              .from('ingest_document_profiles')
-              .update({
-                times_seen: (winner.times_seen ?? 1) + 1,
-                hints: { ...(winner.hints as Record<string, unknown>), ...hints },
-                last_confirmed_payload: savedPayload,
-                last_seen_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', winner.id);
-          }
-        } else if (profileErr) {
-          console.error('[ingest/feedback] Profile insert failed:', profileErr.message);
-        }
       }
     }
 

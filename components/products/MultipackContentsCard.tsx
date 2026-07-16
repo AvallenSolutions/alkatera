@@ -7,8 +7,8 @@ import { Eyebrow } from "@/components/studio/eyebrow";
 import { BigNumber } from "@/components/studio/big-number";
 import { StateChip } from "@/components/studio/state-chip";
 import { PillButton } from "@/components/studio/pill-button";
-import { fetchMultipackComponents, fetchMultipackSecondaryPackaging } from "@/lib/multipacks";
-import type { MultipackComponent, MultipackSecondaryPackaging } from "@/lib/types/products";
+import { fetchMultipackComponents, fetchMultipackPackagingMaterials } from "@/lib/multipacks";
+import type { MultipackComponent } from "@/lib/types/products";
 import Link from "next/link";
 
 interface MultipackContentsCardProps {
@@ -19,7 +19,9 @@ interface MultipackContentsCardProps {
 
 export function MultipackContentsCard({ productId, productName, onEdit }: MultipackContentsCardProps) {
   const [components, setComponents] = useState<MultipackComponent[]>([]);
-  const [packaging, setPackaging] = useState<MultipackSecondaryPackaging[]>([]);
+  // Packaging now lives on product_materials (unified with single SKUs), so
+  // Overview reads the same rows the Specification tab and calculator use.
+  const [packaging, setPackaging] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -28,7 +30,7 @@ export function MultipackContentsCard({ productId, productName, onEdit }: Multip
       try {
         const [componentsData, packagingData] = await Promise.all([
           fetchMultipackComponents(productId),
-          fetchMultipackSecondaryPackaging(productId),
+          fetchMultipackPackagingMaterials(productId),
         ]);
         setComponents(componentsData);
         setPackaging(packagingData);
@@ -43,7 +45,10 @@ export function MultipackContentsCard({ productId, productName, onEdit }: Multip
   }, [productId]);
 
   const totalUnits = components.reduce((sum, c) => sum + c.quantity, 0);
-  const totalPackagingWeight = packaging.reduce((sum, p) => sum + p.weight_grams, 0);
+  const totalPackagingWeight = packaging.reduce(
+    (sum, p) => sum + (Number(p.net_weight_g) || 0),
+    0
+  );
 
   if (isLoading) {
     return (
@@ -136,18 +141,20 @@ export function MultipackContentsCard({ productId, productName, onEdit }: Multip
       {packaging.length > 0 && (
         <div className="mt-5 pt-4 border-t border-studio-hairline">
           <div className="flex items-center gap-3 mb-3">
-            <Eyebrow tone="dim">Secondary packaging</Eyebrow>
+            <Eyebrow tone="dim">Transit &amp; secondary packaging</Eyebrow>
             <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-studio-dim">
-              {totalPackagingWeight}g total
+              {totalPackagingWeight.toFixed(1)}g total
             </span>
           </div>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
             {packaging.map((pkg) => (
               <span key={pkg.id} className="inline-flex items-center gap-2">
                 <StateChip tone="quiet">
-                  {pkg.material_name} ({pkg.weight_grams}g)
+                  {pkg.material_name} ({Number(pkg.net_weight_g) || 0}g)
                 </StateChip>
-                {pkg.is_recyclable && <StateChip tone="good">Recyclable</StateChip>}
+                {Number(pkg.recyclability_percent) > 0 && (
+                  <StateChip tone="good">Recyclable</StateChip>
+                )}
               </span>
             ))}
           </div>

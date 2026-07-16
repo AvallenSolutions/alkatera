@@ -573,9 +573,11 @@ export function SupplierProductImpactForm({
                         value={formData.recycled_content_pct ?? ""}
                         onChange={(e) =>
                           onChange({
-                            recycled_content_pct: e.target.value
-                              ? parseFloat(e.target.value)
-                              : undefined,
+                            // "" = unknown; "0" must parse to a declared 0,
+                            // so test emptiness, never truthiness of the parse.
+                            recycled_content_pct: e.target.value === ""
+                              ? undefined
+                              : parseFloat(e.target.value),
                           })
                         }
                         placeholder="0-100"
@@ -595,9 +597,11 @@ export function SupplierProductImpactForm({
                         value={formData.recyclability_pct ?? ""}
                         onChange={(e) =>
                           onChange({
-                            recyclability_pct: e.target.value
-                              ? parseFloat(e.target.value)
-                              : undefined,
+                            // "" = unknown; "0" must parse to a declared 0,
+                            // so test emptiness, never truthiness of the parse.
+                            recyclability_pct: e.target.value === ""
+                              ? undefined
+                              : parseFloat(e.target.value),
                           })
                         }
                         placeholder="0-100"
@@ -617,9 +621,11 @@ export function SupplierProductImpactForm({
                         value={formData.circularity_score ?? ""}
                         onChange={(e) =>
                           onChange({
-                            circularity_score: e.target.value
-                              ? parseFloat(e.target.value)
-                              : undefined,
+                            // "" = unknown; "0" must parse to a declared 0,
+                            // so test emptiness, never truthiness of the parse.
+                            circularity_score: e.target.value === ""
+                              ? undefined
+                              : parseFloat(e.target.value),
                           })
                         }
                         placeholder="0-100"
