@@ -17,6 +17,7 @@ import { findSmartMeterOverlap } from '@/lib/energy/smart-meter-conflict';
 import { logRosaTelemetry } from './budget';
 import { createVolume } from '@/lib/hospitality/volume-service';
 import { createWaste } from '@/lib/hospitality/waste-service';
+import { dispatchExceptionWrite, isDispatchKind } from '@/lib/intake/dispatch';
 
 export interface ProposeInput {
   organizationId: string;
@@ -547,6 +548,19 @@ async function execApproveException(
       if (error) throw new Error(error.message);
       appliedTo = { table: 'facility_activity_entries', saved: rows.length, facilityId };
     }
+  } else if (isDispatchKind((ex as any).kind)) {
+    // refrigerant_service / supplier_invoice / freight_invoice /
+    // website_supplier / website_certification / website_production_location
+    // — shared with the ExceptionQueue's PATCH dispatch so the two never
+    // drift apart. `supabase` here is already the org-scoped service client.
+    appliedTo = await dispatchExceptionWrite(
+      supabase,
+      organizationId,
+      userId,
+      (ex as any).kind,
+      (ex as any).payload || {},
+      { facilityId, title: (ex as any).title },
+    );
   }
 
   const { error: updErr } = await supabase

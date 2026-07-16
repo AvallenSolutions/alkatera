@@ -18,7 +18,9 @@ import {
   AlertCircle,
   Inbox,
   ArrowRight,
+  Truck,
 } from 'lucide-react'
+import { HANDOFF_CONFIG, buildDeepLink, getStashId } from '@/lib/intake/deep-links'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Uploads jobs inbox (U4)
@@ -57,7 +59,19 @@ interface ProductImportJobRow {
   updated_at: string
 }
 
-type JobKind = 'smart_upload' | 'website_import'
+interface SupplierImportJobRow {
+  id: string
+  supplier_id: string
+  source: string
+  status: string
+  phase_message: string | null
+  extracted_products: { products?: unknown[] } | null
+  error: string | null
+  created_at: string
+  updated_at: string
+}
+
+type JobKind = 'smart_upload' | 'website_import' | 'supplier_catalog_import'
 
 interface UnifiedJob {
   id: string
@@ -190,10 +204,29 @@ export default function UploadsPage() {
       .order('created_at', { ascending: false })
       .limit(50)
 
-    const [ingestRes, importRes] = await Promise.all([ingestQuery, importQuery])
+    // supplier_product_import_jobs is supplier-portal-only and organization_id
+    // is nullable there too, same reasoning as product_import_jobs above.
+    const supplierImportQuery = supabase
+      .from('supplier_product_import_jobs')
+      .select(
+        'id, supplier_id, source, status, phase_message, extracted_products, error, created_at, updated_at',
+      )
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50)
+
+    const [ingestRes, importRes, supplierImportRes] = await Promise.all([
+      ingestQuery,
+      importQuery,
+      supplierImportQuery,
+    ])
 
     if (ingestRes.error) console.error('Error loading smart uploads:', ingestRes.error)
     if (importRes.error) console.error('Error loading website imports:', importRes.error)
+    // The table may not exist on an older local snapshot — treat that as "no rows" rather than an error.
+    if (supplierImportRes.error && (supplierImportRes.error as { code?: string }).code !== '42P01') {
+      console.error('Error loading supplier catalogue imports:', supplierImportRes.error)
+    }
 
     const ingestJobs: UnifiedJob[] = (ingestRes.data as IngestJobRow[] | null ?? []).map(
       mapIngestJob,
@@ -201,8 +234,11 @@ export default function UploadsPage() {
     const importJobs: UnifiedJob[] = (importRes.data as ProductImportJobRow[] | null ?? []).map(
       mapImportJob,
     )
+    const supplierImportJobs: UnifiedJob[] = (
+      (supplierImportRes.data as SupplierImportJobRow[] | null) ?? []
+    ).map(mapSupplierImportJob)
 
-    const merged = [...ingestJobs, ...importJobs].sort(
+    const merged = [...ingestJobs, ...importJobs, ...supplierImportJobs].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     )
     setJobs(merged)
@@ -300,9 +336,21 @@ export default function UploadsPage() {
   )
 }
 
+const JOB_KIND_ICON: Record<JobKind, typeof FileText> = {
+  smart_upload: FileText,
+  website_import: Globe,
+  supplier_catalog_import: Truck,
+}
+
+const JOB_KIND_LABEL: Record<JobKind, string> = {
+  smart_upload: 'Smart upload',
+  website_import: 'Website import',
+  supplier_catalog_import: 'Supplier catalogue import',
+}
+
 function JobRow({ job }: { job: UnifiedJob }) {
   const inProgress = isInProgress(job.status)
-  const KindIcon = job.kind === 'website_import' ? Globe : FileText
+  const KindIcon = JOB_KIND_ICON[job.kind]
 
   return (
     <Card className="transition-shadow hover:shadow-md">
@@ -314,7 +362,7 @@ function JobRow({ job }: { job: UnifiedJob }) {
         <div className="min-w-0 flex-1 space-y-1.5">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              {job.kind === 'website_import' ? 'Website import' : 'Smart upload'}
+              {JOB_KIND_LABEL[job.kind]}
             </span>
             {statusBadge(job.status)}
           </div>
@@ -364,6 +412,8 @@ function JobRow({ job }: { job: UnifiedJob }) {
 function mapIngestJob(row: IngestJobRow): UnifiedJob {
   const typeLabel = resultTypeLabel(row.result_type)
   let summary: string | null = null
+  let href: string | null = null
+  let hrefLabel: string | null = null
   let reopenNote: string | null = null
 
   if (row.status === 'completed') {
@@ -374,10 +424,30 @@ function mapIngestJob(row: IngestJobRow): UnifiedJob {
       summary = reason
     } else {
       summary = typeLabel ? `${typeLabel} recognised.` : 'Analysis complete.'
-      // Handoff types finish inside the Smart Upload dialog wizard, which a
-      // plain link can't drive. Be honest rather than link to a page that
-      // implies the data was already saved.
-      reopenNote = 'Re-open Smart Upload to action this.'
+
+      // Kinds with a real destination (lib/intake/deep-links.ts) get a
+      // genuine deep link: hospitality_menu/pos_sales_export/packaging_spec/
+      // bulk_xlsx/accounts_csv have a fixed target; bom/spray_diary/
+      // soil_carbon_evidence need a record picked first, which only the
+      // Rosa queue offers today, so they point there instead of a dead link.
+      const cfg = row.result_type ? HANDOFF_CONFIG[row.result_type] : undefined
+      if (cfg) {
+        const stashId = row.result_type ? getStashId(row.result_type, row.result_payload) : null
+        const directUrl = row.result_type ? buildDeepLink(row.result_type, { stashId }) : null
+        if (directUrl) {
+          href = directUrl
+          hrefLabel = cfg.buttonLabel
+        } else if (cfg.assetPicker) {
+          href = '/rosa/?tab=queue'
+          hrefLabel = 'Finish in the queue'
+        }
+      }
+      // Bill kinds and the other working-panel kinds (supplier_coa,
+      // certification, soil_carbon_lab, historical_* reports) have no
+      // resume mechanism outside the live dropzone session — no stash
+      // consumer page exists for them, so be honest rather than link to a
+      // page that implies the data was already saved.
+      if (!href) reopenNote = 'Re-open Smart Upload to action this.'
     }
   }
 
@@ -388,9 +458,43 @@ function mapIngestJob(row: IngestJobRow): UnifiedJob {
     status: row.status,
     phaseMessage: row.phase_message,
     summary,
-    href: null,
-    hrefLabel: null,
+    href,
+    hrefLabel,
     reopenNote,
+    error: row.error,
+    createdAt: row.created_at,
+  }
+}
+
+function mapSupplierImportJob(row: SupplierImportJobRow): UnifiedJob {
+  const productCount = Array.isArray(row.extracted_products?.products)
+    ? (row.extracted_products!.products as unknown[]).length
+    : 0
+  let summary: string | null = null
+  let href: string | null = null
+  let hrefLabel: string | null = null
+
+  if (row.status === 'completed') {
+    summary =
+      productCount > 0
+        ? `${productCount} product${productCount === 1 ? '' : 's'} extracted, awaiting confirmation.`
+        : 'Extraction complete.'
+    // Confirmation only happens inside the live Smart Import dialog (no
+    // resume-by-jobId exists) — point at the page it's mounted on.
+    href = '/supplier-portal/products'
+    hrefLabel = 'Open Smart Import'
+  }
+
+  return {
+    id: row.id,
+    kind: 'supplier_catalog_import',
+    title: `Supplier catalogue (${row.source})`,
+    status: row.status,
+    phaseMessage: row.phase_message,
+    summary,
+    href,
+    hrefLabel,
+    reopenNote: null,
     error: row.error,
     createdAt: row.created_at,
   }

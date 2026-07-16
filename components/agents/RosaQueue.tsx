@@ -3,14 +3,13 @@
 import { useEffect, useState } from 'react'
 import { Dog, Sparkles, Activity, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
 import { ExceptionQueue } from './ExceptionQueue'
 import { UniversalDropzone } from '@/components/layouts/UniversalDropzone'
 
 interface RosaSummary {
-  managedEnabled: boolean
   openExceptions: number
   approvedLast30Days: number
   ingestJobsLast30Days: number
@@ -20,6 +19,9 @@ interface RosaSummary {
  * Queue + inbox surface for the unified Rosa hub. Rendered inside the
  * "Queue" tab of /rosa/. Shows the email-in address, a few headline stats,
  * and the exception queue itself. Chat lives on the sibling tab.
+ *
+ * Standard for every org — no longer gated behind managed_footprint_enabled
+ * (that was a pilot flag; the queue works for any org's exceptions now).
  */
 export function RosaQueue() {
   const { currentOrganization } = useOrganization()
@@ -29,12 +31,7 @@ export function RosaQueue() {
   useEffect(() => {
     if (!orgId) return
     const load = async () => {
-      const [orgRes, openRes, approvedRes, jobsRes] = await Promise.all([
-        supabase
-          .from('organizations')
-          .select('managed_footprint_enabled')
-          .eq('id', orgId)
-          .maybeSingle(),
+      const [openRes, approvedRes, jobsRes] = await Promise.all([
         supabase
           .from('agent_exceptions')
           .select('id', { count: 'exact', head: true })
@@ -53,7 +50,6 @@ export function RosaQueue() {
           .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
       ])
       setSummary({
-        managedEnabled: !!orgRes.data?.managed_footprint_enabled,
         openExceptions: openRes.count || 0,
         approvedLast30Days: approvedRes.count || 0,
         ingestJobsLast30Days: jobsRes.count || 0,
@@ -105,24 +101,6 @@ export function RosaQueue() {
           value={summary?.ingestJobsLast30Days ?? '...'}
         />
       </div>
-
-      {summary?.managedEnabled === false && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Rosa not yet enabled for this org</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            <p>
-              Rosa&apos;s queue mode is in pilot. Ask Tim to flip
-              {' '}
-              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                managed_footprint_enabled
-              </code>{' '}
-              on this organisation, then reload this page.
-            </p>
-          </CardContent>
-        </Card>
-      )}
 
       <ExceptionQueue />
     </div>

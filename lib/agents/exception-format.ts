@@ -98,6 +98,38 @@ export function titleAndSummaryForExceptionPayload(
         confidence: 0.7,
       }
     }
+    case 'refrigerant_service': {
+      const r = payload?.refrigerantService || payload || {}
+      const label = r.refrigerant_type ? String(r.refrigerant_type).toUpperCase() : 'refrigerant'
+      const qty = r.quantity_kg != null ? fmtNumber(r.quantity_kg, 'kg') : null
+      return {
+        title: `Refrigerant service: ${label}`,
+        summary: qty ? `${qty} recharged${r.service_date ? ` on ${r.service_date}` : ''}` : fileName || null,
+        confidence: qty ? 0.85 : 0.5,
+      }
+    }
+    case 'supplier_invoice': {
+      const r = payload?.supplierInvoice || payload || {}
+      const supplier = r.supplier_name || 'Supplier'
+      const lineCount = Array.isArray(r.line_items) ? r.line_items.length : 0
+      return {
+        title: `Supplier invoice: ${supplier}`,
+        summary: lineCount ? `${lineCount} line item${lineCount === 1 ? '' : 's'}${r.invoice_date ? ` · ${r.invoice_date}` : ''}` : fileName || null,
+        confidence: lineCount ? 0.8 : 0.5,
+      }
+    }
+    case 'freight_invoice': {
+      const r = payload?.freightInvoice || payload || {}
+      const carrier = r.carrier_name || 'Freight'
+      const activity = r.transport_mode && r.weight_kg && r.distance_km
+        ? `${r.transport_mode}, ${fmtNumber(r.weight_kg, 'kg')} × ${fmtNumber(r.distance_km, 'km')}`
+        : null
+      return {
+        title: `Freight invoice: ${carrier}`,
+        summary: activity || fileName || null,
+        confidence: activity ? 0.8 : 0.5,
+      }
+    }
     case 'bom': {
       const r = payload?.bom || payload || {}
       const product = r.product_name || r.product_sku || 'Product'

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
+import { getSupabaseAPIClient, getSupabaseAdminClient } from '@/lib/supabase/api-client'
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
 import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access'
+import { dispatchExceptionWrite, isDispatchKind } from '@/lib/intake/dispatch'
+import { isHandoffKind } from '@/lib/intake/deep-links'
 
 export const runtime = 'nodejs'
 
@@ -196,48 +198,36 @@ export async function PATCH(
         return NextResponse.json({ error: data.error || 'Save failed' }, { status: res.status })
       }
       appliedTo = { table: 'facility_activity_entries', saved: data.saved, facilityId }
-    } else if (exception.kind === 'website_supplier') {
-      // Approving a supplier proposed from a website crawl creates a real
-      // suppliers row. The exception payload carries the name; everything
-      // else is best-filled in later from the supplier's own page.
-      const name = (payload?.supplier_name || exception.title || '').toString().trim()
-      if (!name) {
-        return NextResponse.json(
-          { error: 'Supplier name missing from payload' },
-          { status: 400 },
+    } else if (isDispatchKind(exception.kind)) {
+      // refrigerant_service / supplier_invoice / freight_invoice /
+      // website_supplier / website_certification / website_production_location
+      // — shared with Rosa's tool-confirm flow so the two never drift apart.
+      const admin = getSupabaseAdminClient()
+      try {
+        appliedTo = await dispatchExceptionWrite(
+          admin,
+          organizationId,
+          user.id,
+          exception.kind,
+          payload,
+          { facilityId, title: exception.title },
         )
-      }
-      const { data: existing } = await (client as any)
-        .from('suppliers')
-        .select('id')
-        .eq('organization_id', organizationId)
-        .ilike('name', name)
-        .maybeSingle()
-      if (existing?.id) {
-        appliedTo = { table: 'suppliers', supplier_id: existing.id, matched: 'existing' }
-      } else {
-        const { data: newSupplier, error: supErr } = await (client as any)
-          .from('suppliers')
-          .insert({
-            organization_id: organizationId,
-            name,
-            notes: 'Added from website crawl during onboarding.',
-          })
-          .select('id')
-          .single()
-        if (supErr) {
-          return NextResponse.json({ error: supErr.message }, { status: 500 })
-        }
-        appliedTo = { table: 'suppliers', supplier_id: newSupplier.id, matched: 'new' }
+      } catch (err: any) {
+        return NextResponse.json({ error: err?.message || 'Save dispatch failed' }, { status: 400 })
       }
     } else {
-      // For kinds we don't auto-save yet (BOM, historical reports, spray
-      // diary, website_production_location, website_certification, the
-      // onboarding seed kinds, etc.) approving the exception just records
-      // the decision — the user follows the deep-link in the queue to
-      // handle the next step on the relevant native page. Fine as a v1
-      // cut: rejecting still trains the agent for next time.
-      appliedTo = { table: null, deferred_save: true, kind: exception.kind }
+      // Handoff kinds (bom, hospitality_menu, pos_sales_export, spray_diary,
+      // soil_carbon_evidence, packaging_spec, bulk_xlsx, accounts_csv,
+      // website_import, supplier_catalog_import) and the onboarding seed
+      // kinds have no auto-write — the queue UI renders a real deep-link
+      // (lib/intake/deep-links.ts) so the user finishes the record on its
+      // native page. Approving here just records the decision.
+      appliedTo = {
+        table: null,
+        deferred_save: true,
+        kind: exception.kind,
+        handoff: isHandoffKind(exception.kind),
+      }
     }
   } catch (err: any) {
     console.error('[agents/exceptions PATCH] save dispatch failed:', err)

@@ -17,6 +17,7 @@ export { Panel } from './panel';
 export { PosterBlock } from './poster-block';
 export { Mark } from './mark';
 export { StateChip } from './state-chip';
+export { ProvenanceChip } from './provenance-chip';
 export { FactRow } from './fact-row';
 export { FactList } from './fact-list';
 export type { FactRowItem } from './fact-list';

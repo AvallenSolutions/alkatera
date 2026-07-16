@@ -15,32 +15,21 @@ interface Props {
 
 /**
  * Banner that sits above the heaviest data-entry forms (water, waste, direct
- * energy, supplier impact). Tells managed-tier users that Rosa handles this
- * data automatically now; the form is still here as a fallback.
+ * energy, supplier impact). Tells users that Rosa handles this data
+ * automatically now; the form is still here as a fallback.
  *
- * Hidden entirely for orgs without managed_footprint_enabled, so non-pilot
- * users don't see references to the queue mode yet.
+ * Standard for every org — no longer gated behind managed_footprint_enabled
+ * (that was a pilot flag; the queue is standard now).
  */
 export function AgentBanner({ kinds, formName }: Props) {
   const { currentOrganization } = useOrganization()
   const orgId = currentOrganization?.id
-  const [enabled, setEnabled] = useState(false)
   const [openCount, setOpenCount] = useState(0)
 
   useEffect(() => {
     if (!orgId) return
     let cancelled = false
     const load = async () => {
-      const orgRes = await supabase
-        .from('organizations')
-        .select('managed_footprint_enabled')
-        .eq('id', orgId)
-        .maybeSingle()
-      if (cancelled) return
-      const isEnabled = !!orgRes.data?.managed_footprint_enabled
-      setEnabled(isEnabled)
-      if (!isEnabled) return
-
       const { count } = await supabase
         .from('agent_exceptions')
         .select('id', { count: 'exact', head: true })
@@ -55,8 +44,6 @@ export function AgentBanner({ kinds, formName }: Props) {
       cancelled = true
     }
   }, [orgId, kinds.join('|')])
-
-  if (!enabled) return null
 
   return (
     <div className="rounded-[6px] border border-border bg-card p-3 mb-4">

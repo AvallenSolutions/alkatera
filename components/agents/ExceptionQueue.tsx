@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   CheckCircle2,
@@ -10,13 +11,23 @@ import {
   ChevronRight,
   FileText,
   RefreshCw,
+  ArrowRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { PillButton } from '@/components/studio/pill-button'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
+import {
+  HANDOFF_CONFIG,
+  isHandoffKind,
+  buildDeepLink,
+  getStashId,
+  GROWING_ASSET_TYPES,
+  type AssetPickerType,
+} from '@/lib/intake/deep-links'
 
 interface AgentException {
   id: string
@@ -37,7 +48,11 @@ interface Facility {
   name: string
 }
 
-const FACILITY_BILL_KINDS = new Set(['utility_bill', 'water_bill', 'waste_bill'])
+// Bill kinds need a facility + a billing period. refrigerant_service also
+// needs a facility (utility_data_entries is facility-scoped), but has no
+// period — it's a single service date carried on the payload already.
+const PERIOD_BILL_KINDS = new Set(['utility_bill', 'water_bill', 'waste_bill'])
+const FACILITY_BILL_KINDS = new Set(['utility_bill', 'water_bill', 'waste_bill', 'refrigerant_service'])
 
 function ConfidencePill({ value }: { value: number | null }) {
   if (value == null) return null
@@ -75,6 +90,11 @@ function SourceBadge({ source }: { source: string }) {
   )
 }
 
+interface AssetOption {
+  id: string
+  name: string
+}
+
 function Row({
   exception,
   facilities,
@@ -84,6 +104,8 @@ function Row({
   facilities: Facility[]
   onChange: () => void
 }) {
+  const router = useRouter()
+  const { currentOrganization } = useOrganization()
   const [expanded, setExpanded] = useState(false)
   const [busy, setBusy] = useState<null | 'approve' | 'reject' | 'defer'>(null)
   const [facilityId, setFacilityId] = useState(exception.suggested_facility_id || '')
@@ -101,6 +123,58 @@ function Row({
   })
 
   const needsFacility = FACILITY_BILL_KINDS.has(exception.kind)
+  const needsPeriod = PERIOD_BILL_KINDS.has(exception.kind)
+
+  // Handoff kinds (bom, spray_diary, soil_carbon_evidence, hospitality_menu,
+  // pos_sales_export, packaging_spec, bulk_xlsx, accounts_csv, website_import,
+  // supplier_catalog_import) have no auto-write — approving them stamps the
+  // decision and carries the file across to the page that finishes the job.
+  const handoffConfig = HANDOFF_CONFIG[exception.kind]
+  const isHandoff = isHandoffKind(exception.kind)
+  const stashId = useMemo(() => getStashId(exception.kind, exception.payload), [exception.kind, exception.payload])
+  const [assetType, setAssetType] = useState<AssetPickerType | ''>(
+    handoffConfig?.assetPicker === 'product' ? 'products' : '',
+  )
+  const [assetId, setAssetId] = useState('')
+  const [assetOptions, setAssetOptions] = useState<AssetOption[]>([])
+  const [assetLoading, setAssetLoading] = useState(false)
+
+  useEffect(() => {
+    if (!expanded || !handoffConfig?.assetPicker || !assetType) return
+    let cancelled = false
+    setAssetLoading(true)
+    setAssetOptions([])
+    setAssetId('')
+    const load = async () => {
+      if (assetType === 'products') {
+        if (!currentOrganization?.id) return
+        const { data } = await supabase
+          .from('products')
+          .select('id, name')
+          .eq('organization_id', currentOrganization.id)
+          .order('name')
+        if (!cancelled) setAssetOptions((data || []).map((p: any) => ({ id: String(p.id), name: p.name })))
+        return
+      }
+      const meta = GROWING_ASSET_TYPES.find(a => a.type === assetType)
+      if (!meta) return
+      try {
+        const res = await fetch(meta.apiPath)
+        const body = await res.json().catch(() => ({}))
+        if (!cancelled) setAssetOptions((body?.data || []).map((a: any) => ({ id: a.id, name: a.name })))
+      } catch {
+        if (!cancelled) setAssetOptions([])
+      }
+    }
+    load().finally(() => { if (!cancelled) setAssetLoading(false) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded, assetType, handoffConfig?.assetPicker])
+
+  const deepLinkUrl = useMemo(
+    () => buildDeepLink(exception.kind, { stashId, assetType: assetType || undefined, assetId: assetId || undefined }),
+    [exception.kind, stashId, assetType, assetId],
+  )
 
   const act = useCallback(
     async (action: 'approve' | 'reject' | 'defer') => {
@@ -108,8 +182,12 @@ function Row({
         toast.error('Pick a facility before approving.')
         return
       }
-      if (action === 'approve' && needsFacility && (!periodStart || !periodEnd)) {
+      if (action === 'approve' && needsPeriod && (!periodStart || !periodEnd)) {
         toast.error('Set the bill period before approving.')
+        return
+      }
+      if (action === 'approve' && handoffConfig?.assetPicker && !assetId) {
+        toast.error('Pick which record this belongs to before approving.')
         return
       }
       setBusy(action)
@@ -126,19 +204,24 @@ function Row({
           body: JSON.stringify({
             action,
             facilityId: needsFacility ? facilityId : undefined,
-            periodStart: needsFacility ? periodStart : undefined,
-            periodEnd: needsFacility ? periodEnd : undefined,
+            periodStart: needsPeriod ? periodStart : undefined,
+            periodEnd: needsPeriod ? periodEnd : undefined,
           }),
         })
         const body = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(body?.error || 'Action failed')
         toast.success(
           action === 'approve'
-            ? `Approved · ${body?.applied_to?.saved ?? 1} entry written`
+            ? isHandoff
+              ? 'Approved · carrying the file across'
+              : `Approved · ${body?.applied_to?.saved ?? 1} entry written`
             : action === 'reject'
             ? 'Rejected'
             : 'Deferred',
         )
+        if (action === 'approve' && isHandoff && deepLinkUrl) {
+          router.push(deepLinkUrl)
+        }
         onChange()
       } catch (err: any) {
         toast.error(err?.message || 'Action failed')
@@ -146,7 +229,7 @@ function Row({
         setBusy(null)
       }
     },
-    [exception.id, facilityId, needsFacility, onChange, periodEnd, periodStart],
+    [exception.id, facilityId, needsFacility, needsPeriod, handoffConfig, assetId, isHandoff, deepLinkUrl, router, onChange, periodEnd, periodStart],
   )
 
   return (
@@ -178,7 +261,7 @@ function Row({
       {expanded && (
         <div className="border-t border-border p-4 space-y-3">
           {needsFacility && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className={`grid grid-cols-1 gap-3 ${needsPeriod ? 'sm:grid-cols-3' : 'sm:max-w-xs'}`}>
               <div className="space-y-1">
                 <Label className="text-xs">Facility</Label>
                 <Select value={facilityId} onValueChange={setFacilityId}>
@@ -192,37 +275,94 @@ function Row({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Period start</Label>
-                <Input
-                  type="date"
-                  value={periodStart}
-                  onChange={e => setPeriodStart(e.target.value)}
-                  className="h-9"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Period end</Label>
-                <Input
-                  type="date"
-                  value={periodEnd}
-                  onChange={e => setPeriodEnd(e.target.value)}
-                  className="h-9"
-                />
-              </div>
+              {needsPeriod && (
+                <>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Period start</Label>
+                    <Input
+                      type="date"
+                      value={periodStart}
+                      onChange={e => setPeriodStart(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Period end</Label>
+                    <Input
+                      type="date"
+                      value={periodEnd}
+                      onChange={e => setPeriodEnd(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                </>
+              )}
             </div>
           )}
           <PayloadPreview kind={exception.kind} payload={exception.payload} />
+          {isHandoff && handoffConfig && (
+            <div className="rounded-md border border-dashed border-border bg-background/40 p-3 space-y-2">
+              <p className="text-xs text-muted-foreground">{handoffConfig.helperText}</p>
+              {handoffConfig.assetPicker === 'growing' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <Select value={assetType} onValueChange={v => setAssetType(v as AssetPickerType)}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Vineyard, orchard or field?" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {GROWING_ASSET_TYPES.map(t => (
+                        <SelectItem key={t.type} value={t.type}>{t.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={assetId} onValueChange={setAssetId} disabled={!assetType || assetLoading}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder={assetLoading ? 'Loading…' : 'Select record'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {assetOptions.map(a => (
+                        <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {handoffConfig.assetPicker === 'product' && (
+                <Select value={assetId} onValueChange={setAssetId} disabled={assetLoading}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder={assetLoading ? 'Loading…' : 'Select product'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {assetOptions.map(a => (
+                      <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          )}
           <div className="flex flex-wrap gap-2 pt-1">
-            <Button
-              size="sm"
-              onClick={() => act('approve')}
-              disabled={busy !== null}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              <CheckCircle2 className="mr-1 h-4 w-4" />
-              Approve
-            </Button>
+            {isHandoff ? (
+              <PillButton
+                variant="ink"
+                size="sm"
+                onClick={() => act('approve')}
+                disabled={busy !== null || (!!handoffConfig?.assetPicker && !assetId)}
+              >
+                {handoffConfig?.buttonLabel || 'Approve'}
+                <ArrowRight className="ml-1 h-3.5 w-3.5" />
+              </PillButton>
+            ) : (
+              <Button
+                size="sm"
+                onClick={() => act('approve')}
+                disabled={busy !== null}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                <CheckCircle2 className="mr-1 h-4 w-4" />
+                Approve
+              </Button>
+            )}
             <Button size="sm" variant="outline" onClick={() => act('defer')} disabled={busy !== null}>
               <Clock3 className="mr-1 h-4 w-4" />
               Defer
@@ -295,6 +435,28 @@ function PayloadPreview({ kind, payload }: { kind: string; payload: any }) {
   }
   if (kind === 'website_certification' && payload?.certification) {
     inlineRows.push({ label: 'Certification', value: String(payload.certification) })
+  }
+  if (kind === 'refrigerant_service') {
+    const r = payload?.refrigerantService || payload || {}
+    if (r.refrigerant_type) inlineRows.push({ label: 'Refrigerant', value: String(r.refrigerant_type).toUpperCase() })
+    if (r.quantity_kg != null) inlineRows.push({ label: 'Recharged', value: `${Number(r.quantity_kg).toLocaleString()} kg` })
+    if (r.service_date) inlineRows.push({ label: 'Service date', value: String(r.service_date) })
+  }
+  if (kind === 'supplier_invoice') {
+    const r = payload?.supplierInvoice || payload || {}
+    if (r.supplier_name) inlineRows.push({ label: 'Supplier', value: String(r.supplier_name) })
+    if (Array.isArray(r.line_items)) inlineRows.push({ label: 'Line items', value: String(r.line_items.length) })
+  }
+  if (kind === 'freight_invoice') {
+    const r = payload?.freightInvoice || payload || {}
+    if (r.carrier_name) inlineRows.push({ label: 'Carrier', value: String(r.carrier_name) })
+    if (r.transport_mode) inlineRows.push({ label: 'Mode', value: String(r.transport_mode) })
+  }
+  if (kind === 'website_import' && payload?.product_count != null) {
+    inlineRows.push({ label: 'Products found', value: String(payload.product_count) })
+  }
+  if (kind === 'supplier_catalog_import' && payload?.product_count != null) {
+    inlineRows.push({ label: 'Products extracted', value: String(payload.product_count) })
   }
 
   if (inlineRows.length > 0) {
