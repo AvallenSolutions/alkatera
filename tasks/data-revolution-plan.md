@@ -81,6 +81,16 @@ Invert the model: a single prioritised queue of small questions, each answerable
 
 Each phase: tsc + scoped vitest + browser walk on :8895, commit per phase, sync log updated. Key reuse: `classify-document.ts`, `ingest_document_profiles`, `save-extracted.ts`, `propose_apply_proxy`/`actions.ts`, `IngredientComposer`, `PackagingWizard` catalogue, `BulkQuantityGrid`, `AutoEvidencePanel`, `lib/industry-benchmarks.ts`, growth signals, desk priorities, room setup panels.
 
+
+## BUILD LOG — all four phases SHIPPED 2026-07-16/17
+
+- **Phase A** (3c89a852): lib/provenance (vocabulary, confidence mapping, ProvenanceChip, org rollup at /api/provenance); agent_exceptions ungated for all orgs, approve genuinely writes via lib/intake/dispatch.ts, deep links via lib/intake/deep-links.ts; /uploads unions all job tables. Migration 20260716120000 (dedupe indexes).
+- **Phase B** (05cd8b82): one classifier (Rosa uploads + supplier smart-import through classify-document.ts + ingest_document_profiles, channel column, Gemini fallback documented); migration engine v1 (deep extraction, drafted records via the queue, trend seeding through historical_imports, arrival-ritual door); email-in (intake+{token}@alkatera.com, IMAP poller, spoof guard, DORMANT until EMAIL_INTAKE_* env vars); give door on desk + five rooms. Migrations 20260716130000/140000.
+- **Phase C** (cf217747): auto-proxy factors + /admin-tools/factor-queue + picker demoted; utility rollover + provenance chips + 80% confirmed-share export gate (lib/provenance/gate.ts); PackagingComposer + quick-add rows + csv-paste-import + global drag layer; Rosa learning capture (rosa_message_feedback migration 20260716150000, learning.* telemetry). Found pre-existing bugs: staging_emission_factors RLS regression (global library unreadable — CHECK PROD), Next fetch-cache stale reads in hand-rolled admin clients (task chips spawned).
+- **Phase D** (7ebfd3a3): ask generation (lib/asks: five sources, impact ordering, idempotent sweep with stale auto-resolve, migration 20260717130000), AskOfTheDay on the desk, inline queue answers, Rosa ask tools; flywheel (rosa_learning_cases/exemplars/eval_cases/eval_runs migrations 20260717100000-120000, /admin/rosa-learning, exemplar injection, scripts/rosa-eval.ts, stats strip).
+- **Pending prod migrations** (all applied locally): 20260716120000, 130000, 140000, 150000, 20260717100000, 110000, 120000, 130000, plus phase-B-adjacent 20260712180000 (report-assets bucket) and 20260712170000 (growth snapshots).
+- **Go-live for email-in**: create intake@alkatera.com in kSuite, set EMAIL_INTAKE_HOST/USER/PASSWORD (+ optional PORT/SECURE/ADDRESS) in Netlify; panel flips from coming-soon automatically.
+
 ## Verification
 
 - Phase A: a seeded org shows provenance chips and a working queue that writes on approve for every kind (test each handler against local DB).
