@@ -23,6 +23,12 @@ const GROUPS: { label: string; items: FactRowItem[] }[] = [
         href: '/admin/ingest-learning',
       },
       {
+        id: 'rosa-learning',
+        title: "Rosa's learning loop",
+        hint: 'Curation queue, exemplars and eval scoreboard for the self-learning flywheel.',
+        href: '/admin/rosa-learning',
+      },
+      {
         id: 'reference-data',
         title: 'Reference data',
         hint: 'Load public emission-factor releases into the versioned factor library.',

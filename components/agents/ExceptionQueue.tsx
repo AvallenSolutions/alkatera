@@ -509,6 +509,130 @@ function PayloadPreview({ kind, payload }: { kind: string; payload: any }) {
   )
 }
 
+// ─── Asks (Pillar 3, data-revolution-plan.md) ──────────────────────────────
+//
+// kind='ask' rows get a compact inline-answer row instead of the generic
+// approve/defer/reject Row above — the whole point of an ask is answering
+// it in place, in under 30 seconds, without opening a dialog. Only
+// answer_shape 'link' (growth-band gaps — no field to write, the deep link
+// IS the answer) falls back to the plain Row, since approve/defer already
+// do the right thing for it with zero extra code.
+
+interface AskExceptionRow extends AgentException {
+  payload: AgentException['payload'] & {
+    ask_type?: string
+    question?: string
+    answer_shape?: 'number' | 'confirm_value' | 'yes_no' | 'choice' | 'link'
+    options?: Array<{ value: string; label: string }>
+    current_value?: number | string | null
+    unit?: string | null
+    impact_share?: number | null
+    href?: string | null
+  }
+}
+
+function AskRow({ exception, onChange }: { exception: AskExceptionRow; onChange: () => void }) {
+  const p = exception.payload
+  const [numberValue, setNumberValue] = useState<string>(p.current_value != null ? String(p.current_value) : '')
+  const [busy, setBusy] = useState<null | 'answer' | 'defer'>(null)
+
+  const send = useCallback(
+    async (body: { action: 'answer'; answer: unknown } | { action: 'defer' }, busyKind: 'answer' | 'defer') => {
+      setBusy(busyKind)
+      try {
+        const session = (await supabase.auth.getSession()).data.session
+        const res = await fetch(`/api/agents/exceptions/${exception.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          },
+          body: JSON.stringify(body),
+        })
+        const resBody = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(resBody?.error || 'Could not save that answer.')
+        toast.success('Thanks — noted.')
+        onChange()
+      } catch (err: any) {
+        toast.error(err?.message || 'Could not save that answer.')
+      } finally {
+        setBusy(null)
+      }
+    },
+    [exception.id, onChange],
+  )
+
+  const impactLine =
+    p.impact_share != null ? `Worth about ${Math.round(p.impact_share * 100)}% of your footprint.` : null
+
+  return (
+    <div className="rounded-[6px] border border-border bg-card p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium">{exception.title}</span>
+            <SourceBadge source={exception.source} />
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">{p.question}</p>
+          {impactLine && <p className="mt-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-attention">{impactLine}</p>}
+        </div>
+        <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
+          {p.answer_shape === 'confirm_value' && (
+            <>
+              <Button size="sm" onClick={() => send({ action: 'answer', answer: true }, 'answer')} disabled={busy !== null}>
+                Confirm
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => send({ action: 'defer' }, 'defer')} disabled={busy !== null}>
+                Not now
+              </Button>
+            </>
+          )}
+          {p.answer_shape === 'yes_no' && (
+            <>
+              <Button size="sm" onClick={() => send({ action: 'answer', answer: true }, 'answer')} disabled={busy !== null}>
+                Yes
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => send({ action: 'answer', answer: false }, 'answer')} disabled={busy !== null}>
+                No
+              </Button>
+            </>
+          )}
+          {p.answer_shape === 'choice' &&
+            (p.options ?? []).map((opt: { value: string; label: string }) => (
+              <Button
+                key={opt.value}
+                size="sm"
+                variant="outline"
+                onClick={() => send({ action: 'answer', answer: opt.value }, 'answer')}
+                disabled={busy !== null}
+              >
+                {opt.label}
+              </Button>
+            ))}
+          {p.answer_shape === 'number' && (
+            <>
+              <Input
+                type="number"
+                value={numberValue}
+                onChange={(e) => setNumberValue(e.target.value)}
+                className="h-9 w-28"
+              />
+              {p.unit && <span className="text-xs text-muted-foreground">{p.unit}</span>}
+              <Button
+                size="sm"
+                onClick={() => send({ action: 'answer', answer: Number(numberValue) }, 'answer')}
+                disabled={busy !== null || !numberValue || !Number.isFinite(Number(numberValue))}
+              >
+                Save
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ExceptionQueue() {
   const { currentOrganization } = useOrganization()
   const orgId = currentOrganization?.id
@@ -530,8 +654,20 @@ export function ExceptionQueue() {
         supabase.from('facilities').select('id, name').eq('organization_id', orgId).order('name'),
       ])
       const exBody = await exRes.json().catch(() => ({}))
-      if (exRes.ok) setExceptions(exBody.exceptions || [])
-      else toast.error(exBody?.error || 'Failed to load queue')
+      if (exRes.ok) {
+        // Impact prioritisation (Pillar 3): asks carry a priority_score
+        // (lib/asks/impact.ts) — sort them to the front of the queue by it,
+        // highest first, so "ten minutes of answers buys maximum accuracy"
+        // even when other exception kinds share the list. Non-ask rows keep
+        // their existing created_at-desc order after the asks.
+        const rows: AgentException[] = exBody.exceptions || []
+        const withScore = rows.filter((r) => typeof r.payload?.priority_score === 'number')
+        const withoutScore = rows.filter((r) => typeof r.payload?.priority_score !== 'number')
+        withScore.sort((a, b) => (b.payload.priority_score ?? 0) - (a.payload.priority_score ?? 0))
+        setExceptions([...withScore, ...withoutScore])
+      } else {
+        toast.error(exBody?.error || 'Failed to load queue')
+      }
       if (!facRes.error) setFacilities(facRes.data || [])
     } finally {
       setLoading(false)
@@ -595,9 +731,13 @@ export function ExceptionQueue() {
         </div>
       ) : (
         <div className="space-y-2">
-          {exceptions.map(e => (
-            <Row key={e.id} exception={e} facilities={facilities} onChange={load} />
-          ))}
+          {exceptions.map(e =>
+            e.kind === 'ask' && e.payload?.answer_shape !== 'link' ? (
+              <AskRow key={e.id} exception={e as AskExceptionRow} onChange={load} />
+            ) : (
+              <Row key={e.id} exception={e} facilities={facilities} onChange={load} />
+            ),
+          )}
         </div>
       )}
     </div>

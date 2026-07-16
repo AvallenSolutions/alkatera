@@ -4,11 +4,12 @@ import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
 import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access'
 import { dispatchExceptionWrite, isDispatchKind } from '@/lib/intake/dispatch'
 import { isHandoffKind } from '@/lib/intake/deep-links'
+import { applyAskAnswer } from '@/lib/asks/apply'
 
 export const runtime = 'nodejs'
 
 interface PatchBody {
-  action: 'approve' | 'reject' | 'defer' | 'edit'
+  action: 'approve' | 'reject' | 'defer' | 'edit' | 'answer'
   // For 'approve' on bill kinds: which facility the bill belongs to.
   facilityId?: string
   // For 'edit': the user's edited payload (replaces payload before approval).
@@ -20,6 +21,10 @@ interface PatchBody {
   periodStart?: string
   periodEnd?: string
   billName?: string
+  // For 'answer' on kind='ask' rows: the value per payload.answer_shape —
+  // number, boolean (yes_no), boolean (confirm_value, must be true), or the
+  // chosen option's value (choice). See lib/asks/apply.ts.
+  answer?: unknown
 }
 
 /**
@@ -34,6 +39,11 @@ interface PatchBody {
  *     gone; useful when the user wants to come back later.
  *   - edit:    update payload only, status stays 'open'. Use before approve
  *     when the user wants to fix a value the agent extracted.
+ *   - answer:  kind='ask' rows only (Pillar 3, the Ask Queue). Applies
+ *     `body.answer` to the ask's target via lib/asks/apply.ts, stamps
+ *     applied_to, sets status='approved'. Shared with Rosa's
+ *     propose_answer_ask (lib/rosa/actions.ts execAnswerAsk) so the two
+ *     never drift apart, same pattern as the dispatch kinds below.
  */
 export async function PATCH(
   request: NextRequest,
@@ -55,7 +65,7 @@ export async function PATCH(
   const body = (await request.json().catch(() => ({}))) as PatchBody
   const action = body.action
 
-  if (!action || !['approve', 'reject', 'defer', 'edit'].includes(action)) {
+  if (!action || !['approve', 'reject', 'defer', 'edit', 'answer'].includes(action)) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   }
 
@@ -88,6 +98,30 @@ export async function PATCH(
       .eq('id', params.id)
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 })
     return NextResponse.json({ ok: true })
+  }
+
+  if (action === 'answer') {
+    if (exception.kind !== 'ask') {
+      return NextResponse.json({ error: "Only kind='ask' rows accept an answer." }, { status: 400 })
+    }
+    const admin = getSupabaseAdminClient()
+    let appliedTo: any
+    try {
+      appliedTo = await applyAskAnswer(admin, organizationId, user.id, exception, body.answer)
+    } catch (err: any) {
+      return NextResponse.json({ error: err?.message || 'Could not apply that answer.' }, { status: 400 })
+    }
+    const { error: updErr } = await (client as any)
+      .from('agent_exceptions')
+      .update({
+        status: 'approved',
+        reviewed_by: user.id,
+        reviewed_at: new Date().toISOString(),
+        applied_to: appliedTo,
+      })
+      .eq('id', params.id)
+    if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 })
+    return NextResponse.json({ ok: true, applied_to: appliedTo })
   }
 
   if (action === 'reject' || action === 'defer') {

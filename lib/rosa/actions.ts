@@ -18,6 +18,7 @@ import { logRosaTelemetry } from './budget';
 import { createVolume } from '@/lib/hospitality/volume-service';
 import { createWaste } from '@/lib/hospitality/waste-service';
 import { dispatchExceptionWrite, isDispatchKind } from '@/lib/intake/dispatch';
+import { applyAskAnswer } from '@/lib/asks/apply';
 
 export interface ProposeInput {
   organizationId: string;
@@ -172,6 +173,7 @@ const ROSA_WRITE_ID_KEY: Partial<Record<string, string>> = {
   propose_save_bcorp_answer: 'evidence_id',
   propose_log_service_volume: 'volume_id',
   propose_log_hospitality_waste: 'waste_id',
+  propose_answer_ask: 'id',
 };
 
 /**
@@ -233,6 +235,8 @@ async function dispatchMutation(
       return await execLogServiceVolume(supabase, row.organization_id, p);
     case 'propose_log_hospitality_waste':
       return await execLogHospitalityWaste(supabase, row.organization_id, p);
+    case 'propose_answer_ask':
+      return await execAnswerAsk(supabase, row.organization_id, row.user_id, p);
     default:
       throw new Error(`Unsupported action tool: ${row.tool_name}`);
   }
@@ -649,6 +653,57 @@ async function execRejectException(
     .eq('organization_id', organizationId);
   if (error) throw new Error(error.message);
   return { exception_id: exceptionId, status: 'rejected' };
+}
+
+/**
+ * Answering an Ask Queue item (tasks/data-revolution-plan.md, Pillar 3) from
+ * inside a Rosa conversation — "I have three quick questions about your
+ * gin." Shares lib/asks/apply.ts with the exceptions PATCH route's 'answer'
+ * action (app/api/agents/exceptions/[id]/route.ts) so the two can never
+ * disagree about what answering an ask actually writes.
+ */
+async function execAnswerAsk(
+  supabase: SupabaseClient,
+  organizationId: string,
+  userId: string,
+  p: any,
+): Promise<Record<string, unknown>> {
+  const exceptionId = String(p.exception_id);
+  const { data: ex, error: exErr } = await supabase
+    .from('agent_exceptions')
+    .select('id, kind, status, organization_id, payload')
+    .eq('id', exceptionId)
+    .eq('organization_id', organizationId)
+    .maybeSingle();
+  if (exErr || !ex) throw new Error('Ask not found.');
+
+  // The Gemini tool schema only accepts a string `answer` (Gemini's
+  // FunctionDeclarationSchema has no union type — see
+  // lib/rosa/tools.ts propose_answer_ask), so coerce it back to the shape
+  // applyAskAnswer expects per the ask's own answer_shape.
+  const answerShape = (ex as any).payload?.answer_shape;
+  const raw = p.answer;
+  const answer =
+    answerShape === 'number'
+      ? Number(raw)
+      : answerShape === 'yes_no' || answerShape === 'confirm_value'
+        ? String(raw).trim().toLowerCase() === 'true'
+        : raw; // 'choice' — pass the option value straight through
+
+  const appliedTo = await applyAskAnswer(supabase, organizationId, userId, ex as any, answer);
+
+  const { error: updErr } = await supabase
+    .from('agent_exceptions')
+    .update({
+      status: 'approved',
+      reviewed_by: userId,
+      reviewed_at: new Date().toISOString(),
+      applied_to: appliedTo,
+    })
+    .eq('id', exceptionId);
+  if (updErr) throw new Error(updErr.message);
+
+  return { exception_id: exceptionId, ...appliedTo };
 }
 
 async function execMatchEmissionFactor(

@@ -26,6 +26,7 @@ import { pulseRefreshRun } from './pulse-refresh';
 import { outreachReportEnrich } from './outreach';
 import { growthStallSweep } from './growth';
 import { emailIntakePoll } from './email-intake';
+import { rosaLearningSweep } from './rosa-learning';
 
 export const allFunctions: InngestFunction.Any[] = [
   scrapingQueueTick,
@@ -49,4 +50,5 @@ export const allFunctions: InngestFunction.Any[] = [
   outreachReportEnrich,
   growthStallSweep,
   emailIntakePoll,
+  rosaLearningSweep,
 ];

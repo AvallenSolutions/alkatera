@@ -4,6 +4,7 @@ import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
 import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access'
 import { titleAndSummaryForExceptionPayload } from '@/lib/agents/exception-format'
 import { safeCompare } from '@/lib/utils/safe-compare'
+import { sweepAsks } from '@/lib/asks/generate'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -35,6 +36,10 @@ interface RunSummary {
   ingestJobsSwept: number
   productImportJobsSwept: number
   supplierImportJobsSwept: number
+  /** Ask Queue rows (Pillar 3, lib/asks/generate.ts) created this run. */
+  asksCreated: number
+  /** Open asks whose underlying gap no longer applies, auto-closed this run. */
+  asksAutoResolved: number
   errors: string[]
 }
 
@@ -256,17 +261,28 @@ async function sweepOrg(
   organizationId: string,
 ): Promise<RunSummary> {
   const errors: string[] = []
-  const [ingest, productImport, supplierImport] = await Promise.all([
+  // The ask sweep runs independently of the three job-table sweeps above —
+  // it reads live data state (products, materials, activity entries),
+  // not a job queue — but shares the same errors array and the same
+  // "never fail the whole run over one source" degrade-to-empty contract.
+  const [ingest, productImport, supplierImport, askSweep] = await Promise.all([
     sweepOrgIngestJobs(admin, organizationId, errors),
     sweepOrgProductImportJobs(admin, organizationId, errors),
     sweepOrgSupplierImportJobs(admin, organizationId, errors),
+    sweepAsks(admin, organizationId).catch((err: any) => {
+      errors.push(`ask sweep: ${err?.message || 'unknown error'}`)
+      return { candidatesGenerated: 0, created: 0, autoResolved: 0, errors: [] }
+    }),
   ])
+  errors.push(...askSweep.errors)
   return {
     organizationId,
-    exceptionsCreated: ingest.created + productImport.created + supplierImport.created,
+    exceptionsCreated: ingest.created + productImport.created + supplierImport.created + askSweep.created,
     ingestJobsSwept: ingest.swept,
     productImportJobsSwept: productImport.swept,
     supplierImportJobsSwept: supplierImport.swept,
+    asksCreated: askSweep.created,
+    asksAutoResolved: askSweep.autoResolved,
     errors,
   }
 }

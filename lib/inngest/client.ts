@@ -112,6 +112,9 @@ export interface AlkateraEvents {
 
   // ─────────── Email-in intake: poll the IMAP mailbox ───────────
   'email/intake.poll': { data: Record<string, never> };
+
+  // ─────────── Rosa learning: weekly curation sweep (Pillar 4 step 2) ───────────
+  'rosa/learning.sweep': { data: Record<string, never> };
 }
 
 const eventKey = process.env.INNGEST_EVENT_KEY;

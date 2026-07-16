@@ -1,12 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useOrganization } from '@/lib/organizationContext';
 import { Eyebrow } from './eyebrow';
 import { FactList } from './fact-list';
+import { PillButton } from './pill-button';
 import type { WorkingTone } from './theme';
 import { GROWTH_WEIGHTS, type GrowthBandKey, type GrowthSignal } from '@/lib/desk/growth-score';
 import { checkScoreStall } from '@/lib/desk/stall-detection';
+import { supabase } from '@/lib/supabaseClient';
+import type { AskAnswerShape } from '@/lib/asks/types';
 
 interface CuratedTile {
   id: string;
@@ -91,7 +95,140 @@ function setupActionsFromSignals(
  * weakest bands — "Add your first facility." — each deep-linking into the
  * room that can close the gap.
  */
-export function DeskPriorities({ limit = 3 }: { limit?: number }) {
+export function DeskPriorities(props: { limit?: number }) {
+  return (
+    <div className="space-y-4">
+      <AskOfTheDay />
+      <PriorityFactList {...props} />
+    </div>
+  );
+}
+
+// ─── Asks lane (Pillar 3, data-revolution-plan.md) ──────────────────────────
+//
+// The top-impact open ask, one tap to answer. Deliberately separate from
+// the curated-tiles/growth-signal fallback above: asks are real data gaps
+// with a genuine write behind them, tiles/signals are narrative/navigation.
+// Never more than one ask shown here — the full ordered queue lives on
+// /rosa?view=queue (ExceptionQueue.tsx AskRow).
+//
+// growth_signal asks are excluded: they have no field to answer inline
+// (answer_shape 'link') and the setup-action fallback above already covers
+// the same undone-signal ground for a quiet new org — showing both would
+// duplicate "Add your first facility" in two places on the same page. See
+// components/studio/room-setup-panel.tsx for the equivalent guard on the
+// room checklists.
+
+interface AskRow {
+  id: string;
+  title: string;
+  payload: {
+    ask_type: string;
+    question: string;
+    answer_shape: AskAnswerShape;
+    impact_share: number | null;
+    priority_score: number;
+    href?: string | null;
+  };
+}
+
+function AskOfTheDay() {
+  const { currentOrganization } = useOrganization();
+  const orgId = currentOrganization?.id;
+  const router = useRouter();
+  const [ask, setAsk] = useState<AskRow | null | undefined>(undefined); // undefined = loading
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!orgId) return;
+    const res = await fetch('/api/agents/exceptions?kind=ask&status=open&limit=100', { credentials: 'include' }).catch(
+      () => null,
+    );
+    if (!res || !res.ok) {
+      setAsk(null);
+      return;
+    }
+    const body = await res.json().catch(() => ({ exceptions: [] }));
+    const top = ((body.exceptions ?? []) as AskRow[])
+      .filter((e) => e.payload?.ask_type !== 'growth_signal')
+      .sort((a, b) => (b.payload?.priority_score ?? -1) - (a.payload?.priority_score ?? -1))[0];
+    setAsk(top ?? null);
+  }, [orgId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const act = useCallback(
+    async (body: { action: 'answer'; answer: boolean } | { action: 'defer' }) => {
+      if (!ask) return;
+      setBusy(true);
+      try {
+        const session = (await supabase.auth.getSession()).data.session;
+        const res = await fetch(`/api/agents/exceptions/${ask.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error();
+        // A confirmed answer may have flipped provenance (a growth-field
+        // input) — refresh both this lane and the rest of the desk's
+        // server data so the forest reflects it immediately.
+        await load();
+        router.refresh();
+      } catch {
+        // Quietly leave the card as-is; the queue view is the fallback.
+      } finally {
+        setBusy(false);
+      }
+    },
+    [ask, load, router],
+  );
+  const answer = (value: boolean) => act({ action: 'answer', answer: value });
+  const notNow = () => act({ action: 'defer' });
+
+  if (!ask) return null;
+  const { question, answer_shape, impact_share, href } = ask.payload;
+  const impactLine = impact_share != null ? `Worth about ${Math.round(impact_share * 100)}% of your footprint.` : null;
+
+  return (
+    <section className="rounded-[6px] border border-border bg-card p-5 md:p-6">
+      <Eyebrow className="mb-4 text-room-accent">A quick question</Eyebrow>
+      <p className="font-display text-sm font-semibold text-foreground">{question}</p>
+      {impactLine ? <p className="mt-1 text-xs text-muted-foreground">{impactLine}</p> : null}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {answer_shape === 'confirm_value' ? (
+          <>
+            <PillButton variant="ink" size="sm" onClick={() => answer(true)} disabled={busy}>
+              Confirm
+            </PillButton>
+            <PillButton variant="ghost" size="sm" onClick={notNow} disabled={busy}>
+              Not now
+            </PillButton>
+          </>
+        ) : answer_shape === 'yes_no' ? (
+          <>
+            <PillButton variant="ink" size="sm" onClick={() => answer(true)} disabled={busy}>
+              Yes
+            </PillButton>
+            <PillButton variant="outline" size="sm" onClick={() => answer(false)} disabled={busy}>
+              No
+            </PillButton>
+          </>
+        ) : href ? (
+          <PillButton variant="outline" size="sm" href={href}>
+            Sort this out
+          </PillButton>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function PriorityFactList({ limit = 3 }: { limit?: number }) {
   const { currentOrganization } = useOrganization();
   const orgId = currentOrganization?.id;
   const [tiles, setTiles] = useState<CuratedTile[] | null>(null);
