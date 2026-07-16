@@ -32,7 +32,8 @@ export interface MultipackPackagingInput {
   packaging_category?: string;
   weight_grams: number;
   is_recyclable?: boolean;
-  recycled_content_percentage?: number;
+  /** Empty string / undefined = unknown (saved as null); 0 = declared zero. */
+  recycled_content_percentage?: number | "";
   notes?: string;
 }
 
@@ -328,7 +329,11 @@ export async function addMultipackSecondaryPackaging(
       material_type: input.material_type,
       weight_grams: input.weight_grams,
       is_recyclable: input.is_recyclable ?? true,
-      recycled_content_percentage: input.recycled_content_percentage ?? 0,
+      // Unknown stays null; the old `?? 0` recorded a declared 0% for unknowns.
+      recycled_content_percentage:
+        input.recycled_content_percentage == null || input.recycled_content_percentage === ''
+          ? null
+          : input.recycled_content_percentage,
       notes: input.notes || null,
     })
     .select()

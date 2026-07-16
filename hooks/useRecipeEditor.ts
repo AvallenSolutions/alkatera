@@ -815,7 +815,10 @@ export function useRecipeEditor(productId: string, organizationId: string) {
             epr_material_type: comp.epr_material_type,
             component_name: comp.component_name,
             weight_grams: comp.weight_grams,
-            recycled_content_percentage: comp.recycled_content_percentage || 0,
+            recycled_content_percentage:
+              // undefined = unknown (null); 0 is a declared zero — the old `|| 0`
+              // stamped a declared 0% onto every component with no data.
+              comp.recycled_content_percentage ?? null,
             is_recyclable: comp.is_recyclable !== undefined ? comp.is_recyclable : true,
           }));
 
@@ -1061,7 +1064,10 @@ export function useRecipeEditor(productId: string, organizationId: string) {
             epr_material_type: comp.epr_material_type,
             component_name: comp.component_name,
             weight_grams: comp.weight_grams,
-            recycled_content_percentage: comp.recycled_content_percentage || 0,
+            recycled_content_percentage:
+              // undefined = unknown (null); 0 is a declared zero — the old `|| 0`
+              // stamped a declared 0% onto every component with no data.
+              comp.recycled_content_percentage ?? null,
             is_recyclable: comp.is_recyclable !== undefined ? comp.is_recyclable : true,
           }));
           // Errors here must not pass silently: a swallowed failure was the
@@ -1094,7 +1100,10 @@ export function useRecipeEditor(productId: string, organizationId: string) {
           epr_material_type: comp.epr_material_type,
           component_name: comp.component_name,
           weight_grams: comp.weight_grams,
-          recycled_content_percentage: comp.recycled_content_percentage || 0,
+          recycled_content_percentage:
+              // undefined = unknown (null); 0 is a declared zero — the old `|| 0`
+              // stamped a declared 0% onto every component with no data.
+              comp.recycled_content_percentage ?? null,
           is_recyclable: comp.is_recyclable !== undefined ? comp.is_recyclable : true,
         }));
         const { error: insErr } = await supabase.from('packaging_material_components').insert(componentsToInsert);

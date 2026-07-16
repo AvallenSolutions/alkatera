@@ -2498,8 +2498,11 @@ function PackagingSpecPanel({
             material: r.material || null,
             role: r.role,
             weight_g: Number(r.weight_g),
-            recycled_content_pct: r.recycled_content_pct ? Number(r.recycled_content_pct) : null,
-            recyclability_pct: r.recyclability_pct ? Number(r.recyclability_pct) : null,
+            // Explicit empty-string checks: these are string fields today so a
+            // truthy gate happens to keep "0", but one type change would
+            // silently collapse a declared 0% to null. Blank = unknown (null).
+            recycled_content_pct: r.recycled_content_pct.trim() === '' ? null : Number(r.recycled_content_pct),
+            recyclability_pct: r.recyclability_pct.trim() === '' ? null : Number(r.recyclability_pct),
           })),
         }),
       })
@@ -2514,8 +2517,11 @@ function PackagingSpecPanel({
             material: r.material || null,
             role: r.role,
             weight_g: Number(r.weight_g),
-            recycled_content_pct: r.recycled_content_pct ? Number(r.recycled_content_pct) : null,
-            recyclability_pct: r.recyclability_pct ? Number(r.recyclability_pct) : null,
+            // Explicit empty-string checks: these are string fields today so a
+            // truthy gate happens to keep "0", but one type change would
+            // silently collapse a declared 0% to null. Blank = unknown (null).
+            recycled_content_pct: r.recycled_content_pct.trim() === '' ? null : Number(r.recycled_content_pct),
+            recyclability_pct: r.recyclability_pct.trim() === '' ? null : Number(r.recyclability_pct),
           })),
         },
         {

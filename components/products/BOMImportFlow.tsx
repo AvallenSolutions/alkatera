@@ -438,7 +438,10 @@ export function BOMImportFlow({
             amount: item.quantity ?? 0,
             unit: canonicaliseUnit(item.unit) ?? "kg",
             packaging_category: detectPackagingCategory(item.cleanName),
-            recycled_content_percentage: 0,
+            // A BOM never states recycled content — leave unknown ('' saves as
+            // null). A hardcoded 0 recorded "declared virgin material" for
+            // every imported row.
+            recycled_content_percentage: "",
             printing_process: "standard_ink",
             net_weight_g: convertToGrams(item.quantity, item.unit),
             origin_country: "",

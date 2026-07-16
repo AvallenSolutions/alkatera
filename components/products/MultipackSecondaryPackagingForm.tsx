@@ -31,7 +31,9 @@ export interface SecondaryPackagingItem {
   packaging_category: "secondary" | "shipment" | "tertiary";
   weight_grams: number;
   is_recyclable: boolean;
-  recycled_content_percentage: number;
+  /** Empty string = unknown (saves as null). An explicit 0 is a DECLARED zero
+   *  (virgin material) and must round-trip — never coalesce with `||`. */
+  recycled_content_percentage: number | "";
   notes: string;
 }
 
@@ -84,7 +86,7 @@ export function MultipackSecondaryPackagingForm({
     packaging_category: "shipment",
     weight_grams: 0,
     is_recyclable: true,
-    recycled_content_percentage: 0,
+    recycled_content_percentage: "",
     notes: "",
   });
 
@@ -259,10 +261,14 @@ export function MultipackSecondaryPackagingForm({
                         type="number"
                         min="0"
                         max="100"
-                        value={item.recycled_content_percentage || ""}
+                        value={item.recycled_content_percentage}
                         onChange={(e) =>
                           handleUpdateItem(item.id, {
-                            recycled_content_percentage: parseFloat(e.target.value) || 0,
+                            // "" = unknown; 0 is a declared zero and must stick.
+                            recycled_content_percentage:
+                              e.target.value === ""
+                                ? ""
+                                : Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)),
                           })
                         }
                         disabled={disabled}
@@ -424,11 +430,15 @@ export function MultipackSecondaryPackagingForm({
                   min="0"
                   max="100"
                   placeholder="0"
-                  value={newItem.recycled_content_percentage || ""}
+                  value={newItem.recycled_content_percentage}
                   onChange={(e) =>
                     setNewItem({
                       ...newItem,
-                      recycled_content_percentage: parseFloat(e.target.value) || 0,
+                      // "" = unknown; 0 is a declared zero and must stick.
+                      recycled_content_percentage:
+                        e.target.value === ""
+                          ? ""
+                          : Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)),
                     })
                   }
                   disabled={disabled}

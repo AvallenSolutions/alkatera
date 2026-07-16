@@ -56,7 +56,11 @@ function rowToItem(row: any): SecondaryPackagingItem {
     weight_grams: Number(row.net_weight_g) || 0,
     // Recyclability is stored all-or-nothing (100/0) from this mini editor.
     is_recyclable: Number(row.recyclability_percent) > 0,
-    recycled_content_percentage: Number(row.recycled_content_percentage) || 0,
+    // null = unknown (stays blank); a stored 0 is a DECLARED zero and must
+    // display as "0", not blank — the old `Number(x) || 0` also turned every
+    // unknown into a declared 0% on the next save.
+    recycled_content_percentage:
+      row.recycled_content_percentage != null ? Number(row.recycled_content_percentage) : "",
     notes: row.notes || "",
   };
 }

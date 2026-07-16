@@ -1122,7 +1122,7 @@ export default function SupplierProductDetailPage() {
                           min="0"
                           max="100"
                           value={comp.recycled_content_pct ?? ''}
-                          onChange={(e) => updateComponent(comp.id, 'recycled_content_pct', e.target.value ? parseFloat(e.target.value) : null)}
+                          onChange={(e) => updateComponent(comp.id, 'recycled_content_pct', e.target.value === '' ? null : parseFloat(e.target.value))}
                           onBlur={() => saveComponent(comp)}
                           placeholder="%"
                           className="text-sm"

@@ -226,7 +226,12 @@ export function SmartImportFlow({ open, onClose, supplierId, onSuccess }: SmartI
       prev.map((p, i) => {
         if (i !== idx) return p;
         const existing = (p as any)[key] as ExtractedField<number> | undefined;
-        const source_quote = existing?.source_quote ?? (raw.trim() === '' ? null : 'Edited by supplier');
+        // A blank-but-present quote ('') would survive `??` and later be
+        // treated as unsourced by the confirm route, silently nulling the
+        // typed value (including a declared 0). Require a non-blank quote.
+        const source_quote = existing?.source_quote?.trim()
+          ? existing.source_quote
+          : (raw.trim() === '' ? null : 'Edited by supplier');
         const confidence = existing?.confidence ?? 'high';
         return {
           ...p,

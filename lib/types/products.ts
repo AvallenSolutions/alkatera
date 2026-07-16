@@ -303,7 +303,8 @@ export interface CreateMultipackSecondaryPackagingInput {
   material_type: string;
   weight_grams: number;
   is_recyclable?: boolean;
-  recycled_content_percentage?: number;
+  /** Empty string / undefined = unknown (saved as null); 0 = declared zero. */
+  recycled_content_percentage?: number | "";
   notes?: string;
 }
 

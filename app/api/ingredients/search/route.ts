@@ -496,7 +496,9 @@ export async function GET(request: NextRequest) {
                 epr_material_type: comp.epr_material_type,
                 component_name: comp.component_name,
                 weight_grams: comp.weight_grams,
-                recycled_content_percentage: comp.recycled_content_pct || 0,
+                // null = unknown; 0 = supplier-declared zero. `|| 0` presented
+                // every unknown as a declared 0% that then saved as such.
+                recycled_content_percentage: comp.recycled_content_pct ?? null,
                 is_recyclable: comp.is_recyclable,
               });
             }
