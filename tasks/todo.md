@@ -126,3 +126,41 @@ per-org supplier/document memory injected into the classifier prompt (Layer 2)._
 - ⚠️ Migration pending PROD apply (SQL posted in chat).
 - Deferred (Layer 3+): embedding-based exemplar retrieval, cross-org anonymised learning,
   content-hash dedup of re-uploads, feedback on handoff types (bom/spray/evidence).
+
+# Parametric packaging factor model (2026-07-16)
+
+Plan approved by Tim; full plan at ~/.claude/plans/validated-drifting-feather.md.
+
+- [x] Migration A: packaging_factor_endpoints table + 13 provisional EU-27 endpoint rows + 3 gap-filler staging factors + RLS + active view
+- [x] Migration B: pin columns (endpoint id, library version, factor_derivation, eol_allocation_method) + data_source 'parametric' CHECK arms on both material tables
+- [x] Migration C: PCF dedupe (supersede duplicates + partial unique index per product+reference_year)
+- [x] lib/constants/packaging-material-classes.ts (controlled vocabulary, catalogue mapping, legacy inference)
+- [x] lib/calculations/packaging-factor.ts (pure interpolation returning WaterfallResult; deterministic endpoint fetch)
+- [x] Calculator: parametric partition, recycled multiplier gated to legacy rows, snapshot pins, pinned-recalc carries pins, fingerprint includes endpoint pin
+- [x] Aggregator: EoL default flipped to cut-off; parametric rows forced cut-off; supersede scoped to reference_year and runs before completion
+- [x] Resolver: deterministic ORDER BY on all fuzzy lookups; hard category='Packaging' scope; post-calc ingredient factor pinning
+- [x] UI: PackagingMaterialClassPicker replaces factor search; recycled % un-gated; wizard writes classes; save builder + loaders updated
+- [x] Report: factor_derivation rendered as a one-line parametric derivation with endpoints, library version and allocation
+- [x] Admin dry-run mapping tool at /admin-tools/packaging-migration (apply writes classes only, no recompute)
+- [x] Wizard materialHasAssignedFactor recognises parametric rows
+- [x] Tests: 31 new (interpolation golden/property/idempotency, vocabulary coverage, carbon-negative regression) + 3 updated for the cut-off default; scoped suites all green (500+ tests)
+
+## Review
+- Verified locally: migrations applied to local Supabase (13 endpoints, 3 gap-fillers, 6 pin
+  columns, dedupe index, 0 remaining duplicate PCFs). Browser: class picker replaces the
+  factor search, live derived-factor caption updates with recycled % (aluminium at 70% =
+  2.970 = 8.50 - 0.7 x (8.50 - 0.60)), autosave writes data_source='parametric' + class to
+  product_materials, admin tool buckets 6 legacy rows with correct dry-run diffs and applies
+  classes without recompute.
+- Everleaf regression locked in tests: a 100% recycled flint bottle derives exactly the
+  recycled endpoint and can never net carbon-negative under cut-off; the old avoided-burden
+  behaviour is asserted as the documented bug.
+- ⚠️ Migrations 20260717100000/110000/120000 pending PROD apply (SQL posted in chat).
+- ⚠️ Endpoint values are provisional (is_provisional=true, MEDIUM data quality) pending
+  ecoinvent 3.12 sign-off; approving them is the Phase 0 gate for HIGH grade.
+- ⚠️ Phase 3 (prod backfill via the mapping tool + recompute + user comms) deliberately not
+  executed; run after reviewing dry-run diffs per product.
+- Note: full wizard Calculate click-through on local was limited by missing local factor
+  seed data (local staging_emission_factors is nearly empty) and an intermittent tool
+  outage; the calculation path itself is covered by the full-flow calculator/aggregator
+  suites (mocked Supabase) plus the golden tests.

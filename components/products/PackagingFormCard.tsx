@@ -34,8 +34,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
 import { MatchStatusBadge } from "@/components/products/MatchStatusBadge";
+import { PackagingMaterialClassPicker } from "@/components/products/PackagingMaterialClassPicker";
 import { LocationPicker, LocationData } from "@/components/shared/LocationPicker";
 import { COUNTRIES } from "@/lib/countries";
 import type {
@@ -121,6 +121,13 @@ export interface PackagingFormData {
   weight_source?: 'measured' | 'typical' | 'estimated' | null;
   /** Emission factor provenance; null = legacy/unknown (no badge) */
   match_status?: MatchStatus | null;
+  /**
+   * Parametric material identity (lib/constants/packaging-material-classes.ts).
+   * When set, the calculator derives the factor from virgin/recycled endpoints
+   * at the item's recycled content — no factor search.
+   */
+  packaging_material_class?: string | null;
+  packaging_material_variant?: string | null;
 }
 
 interface ProductionFacility {
@@ -654,116 +661,10 @@ export function PackagingFormCard({
     return PACKAGING_UNITS.some((p) => p.value === cleaned) ? cleaned : 'g';
   };
 
-  const handleSearchSelect = (selection: {
-    name: string;
-    user_query?: string;
-    data_source: DataSource;
-    data_source_id?: string;
-    supplier_product_id?: string;
-    supplier_name?: string;
-    unit: string;
-    auto_matched?: boolean;
-    carbon_intensity?: number;
-    location?: string;
-    recycled_content_pct?: number;
-    packaging_components?: any;
-    ef_source?: string;
-    ef_source_type?: string;
-    ef_data_quality_grade?: string;
-    ef_uncertainty_percent?: number;
-    // Packaging supplier product data
-    supplier_weight_g?: number | null;
-    supplier_packaging_category?: string | null;
-    supplier_primary_material?: string | null;
-    supplier_epr_material_code?: string | null;
-    supplier_epr_is_drinks_container?: boolean | null;
-  }) => {
-    // Preserve user's real material name, store DB match name separately
-    const userOriginalName = selection.user_query || selection.name;
-
-    // Use supplier packaging_category if available, otherwise auto-detect from name
-    let detectedCategory: PackagingCategory = packaging.packaging_category || 'container';
-
-    if (selection.supplier_packaging_category) {
-      // Trust supplier-provided packaging category
-      detectedCategory = selection.supplier_packaging_category as PackagingCategory;
-    } else {
-      // Auto-detect packaging category from the DATABASE match name (not user name)
-      const nameLower = selection.name.toLowerCase();
-
-      if (nameLower.includes('label') || nameLower.includes('sticker') || nameLower.includes('tamper')) {
-        detectedCategory = 'label';
-      } else if (nameLower.includes('cap') || nameLower.includes('lid') || nameLower.includes('closure') || nameLower.includes('cork') || nameLower.includes('seal')) {
-        detectedCategory = 'closure';
-      } else if (nameLower.includes('pallet') || nameLower.includes('stretch wrap') || nameLower.includes('edge protector') || nameLower.includes('strapping')) {
-        detectedCategory = 'tertiary';
-      } else if (nameLower.includes('trade case') || nameLower.includes('shipping') || nameLower.includes('transit')) {
-        detectedCategory = 'shipment';
-      } else if (nameLower.includes('box') || nameLower.includes('carton') || nameLower.includes('cardboard') || nameLower.includes('case') || nameLower.includes('crate') || nameLower.includes('gift')) {
-        detectedCategory = 'secondary';
-      } else if (nameLower.includes('bottle') || nameLower.includes('jar') || nameLower.includes('can') || nameLower.includes('container') || nameLower.includes('pouch')) {
-        detectedCategory = 'container';
-      }
-    }
-
-    const updates: Partial<PackagingFormData> = {
-      // Auto-fill the display name from the DB match only if user hasn't entered one yet
-      ...(!packaging.name ? { name: selection.name } : {}),
-      matched_source_name: selection.name,
-      data_source: selection.data_source,
-      data_source_id: selection.data_source_id,
-      supplier_product_id: selection.supplier_product_id,
-      supplier_name: selection.supplier_name,
-      carbon_intensity: selection.carbon_intensity,
-      // Emission factor metadata for tooltip
-      ef_source: selection.ef_source,
-      ef_source_type: selection.ef_source_type,
-      ef_data_quality_grade: selection.ef_data_quality_grade,
-      ef_uncertainty_percent: selection.ef_uncertainty_percent,
-      // Apply + flag: software picks need a one-click confirmation, the
-      // user's own picks are verified immediately.
-      match_status: selection.auto_matched ? 'auto_matched' : 'verified',
-      // Only auto-detect category if user hasn't already chosen one
-      ...(!packaging.packaging_category ? { packaging_category: detectedCategory } : {}),
-      // Only prefill unit from search result when packaging has no amount set yet (first selection).
-      // This prevents overriding a unit the user already chose (e.g., user picked "g" but DB has "kg").
-      ...(!packaging.amount ? { unit: clampPackagingUnit(selection.unit) } : {}),
-      // Map search location to origin_address (the field actually saved to DB).
-      // Only prefill if user hasn't already set an origin address.
-      ...(!packaging.origin_address && selection.location ? { origin_address: selection.location } : {}),
-    };
-
-    // Auto-populate recycled content if provided
-    if (selection.recycled_content_pct !== undefined && selection.recycled_content_pct !== null) {
-      updates.recycled_content_percentage = selection.recycled_content_pct;
-    }
-
-    // Auto-populate component breakdown if provided
-    if (selection.packaging_components && Array.isArray(selection.packaging_components) && selection.packaging_components.length > 0) {
-      updates.components = selection.packaging_components;
-      updates.has_component_breakdown = true;
-    }
-
-    // Auto-populate packaging-specific supplier data
-    if (selection.supplier_weight_g !== undefined && selection.supplier_weight_g !== null && selection.supplier_weight_g > 0) {
-      updates.net_weight_g = selection.supplier_weight_g;
-      // Convert weight to the packaging unit for the amount field
-      if (!packaging.amount || packaging.amount === '' || Number(packaging.amount) === 0) {
-        if (packaging.unit === 'kg') {
-          updates.amount = (selection.supplier_weight_g / 1000).toString();
-        } else {
-          updates.amount = selection.supplier_weight_g.toString();
-        }
-      }
-    }
-
-    // Auto-populate EPR drinks container flag from supplier
-    if (selection.supplier_epr_is_drinks_container !== undefined && selection.supplier_epr_is_drinks_container !== null) {
-      updates.epr_is_drinks_container = selection.supplier_epr_is_drinks_container;
-    }
-
-    onUpdate(packaging.tempId, updates);
-  };
+  // NOTE: the free-text emission-factor search (handleSearchSelect +
+  // InlineIngredientSearch) was retired for packaging: factors are now
+  // derived parametrically from the material class via
+  // PackagingMaterialClassPicker, or taken from a linked supplier product.
 
   // Filter linked supplier products for packaging context.
   // Treat any product with a packaging_category as packaging — older supplier
@@ -1066,26 +967,44 @@ export function PackagingFormCard({
               </div>
 
               <div>
-                <Label htmlFor={`search-${packaging.tempId}`} className="flex items-center gap-2">
-                  Emission Factor <span className="text-destructive">*</span>
+                <Label className="flex items-center gap-2">
+                  Material identity <span className="text-destructive">*</span>
                   <MatchStatusBadge
                     status={packaging.match_status}
                     onConfirm={() => onUpdate(packaging.tempId, { match_status: 'verified' })}
                   />
                 </Label>
-                <InlineIngredientSearch
-                  organizationId={organizationId}
-                  value={packaging.matched_source_name || ''}
-                  placeholder="Search databases for emission factor..."
-                  materialType="packaging"
-                  packagingCategory={packaging.packaging_category || undefined}
-                  onSelect={handleSearchSelect}
-                  onChange={() => onUpdate(packaging.tempId, { matched_source_name: undefined, data_source: null, data_source_id: undefined, ef_source: undefined, ef_source_type: undefined, ef_data_quality_grade: undefined, ef_uncertainty_percent: undefined })}
-                />
+                <div className="mt-1.5">
+                  <PackagingMaterialClassPicker
+                    idPrefix={packaging.tempId}
+                    materialClass={packaging.packaging_material_class}
+                    variant={packaging.packaging_material_variant}
+                    recycledContentPct={packaging.recycled_content_percentage}
+                    onSelect={(selection) =>
+                      onUpdate(packaging.tempId, {
+                        packaging_material_class: selection.packaging_material_class,
+                        packaging_material_variant: selection.packaging_material_variant,
+                        container_material: selection.container_material,
+                        data_source: selection.data_source,
+                        data_source_id: selection.data_source_id,
+                        matched_source_name: undefined,
+                        carbon_intensity: selection.carbon_intensity,
+                        ef_source: selection.ef_source,
+                        ef_source_type: selection.ef_source_type,
+                        ef_data_quality_grade: selection.ef_data_quality_grade,
+                        ef_uncertainty_percent: undefined,
+                        match_status: 'verified',
+                      })
+                    }
+                    disabled={packaging.data_source === 'supplier'}
+                  />
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Search for the closest matching emission factor from supplier data or global databases
+                  {packaging.data_source === 'supplier'
+                    ? 'Supplier primary data is in use; the material identity still drives end-of-life and EPR.'
+                    : 'The emission factor is derived from vetted virgin and recycled endpoints at your recycled content. No factor search needed.'}
                 </p>
-                {packaging.matched_source_name && packaging.matched_source_name !== packaging.name && packaging.data_source !== 'supplier' && (
+                {packaging.matched_source_name && packaging.matched_source_name !== packaging.name && packaging.data_source !== 'supplier' && !packaging.packaging_material_class && (
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -1140,26 +1059,29 @@ export function PackagingFormCard({
                 )}
               </div>
 
-              {packaging.packaging_category === 'container' && (
-                <div>
-                  <Label htmlFor={`recycled-${packaging.tempId}`}>
-                    Recycled Content (%)
-                  </Label>
-                  <Input
-                    id={`recycled-${packaging.tempId}`}
-                    type="number"
-                    step="1"
-                    min="0"
-                    max="100"
-                    placeholder="0"
-                    value={packaging.recycled_content_percentage}
-                    onChange={(e) => onUpdate(packaging.tempId, { recycled_content_percentage: e.target.value })}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Required for Plastic Tax calculation
-                  </p>
-                </div>
-              )}
+              {/* Recycled content is a first-class model input for every
+                  parametric material (it sets the factor interpolation), not
+                  just containers. */}
+              <div>
+                <Label htmlFor={`recycled-${packaging.tempId}`}>
+                  Recycled Content (%)
+                </Label>
+                <Input
+                  id={`recycled-${packaging.tempId}`}
+                  type="number"
+                  step="1"
+                  min="0"
+                  max="100"
+                  placeholder="0"
+                  value={packaging.recycled_content_percentage}
+                  onChange={(e) => onUpdate(packaging.tempId, { recycled_content_percentage: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {packaging.packaging_material_class
+                    ? 'Sets the emission factor between the virgin and fully recycled endpoints. Also used for Plastic Tax.'
+                    : 'Required for Plastic Tax calculation'}
+                </p>
+              </div>
 
               {packaging.packaging_category === 'label' && (
                 <div>

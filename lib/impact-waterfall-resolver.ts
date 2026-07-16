@@ -1232,6 +1232,10 @@ export async function resolveImpactFactors(
           .select('*')
           .ilike('material_name', `%${searchName}%`)
           .not('impact_climate', 'is', null)
+          // Deterministic: an unordered LIMIT 1 returns an arbitrary row, so
+          // adding a factor to the library could silently flip which one a
+          // product resolved to between runs.
+          .order('id', { ascending: true })
           .limit(1)
           .maybeSingle();
         if (match && match.impact_climate) {
@@ -1248,6 +1252,7 @@ export async function resolveImpactFactors(
           .select('*')
           .ilike('ecoinvent_process_name', `%${material.matched_source_name}%`)
           .not('impact_climate', 'is', null)
+          .order('id', { ascending: true })
           .limit(1)
           .maybeSingle();
         if (processMatch && processMatch.impact_climate) {
@@ -1316,12 +1321,29 @@ export async function resolveImpactFactors(
 
   // Fallback: Try staging_emission_factors by name — first exact match, then partial match
   // Try matched_source_name first (the database match name), then fall back to material_name (user's name)
+  //
+  // Two determinism guarantees on every name-based lookup below:
+  //  1. AREA SCOPING (hard rule): packaging rows only ever match rows tagged
+  //     category='Packaging' — an "Inbound Container - Glass Bottle" factor
+  //     must never resolve a packaging item (and vice versa).
+  //  2. STABLE ORDERING: org-specific factors beat global ones, then lowest
+  //     id wins. An unordered LIMIT 1 returned an arbitrary row, so adding a
+  //     factor to the library silently flipped existing products' matches.
+  const isPackagingMaterial = (material.material_type || '').toLowerCase().startsWith('packaging');
+  const applyStagingScope = (query: any) => {
+    const scoped = isPackagingMaterial ? query.ilike('category', 'Packaging') : query;
+    return scoped
+      .order('organization_id', { ascending: false, nullsFirst: false })
+      .order('id', { ascending: true });
+  };
   console.log(`[Waterfall] Priority 3 staging lookup for "${material.material_name}" (matched_source_name="${material.matched_source_name || 'none'}", stagingFactor=${!!stagingFactor})`);
   if (!stagingFactor && material.matched_source_name) {
-    const { data: nameMatch } = await supabase
-      .from('staging_emission_factors')
-      .select('*')
-      .ilike('name', material.matched_source_name)
+    const { data: nameMatch } = await applyStagingScope(
+      supabase
+        .from('staging_emission_factors')
+        .select('*')
+        .ilike('name', material.matched_source_name)
+    )
       .limit(1)
       .maybeSingle();
     stagingFactor = nameMatch;
@@ -1330,10 +1352,12 @@ export async function resolveImpactFactors(
     }
   }
   if (!stagingFactor) {
-    const { data: nameMatch } = await supabase
-      .from('staging_emission_factors')
-      .select('*')
-      .ilike('name', material.material_name)
+    const { data: nameMatch } = await applyStagingScope(
+      supabase
+        .from('staging_emission_factors')
+        .select('*')
+        .ilike('name', material.material_name)
+    )
       .limit(1)
       .maybeSingle();
     stagingFactor = nameMatch;
@@ -1342,19 +1366,23 @@ export async function resolveImpactFactors(
   // If no exact match, try partial/fuzzy match with wildcards
   // Try matched_source_name first (more specific database name), then material_name
   if (!stagingFactor && material.matched_source_name) {
-    const { data: fuzzyMatch } = await supabase
-      .from('staging_emission_factors')
-      .select('*')
-      .ilike('name', `%${material.matched_source_name}%`)
+    const { data: fuzzyMatch } = await applyStagingScope(
+      supabase
+        .from('staging_emission_factors')
+        .select('*')
+        .ilike('name', `%${material.matched_source_name}%`)
+    )
       .limit(1)
       .maybeSingle();
     stagingFactor = fuzzyMatch;
   }
   if (!stagingFactor) {
-    const { data: fuzzyMatch } = await supabase
-      .from('staging_emission_factors')
-      .select('*')
-      .ilike('name', `%${material.material_name}%`)
+    const { data: fuzzyMatch } = await applyStagingScope(
+      supabase
+        .from('staging_emission_factors')
+        .select('*')
+        .ilike('name', `%${material.material_name}%`)
+    )
       .limit(1)
       .maybeSingle();
     stagingFactor = fuzzyMatch;
@@ -1374,7 +1402,9 @@ export async function resolveImpactFactors(
         .from('staging_emission_factors')
         .select('*')
         .ilike('name', `%${keyword}%`)
-        .ilike('category', material.material_type === 'packaging' ? 'Packaging' : 'Ingredient')
+        .ilike('category', isPackagingMaterial ? 'Packaging' : 'Ingredient')
+        .order('organization_id', { ascending: false, nullsFirst: false })
+        .order('id', { ascending: true })
         .limit(1)
         .maybeSingle();
       if (keywordMatch) {
@@ -1485,11 +1515,19 @@ export async function resolveImpactFactors(
     };
   }
 
-  // Fallback to ecoinvent_material_proxies with full 18 categories
-  const { data: ecoinventProxy } = await supabase
+  // Fallback to ecoinvent_material_proxies with full 18 categories.
+  // Deterministic ordering: an unordered LIMIT 1 here was one of the enablers
+  // of run-to-run instability (a newly added proxy could silently steal the
+  // match). Packaging rows exclude inbound-container proxies (area scoping).
+  let ecoinventProxyQuery = supabase
     .from('ecoinvent_material_proxies')
     .select('*')
-    .ilike('material_name', `%${material.material_name}%`)
+    .ilike('material_name', `%${material.material_name}%`);
+  if (isPackagingMaterial) {
+    ecoinventProxyQuery = ecoinventProxyQuery.not('material_category', 'ilike', '%inbound%');
+  }
+  const { data: ecoinventProxy } = await ecoinventProxyQuery
+    .order('id', { ascending: true })
     .limit(1)
     .maybeSingle();
 

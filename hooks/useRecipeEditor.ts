@@ -399,6 +399,9 @@ export function useRecipeEditor(productId: string, organizationId: string) {
             container_size_ml: item.container_size_ml ?? null,
             weight_source: item.weight_source ?? null,
             match_status: item.match_status ?? null,
+            // Parametric material identity
+            packaging_material_class: item.packaging_material_class ?? null,
+            packaging_material_variant: item.packaging_material_variant ?? null,
           };
         });
         setPackagingForms(mappedPackaging);

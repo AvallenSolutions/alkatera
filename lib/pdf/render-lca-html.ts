@@ -1190,8 +1190,28 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
       : '';
 
     const rows = pageIngredients.map(ing => {
+      // Parametric packaging: render the full derivation so an external
+      // reviewer can reproduce the factor from the stated endpoints.
+      const derivation = (ing as any).derivation;
+      const derivationNote = derivation
+        ? `<div style="font-size: 8px; color: #78716c; margin-top: 2px; word-wrap: break-word; line-height: 1.35;">
+            &#8627; Parametric: ${escapeHtml(String(derivation.materialClass))}${derivation.variant && derivation.variant !== 'standard' ? ` (${escapeHtml(String(derivation.variant))})` : ''},
+            ${escapeHtml(String(derivation.recycledPct))}% recycled.
+            ${escapeHtml(derivation.derivedEf.toFixed(3))} = ${escapeHtml(derivation.virginEf.toFixed(3))} &#8722; ${escapeHtml((derivation.recycledPct / 100).toFixed(2))} &#215; (${escapeHtml(derivation.virginEf.toFixed(3))} &#8722; ${escapeHtml(derivation.recycledEf.toFixed(3))}) kg CO&#8322;e/kg
+            &#183; ${escapeHtml(String(derivation.dataset))} ${escapeHtml(String(derivation.datasetVersion))} ${escapeHtml(String(derivation.systemModel))}
+            &#183; library v${escapeHtml(String(derivation.libraryVersion))}
+            &#183; EoL: ${escapeHtml(String(derivation.allocationMethod))}${derivation.isProvisional ? ' &#183; provisional pending sign-off' : ''}
+          </div>`
+        : '';
+
       // Ingredient cell: show real name, then proxy factor below if different
-      const ingredientCell = ing.isProxy
+      const ingredientCell = derivation
+        ? `<td style="min-width: 160px; max-width: 220px;">
+            <div style="font-weight: 500; word-wrap: break-word;">${escapeHtml(ing.name)}</div>
+            ${derivationNote}
+            <div style="font-size: 7.5px; color: #78716c;">${escapeHtml(ing.factorDatabase)}</div>
+           </td>`
+        : ing.isProxy
         ? `<td style="min-width: 160px; max-width: 220px;">
             <div style="font-weight: 500; word-wrap: break-word;">${escapeHtml(ing.name)}</div>
             <div style="font-size: 8px; color: #f59e0b; margin-top: 2px; word-wrap: break-word;">
@@ -1204,7 +1224,9 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
             <div style="font-size: 7.5px; color: #78716c; margin-top: 2px;">${escapeHtml(ing.factorDatabase)}</div>
            </td>`;
 
-      const dataSourceBadge = ing.isProxy
+      const dataSourceBadge = derivation
+        ? `<span class="badge badge-medium">Parametric</span>`
+        : ing.isProxy
         ? `<span class="badge badge-high">Proxy</span>`
         : ing.dataSource === 'Primary'
           ? `<span class="badge badge-low">Primary</span>`

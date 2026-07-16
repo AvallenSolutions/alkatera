@@ -724,7 +724,9 @@ export function transformLCADataForReport(
     const gwpSrc: string = m.gwp_data_source || '';
     const nonGwpSrc: string = m.non_gwp_data_source || '';
     let factorDatabase = 'Secondary database';
-    if (m.impact_source === 'primary_verified' || m.data_priority === 1) {
+    if (gwpSrc === 'packaging_parametric') {
+      factorDatabase = 'Parametric (ecoinvent endpoints)';
+    } else if (m.impact_source === 'primary_verified' || m.data_priority === 1) {
       factorDatabase = 'Supplier verified';
     } else if (gwpSrc.toLowerCase().includes('defra')) {
       factorDatabase = nonGwpSrc
@@ -805,6 +807,25 @@ export function transformLCADataForReport(
       transportMode: modeLabel,
       transportDistance: transportDistanceKm > 0 ? transportDistanceKm.toLocaleString('en-GB') : null,
       transportWarning,
+      // Parametric packaging derivation (self-contained snapshot written by
+      // the calculator; renders the working so a reviewer can reproduce it).
+      derivation: m.factor_derivation
+        ? {
+            materialClass: m.factor_derivation.material_class,
+            variant: m.factor_derivation.variant,
+            region: m.factor_derivation.region,
+            recycledPct: Number(m.factor_derivation.recycled_content_pct ?? 0),
+            virginEf: Number(m.factor_derivation.virgin_climate ?? 0),
+            recycledEf: Number(m.factor_derivation.recycled_climate ?? 0),
+            derivedEf: Number(m.factor_derivation.derived_ef_climate ?? 0),
+            dataset: m.factor_derivation.dataset || 'ecoinvent',
+            datasetVersion: m.factor_derivation.dataset_version || '3.12',
+            systemModel: m.factor_derivation.system_model || 'Cutoff',
+            libraryVersion: Number(m.factor_derivation.library_version ?? 1),
+            isProvisional: Boolean(m.factor_derivation.is_provisional),
+            allocationMethod: m.eol_allocation_method || m.factor_derivation.allocation_method || 'cut-off',
+          }
+        : null,
     };
   });
 
