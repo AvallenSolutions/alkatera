@@ -1,12 +1,22 @@
 /**
  * Rosa — document intelligence helpers.
  *
- * Loads files from the `rosa-uploads` Supabase Storage bucket, builds the
- * Gemini inlineData part shape, and (optionally) runs a targeted structured
- * extraction via Gemini vision.
+ * Loads files from Supabase Storage, builds the Gemini inlineData part
+ * shape, and (optionally) runs a targeted structured extraction via Gemini
+ * vision — kept as the fallback path for when the shared Smart Upload
+ * classifier (lib/ingest/classify-document.ts) returns 'unsupported' (see
+ * app/api/rosa/uploads/extract/route.ts).
+ *
+ * Bucket model (data-revolution-plan.md Pillar 1 — one intake, one learning
+ * substrate): new uploads are stashed to `ingest-staging`, the same bucket
+ * every other Smart Upload channel uses, so a Rosa upload produces a real
+ * `ingest_jobs` row. Historical uploads from before this rewire live in the
+ * legacy `rosa-uploads` bucket, which stays readable — `loadAttachment` tries
+ * the new bucket first and falls back to the legacy one, so old chat
+ * attachments (`/api/rosa/chat`'s `attachments: [{file_id}]`) keep resolving.
  *
  * Ownership model:
- *   - Files are stored at `{organization_id}/{user_id}/{uuid}.{ext}`.
+ *   - Files are stored at `{organization_id}/{user_id}/{uuid}-{filename}`.
  *   - All reads go through the service-role client. We check that the prefix
  *     matches the caller's org+user before returning the payload.
  */
@@ -32,11 +42,18 @@ const SUPPORTED_VISION_TYPES: AttachmentMediaType[] = [
   'image/gif',
 ];
 
+/** New Rosa uploads land here — the same bucket every Smart Upload channel stashes into. */
+export const ROSA_UPLOAD_BUCKET = 'ingest-staging';
+/** Pre-rewire uploads only. Never written to any more; kept readable. */
+export const LEGACY_ROSA_UPLOAD_BUCKET = 'rosa-uploads';
+
 export interface LoadedAttachment {
   file_id: string;
   filename: string;
   media_type: AttachmentMediaType;
   base64: string;
+  /** Raw bytes, for callers (e.g. classifyDocument) that don't want a base64 round-trip. */
+  bytes: Uint8Array;
   size_bytes: number;
 }
 
@@ -66,9 +83,11 @@ export function ownsUploadPath(
 }
 
 /**
- * Load a file out of storage and return it as a base64 attachment ready for
- * a Gemini inlineData part. Returns null if the file does not exist or the
- * caller does not own it.
+ * Load a file out of storage and return it as a base64 (+ raw bytes)
+ * attachment. Tries the current `ingest-staging` bucket first, then falls
+ * back to the legacy `rosa-uploads` bucket for files stashed before the
+ * Pillar 1 rewire. Returns null if the file does not exist in either bucket
+ * or the caller does not own it.
  */
 export async function loadAttachment(
   supabase: SupabaseClient,
@@ -77,8 +96,12 @@ export async function loadAttachment(
   userId: string,
 ): Promise<LoadedAttachment | null> {
   if (!ownsUploadPath(path, organizationId, userId)) return null;
-  const { data, error } = await supabase.storage.from('rosa-uploads').download(path);
-  if (error || !data) return null;
+
+  let data = (await supabase.storage.from(ROSA_UPLOAD_BUCKET).download(path)).data;
+  if (!data) {
+    data = (await supabase.storage.from(LEGACY_ROSA_UPLOAD_BUCKET).download(path)).data;
+  }
+  if (!data) return null;
 
   const buf = Buffer.from(await data.arrayBuffer());
   const base64 = buf.toString('base64');
@@ -90,6 +113,7 @@ export async function loadAttachment(
     filename,
     media_type: mediaType,
     base64,
+    bytes: new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength),
     size_bytes: buf.length,
   };
 }

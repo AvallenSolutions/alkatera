@@ -196,17 +196,21 @@ function renderReportSummary(r: HistoricalImportRow) {
     ['Headcount', d.headcount],
   ]
   const items = all.filter((e): e is [string, string | number] => e[1] !== undefined && e[1] !== null && e[1] !== '')
-  if (items.length === 0) {
-    return <p className="text-xs text-muted-foreground">No metrics captured.</p>
-  }
   return (
-    <div className="text-xs text-muted-foreground grid grid-cols-3 gap-1">
-      {items.map(([k, v]) => (
-        <div key={k as string}>
-          <span className="text-foreground font-medium">{v as string | number}</span>{' '}
-          <span>{k}</span>
+    <div className="space-y-2">
+      {items.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No metrics captured.</p>
+      ) : (
+        <div className="text-xs text-muted-foreground grid grid-cols-3 gap-1">
+          {items.map(([k, v]) => (
+            <div key={k as string}>
+              <span className="text-foreground font-medium">{v as string | number}</span>{' '}
+              <span>{k}</span>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
+      <MigrationDetail extractedData={d} />
     </div>
   )
 }
@@ -214,11 +218,46 @@ function renderReportSummary(r: HistoricalImportRow) {
 function renderLcaSummary(r: HistoricalImportRow) {
   const d = r.extracted_data || {}
   return (
-    <div className="text-xs text-muted-foreground space-y-0.5">
-      {d.functional_unit && <p>Unit: <span className="text-foreground">{d.functional_unit}</span></p>}
-      {d.total_gwp_kgco2e !== undefined && <p>GWP: <span className="text-foreground font-medium">{d.total_gwp_kgco2e} kgCO₂e</span></p>}
-      {d.system_boundary && <p>Boundary: <span className="text-foreground">{d.system_boundary}</span></p>}
-      {d.methodology && <p>Methodology: <span className="text-foreground">{d.methodology}</span></p>}
+    <div className="space-y-2">
+      <div className="text-xs text-muted-foreground space-y-0.5">
+        {d.functional_unit && <p>Unit: <span className="text-foreground">{d.functional_unit}</span></p>}
+        {d.total_gwp_kgco2e !== undefined && <p>GWP: <span className="text-foreground font-medium">{d.total_gwp_kgco2e} kgCO₂e</span></p>}
+        {d.system_boundary && <p>Boundary: <span className="text-foreground">{d.system_boundary}</span></p>}
+        {d.methodology && <p>Methodology: <span className="text-foreground">{d.methodology}</span></p>}
+      </div>
+      <MigrationDetail extractedData={d} />
+    </div>
+  )
+}
+
+// Migration engine v1 (lib/ingest/migrate-report.ts) — the deeper extraction
+// fields, when a document had them. Purely a "what did we find" summary; the
+// facilities/products/targets/certifications themselves live in the Ask
+// Queue until confirmed (see /admin/... Agent Console / ExceptionQueue).
+function MigrationDetail({ extractedData: d }: { extractedData: Record<string, any> }) {
+  const facilities: Array<{ name?: string }> = d.facilities || []
+  const products: Array<{ product_name?: string }> = d.products || []
+  const annualTotals: Array<{ year?: number }> = d.annual_totals || []
+  const suppliers: string[] = d.supplier_names || []
+
+  const hasAny = facilities.length || products.length || annualTotals.length || suppliers.length
+  if (!hasAny) return null
+
+  return (
+    <div className="text-xs text-muted-foreground border-t border-border pt-2 space-y-0.5">
+      {!!facilities.length && (
+        <p>{facilities.length} facilit{facilities.length === 1 ? 'y' : 'ies'} · {facilities.map((f) => f.name).filter(Boolean).join(', ')}</p>
+      )}
+      {!!products.length && (
+        <p>{products.length} product PCF{products.length === 1 ? '' : 's'} · {products.map((p) => p.product_name).filter(Boolean).join(', ')}</p>
+      )}
+      {!!annualTotals.length && (
+        <p>Years covered: {annualTotals.map((t) => t.year).filter(Boolean).join(', ')}</p>
+      )}
+      {!!suppliers.length && (
+        <p>{suppliers.length} supplier{suppliers.length === 1 ? '' : 's'} mentioned</p>
+      )}
+      <p className="text-studio-dim">Check your <Link href="/rosa?view=queue" className="underline decoration-dotted underline-offset-2 hover:text-foreground">Ask Queue</Link> to confirm these.</p>
     </div>
   )
 }

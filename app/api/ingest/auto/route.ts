@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createHmac } from 'crypto'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
 import { createClient } from '@supabase/supabase-js'
-import { classifyDocument, shapeIngestResult } from '@/lib/ingest/classify-document'
-import { buildIngestOrgContext } from '@/lib/ingest/org-context'
+import { enqueueIngestJob } from '@/lib/ingest/enqueue'
 import { userHasOrgAccess } from '@/lib/supabase/verify-org-access'
 import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access'
 import type { ExtractedBillData } from '@/app/api/utilities/import-from-pdf/route'
@@ -12,35 +10,6 @@ import type {
   ExtractedWaterEntry,
   ExtractedWasteEntry,
 } from '@/app/api/facilities/import-bill/route'
-
-// Files smaller than this can be classified inline if the background trigger
-// fails — Claude on a single PDF page typically completes in 5-12s, well
-// under Netlify's 26s sync ceiling.
-const INLINE_FALLBACK_MAX_BYTES = 5 * 1024 * 1024
-// PDFs with more than this many pages routinely blow the 26s inline budget
-// (Claude reads every page), so they go to the background function even when
-// their byte size is small. A 60-page catalogue at 4.8MB used to be classified
-// inline, get the lambda killed mid-await, and leave the job stuck at
-// "extracting" forever.
-const INLINE_MAX_PDF_PAGES = 8
-const TRIGGER_TIMEOUT_MS = 4000
-
-/**
- * Cheap PDF page-count estimate from the raw bytes (no full parse): count the
- * "/Type /Page" objects (excluding the "/Pages" tree node). Good enough to
- * decide inline-vs-background; returns null for non-PDF or unreadable input.
- */
-function estimatePdfPageCount(bytes: Uint8Array): number | null {
-  try {
-    // Only scan a bounded prefix — page objects are spread through the file,
-    // but for a routing heuristic a generous cap keeps this O(1)-ish.
-    const text = Buffer.from(bytes).toString('latin1')
-    const matches = text.match(/\/Type\s*\/Page[^s]/g)
-    return matches ? matches.length : null
-  } catch {
-    return null
-  }
-}
 
 // On Netlify the lambda freezes the moment the HTTP response is sent, so the
 // inline fallback below MUST be awaited. Bumping maxDuration gives us
@@ -51,10 +20,12 @@ export const maxDuration = 26
 // ───────────────────────────────────────────────────────────────────────────────
 // Smart Upload enqueue endpoint.
 //
-// Stashes the incoming file in ingest-staging, inserts an ingest_jobs row,
-// and fires a fire-and-forget HMAC-signed request to the -background Netlify
-// function which runs the slow Claude classifier (15 min cap). The client
-// then polls /api/ingest/auto/[jobId] for the result.
+// Everything about stashing the file, creating its ingest_jobs row and
+// deciding inline-vs-background classification lives in
+// lib/ingest/enqueue.ts (shared with the Rosa drawer, supplier smart-import
+// and email-in channels — data-revolution-plan.md Pillar 1). This route is
+// left with the HTTP-specific concerns: auth, per-org rate limiting, access
+// checks and multipart parsing.
 //
 // Moving extraction off the synchronous code path is what fixes the
 // "completely failed" historical-report uploads — those were dying at
@@ -77,119 +48,6 @@ function checkRateLimit(orgId: string): { allowed: boolean; remaining: number } 
   }
   entry.count += 1
   return { allowed: true, remaining: RATE_LIMIT_MAX - entry.count }
-}
-
-async function triggerBackground(
-  target: string,
-  hmacSecret: string,
-  jobId: string,
-): Promise<boolean> {
-  const triggerPayload = JSON.stringify({ jobId })
-  const signature = createHmac('sha256', hmacSecret).update(triggerPayload).digest('hex')
-  const ctrl = new AbortController()
-  const timeout = setTimeout(() => ctrl.abort(), TRIGGER_TIMEOUT_MS)
-  try {
-    const res = await fetch(target, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-internal-hmac': signature },
-      body: triggerPayload,
-      signal: ctrl.signal,
-    })
-    // Netlify -background functions return 202 immediately. Any 2xx is fine;
-    // 4xx/5xx means the function didn't accept the trigger.
-    return res.status >= 200 && res.status < 300
-  } catch (err: any) {
-    // Treat timeout as failure: a healthy Netlify -background function
-    // returns 202 in well under a second. If we hit the timeout, the
-    // function is either broken or undeployed, and we want to surface
-    // that to the user rather than wait silently.
-    console.error('[ingest/auto] trigger fetch failed:', err?.name, err?.message)
-    return false
-  } finally {
-    clearTimeout(timeout)
-  }
-}
-
-// Inline fallback path for when the background function trigger fails. Runs
-// the same classifier the background function would, then writes the result
-// (or failure) onto the ingest_jobs row exactly like the function does, so
-// the client polling loop sees no difference.
-async function runInlineClassifier(
-  serviceClient: any,
-  jobId: string,
-  file: File,
-  stashPath: string,
-  organizationId: string,
-): Promise<void> {
-  const updateJob = (patch: Record<string, any>) =>
-    serviceClient
-      .from('ingest_jobs')
-      .update({ ...patch, updated_at: new Date().toISOString() })
-      .eq('id', jobId)
-  try {
-    await updateJob({
-      status: 'extracting',
-      phase_message: 'Reading the document (inline fallback)…',
-    })
-    // Org context (learned document profiles + org facts) fetches in parallel
-    // with reading the file; a failure or timeout degrades to null and the
-    // document classifies without hints.
-    const [fileBytes, orgContext] = await Promise.all([
-      file.arrayBuffer().then((b) => new Uint8Array(b)),
-      buildIngestOrgContext(serviceClient, organizationId).catch(() => null),
-    ])
-    const result = await classifyDocument({
-      fileBytes,
-      fileName: file.name,
-      fileMime: file.type || '',
-      orgContext: orgContext ?? undefined,
-    })
-    // Pass the real stash path so the file carry-through works on the inline
-    // path too. Without it, historical-report source PDFs are never preserved
-    // and the bom / spray_diary / soil_carbon_evidence handoffs silently
-    // degrade to "re-upload the file" for every file under the inline ceiling.
-    const shaped = shapeIngestResult(result.type, result.payload, stashPath, result.meta)
-    await updateJob({
-      status: 'completed',
-      phase_message: null,
-      result_type: shaped.result_type,
-      result_payload: shaped.result_payload,
-    })
-  } catch (err: any) {
-    console.error('[ingest/auto] Inline classifier failed:', err)
-    await updateJob({
-      status: 'failed',
-      error: err?.message?.slice(0, 500) || 'Inline classification failed',
-    })
-  }
-}
-
-async function stashFile(
-  serviceClient: any,
-  file: File,
-  orgId: string,
-  userId: string,
-): Promise<string | null> {
-  try {
-    const ext = (file.name.split('.').pop() || 'bin').toLowerCase()
-    const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`
-    const path = `${orgId}/${userId}/${unique}`
-    const buffer = Buffer.from(await file.arrayBuffer())
-    const { error } = await serviceClient.storage
-      .from('ingest-staging')
-      .upload(path, buffer, {
-        contentType: file.type || 'application/octet-stream',
-        upsert: false,
-      })
-    if (error) {
-      console.error('[ingest/auto] Stash upload failed:', error.message)
-      return null
-    }
-    return path
-  } catch (err: any) {
-    console.error('[ingest/auto] Stash unexpected error:', err?.message)
-    return null
-  }
 }
 
 export type IngestResultType =
@@ -347,8 +205,43 @@ export interface IngestResponse {
     headcount?: number
     revenue_gbp?: number
     certifications_held?: string[]
-    targets?: Array<{ metric?: string; year?: number; percent_reduction?: number }>
+    targets?: Array<{
+      metric?: string
+      year?: number
+      percent_reduction?: number
+      baseline_value?: number
+      baseline_year?: number
+      target_value?: number
+      target_date?: string
+    }>
     stashId?: string
+    // Migration engine v1 (lib/ingest/migrate-report.ts) — deep-extraction
+    // fields, present when the source document has them. All optional and
+    // additive: an older/simpler upload with only the headline fields above
+    // still works exactly as before.
+    company_profile?: { name?: string; sector?: string; founding_year?: number }
+    facilities?: Array<{ name: string; location?: string; type?: string }>
+    baseline_year?: number
+    annual_totals?: Array<{
+      year: number
+      scope1_tco2e?: number
+      scope2_tco2e_market?: number
+      scope2_tco2e_location?: number
+      scope3_tco2e?: number
+      energy_kwh?: number
+      water_m3?: number
+      waste_tonnes?: number
+    }>
+    products?: Array<{
+      product_name: string
+      functional_unit?: string
+      system_boundary?: string
+      reference_year?: number
+      total_gwp_kgco2e?: number
+      methodology?: string
+    }>
+    supplier_names?: string[]
+    methodology_notes?: string
   }
   historicalLcaReport?: {
     product_name?: string
@@ -367,6 +260,20 @@ export interface IngestResponse {
     water_footprint_l?: number
     methodology?: string
     study_commissioned_by?: string
+    // Migration engine v1 — see historicalSustainabilityReport above.
+    company_profile?: { name?: string; sector?: string; founding_year?: number }
+    facilities?: Array<{ name: string; location?: string; type?: string }>
+    products?: Array<{
+      product_name: string
+      functional_unit?: string
+      system_boundary?: string
+      reference_year?: number
+      total_gwp_kgco2e?: number
+      methodology?: string
+    }>
+    certifications_held?: string[]
+    supplier_names?: string[]
+    methodology_notes?: string
     stashId?: string
   }
   hospitalityMenu?: {
@@ -391,6 +298,13 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     const organizationId = formData.get('organizationId') as string | null
+    // Which intake surface is driving this upload (data-revolution-plan.md
+    // Pillar 1: one classifier, one learning substrate, shared by every
+    // channel). Purely an admin-visible tag on ingest_jobs.channel — absent
+    // or unrecognised falls back to the untagged default (the Smart Upload
+    // dropzone), never blocks the upload.
+    const channelRaw = formData.get('channel') as string | null
+    const channel = channelRaw === 'rosa' || channelRaw === 'supplier_import' ? channelRaw : null
 
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     if (!organizationId) {
@@ -402,7 +316,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File too large (max 20MB)' }, { status: 400 })
     }
 
-    const hmacSecret = process.env.INTERNAL_JOB_HMAC_SECRET
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     if (!supabaseUrl || !serviceRoleKey) {
@@ -434,77 +347,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const stashPath = await stashFile(serviceClient, file, organizationId, user.id)
-    if (!stashPath) {
-      return NextResponse.json({ error: 'Failed to stash uploaded file' }, { status: 500 })
-    }
-
-    const { data: job, error: insertErr } = await (serviceClient as any)
-      .from('ingest_jobs')
-      .insert({
-        user_id: user.id,
-        organization_id: organizationId,
-        status: 'pending',
-        phase_message: 'Queued…',
-        stash_path: stashPath,
-        file_name: file.name,
-        file_mime: file.type || null,
-      })
-      .select('id')
-      .single()
-
-    if (insertErr || !job) {
-      console.error('[ingest/auto] Failed to create job:', insertErr)
-      return NextResponse.json({ error: 'Failed to start ingest' }, { status: 500 })
-    }
-
-    // Strategy: classify inline whenever the file fits within the sync
-    // budget. The Netlify -background function has been failing to
-    // cold-start in production (jobs stuck at "Queued…"), and even when
-    // it works the inline path is faster for typical bills. We fall back to
-    // the background trigger for large files AND for multi-page PDFs, which
-    // are slow to read regardless of byte size and would otherwise get the
-    // 26s lambda killed mid-await (leaving the job stuck at "extracting").
-    const isPdf = (file.type || '').includes('pdf') || file.name.toLowerCase().endsWith('.pdf')
-    let inlineEligible = file.size <= INLINE_FALLBACK_MAX_BYTES
-    if (inlineEligible && isPdf) {
-      const pageCount = estimatePdfPageCount(new Uint8Array(await file.arrayBuffer()))
-      if (pageCount != null && pageCount > INLINE_MAX_PDF_PAGES) {
-        inlineEligible = false
-        console.log(`[ingest/auto] PDF has ~${pageCount} pages (> ${INLINE_MAX_PDF_PAGES}); routing to background`)
-      }
-    }
-    if (inlineEligible) {
-      await runInlineClassifier(serviceClient, job.id, file, stashPath, organizationId)
-      return NextResponse.json({ jobId: job.id }, { status: 202 })
-    }
-
     const baseUrl =
       process.env.URL ||
       process.env.DEPLOY_URL ||
       `${request.nextUrl.protocol}//${request.headers.get('host')}`
-    const target = `${baseUrl}/.netlify/functions/ingest-auto-background`
 
-    const triggerOk = hmacSecret
-      ? await triggerBackground(target, hmacSecret, job.id).catch((err) => {
-          console.error('[ingest/auto] Background trigger error:', err)
-          return false
-        })
-      : false
+    const fileBytes = new Uint8Array(await file.arrayBuffer())
 
-    if (!triggerOk) {
-      await (serviceClient as any)
-        .from('ingest_jobs')
-        .update({
-          status: 'failed',
-          error:
-            'This file is too large for synchronous processing and the background processor is unavailable. Try uploading a smaller (< 5MB) version, or contact support.',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', job.id)
+    let jobId: string
+    try {
+      const enqueued = await enqueueIngestJob({
+        serviceClient,
+        organizationId,
+        userId: user.id,
+        file: { bytes: fileBytes, name: file.name, mime: file.type || '', size: file.size },
+        channel,
+        baseUrl,
+      })
+      jobId = enqueued.jobId
+    } catch (err: any) {
+      console.error('[ingest/auto] enqueueIngestJob failed:', err?.message)
+      return NextResponse.json({ error: err?.message || 'Failed to start ingest' }, { status: 500 })
     }
 
-    return NextResponse.json({ jobId: job.id }, { status: 202 })
+    return NextResponse.json({ jobId }, { status: 202 })
   } catch (err: any) {
     console.error('[ingest/auto] Error:', err)
     return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 })

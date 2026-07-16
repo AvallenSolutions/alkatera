@@ -71,6 +71,11 @@ interface UniversalDropzoneProps {
   /** Fired once the supplied `file` has been picked up, so the parent can
    *  clear its own state and avoid re-processing the same file. */
   onFileConsumed?: () => void
+  /** Which intake surface is driving this upload, stamped onto ingest_jobs.channel
+   *  (data-revolution-plan.md Pillar 1: one classifier, one learning substrate —
+   *  every channel shares this dialog, so this is just an admin-visible tag,
+   *  not a behaviour switch). Omit for the default Smart Upload dropzone. */
+  channel?: 'rosa'
 }
 
 // Types whose review panel is a handoff (navigate elsewhere to finish), not a
@@ -155,7 +160,7 @@ function ChangeTypeMenu({
   )
 }
 
-export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDropzoneProps) {
+export function UniversalDropzone({ trigger, file, onFileConsumed, channel }: UniversalDropzoneProps) {
   const { currentOrganization } = useOrganization()
   const orgId = currentOrganization?.id
 
@@ -252,6 +257,7 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
         const form = new FormData()
         form.append('file', file)
         form.append('organizationId', orgId)
+        if (channel) form.append('channel', channel)
 
         const res = await fetch('/api/ingest/auto', {
           method: 'POST',
@@ -1280,6 +1286,17 @@ function HistoricalReportPanel({ result, onClose, onSaved }: { result: IngestRes
             ...form,
             certifications_held: data.certifications_held || [],
             targets: data.targets || [],
+            // Migration engine v1 (lib/ingest/migrate-report.ts) — passed
+            // through as extracted, not re-editable in this quick-review
+            // panel. The Ask Queue is where each group gets confirmed
+            // (or corrected) before anything lands as a real record.
+            company_profile: data.company_profile || undefined,
+            facilities: data.facilities || [],
+            baseline_year: data.baseline_year,
+            annual_totals: data.annual_totals || [],
+            products: data.products || [],
+            supplier_names: data.supplier_names || [],
+            methodology_notes: data.methodology_notes,
           },
           stash_id: data.stashId,
         }),
@@ -1288,7 +1305,13 @@ function HistoricalReportPanel({ result, onClose, onSaved }: { result: IngestRes
         const body = await res.json().catch(() => ({}))
         throw new Error(body.error || 'Save failed')
       }
-      toast.success('Historical report saved')
+      const saveBody = await res.json().catch(() => ({}))
+      const groupsCreated = saveBody?.exceptionsCreated || 0
+      toast.success(
+        groupsCreated > 0
+          ? `Historical report saved. ${groupsCreated} item${groupsCreated === 1 ? '' : 's'} added to your Ask Queue to confirm.`
+          : 'Historical report saved',
+      )
       setSaved(true)
       onSaved?.({ ...form })
     } catch (err: any) {
@@ -1352,6 +1375,8 @@ function HistoricalReportPanel({ result, onClose, onSaved }: { result: IngestRes
         </div>
       ) : null}
 
+      <MigrationExtractionSummary data={data} />
+
       <div className="flex items-center justify-end gap-2 pt-1">
         <Button size="sm" onClick={handleSave} disabled={saving}>
           <FileText className="h-3.5 w-3.5 mr-1.5" />
@@ -1409,6 +1434,15 @@ function HistoricalLcaPanel({ result, onClose, onSaved }: { result: IngestRespon
           extracted_data: {
             ...form,
             stage_breakdown: data.stage_breakdown || {},
+            // Migration engine v1 — see the equivalent block in
+            // HistoricalReportPanel above for why these pass through as
+            // extracted rather than being editable here.
+            company_profile: data.company_profile || undefined,
+            facilities: data.facilities || [],
+            products: data.products || [],
+            certifications_held: data.certifications_held || [],
+            supplier_names: data.supplier_names || [],
+            methodology_notes: data.methodology_notes,
           },
           stash_id: data.stashId,
         }),
@@ -1417,7 +1451,13 @@ function HistoricalLcaPanel({ result, onClose, onSaved }: { result: IngestRespon
         const body = await res.json().catch(() => ({}))
         throw new Error(body.error || 'Save failed')
       }
-      toast.success('Historical LCA saved')
+      const saveBody = await res.json().catch(() => ({}))
+      const groupsCreated = saveBody?.exceptionsCreated || 0
+      toast.success(
+        groupsCreated > 0
+          ? `Historical LCA saved. ${groupsCreated} item${groupsCreated === 1 ? '' : 's'} added to your Ask Queue to confirm.`
+          : 'Historical LCA saved',
+      )
       setSaved(true)
       onSaved?.({ ...form })
     } catch (err: any) {
@@ -1496,12 +1536,66 @@ function HistoricalLcaPanel({ result, onClose, onSaved }: { result: IngestRespon
         </div>
       )}
 
+      <MigrationExtractionSummary data={data} />
+
       <div className="flex items-center justify-end gap-2 pt-1">
         <Button size="sm" onClick={handleSave} disabled={saving}>
           <FileText className="h-3.5 w-3.5 mr-1.5" />
           Save historical LCA
         </Button>
       </div>
+    </div>
+  )
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// MigrationExtractionSummary — read-only preview of the migration-engine deep
+// extraction (lib/ingest/migrate-report.ts), shown on both historical review
+// panels above. Nothing here is edited inline: everything shown lands as a
+// batched agent_exceptions group on save, and gets confirmed (or corrected)
+// from the Ask Queue — see /api/ingest/historical and lib/intake/dispatch.ts.
+// ───────────────────────────────────────────────────────────────────────────────
+
+interface MigrationSummaryData {
+  company_profile?: { name?: string; sector?: string; founding_year?: number }
+  facilities?: Array<{ name: string; location?: string; type?: string }>
+  annual_totals?: Array<{ year: number }>
+  products?: Array<{ product_name: string }>
+  supplier_names?: string[]
+  methodology_notes?: string
+}
+
+function MigrationExtractionSummary({ data }: { data: MigrationSummaryData }) {
+  const hasAny =
+    !!data.company_profile?.name ||
+    !!data.company_profile?.sector ||
+    !!data.facilities?.length ||
+    !!data.annual_totals?.length ||
+    !!data.products?.length ||
+    !!data.supplier_names?.length ||
+    !!data.methodology_notes
+
+  if (!hasAny) return null
+
+  return (
+    <div className="rounded-md border border-border p-3 text-xs space-y-1.5">
+      <p className="font-medium text-foreground">Also found in this document</p>
+      {data.company_profile?.sector && (
+        <p><span className="font-medium text-foreground">Sector:</span> {data.company_profile.sector}</p>
+      )}
+      {!!data.facilities?.length && (
+        <p><span className="font-medium text-foreground">Facilities:</span> {data.facilities.map((f) => f.name).join(', ')}</p>
+      )}
+      {!!data.products?.length && (
+        <p><span className="font-medium text-foreground">Product PCFs:</span> {data.products.map((p) => p.product_name).join(', ')}</p>
+      )}
+      {!!data.annual_totals?.length && (
+        <p><span className="font-medium text-foreground">Years covered:</span> {data.annual_totals.map((t) => t.year).join(', ')}</p>
+      )}
+      {!!data.supplier_names?.length && (
+        <p><span className="font-medium text-foreground">Suppliers:</span> {data.supplier_names.join(', ')}</p>
+      )}
+      <p className="text-studio-dim">These will be added to your Ask Queue to confirm after saving.</p>
     </div>
   )
 }

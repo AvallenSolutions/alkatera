@@ -100,6 +100,7 @@ export function RosaInputBar({ onSubmit, placeholder, defaultValue }: Props) {
       <UniversalDropzone
         file={dropzoneFile}
         onFileConsumed={() => setDropzoneFile(null)}
+        channel="rosa"
       />
       <div className="relative">
         {showSlash && (

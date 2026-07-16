@@ -19,6 +19,7 @@ import { FactList, type FactRowItem } from '@/components/studio/fact-list'
 import type { WorkingTone } from '@/components/studio/theme'
 import { GrowthFieldMount } from '@/components/studio/growth/growth-field-mount'
 import { RoomSetupPanel } from '@/components/studio/room-setup-panel'
+import { GiveDoor } from '@/components/studio/give-door'
 
 interface EvidenceCounts {
   reportsGenerated: number
@@ -172,6 +173,8 @@ export default function EvidenceLandingPage() {
       <Statement eyebrow="THE EVIDENCE" headline="What you can prove." />
 
       <RoomSetupPanel room="evidence" />
+
+      <GiveDoor hint="Certificates and reports land here." />
 
       <ProofPoster counts={counts} />
 

@@ -19,6 +19,7 @@ import { PosterBlock } from '@/components/studio/poster-block'
 import { FactList, type FactRowItem } from '@/components/studio/fact-list'
 import { GrowthFieldMount } from '@/components/studio/growth/growth-field-mount'
 import { RoomSetupPanel } from '@/components/studio/room-setup-panel'
+import { GiveDoor } from '@/components/studio/give-door'
 
 interface NetworkCounts {
   suppliers: number
@@ -155,6 +156,8 @@ export default function NetworkLandingPage() {
       <Statement eyebrow="THE NETWORK" headline="The people you talk to." />
 
       <RoomSetupPanel room="network" />
+
+      <GiveDoor hint="Supplier documents land here." />
 
       <ChainPoster counts={counts} />
 

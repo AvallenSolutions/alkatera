@@ -25,7 +25,12 @@ interface JobRow {
 let jobs: JobRow[];
 let cachedJobBySupplierAndHash: { supplier_id: string; file_hash: string; created_at: string; id: string } | null;
 let dailyCount: number;
-let lastUploadCall: { bucket: string; path: string } | null;
+// Every storage.upload() call, in order — the route now stashes to TWO
+// buckets (supplier-product-evidence for the confirmed evidence copy,
+// ingest-staging for the shared Smart Upload classify pass), so a single
+// "last call" no longer identifies either one.
+let uploadCalls: Array<{ bucket: string; path: string }>;
+let ingestJobs: Array<{ id: string; status: string; result_type?: string | null }>;
 let supplierLookup: typeof mockSupplier | null;
 
 const fromImpl = vi.fn();
@@ -126,6 +131,24 @@ const buildFromBuilder = (table: string) => {
     };
     return insertChain;
   }
+  // The Pillar 1 classify-for-learning pass (best-effort, non-fatal by
+  // design): a real ingest_jobs row tagged channel='supplier_import'.
+  if (table === 'ingest_jobs') {
+    return {
+      insert: (row: any) => {
+        const newJob = { id: `ingest-job-${ingestJobs.length + 1}`, status: row.status };
+        ingestJobs.push(newJob);
+        return { select: () => ({ single: async () => ({ data: newJob, error: null }) }) };
+      },
+      update: (patch: any) => ({
+        eq: async (_col: string, id: string) => {
+          const j = ingestJobs.find(x => x.id === id);
+          if (j) Object.assign(j, patch);
+          return { error: null };
+        },
+      }),
+    };
+  }
   throw new Error(`Unmocked table: ${table}`);
 };
 
@@ -134,13 +157,14 @@ beforeEach(async () => {
   jobs = [];
   cachedJobBySupplierAndHash = null;
   dailyCount = 0;
-  lastUploadCall = null;
+  uploadCalls = [];
+  ingestJobs = [];
   supplierLookup = mockSupplier;
 
   fromImpl.mockImplementation(buildFromBuilder);
   storageFromImpl.mockImplementation((bucket: string) => ({
     upload: async (path: string, _buf: Buffer, _opts: any) => {
-      lastUploadCall = { bucket, path };
+      uploadCalls.push({ bucket, path });
       return { data: { path }, error: null };
     },
   }));
@@ -287,19 +311,38 @@ describe('POST /api/supplier-products/smart-import', () => {
     const body = await res.json();
     expect(body.jobId).toBeTruthy();
 
-    // File landed in supplier-product-evidence under the supplier's folder.
-    expect(lastUploadCall?.bucket).toBe('supplier-product-evidence');
-    expect(lastUploadCall?.path).toMatch(/^supplier-1\/imports\/job-\d+-frugal\.pdf$/);
+    // File landed in supplier-product-evidence under the supplier's folder
+    // (the confirmed-evidence copy) AND in ingest-staging (the shared Smart
+    // Upload classify pass, org-scoped since ingest_jobs.organization_id is
+    // NOT NULL) — two buckets, two independent copies.
+    const evidenceUpload = uploadCalls.find(c => c.bucket === 'supplier-product-evidence');
+    expect(evidenceUpload?.path).toMatch(/^supplier-1\/imports\/job-\d+-frugal\.pdf$/);
+    const stagingUpload = uploadCalls.find(c => c.bucket === 'ingest-staging');
+    expect(stagingUpload?.path).toMatch(/^org-1\/user-1\/\d+-frugal\.pdf$/);
 
-    // Anthropic was called once and the row is back as completed with the
-    // extracted product attached.
-    expect(anthropicCreateMock).toHaveBeenCalledTimes(1);
+    // Anthropic was called twice: once for the specialised catalogue
+    // extraction (the row of truth below) and once for the classify-for-
+    // learning pass through the shared substrate (lib/ingest/classify-document.ts).
+    expect(anthropicCreateMock).toHaveBeenCalledTimes(2);
     const completed = jobs.find(j => j.status === 'completed');
     expect(completed?.extracted_products?.products?.[0]?.name).toBe('Frugal Bottle');
+
+    // The classify pass produced a real ingest_jobs row, channel='supplier_import'
+    // (channel isn't tracked by this mock, but the completed status + a
+    // result_type is enough to prove the classify pass ran to completion).
+    const completedIngestJob = ingestJobs.find(j => j.status === 'completed');
+    expect(completedIngestJob).toBeTruthy();
+    expect(completed?.extracted_products?._classification?.ingestJobId).toBe(completedIngestJob?.id);
   });
 
   it('marks the job failed and still returns 202 when extraction throws', async () => {
-    anthropicCreateMock.mockRejectedValueOnce(new Error('Anthropic rate limited'));
+    // Every Anthropic call rejects, not just the first — the main extraction
+    // and the classify-for-learning pass both call anthropicCreateMock
+    // concurrently (Promise.all), so a "once" rejection could land on either
+    // one depending on scheduling. Only the main extraction's failure should
+    // fail supplier_product_import_jobs; the classify pass rejecting is
+    // caught internally (non-fatal, see classifyForLearning).
+    anthropicCreateMock.mockRejectedValue(new Error('Anthropic rate limited'));
     const res = await POST(makeRequest({ name: 'frugal.pdf', type: 'application/pdf' }, 'supplier-1'));
     expect(res.status).toBe(202);
     const failed = jobs.find(j => j.status === 'failed');
@@ -318,7 +361,9 @@ describe('POST /api/supplier-products/smart-import', () => {
     );
     const res = await POST(makeRequest({ name: 'cat.csv', type: 'text/csv', bytes: csvBytes }, 'supplier-1'));
     expect(res.status).toBe(202);
-    expect(anthropicCreateMock).toHaveBeenCalledTimes(1);
+    // Once for the catalogue extraction, once for the classify-for-learning
+    // pass (see the happy-path test above).
+    expect(anthropicCreateMock).toHaveBeenCalledTimes(2);
 
     // pdf-parse must not be invoked for CSVs.
     const pdfMod = await import('pdf-parse');

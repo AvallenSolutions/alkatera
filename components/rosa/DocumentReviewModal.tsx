@@ -24,6 +24,9 @@ import { AlertCircle, CheckCircle2, FileText, Zap } from 'lucide-react';
 export interface ExtractResult {
   ok: boolean;
   error?: string;
+  /** The ingest_jobs row behind this extraction, for the /api/ingest/feedback
+   *  learning hook on import. Null for legacy pre-rewire attachments. */
+  job_id?: string | null;
   document_type: string;
   utility_type: string;
   supplier_name: string | null;
@@ -169,6 +172,35 @@ export function DocumentReviewModal({
         return;
       }
       setImportSuccess(true);
+
+      // Fire-and-forget learning hook: same mechanism UniversalDropzone's
+      // Smart Upload panels use — report what the user actually saved so
+      // ingest_document_profiles learns this supplier/document for next time.
+      // Never blocks or breaks the import UX; skipped for legacy (pre-rewire)
+      // attachments that have no ingest_jobs row.
+      if (extractResult?.job_id) {
+        try {
+          void fetch('/api/ingest/feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            keepalive: true,
+            body: JSON.stringify({
+              jobId: extractResult.job_id,
+              savedPayload: {
+                supplier_name: extractResult.supplier_name,
+                period_start: periodStart,
+                period_end: periodEnd,
+                account_number: extractResult.account_number,
+                entries: [{ utility_type: utilityType, quantity: Number(quantity), unit }],
+              },
+              context: { facility_id: facilityId, source: 'rosa_drawer' },
+            }),
+          }).catch(() => {});
+        } catch {
+          // never surface
+        }
+      }
+
       const facility = extractResult?.facilities.find(f => f.id === facilityId);
       const utility = UTILITY_TYPES.find(t => t.value === utilityType);
       setTimeout(() => {

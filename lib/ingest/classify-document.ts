@@ -11,6 +11,10 @@ import { parseHalfHourlyCsv } from '../energy/hh-csv-parser';
 import { readingsSpan, deriveMonthlyEntries } from '../energy/derive-utility';
 import { logClaudeUsage } from '../ai/usage-log';
 import { workbookToText, csvToText, sanitiseFileName } from './spreadsheet-text';
+import {
+  MIGRATION_EXTRACTION_SCHEMA_PROPERTIES,
+  MIGRATION_TARGET_ITEM_EXTRA_PROPERTIES,
+} from './migrate-report';
 
 /**
  * Shared Smart Upload classifier.
@@ -954,7 +958,7 @@ async function callClassifier(params: CallClassifierParams): Promise<ClassifierR
       {
         name: 'extract_sustainability_report',
         description:
-          'Use for annual sustainability / ESG / CSR / impact reports. Extract the headline metrics for ONE reporting year.',
+          'Use for annual sustainability / ESG / CSR / impact reports, B Corp impact reports, CDP/EcoVadis responses, or GHG inventories. Extract the headline metrics for the primary reporting year, PLUS the deeper migration-engine fields below when the document has them (company profile, facilities, multi-year totals, product-level PCFs, targets, suppliers) — a brand arriving with a prior report should not have to re-key everything by hand.',
         input_schema: {
           type: 'object',
           properties: {
@@ -978,16 +982,18 @@ async function callClassifier(params: CallClassifierParams): Promise<ClassifierR
                   metric: { type: 'string' },
                   year: { type: 'number' },
                   percent_reduction: { type: 'number' },
+                  ...MIGRATION_TARGET_ITEM_EXTRA_PROPERTIES,
                 },
               },
             },
+            ...MIGRATION_EXTRACTION_SCHEMA_PROPERTIES,
           },
         },
       },
       {
         name: 'extract_lca_report',
         description:
-          'Use for prior LCA / PCF / product carbon footprint study documents.',
+          'Use for prior LCA / PCF / product carbon footprint study documents (consultant LCAs, competitor-platform exports). Extract the primary product headline fields, PLUS the deeper migration-engine fields below when the study covers more than one product/SKU or names facilities and suppliers.',
         input_schema: {
           type: 'object',
           properties: {
@@ -1013,6 +1019,7 @@ async function callClassifier(params: CallClassifierParams): Promise<ClassifierR
             water_footprint_l: { type: 'number' },
             methodology: { type: 'string' },
             study_commissioned_by: { type: 'string' },
+            ...MIGRATION_EXTRACTION_SCHEMA_PROPERTIES,
           },
         },
       },

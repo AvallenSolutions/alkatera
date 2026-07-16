@@ -7,6 +7,7 @@ import { PosterBlock } from '@/components/studio/poster-block';
 import { Statement } from '@/components/studio/statement';
 import { DeskPriorities } from '@/components/studio/desk-priorities';
 import { DeskWelcome } from '@/components/studio/desk-welcome';
+import { GiveDoor } from '@/components/studio/give-door';
 import {
   PLATFORM_ROOMS,
   deskOrderForPersona,
@@ -163,6 +164,9 @@ export default function DeskPage() {
 
       {/* What needs you today: Rosa's top priorities, quiet on paper. */}
       <DeskPriorities />
+
+      {/* Give us anything: the one gesture that hands data over from here. */}
+      <GiveDoor hint="Anything at all. We will work out where it goes." />
 
       {/* The key numbers greet you in the hall: the vitality panel. */}
       <VitalityHero />

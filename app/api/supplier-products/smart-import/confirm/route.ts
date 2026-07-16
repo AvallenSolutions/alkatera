@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import type { ExtractedSupplierProduct } from '@/lib/extraction/supplier-product-extractor';
+import { normaliseSupplierKey } from '@/lib/ingest/supplier-key';
+import { computeFieldDiff } from '@/lib/ingest/feedback-diff';
+import { bumpDocumentProfile } from '@/lib/ingest/profile-upsert';
 
 export const runtime = 'nodejs';
 
@@ -40,7 +43,7 @@ export async function POST(request: NextRequest) {
     // Caller must own the supplier or be a member of its org.
     const { data: supplier, error: supplierError } = await (client as any)
       .from('suppliers')
-      .select('id, organization_id, user_id')
+      .select('id, name, organization_id, user_id')
       .eq('id', supplierId)
       .maybeSingle();
 
@@ -179,6 +182,62 @@ export async function POST(request: NextRequest) {
       } catch (eventErr) {
         console.error('[smart-import confirm] match.suggest dispatch failed (non-fatal):', eventErr);
       }
+    }
+
+    // Pillar 1 (data-revolution-plan.md): teach ingest_document_profiles from
+    // this confirm, the same learning mechanism /api/ingest/feedback uses for
+    // every other Smart Upload channel. Diffs what the CATALOGUE EXTRACTOR
+    // originally read (job.extracted_products.products, before the user's
+    // edits) against what was actually confirmed just now — that comparison
+    // is the real correction signal here, not the classify-document.ts pass
+    // (which frequently can't recognise a multi-product catalogue and is only
+    // there for admin-visible classification stats). Best-effort: any
+    // failure here must never affect the products that were just created.
+    try {
+      const supplierKey = normaliseSupplierKey(supplier.name || '');
+      if (supplierKey && supplier.organization_id) {
+        const { data: jobRow } = await (client as any)
+          .from('supplier_product_import_jobs')
+          .select('extracted_products')
+          .eq('id', jobId)
+          .maybeSingle();
+        const originalProducts = Array.isArray(jobRow?.extracted_products?.products)
+          ? jobRow.extracted_products.products
+          : [];
+        const ingestJobId: string | null = jobRow?.extracted_products?._classification?.ingestJobId ?? null;
+        const modeUsed: string | null = jobRow?.extracted_products?.mode_used ?? null;
+
+        const fieldDiff = computeFieldDiff({ products: originalProducts }, { products });
+        await (client as any).from('ingest_feedback').insert({
+          // Links to the classify-document.ts job when the classify pass
+          // succeeded; null is fine (the column allows it) when it didn't.
+          job_id: ingestJobId,
+          organization_id: supplier.organization_id,
+          user_id: user.id,
+          // Not a classify-document.ts ClassifierResultType — this channel's
+          // extraction schema is genuinely different (see
+          // lib/extraction/supplier-product-extractor.ts), so it gets its own
+          // descriptive result_type. ingest_feedback.result_type has no CHECK
+          // constraint restricting it to the classifier's union.
+          result_type: 'supplier_catalogue_product',
+          supplier_key: supplierKey,
+          classifier_payload: { products: originalProducts },
+          saved_payload: { products },
+          field_diff: fieldDiff,
+          context: { supplier_id: supplierId, mode_used: modeUsed, product_count: products.length },
+        });
+
+        await bumpDocumentProfile(client, {
+          organizationId: supplier.organization_id,
+          matchKind: 'supplier',
+          supplierKey,
+          resultType: 'supplier_catalogue_product',
+          hints: modeUsed ? { typical_mode_used: modeUsed } : {},
+          lastConfirmedPayload: { products },
+        });
+      }
+    } catch (learnErr) {
+      console.error('[smart-import confirm] feedback learning failed (non-fatal):', learnErr);
     }
 
     return NextResponse.json({ created: productIds.length, productIds });

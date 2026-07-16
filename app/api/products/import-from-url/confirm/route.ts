@@ -483,6 +483,19 @@ export async function POST(request: NextRequest) {
           certifications_found: (orgCertifications ?? []).length,
           suppliers_proposed: (brandMetadata?.suppliers ?? []).length,
           production_locations_proposed: (brandMetadata?.production_locations ?? []).length,
+          // Provenance (data-revolution-plan.md Pillar 1, item 3): imported
+          // draft products and their auto-created placeholder packaging /
+          // ingredient materials are 'drafted' — extracted from the website,
+          // nobody has confirmed them yet. Neither `products` nor
+          // `product_materials` has a column to hold this (checked the
+          // schema: products has only the overloaded `is_draft` boolean,
+          // product_materials has no metadata jsonb), and this task's scope
+          // excludes new migrations, so it's recorded here instead — this
+          // synthetic ingest_jobs row is the audit trail for the whole
+          // import already, and lib/provenance's mappers read the record's
+          // own status fields elsewhere, not a per-import log like this one.
+          provenance: 'drafted',
+          product_ids: createdIds,
         },
       });
     } catch (rosaErr: any) {

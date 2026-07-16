@@ -17,6 +17,7 @@ import { PosterBlock } from '@/components/studio/poster-block'
 import { FactList, type FactRowItem } from '@/components/studio/fact-list'
 import { GrowthFieldMount } from '@/components/studio/growth/growth-field-mount'
 import { RoomSetupPanel } from '@/components/studio/room-setup-panel'
+import { GiveDoor } from '@/components/studio/give-door'
 
 interface CellarCounts {
   products: number
@@ -172,6 +173,8 @@ export default function CellarLandingPage() {
       <Statement eyebrow="THE CELLAR" headline="The footprints being made." />
 
       <RoomSetupPanel room="cellar" />
+
+      <GiveDoor hint="Spec sheets and recipes land here." />
 
       <VitalityPoster />
 

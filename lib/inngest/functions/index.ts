@@ -25,6 +25,7 @@ import { trialReminderSweep } from './trial-reminders';
 import { pulseRefreshRun } from './pulse-refresh';
 import { outreachReportEnrich } from './outreach';
 import { growthStallSweep } from './growth';
+import { emailIntakePoll } from './email-intake';
 
 export const allFunctions: InngestFunction.Any[] = [
   scrapingQueueTick,
@@ -47,4 +48,5 @@ export const allFunctions: InngestFunction.Any[] = [
   pulseRefreshRun,
   outreachReportEnrich,
   growthStallSweep,
+  emailIntakePoll,
 ];

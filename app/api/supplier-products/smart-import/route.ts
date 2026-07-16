@@ -10,11 +10,14 @@ import {
   type ExtractionMode,
   type ExtractionResult,
 } from '@/lib/extraction/supplier-product-extractor';
+import { classifyDocument, shapeIngestResult } from '@/lib/ingest/classify-document';
+import { buildIngestOrgContext } from '@/lib/ingest/org-context';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const STORAGE_BUCKET = 'supplier-product-evidence';
+const STAGING_BUCKET = 'ingest-staging';
 const DEDUPE_WINDOW_HOURS = 24;
 const DEFAULT_DAILY_CAP = 20;
 
@@ -186,11 +189,20 @@ export async function POST(request: NextRequest) {
       .update({ file_storage_path: storagePath, status: 'parsing', phase_message: 'Parsing file…' })
       .eq('id', job.id);
 
+    // Pillar 1 (data-revolution-plan.md): classify through the SAME shared
+    // substrate as every other Smart Upload channel (channel='supplier_import'),
+    // purely for the confidence signal + ingest_document_profiles learning.
+    // The specialised catalogue extractor below stays the source of truth for
+    // the actual product rows — this never blocks or fails the import; it
+    // just resolves to the ingest_jobs id (or null) once done.
+    const classifyPromise = classifyForLearning({ client, supplier, userId: user.id, file, buffer });
+
     // === Extract synchronously (v1) ============================================
     // The plan calls for a Netlify -background function in step 5; for now we
     // run extraction inline. PDFs typically parse + extract in <30s — within
     // the maxDuration cap on this route.
-    let result: ExtractionResult;
+    let result: ExtractionResult | null = null;
+    let extractError: string | null = null;
     try {
       const { content, mode } = await readContent(source, buffer);
 
@@ -200,15 +212,19 @@ export async function POST(request: NextRequest) {
         .eq('id', job.id);
 
       result = await runExtraction({ content, mode, filename: file.name });
-    } catch (extractErr: any) {
-      console.error('[smart-import] extraction failed:', extractErr);
+    } catch (err: any) {
+      console.error('[smart-import] extraction failed:', err);
+      extractError = err?.message?.slice(0, 500) || 'Extraction failed';
+    }
+
+    // Always wait for the classify pass before returning — once the response
+    // is sent, the serverless function may freeze and never resume it.
+    const ingestJobId = await classifyPromise;
+
+    if (extractError || !result) {
       await (client as any)
         .from('supplier_product_import_jobs')
-        .update({
-          status: 'failed',
-          phase_message: null,
-          error: extractErr?.message?.slice(0, 500) || 'Extraction failed',
-        })
+        .update({ status: 'failed', phase_message: null, error: extractError || 'Extraction failed' })
         .eq('id', job.id);
       return NextResponse.json({ jobId: job.id }, { status: 202 });
     }
@@ -218,7 +234,10 @@ export async function POST(request: NextRequest) {
       .update({
         status: 'completed',
         phase_message: null,
-        extracted_products: result,
+        // _classification rides along in the same jsonb column (no schema
+        // change) so the confirm route can find the ingest_jobs row to teach
+        // via /api/ingest/feedback without exposing it to the client GET.
+        extracted_products: ingestJobId ? { ...result, _classification: { ingestJobId } } : result,
       })
       .eq('id', job.id);
 
@@ -275,4 +294,100 @@ async function runExtraction({
   const params = buildExtractionRequest({ mode, content, filename });
   const response = await anthropic.messages.create(params);
   return parseExtractionResponse(response, mode);
+}
+
+/**
+ * Best-effort classification pass through the shared Smart Upload substrate
+ * (data-revolution-plan.md Pillar 1). Stashes a copy of the file to
+ * ingest-staging (the supplier-product-evidence bucket keeps holding the
+ * confirmed evidence copy, untouched), creates an ingest_jobs row tagged
+ * channel='supplier_import', and runs it through the same Claude classifier
+ * as every other channel.
+ *
+ * None of classify-document.ts's document types describe a multi-product
+ * supplier catalogue, so this frequently comes back 'unsupported' or
+ * misclassified for CSV/XLSX catalogues — that's fine and expected. The
+ * point isn't the classifier's type guess, it's threading this upload
+ * through the one ingest_jobs table + ingest_feedback loop everything else
+ * uses, so admin views and the eval corpus see every intake channel. The
+ * SPECIALISED catalogue extraction (buildExtractionRequest/runExtraction
+ * above) remains the only thing that actually produces product rows.
+ *
+ * Never throws. Returns the ingest_jobs id on success, null on any failure
+ * (including: no organisation on the supplier, storage/DB errors, or a
+ * classifier error) — the caller always awaits this before responding, but
+ * never lets a failure here affect the import itself.
+ */
+async function classifyForLearning({
+  client,
+  supplier,
+  userId,
+  file,
+  buffer,
+}: {
+  client: any;
+  supplier: { id: string; organization_id: string | null };
+  userId: string;
+  file: File;
+  buffer: Buffer;
+}): Promise<string | null> {
+  if (!supplier.organization_id) return null;
+  try {
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
+    const stagingPath = `${supplier.organization_id}/${userId}/${Date.now()}-${safeName}`;
+
+    const [{ error: stageErr }, orgContext] = await Promise.all([
+      client.storage.from(STAGING_BUCKET).upload(stagingPath, buffer, {
+        contentType: file.type || 'application/octet-stream',
+        upsert: false,
+      }),
+      buildIngestOrgContext(client, supplier.organization_id).catch(() => null),
+    ]);
+    if (stageErr) {
+      console.error('[smart-import] classify stage upload failed (non-fatal):', stageErr.message);
+      return null;
+    }
+
+    const { data: ingestJob, error: insertErr } = await client
+      .from('ingest_jobs')
+      .insert({
+        user_id: userId,
+        organization_id: supplier.organization_id,
+        status: 'pending',
+        phase_message: 'Classifying…',
+        stash_path: stagingPath,
+        file_name: file.name,
+        file_mime: file.type || null,
+        channel: 'supplier_import',
+      })
+      .select('id')
+      .single();
+    if (insertErr || !ingestJob) {
+      console.error('[smart-import] classify job insert failed (non-fatal):', insertErr);
+      return null;
+    }
+
+    const classified = await classifyDocument({
+      fileBytes: buffer,
+      fileName: file.name,
+      fileMime: file.type || '',
+      orgContext: orgContext ?? undefined,
+    });
+    const shaped = shapeIngestResult(classified.type, classified.payload, stagingPath, classified.meta);
+    await client
+      .from('ingest_jobs')
+      .update({
+        status: 'completed',
+        phase_message: null,
+        result_type: shaped.result_type,
+        result_payload: shaped.result_payload,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', ingestJob.id);
+
+    return ingestJob.id as string;
+  } catch (err: any) {
+    console.error('[smart-import] classify pass failed (non-fatal):', err?.message || err);
+    return null;
+  }
 }

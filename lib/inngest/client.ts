@@ -109,6 +109,9 @@ export interface AlkateraEvents {
 
   // ─────────── Growth score: "forest gone quiet" stall sweep ───────────
   'growth/stall.check': { data: Record<string, never> };
+
+  // ─────────── Email-in intake: poll the IMAP mailbox ───────────
+  'email/intake.poll': { data: Record<string, never> };
 }
 
 const eventKey = process.env.INNGEST_EVENT_KEY;

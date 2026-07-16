@@ -22,6 +22,7 @@ import { PosterBlock } from '@/components/studio/poster-block'
 import { FactList, type FactRowItem } from '@/components/studio/fact-list'
 import { GrowthFieldMount } from '@/components/studio/growth/growth-field-mount'
 import { RoomSetupPanel } from '@/components/studio/room-setup-panel'
+import { GiveDoor } from '@/components/studio/give-door'
 
 interface WorkbenchCounts {
   facilities: number
@@ -201,6 +202,8 @@ export default function WorkbenchLandingPage() {
       <Statement eyebrow="THE WORKBENCH" headline="The data going in." />
 
       <RoomSetupPanel room="workbench" />
+
+      <GiveDoor hint="Bills and meter readings land here." />
 
       <FootprintPoster />
 

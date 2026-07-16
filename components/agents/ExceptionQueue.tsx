@@ -459,6 +459,34 @@ function PayloadPreview({ kind, payload }: { kind: string; payload: any }) {
     inlineRows.push({ label: 'Products extracted', value: String(payload.product_count) })
   }
 
+  // Migration engine v1 (lib/ingest/migrate-report.ts) — the four migration_*
+  // kinds batch a list under payload.items, one exception per entity group
+  // rather than per item, so the preview lists names instead of one field.
+  if (kind.startsWith('migration_') && Array.isArray(payload?.items)) {
+    const items: any[] = payload.items
+    const label =
+      kind === 'migration_facilities' ? 'Facilities' :
+      kind === 'migration_products' ? 'Products' :
+      kind === 'migration_targets' ? 'Targets' :
+      'Certifications'
+    const names = items
+      .map((item) => item?.name || item?.product_name || item?.metric || null)
+      .filter(Boolean)
+    return (
+      <div className="rounded-md border border-border bg-background/40 p-3">
+        <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
+        <ul className="space-y-1 text-sm">
+          {names.map((name: string, i: number) => (
+            <li key={i} className="text-foreground">{name}</li>
+          ))}
+        </ul>
+        {payload?.sourceDocumentName && (
+          <p className="mt-2 text-xs text-muted-foreground">From {payload.sourceDocumentName}</p>
+        )}
+      </div>
+    )
+  }
+
   if (inlineRows.length > 0) {
     return (
       <div className="rounded-md border border-border bg-background/40 p-3">

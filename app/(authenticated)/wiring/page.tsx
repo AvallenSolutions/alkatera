@@ -18,6 +18,7 @@ import { PosterBlock } from '@/components/studio/poster-block'
 import { FactList, type FactRowItem } from '@/components/studio/fact-list'
 import { GrowthFieldMount } from '@/components/studio/growth/growth-field-mount'
 import { RoomSetupPanel } from '@/components/studio/room-setup-panel'
+import { GiveDoor } from '@/components/studio/give-door'
 
 interface WiringCounts {
   plan: { tier: string | null; status: string | null; renewsAt: string | null }
@@ -194,6 +195,8 @@ export default function WiringLandingPage() {
       <Statement eyebrow="THE WIRING" headline="The quiet machinery." />
 
       <RoomSetupPanel room="wiring" />
+
+      <GiveDoor hint="Anything else, we will file it." />
 
       <PlanPoster counts={counts} />
 

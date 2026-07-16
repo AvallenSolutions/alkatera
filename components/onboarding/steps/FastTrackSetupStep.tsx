@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { CountrySelect } from '@/components/shared/CountrySelect'
 import { COUNTRIES } from '@/lib/countries'
 import { RosaIntro } from './RosaIntro'
+import { UniversalDropzone } from '@/components/layouts/UniversalDropzone'
 import { GROWTH_PALETTE, STUDIO } from '@/components/studio/theme'
 
 const BEVERAGE_OPTIONS: { value: BeverageType; label: string; icon: string }[] = [
@@ -716,6 +717,21 @@ export function FastTrackSetupStep() {
             <>Continue <ArrowRight className="w-4 h-4 ml-2" /></>
           )}
         </Button>
+
+        {/* Migration engine v1 (data-revolution plan, Pillar 2b): a quiet door
+            for brands arriving with a prior consultant LCA, B Corp report or
+            CDP/EcoVadis response — routes through the normal Smart Upload
+            pipeline, same as every other document. */}
+        <UniversalDropzone
+          trigger={
+            <button
+              type="button"
+              className="block w-full text-center text-xs text-muted-foreground underline decoration-dotted underline-offset-4 hover:text-foreground transition-colors"
+            >
+              Already have a sustainability report? Drop it here.
+            </button>
+          }
+        />
 
         {/* Arrival flow only: this step is skippable there (see
             ARRIVAL_STEPS), and the fast-track flow has no equivalent

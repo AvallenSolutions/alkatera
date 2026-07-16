@@ -63,6 +63,7 @@ describe('toGeminiPart', () => {
     filename: 'bill.pdf',
     media_type: 'application/pdf',
     base64: 'AAAA',
+    bytes: new Uint8Array(10),
     size_bytes: 10,
   };
 
