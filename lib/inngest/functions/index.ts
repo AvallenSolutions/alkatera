@@ -14,6 +14,7 @@ import { documentsQueueTick, documentsProcessOne } from './documents';
 import { ingestReclassifyRun } from './ingest-reclassify';
 import { matchingSweepRun } from './matching';
 import { openlcaCertMonitor } from './monitoring';
+import { dnsHealthMonitor } from './dns-health';
 import { xeroSyncTick, xeroOrgSync } from './xero';
 import { reportPdfGenerate } from './reports';
 import { ingredientMatchSuggest } from './ingredient-match';
@@ -33,6 +34,7 @@ export const allFunctions: InngestFunction.Any[] = [
   ingestReclassifyRun,
   matchingSweepRun,
   openlcaCertMonitor,
+  dnsHealthMonitor,
   xeroSyncTick,
   xeroOrgSync,
   reportPdfGenerate,
