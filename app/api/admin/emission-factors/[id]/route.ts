@@ -4,6 +4,13 @@ import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
+// Next.js patches global fetch and, on this route pattern (no next/headers
+// call to auto-trigger dynamic mode), would otherwise cache these outbound
+// Supabase requests across invocations — a GET with an identical URL every
+// time would keep returning the first response it ever saw. no-store on
+// every call is what makes this route actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' });
+
 // Values are forwarded straight to the DB update (no coercion here), so
 // scalar fields stay permissive (string | number | boolean | null) and
 // metadata is free-form jsonb. The schema's job is to reject non-object
@@ -62,7 +69,7 @@ export async function GET(
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
+      global: { headers: { Authorization: `Bearer ${token}` }, fetch: noStoreFetch },
     });
 
     const { data: userData, error: authError } = await supabase.auth.getUser();
@@ -125,7 +132,7 @@ export async function PATCH(
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
+      global: { headers: { Authorization: `Bearer ${token}` }, fetch: noStoreFetch },
     });
 
     const { data: userData, error: authError } = await supabase.auth.getUser();

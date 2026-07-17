@@ -4,6 +4,13 @@ import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
+// Next.js patches global fetch and, on this route pattern (no next/headers
+// call to auto-trigger dynamic mode), would otherwise cache these outbound
+// Supabase requests across invocations — a GET with an identical URL every
+// time would keep returning the first response it ever saw. no-store on
+// every call is what makes this route actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' });
+
 // id is the only strictly-required field; the "at least one of
 // proxy_value / source / label" rule stays in the handler to preserve
 // its specific message. proxy_value is forwarded to the DB untouched.
@@ -31,7 +38,7 @@ export async function GET(request: NextRequest) {
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
+      global: { headers: { Authorization: `Bearer ${token}` }, fetch: noStoreFetch },
     });
 
     const { data: userData, error: authError } = await supabase.auth.getUser();
@@ -100,7 +107,7 @@ export async function PATCH(request: NextRequest) {
 
     // User-scoped client for auth checks
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
+      global: { headers: { Authorization: `Bearer ${token}` }, fetch: noStoreFetch },
     });
 
     const { data: userData, error: authError } = await supabase.auth.getUser();
@@ -135,7 +142,7 @@ export async function PATCH(request: NextRequest) {
 
     // Use service role client for the actual database operations
     // (impact_proxy_values has no RLS — it's reference data)
-    const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
+    const serviceClient = createClient(supabaseUrl, supabaseServiceKey, { global: { fetch: noStoreFetch } });
 
     // Fetch the existing row
     const { data: existing, error: fetchError } = await serviceClient
