@@ -12,6 +12,7 @@ import { inngest } from '../client';
 import { orgForIntakeAddress, type ResolvedIntakeOrg } from '@/lib/intake/email-address';
 import { isAllowedIntakeSender, findOrgMemberUserIdByEmail } from '@/lib/intake/spoof-guard';
 import { enqueueIngestJob } from '@/lib/ingest/enqueue';
+import { getAppBaseUrl } from '@/lib/deployment/base-url';
 
 /**
  * Email-in intake poller (data-revolution-plan.md Pillar 1).
@@ -281,8 +282,8 @@ async function processMessage(db: SupabaseClient, raw: RawIntakeMessage): Promis
 /** Best-effort nudge to the existing Footprint Agent sweep so today's asks show up promptly instead of waiting for its own schedule. Never throws past this function — a failed nudge just means the sweep's own cadence (once wired) or the next poll picks it up. */
 async function triggerFootprintSweep(): Promise<void> {
   const cronSecret = process.env.CRON_SECRET;
-  const baseUrl = process.env.URL || process.env.DEPLOY_URL;
-  if (!cronSecret || !baseUrl) return;
+  if (!cronSecret) return;
+  const baseUrl = getAppBaseUrl();
   try {
     await fetch(`${baseUrl}/api/agents/footprint/run`, {
       method: 'POST',
@@ -299,7 +300,7 @@ export const emailIntakePoll = inngest.createFunction(
     name: 'Email-in: poll the intake mailbox',
     concurrency: { limit: 1 },
     retries: 1,
-    triggers: [{ event: 'email/intake.poll' }],
+    triggers: [{ event: 'email/intake.poll' }, { cron: '*/10 * * * *' }],
   },
   async ({ step }) => {
     const config = readImapConfig();

@@ -120,7 +120,7 @@ export const openlcaCertMonitor = inngest.createFunction(
     name: 'OpenLCA TLS cert expiry monitor',
     concurrency: { limit: 1 },
     retries: 1,
-    triggers: [{ event: 'monitoring/openlca-cert.check' }],
+    triggers: [{ event: 'monitoring/openlca-cert.check' }, { cron: '0 8 * * *' }],
   },
   async ({ step }) => {
     const checks = await step.run('check-certs', runCertChecks);

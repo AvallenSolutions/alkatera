@@ -7,6 +7,7 @@ import {
 } from './readiness';
 import { renderReadinessEmail } from './readiness-email';
 import type { CertificationReadiness } from './scoring';
+import { getAppBaseUrl } from '@/lib/deployment/base-url';
 
 /**
  * Recalculate readiness for an organisation's B Corp certification, persist
@@ -216,7 +217,7 @@ async function notifyOwners(
       orgName,
       isReadyToSubmit: readiness.isReadyToSubmit,
       blockingCount: readiness.blockingRequirements.length,
-      appUrl: process.env.URL ?? 'https://app.alkatera.com',
+      appUrl: getAppBaseUrl(),
     });
     try {
       await resend.emails.send({

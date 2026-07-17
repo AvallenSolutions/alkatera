@@ -1,20 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { safeCompare } from '@/lib/utils/safe-compare';
-import {
-  gatherInsightContext,
-  generateInsight,
-  persistInsight,
-} from '@/lib/pulse/insights';
+import { runInsightsSweep } from '@/lib/pulse/cron-jobs';
 
 /**
  * Cron: Pulse — generate daily AI insights
  *
  * POST /api/cron/generate-insights
  *
- * Iterates every organisation, builds a structured prompt from their latest
- * snapshots / anomalies / targets, asks Gemini for a fresh narrative, and
- * writes it to dashboard_insights. Schedule daily ~06:00.
+ * Manual/admin trigger. In production this sweep runs on the
+ * `pulseGenerateInsights` Inngest native cron
+ * (lib/inngest/functions/pulse-jobs.ts, daily ~06:00 UTC) — this route
+ * calls the same `runInsightsSweep` for on-demand use.
  *
  * Falls back gracefully if GEMINI_API_KEY is missing — logs and skips.
  */
@@ -37,11 +34,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing Supabase config' }, { status: 500 });
     }
 
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
     // Distinguish "API key not configured" from "Gemini call failed for org X".
     // Claude Code injects an empty GEMINI_API_KEY into child processes for
-    // security, so we trim and treat empty as missing.
-    const geminiKey = process.env.GEMINI_API_KEY?.trim();
-    if (!geminiKey) {
+    // security, so runInsightsSweep trims and treats empty as missing too —
+    // it returns null in that case.
+    const result = await runInsightsSweep(supabase);
+    if (result === null) {
       return NextResponse.json(
         {
           error: 'GEMINI_API_KEY missing or empty',
@@ -54,56 +56,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-
-    const { data: orgs, error } = await supabase
-      .from('organizations')
-      .select('id');
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    let written = 0;
-    const failures: { organization_id: string; reason: string }[] = [];
-
-    for (const org of orgs ?? []) {
-      try {
-        const context = await gatherInsightContext(supabase, org.id);
-        // Skip orgs with no data at all — nothing meaningful to brief.
-        if (context.snapshots.length === 0) {
-          failures.push({ organization_id: org.id, reason: 'no_snapshots' });
-          continue;
-        }
-        const insight = await generateInsight(context, { period: 'daily' });
-        if (!insight) {
-          failures.push({ organization_id: org.id, reason: 'generation_failed' });
-          continue;
-        }
-        const { error: writeError } = await persistInsight(supabase, org.id, insight, 'daily');
-        if (writeError) {
-          failures.push({ organization_id: org.id, reason: writeError });
-        } else {
-          written += 1;
-        }
-      } catch (err: any) {
-        const reason = err?.status
-          ? `${err.status} ${err.name ?? ''} ${err.message ?? ''}`.trim()
-          : err?.message ?? 'unknown';
-        console.error(`[generate-insights cron] org ${org.id} failed:`, err);
-        failures.push({ organization_id: org.id, reason });
-      }
-    }
-
-    return NextResponse.json({
-      synced: written,
-      failed: failures.length,
-      total: orgs?.length ?? 0,
-      failures,
-    });
+    return NextResponse.json(result);
   } catch (err: any) {
     console.error('[generate-insights cron]', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: err?.message ?? 'Internal server error' }, { status: 500 });
   }
 }

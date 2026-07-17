@@ -2,13 +2,14 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { deepEnrichBrand } from '@/lib/admin/sourcing/deep-enrich';
 
 /**
- * Local-dev fallback for the deep-enrich background fn. Only imported
- * dynamically from route.ts when NODE_ENV !== 'production' so the
- * Anthropic SDK + the comprehensive enrichment prompt don't get
- * bundled into the production lambda for this route.
+ * Local-dev fallback for the deep-enrich worker. Only imported dynamically
+ * from route.ts when the Inngest dispatch fails and we're not in
+ * production, so the Anthropic SDK + the comprehensive enrichment prompt
+ * don't get bundled into the production lambda for this route.
  *
- * In production the bg fn at netlify/functions/deep-enrich-background.ts
- * does the same work in a 15-minute window.
+ * In production (and whenever an Inngest dev server is running locally),
+ * the `enrich/brand.run` Inngest function (lib/inngest/functions/enrich.ts)
+ * does the same work with proper step-level retries.
  */
 export async function runInline(service: SupabaseClient, jobId: string): Promise<void> {
   const update = (patch: Record<string, unknown>) =>

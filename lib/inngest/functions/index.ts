@@ -27,6 +27,18 @@ import { outreachReportEnrich } from './outreach';
 import { growthStallSweep } from './growth';
 import { emailIntakePoll } from './email-intake';
 import { rosaLearningSweep } from './rosa-learning';
+import { importFromUrlRun, ingestAutoRun } from './product-import';
+import { directorySourcingRun, findWebsitesRun, skuImportRun } from './distributor-jobs';
+import { alkateraSyncQueueTick, distributorReminderSweep } from './distributor-cron';
+import {
+  pulseGenerateSnapshots,
+  pulseGenerateInsights,
+  pulseDetectAnomalies,
+  pulseRefreshGridCarbon,
+  pulseRefreshShadowPrices,
+} from './pulse-jobs';
+import { retentionPurgeSweep } from './retention';
+import { wikiSyncTick } from './wiki-sync';
 
 export const allFunctions: InngestFunction.Any[] = [
   scrapingQueueTick,
@@ -51,4 +63,18 @@ export const allFunctions: InngestFunction.Any[] = [
   growthStallSweep,
   emailIntakePoll,
   rosaLearningSweep,
+  importFromUrlRun,
+  ingestAutoRun,
+  directorySourcingRun,
+  findWebsitesRun,
+  skuImportRun,
+  alkateraSyncQueueTick,
+  distributorReminderSweep,
+  pulseGenerateSnapshots,
+  pulseGenerateInsights,
+  pulseDetectAnomalies,
+  pulseRefreshGridCarbon,
+  pulseRefreshShadowPrices,
+  retentionPurgeSweep,
+  wikiSyncTick,
 ];

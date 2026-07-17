@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { safeCompare } from '@/lib/utils/safe-compare';
+import { purgeStaleInvitations } from '@/lib/retention/purge';
 
 /**
  * Cron: purge stale invitations (retention, MED-8, security review 2026-05-29).
+ *
+ * POST /api/cron/purge-stale-invitations
+ *
+ * Manual/admin trigger. In production this runs on the
+ * `retentionPurgeSweep` Inngest native cron (lib/inngest/functions/retention.ts,
+ * daily 04:00 UTC) — this route calls the same `purgeStaleInvitations` for
+ * on-demand use.
  *
  * Invitations hold invitee email addresses. Once an invitation is resolved
  * (accepted / expired / cancelled) or long past its expiry, the email no longer
@@ -35,23 +43,6 @@ export async function POST(request: NextRequest) {
     auth: { autoRefreshToken: false, persistSession: false },
   }) as SupabaseClient;
 
-  const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
-  const nowIso = new Date().toISOString();
-  const purged: Record<string, number> = {};
-
-  for (const table of ['team_invitations', 'supplier_invitations'] as const) {
-    const { data, error } = await supabase
-      .from(table)
-      .delete()
-      .lt('created_at', cutoff)
-      .or(`status.neq.pending,expires_at.lt.${nowIso}`)
-      .select('id');
-    if (error) {
-      console.error(`[purge-stale-invitations] ${table}:`, error.message);
-    } else {
-      purged[table] = data?.length ?? 0;
-    }
-  }
-
+  const purged = await purgeStaleInvitations(supabase);
   return NextResponse.json({ purged });
 }

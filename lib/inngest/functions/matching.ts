@@ -42,7 +42,7 @@ export const matchingSweepRun = inngest.createFunction(
     // than double-link.
     concurrency: { limit: 1 },
     retries: 1,
-    triggers: [{ event: 'matching/sweep.run' }],
+    triggers: [{ event: 'matching/sweep.run' }, { cron: '0 3 * * *' }],
   },
   async ({ step }) => {
     const supabase = service();

@@ -347,11 +347,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const baseUrl =
-      process.env.URL ||
-      process.env.DEPLOY_URL ||
-      `${request.nextUrl.protocol}//${request.headers.get('host')}`
-
     const fileBytes = new Uint8Array(await file.arrayBuffer())
 
     let jobId: string
@@ -362,7 +357,6 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         file: { bytes: fileBytes, name: file.name, mime: file.type || '', size: file.size },
         channel,
-        baseUrl,
       })
       jobId = enqueued.jobId
     } catch (err: any) {

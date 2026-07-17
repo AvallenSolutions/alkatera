@@ -10,6 +10,15 @@
 // scope - that is the contract documented in docs/env-vars.md and is also the
 // recommended Next.js pattern (those values are inlined into the bundle at
 // build time, so the Lambda never reads them from env).
+//
+// This whole check is Netlify/AWS-Lambda-specific (the 4 KB ceiling is an
+// AWS Lambda constraint on the env forwarded into the function bundle;
+// Vercel Functions have no equivalent hard limit). No-op on any host other
+// than Netlify so it doesn't fail Vercel builds.
+if (!process.env.NETLIFY) {
+  process.stdout.write('check-function-env-budget: not on Netlify, skipping.\n');
+  process.exit(0);
+}
 
 const HARD_LIMIT = 4096;
 const SAFETY_BUDGET = 3500;

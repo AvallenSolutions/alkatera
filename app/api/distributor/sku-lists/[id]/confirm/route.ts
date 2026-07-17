@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createHmac } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { requireDistributor } from '@/lib/distributor/auth';
+import { inngest } from '@/lib/inngest/client';
 import type { ColumnMapping } from '@/types/distributor';
 
 /**
@@ -10,12 +10,13 @@ import type { ColumnMapping } from '@/types/distributor';
  *
  * Persists the chosen mapping, flips the row to status='processing', and hands
  * the heavy work (download + parse + brand/SKU persistence + scraping queue) to
- * the process-sku-import-background Netlify function. Returns 202 immediately;
- * the upload wizard polls GET /api/distributor/sku-lists/[id] for the result.
+ * the `distributor/sku-import.run` Inngest function
+ * (lib/inngest/functions/distributor-jobs.ts). Returns 202 immediately; the
+ * upload wizard polls GET /api/distributor/sku-lists/[id] for the result.
  *
  * Real distributor catalogues run ~1-2k serial Supabase round-trips, which
- * exceeded Netlify's synchronous function limit and 504'd. The 15-min
- * background function removes that ceiling.
+ * exceeded Netlify's synchronous function limit and 504'd. Inngest removes
+ * that ceiling with no platform-specific dispatch.
  */
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const auth = await requireDistributor();
@@ -54,12 +55,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
 
-  const hmacSecret = process.env.INTERNAL_JOB_HMAC_SECRET;
-  if (!hmacSecret) {
-    console.error('[sku-import] INTERNAL_JOB_HMAC_SECRET not set');
-    return NextResponse.json({ error: 'import_not_configured' }, { status: 500 });
-  }
-
   // Reset the row for a fresh run: mapping persisted, status=processing,
   // any prior result/error cleared so the poller sees a clean state.
   await auth.supabase
@@ -73,45 +68,22 @@ export async function POST(request: Request, { params }: { params: { id: string 
     })
     .eq('id', params.id);
 
-  const payload = JSON.stringify({
-    skuListId: params.id,
-    distributorOrgId: auth.organization.id,
-    mapping,
-  });
-  const signature = createHmac('sha256', hmacSecret).update(payload).digest('hex');
-
-  // Local dev (`pnpm dev`) doesn't run Netlify functions, so a fetch to
-  // /.netlify/functions/... would 404 and the row would sit at 'processing'
-  // forever. Invoke the handler in-process instead — Next dev has no 26s
-  // synchronous cap, so the long run is fine. Fire-and-forget either way;
-  // the client polls for completion.
-  const isDev = process.env.NODE_ENV !== 'production' && !process.env.NETLIFY;
-  if (isDev) {
-    void (async () => {
-      try {
-        const { handler } = await import('@/netlify/functions/process-sku-import-background');
-        await handler({ body: payload, headers: { 'x-internal-hmac': signature } });
-      } catch (err) {
-        console.error('[sku-import] Inline runner failed:', err);
-        await markError(
-          auth.supabase as unknown as SupabaseClient,
-          params.id,
-          err instanceof Error ? err.message : 'inline_runner_failed',
-        );
-      }
-    })();
-  } else {
-    const baseUrl =
-      process.env.URL || process.env.DEPLOY_URL || `https://${request.headers.get('host')}`;
-    const target = `${baseUrl}/.netlify/functions/process-sku-import-background`;
-    void fetch(target, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-internal-hmac': signature },
-      body: payload,
-    }).catch((err) => {
-      console.error('[sku-import] Failed to trigger background function:', err);
+  // Fire-and-forget: the client polls for completion either way. Runs
+  // identically in local dev (via the Inngest dev server) and production —
+  // no Netlify-only background-function URL to construct.
+  inngest
+    .send({
+      name: 'distributor/sku-import.run',
+      data: { sku_list_id: params.id, distributor_org_id: auth.organization.id, mapping },
+    })
+    .catch(async (err) => {
+      console.error('[sku-import] inngest.send failed:', err);
+      await markError(
+        auth.supabase as unknown as SupabaseClient,
+        params.id,
+        err instanceof Error ? err.message : 'dispatch_failed',
+      );
     });
-  }
 
   return NextResponse.json({ status: 'processing', sku_list_id: params.id }, { status: 202 });
 }

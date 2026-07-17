@@ -63,7 +63,7 @@ export const scrapingQueueTick = inngest.createFunction(
     // One in flight at a time so duplicate ticks can't double-claim.
     concurrency: { limit: 1 },
     retries: 0,
-    triggers: [{ event: 'scraping/queue.tick' }],
+    triggers: [{ event: 'scraping/queue.tick' }, { cron: '*/2 * * * *' }],
   },
   async ({ step }) => {
     const supabase = service();

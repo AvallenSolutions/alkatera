@@ -44,7 +44,7 @@ export const xeroSyncTick = inngest.createFunction(
     name: 'Xero sync: fan out connected orgs',
     concurrency: { limit: 1 },
     retries: 0,
-    triggers: [{ event: 'xero/sync.tick' }],
+    triggers: [{ event: 'xero/sync.tick' }, { cron: '0 * * * *' }],
   },
   async ({ step }) => {
     const supabase = service();

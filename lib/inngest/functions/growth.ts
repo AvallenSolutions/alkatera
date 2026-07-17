@@ -49,7 +49,7 @@ export const growthStallSweep = inngest.createFunction(
     name: 'Growth score: "forest gone quiet" stall nudge',
     concurrency: { limit: 1 },
     retries: 1,
-    triggers: [{ event: 'growth/stall.check' }],
+    triggers: [{ event: 'growth/stall.check' }, { cron: '0 8 * * 1' }],
   },
   async ({ step }) => {
     let supabase: SupabaseClient;

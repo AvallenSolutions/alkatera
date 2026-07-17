@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { createHmac } from 'crypto';
 import { safeCompare } from '@/lib/utils/safe-compare';
 import { queueBrandsForScraping } from '@/lib/distributor/scraping/agent-dispatcher';
+import { inngest } from '@/lib/inngest/client';
 
 /**
  * Cron: distributor scraping queue processor
@@ -11,13 +11,11 @@ import { queueBrandsForScraping } from '@/lib/distributor/scraping/agent-dispatc
  *
  * Triggered every 5 minutes by netlify/functions/process-scraping-queue.ts.
  * Picks up to MAX_JOBS_PER_RUN queued jobs (oldest first), marks them
- * 'running', and HMAC-fires the `scrape-brand-background` background
- * function once per job. The actual scrape runs there (15-minute budget)
- * because a single brand agent exceeds Netlify's ~26s synchronous
- * ceiling. This route only claims + dispatches, so it returns in well
- * under the limit. We fire from a Next route (not the scheduled tick
- * directly) because that's the proven background-invocation path used by
- * find-websites-background / directory-sourcing-background.
+ * 'running', and dispatches a `scraping/brand.run` Inngest event once per
+ * job — the same event `lib/inngest/functions/scraping.ts`'s own fan-out
+ * tick uses, so both paths land on the identical per-brand worker. The
+ * actual scrape runs there with no sync-ceiling risk. This route only
+ * claims + dispatches, so it returns in well under any time limit.
  *
  * Also runs the monthly-refresh sweep occasionally (cheap idempotent
  * query — re-queues brands that haven't been scraped for 30+ days).
@@ -100,44 +98,25 @@ export async function POST(request: NextRequest) {
     .update({ status: 'running', started_at: startedAt })
     .in('id', jobs.map((j) => j.id));
 
-  // 4. Fire the background scrape for each claimed job. The background
-  //    function (scrape-brand-background) runs the agent with a 15-min
-  //    budget and writes the terminal job status itself. We invoke it the
-  //    same way find-websites does: in-process in dev (no Netlify
-  //    runtime), via a public fetch in prod. Fire-and-forget — it returns
-  //    202 immediately.
-  const hmacSecret = process.env.INTERNAL_JOB_HMAC_SECRET;
-  if (!hmacSecret) {
-    return NextResponse.json({ error: 'missing_hmac_secret' }, { status: 500 });
+  // 4. Fan out a `scraping/brand.run` event per claimed job. The Inngest
+  //    function (lib/inngest/functions/scraping.ts) runs the agent with its
+  //    own retry envelope and writes the terminal job status itself. Runs
+  //    identically in local dev and production — no background-function URL
+  //    to construct.
+  try {
+    await inngest.send(
+      jobs.map((job) => ({
+        name: 'scraping/brand.run' as const,
+        data: {
+          job_id: job.id,
+          brand_profile_id: job.brand_profile_id,
+          brand_directory_id: job.brand_directory_id,
+        },
+      })),
+    );
+  } catch (err) {
+    console.error('[process-scraping-queue] inngest.send failed', err instanceof Error ? err.message : err);
   }
-  const isDev = process.env.NODE_ENV !== 'production' && !process.env.NETLIFY;
-  const baseUrl =
-    process.env.URL || process.env.DEPLOY_URL || `https://${request.headers.get('host')}`;
-
-  await Promise.all(
-    jobs.map(async (job) => {
-      const payload = JSON.stringify({
-        jobId: job.id,
-        brandProfileId: job.brand_profile_id,
-        brandDirectoryId: job.brand_directory_id,
-      });
-      const signature = createHmac('sha256', hmacSecret).update(payload).digest('hex');
-      try {
-        if (isDev) {
-          const { handler } = await import('@/netlify/functions/scrape-brand-background');
-          void handler({ body: payload, headers: { 'x-internal-hmac': signature } });
-        } else {
-          await fetch(`${baseUrl}/.netlify/functions/scrape-brand-background`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-internal-hmac': signature },
-            body: payload,
-          });
-        }
-      } catch (err) {
-        console.error('[process-scraping-queue] fire failed', job.id, err instanceof Error ? err.message : err);
-      }
-    }),
-  );
 
   return NextResponse.json({
     dispatched: jobs.length,

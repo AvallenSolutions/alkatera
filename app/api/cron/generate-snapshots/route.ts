@@ -1,28 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { safeCompare } from '@/lib/utils/safe-compare';
-import { computeOrgSnapshots, writeSnapshots } from '@/lib/pulse/snapshots';
+import { runSnapshotsSweep } from '@/lib/pulse/cron-jobs';
 
 /**
  * Cron: Pulse — generate daily metric snapshots
  *
  * POST /api/cron/generate-snapshots
  *
- * Iterates every organisation and writes today's snapshots to
- * metric_snapshots. Designed to be invoked nightly (~02:00 UTC).
+ * Manual/admin trigger. In production this sweep runs on the
+ * `pulseGenerateSnapshots` Inngest native cron
+ * (lib/inngest/functions/pulse-jobs.ts, nightly ~02:00 UTC) — this route
+ * calls the same `runSnapshotsSweep` for on-demand use.
  *
- * Protected by CRON_SECRET Bearer token. Same auth pattern as the
- * existing Xero sync cron.
+ * Protected by CRON_SECRET Bearer token.
  */
 
 export const runtime = 'nodejs';
 // Snapshot generation can take a minute or more for large workspaces.
 export const maxDuration = 300;
-
-interface OrgFailure {
-  organization_id: string;
-  error: string;
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,52 +41,10 @@ export async function POST(request: NextRequest) {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { data: orgs, error: orgsError } = await supabase
-      .from('organizations')
-      .select('id');
-
-    if (orgsError) {
-      console.error('Pulse snapshots: failed to list organisations', orgsError);
-      return NextResponse.json({ error: orgsError.message }, { status: 500 });
-    }
-
-    if (!orgs || orgs.length === 0) {
-      return NextResponse.json({ message: 'No organisations to snapshot', written: 0 });
-    }
-
-    const today = new Date();
-    let totalRowsWritten = 0;
-    let successCount = 0;
-    const failures: OrgFailure[] = [];
-
-    for (const org of orgs) {
-      try {
-        const rows = await computeOrgSnapshots(supabase, org.id, today);
-        const { written, error } = await writeSnapshots(supabase, rows);
-        if (error) {
-          failures.push({ organization_id: org.id, error });
-        } else {
-          totalRowsWritten += written;
-          successCount += 1;
-        }
-      } catch (err: any) {
-        failures.push({
-          organization_id: org.id,
-          error: err?.message || 'Unknown error',
-        });
-        console.error(`Pulse snapshots failed for org ${org.id}:`, err);
-      }
-    }
-
-    return NextResponse.json({
-      synced: successCount,
-      failed: failures.length,
-      total: orgs.length,
-      rows_written: totalRowsWritten,
-      failures,
-    });
+    const result = await runSnapshotsSweep(supabase);
+    return NextResponse.json(result);
   } catch (error: any) {
     console.error('Error in generate-snapshots cron:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: error?.message ?? 'Internal server error' }, { status: 500 });
   }
 }

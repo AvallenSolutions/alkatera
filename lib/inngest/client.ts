@@ -115,6 +115,58 @@ export interface AlkateraEvents {
 
   // ─────────── Rosa learning: weekly curation sweep (Pillar 4 step 2) ───────────
   'rosa/learning.sweep': { data: Record<string, never> };
+
+  // ─────────── Product import: "Import from website" ───────────
+  'products/import-from-url.run': {
+    data: { job_id: string; url: string };
+  };
+
+  // ─────────── Smart Upload: background classify (large files) ───────────
+  'ingest/auto.run': {
+    data: { job_id: string };
+  };
+
+  // ─────────── Admin directory: web-search brand sourcing ───────────
+  'directory/sourcing.run': {
+    data: { job_id: string };
+  };
+
+  // ─────────── Distributor: find brand websites backfill ───────────
+  'distributor/find-websites.run': {
+    data: {
+      distributor_org_id: string;
+      brand_profile_id: string | null;
+      run_id: string | null;
+    };
+  };
+
+  // ─────────── Distributor: process an uploaded SKU list ───────────
+  'distributor/sku-import.run': {
+    data: {
+      sku_list_id: string;
+      distributor_org_id: string;
+      mapping: Record<string, unknown>;
+    };
+  };
+
+  // ─────────── Distributor: alkatera live-data sync queue drain ───────────
+  'distributor/alkatera-sync-queue.tick': { data: Record<string, never> };
+
+  // ─────────── Distributor: outreach reminder sweep ───────────
+  'distributor/reminder-sweep.run': { data: Record<string, never> };
+
+  // ─────────── Pulse: scheduled sweeps ───────────
+  'pulse/snapshots.generate': { data: Record<string, never> };
+  'pulse/insights.generate': { data: Record<string, never> };
+  'pulse/anomalies.detect': { data: Record<string, never> };
+  'pulse/grid-carbon.refresh': { data: Record<string, never> };
+  'pulse/shadow-prices.refresh': { data: Record<string, never> };
+
+  // ─────────── Retention: purge sweep ───────────
+  'retention/purge.sweep': { data: Record<string, never> };
+
+  // ─────────── Wiki -> Rosa knowledge-base sync ───────────
+  'wiki/sync.tick': { data: Record<string, never> };
 }
 
 const eventKey = process.env.INNGEST_EVENT_KEY;

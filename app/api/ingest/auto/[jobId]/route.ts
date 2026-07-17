@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createHmac } from 'crypto';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { inngest } from '@/lib/inngest/client';
 
 // Belt-and-braces stuck-job recovery: if a job has been sitting in 'pending'
 // for longer than this, the poll endpoint re-fires the background trigger
@@ -52,7 +52,7 @@ export async function GET(
   }
 
   // If the row is still 'pending' well after enqueue, the background
-  // function never picked it up. Re-fire the trigger once. We bump
+  // worker never picked it up. Re-fire the trigger once. We bump
   // retry_count using a conditional update so concurrent polls can't
   // double-fire.
   if (
@@ -60,33 +60,18 @@ export async function GET(
     Date.now() - new Date(job.created_at).getTime() > STUCK_PENDING_MS &&
     (job.retry_count ?? 0) === 0
   ) {
-    const hmacSecret = process.env.INTERNAL_JOB_HMAC_SECRET;
-    if (hmacSecret) {
-      const { data: claimed } = await (client as any)
-        .from('ingest_jobs')
-        .update({ retry_count: 1, phase_message: 'Retrying…', updated_at: new Date().toISOString() })
-        .eq('id', job.id)
-        .eq('retry_count', 0)
-        .select('id')
-        .maybeSingle();
+    const { data: claimed } = await (client as any)
+      .from('ingest_jobs')
+      .update({ retry_count: 1, phase_message: 'Retrying…', updated_at: new Date().toISOString() })
+      .eq('id', job.id)
+      .eq('retry_count', 0)
+      .select('id')
+      .maybeSingle();
 
-      if (claimed) {
-        const triggerPayload = JSON.stringify({ jobId: job.id });
-        const signature = createHmac('sha256', hmacSecret)
-          .update(triggerPayload)
-          .digest('hex');
-        const baseUrl =
-          process.env.URL ||
-          process.env.DEPLOY_URL ||
-          `${request.nextUrl.protocol}//${request.headers.get('host')}`;
-        void fetch(`${baseUrl}/.netlify/functions/ingest-auto-background`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-internal-hmac': signature },
-          body: triggerPayload,
-        }).catch((err) => {
-          console.error('[ingest/auto/[jobId]] Re-trigger failed:', err?.message);
-        });
-      }
+    if (claimed) {
+      inngest.send({ name: 'ingest/auto.run', data: { job_id: job.id } }).catch((err) => {
+        console.error('[ingest/auto/[jobId]] Re-trigger failed:', err?.message);
+      });
     }
   }
 

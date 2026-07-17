@@ -130,3 +130,73 @@ export async function fetchRegionalToday(): Promise<CarbonIntensityReading[]> {
     return [];
   }
 }
+
+export interface GridCarbonRefreshResult {
+  written: number;
+  message?: string;
+}
+
+/**
+ * Fetches current + forecast + regional readings and upserts them into
+ * grid_carbon_readings. Shared by the `/api/cron/refresh-grid-carbon` route
+ * (manual/admin trigger) and the `pulseRefreshGridCarbon` Inngest cron
+ * function so the merge/dedupe logic lives in exactly one place.
+ */
+export async function refreshGridCarbonReadings(
+  supabase: import('@supabase/supabase-js').SupabaseClient,
+): Promise<GridCarbonRefreshResult> {
+  const [current, forecast, regional] = await Promise.all([
+    fetchCurrentNationalIntensity(),
+    fetchTodayForecast(),
+    fetchRegionalToday(),
+  ]);
+
+  // The "current" reading is the same half-hour slot as one of the forecast
+  // entries, so naively concatenating the two lists would send duplicate
+  // (region_code, recorded_at, source) keys to Postgres and the upsert would
+  // fail with "ON CONFLICT DO UPDATE command cannot affect row a second time".
+  // Dedupe with a Map keyed on the conflict columns; later writes (ordered so
+  // the live "current" reading wins over the forecast entry for the same
+  // slot) overwrite earlier ones.
+  const merged = new Map<string, {
+    region_code: string;
+    recorded_at: string;
+    intensity_g_per_kwh: number;
+    forecast_g_per_kwh: number | null;
+    source: string;
+  }>();
+
+  for (const r of [...forecast, ...regional]) {
+    const key = `${r.region_code}|${r.recorded_at}|uk_carbon_intensity`;
+    merged.set(key, {
+      region_code: r.region_code,
+      recorded_at: r.recorded_at,
+      intensity_g_per_kwh: r.intensity_g_per_kwh,
+      forecast_g_per_kwh: r.forecast_g_per_kwh,
+      source: 'uk_carbon_intensity',
+    });
+  }
+  if (current) {
+    const key = `${current.region_code}|${current.recorded_at}|uk_carbon_intensity`;
+    merged.set(key, {
+      region_code: current.region_code,
+      recorded_at: current.recorded_at,
+      intensity_g_per_kwh: current.intensity_g_per_kwh,
+      forecast_g_per_kwh: current.forecast_g_per_kwh,
+      source: 'uk_carbon_intensity',
+    });
+  }
+
+  const rows = Array.from(merged.values());
+  if (rows.length === 0) {
+    return { written: 0, message: 'No data from upstream' };
+  }
+
+  const { error } = await supabase
+    .from('grid_carbon_readings')
+    .upsert(rows, { onConflict: 'region_code,recorded_at,source' });
+
+  if (error) throw new Error(error.message);
+
+  return { written: rows.length };
+}

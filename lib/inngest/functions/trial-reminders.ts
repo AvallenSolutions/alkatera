@@ -87,7 +87,7 @@ export const trialReminderSweep = inngest.createFunction(
     name: 'Free-trial lifecycle: remind before end, expire after',
     concurrency: { limit: 1 },
     retries: 2,
-    triggers: [{ event: 'subscriptions/trial-reminder.sweep' }],
+    triggers: [{ event: 'subscriptions/trial-reminder.sweep' }, { cron: '0 9 * * *' }],
   },
   async ({ step }) => {
     const supabase = service();

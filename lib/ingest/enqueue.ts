@@ -1,8 +1,8 @@
 import 'server-only'
-import { createHmac } from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { classifyDocument, shapeIngestResult } from '@/lib/ingest/classify-document'
 import { buildIngestOrgContext } from '@/lib/ingest/org-context'
+import { inngest } from '@/lib/inngest/client'
 
 /**
  * Shared core of the Smart Upload enqueue path: stash a file into
@@ -37,14 +37,6 @@ export interface EnqueueIngestJobParams {
   userId: string
   file: IngestFileInput
   channel?: IngestChannel
-  /**
-   * Base URL to reach this deployment's Netlify functions for the
-   * background-trigger fetch (e.g. `https://app.alkatera.com`). Falls back
-   * to `URL`/`DEPLOY_URL` (set by Netlify on every function invocation) when
-   * omitted, so background-eligible callers outside an HTTP request (the
-   * email poller) still work without passing anything.
-   */
-  baseUrl?: string | null
 }
 
 export interface EnqueueIngestJobResult {
@@ -57,7 +49,6 @@ export interface EnqueueIngestJobResult {
 // reasoning behind each threshold.
 const INLINE_FALLBACK_MAX_BYTES = 5 * 1024 * 1024
 const INLINE_MAX_PDF_PAGES = 8
-const TRIGGER_TIMEOUT_MS = 4000
 
 function estimatePdfPageCount(bytes: Uint8Array): number | null {
   try {
@@ -96,24 +87,13 @@ async function stashBytes(
   }
 }
 
-async function triggerBackground(target: string, hmacSecret: string, jobId: string): Promise<boolean> {
-  const triggerPayload = JSON.stringify({ jobId })
-  const signature = createHmac('sha256', hmacSecret).update(triggerPayload).digest('hex')
-  const ctrl = new AbortController()
-  const timeout = setTimeout(() => ctrl.abort(), TRIGGER_TIMEOUT_MS)
+async function triggerBackground(jobId: string): Promise<boolean> {
   try {
-    const res = await fetch(target, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-internal-hmac': signature },
-      body: triggerPayload,
-      signal: ctrl.signal,
-    })
-    return res.status >= 200 && res.status < 300
+    await inngest.send({ name: 'ingest/auto.run', data: { job_id: jobId } })
+    return true
   } catch (err: any) {
-    console.error('[ingest/enqueue] trigger fetch failed:', err?.name, err?.message)
+    console.error('[ingest/enqueue] inngest.send failed:', err?.message)
     return false
-  } finally {
-    clearTimeout(timeout)
   }
 }
 
@@ -156,14 +136,14 @@ async function runInlineClassifier(
 
 /**
  * Stash a file, create its ingest_jobs row, and classify it inline or hand
- * it to the background Netlify function — mirroring exactly what
+ * it to the Inngest background worker — mirroring exactly what
  * `POST /api/ingest/auto` does for a browser upload. Always resolves (never
  * throws past the job-creation step); a background-trigger failure is
  * recorded on the job row itself, matching the poll UI's existing failure
  * vocabulary, and this function returns normally either way.
  */
 export async function enqueueIngestJob(params: EnqueueIngestJobParams): Promise<EnqueueIngestJobResult> {
-  const { serviceClient, organizationId, userId, file, channel = null, baseUrl } = params
+  const { serviceClient, organizationId, userId, file, channel = null } = params
 
   const stashPath = await stashBytes(serviceClient, organizationId, userId, file)
   if (!stashPath) throw new Error('Failed to stash uploaded file')
@@ -202,17 +182,10 @@ export async function enqueueIngestJob(params: EnqueueIngestJobParams): Promise<
     return { jobId: job.id, inline: true }
   }
 
-  const hmacSecret = process.env.INTERNAL_JOB_HMAC_SECRET
-  const resolvedBaseUrl = baseUrl ?? process.env.URL ?? process.env.DEPLOY_URL ?? null
-  const target = resolvedBaseUrl ? `${resolvedBaseUrl}/.netlify/functions/ingest-auto-background` : null
-
-  const triggerOk =
-    hmacSecret && target
-      ? await triggerBackground(target, hmacSecret, job.id).catch((err) => {
-          console.error('[ingest/enqueue] Background trigger error:', err)
-          return false
-        })
-      : false
+  const triggerOk = await triggerBackground(job.id).catch((err) => {
+    console.error('[ingest/enqueue] Background trigger error:', err)
+    return false
+  })
 
   if (!triggerOk) {
     await (serviceClient as any)

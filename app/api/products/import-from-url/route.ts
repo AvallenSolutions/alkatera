@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createHmac } from 'crypto';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { inngest } from '@/lib/inngest/client';
 
 // SSRF protection: block private/internal IP ranges
 const BLOCKED_HOSTS = [
@@ -55,12 +55,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Access to internal addresses is not allowed' }, { status: 400 });
     }
 
-    const hmacSecret = process.env.INTERNAL_JOB_HMAC_SECRET;
-    if (!hmacSecret) {
-      console.error('[import-from-url] INTERNAL_JOB_HMAC_SECRET not set');
-      return NextResponse.json({ error: 'Import service not configured' }, { status: 500 });
-    }
-
     // Best-effort per-user rate limit: each non-Shopify run costs ~10 page
     // fetches plus a Claude Sonnet call, so cap concurrent/rapid submissions.
     const { count: recentCount } = await (client as any)
@@ -97,59 +91,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to start import' }, { status: 500 });
     }
 
-    const payload = JSON.stringify({ jobId: job.id, url: normalizedUrl });
-    const signature = createHmac('sha256', hmacSecret).update(payload).digest('hex');
-
-    // Local dev (`pnpm dev`) doesn't run Netlify functions, so firing at
-    // `/.netlify/functions/...` would 404 and the job would sit at 'pending'
-    // forever. Invoke the runner directly in-process instead — Next.js dev
-    // doesn't impose the 26s synchronous cap that drove the original
-    // background-function split, so a long-running scrape is fine.
-    const isDev = process.env.NODE_ENV !== 'production' && !process.env.NETLIFY;
-    if (isDev) {
-      // Fire-and-forget: don't await, the client polls for completion.
-      void (async () => {
-        try {
-          const { handler } = await import('@/netlify/functions/import-from-url-background');
-          await handler({
-            body: payload,
-            headers: { 'x-internal-hmac': signature },
-          });
-        } catch (err) {
-          console.error('[import-from-url] Inline runner failed:', err);
-        }
-      })();
-    } else {
-      // Production: kick off the Netlify background function. The -background
-      // suffix gives it 15 min of runtime, dodging the 26s sync cap.
-      //
-      // baseUrl must be the APP's own origin. Deriving it from parsedUrl (the
-      // user-submitted site) borrowed that site's protocol; use only the app's
-      // env origin, falling back to https + the request host, never the target
-      // site's protocol.
-      const baseUrl = process.env.URL || process.env.DEPLOY_URL || `https://${request.headers.get('host')}`;
-      const target = `${baseUrl}/.netlify/functions/import-from-url-background`;
-      // AWAIT the dispatch: a fire-and-forget fetch can be dropped when the
-      // Lambda freezes as soon as the response returns, leaving the job stuck
-      // at 'pending' forever. A -background function returns 202 immediately,
-      // so awaiting adds only the round-trip.
-      try {
-        await fetch(target, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-internal-hmac': signature,
-          },
-          body: payload,
-        });
-      } catch (err) {
-        console.error('[import-from-url] Failed to trigger background function:', err);
-        await (client as any)
-          .from('product_import_jobs')
-          .update({ status: 'failed', error: 'Could not start the import worker. Please try again.' })
-          .eq('id', job.id);
-        return NextResponse.json({ error: 'Failed to start import' }, { status: 502 });
-      }
+    // Dispatch the long-running import (scrape + Claude extract) to Inngest —
+    // no Netlify-only background-function URL to construct, and it runs
+    // identically in local dev (via the Inngest dev server) and production.
+    try {
+      await inngest.send({
+        name: 'products/import-from-url.run',
+        data: { job_id: job.id, url: normalizedUrl },
+      });
+    } catch (err) {
+      console.error('[import-from-url] Failed to dispatch import job:', err);
+      await (client as any)
+        .from('product_import_jobs')
+        .update({ status: 'failed', error: 'Could not start the import worker. Please try again.' })
+        .eq('id', job.id);
+      return NextResponse.json({ error: 'Failed to start import' }, { status: 502 });
     }
 
     return NextResponse.json({ jobId: job.id }, { status: 202 });

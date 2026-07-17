@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createHmac } from 'crypto';
 import { requireDistributor } from '@/lib/distributor/auth';
+import { inngest } from '@/lib/inngest/client';
 
 /**
  * Brand website backfill — find official websites (Gemini grounded search) for
@@ -9,13 +9,13 @@ import { requireDistributor } from '@/lib/distributor/auth';
  * worked stay empty forever; this is the on-demand self-heal path.
  *
  * GET  → status counts the client polls: { total_brands, without_website }.
- * POST → kicks off the work in a Netlify background function and returns 202.
+ * POST → dispatches `distributor/find-websites.run` to Inngest and returns 202.
  *        Body: { brand_profile_id? } — one brand, or the whole portfolio.
  *
- * Why a background function: a single grounded-search call reliably takes
- * 40-60s, so any synchronous request blows Netlify's ~26s ceiling (the route
- * used to 504). The -background runner has a 15-minute window. The client tracks
- * progress by polling GET and watching `without_website` fall — no job table.
+ * Why Inngest: a single grounded-search call reliably takes 40-60s, so any
+ * synchronous request blows a serverless function's sync ceiling (the route
+ * used to 504 on Netlify). The client tracks progress by polling GET and
+ * watching `without_website` fall — no job table.
  *
  * Owner / data_manager only.
  */
@@ -99,13 +99,7 @@ export async function POST(request: Request) {
     });
   }
 
-  const hmacSecret = process.env.INTERNAL_JOB_HMAC_SECRET;
-  if (!hmacSecret) {
-    console.error('[find-websites] INTERNAL_JOB_HMAC_SECRET not set');
-    return NextResponse.json({ error: 'not_configured' }, { status: 500 });
-  }
-
-  // Create a run row the background function will write its outcome onto.
+  // Create a run row the Inngest function will write its outcome onto.
   const { data: run } = await auth.supabase
     .from('distributor_backfill_runs')
     .insert({
@@ -118,39 +112,26 @@ export async function POST(request: Request) {
     .single();
   const runId = run?.id ?? null;
 
-  const payload = JSON.stringify({
-    distributorOrgId: orgId,
-    brandProfileId: singleBrandId ?? undefined,
-    runId: runId ?? undefined,
-  });
-  const signature = createHmac('sha256', hmacSecret).update(payload).digest('hex');
-
-  // Local dev (`pnpm dev`) doesn't run Netlify functions, so a fetch to
-  // /.netlify/functions/... would 404. Invoke the handler in-process instead —
-  // Next dev has no 26s synchronous cap. Fire-and-forget either way; the client
-  // polls GET for progress.
-  const isDev = process.env.NODE_ENV !== 'production' && !process.env.NETLIFY;
-  if (isDev) {
-    void (async () => {
-      try {
-        const { handler } = await import('@/netlify/functions/find-websites-background');
-        await handler({ body: payload, headers: { 'x-internal-hmac': signature } });
-      } catch (err) {
-        console.error('[find-websites] inline runner failed:', err);
+  // Fire-and-forget: the client polls GET for progress either way. Runs
+  // identically in local dev (via the Inngest dev server) and production.
+  inngest
+    .send({
+      name: 'distributor/find-websites.run',
+      data: { distributor_org_id: orgId, brand_profile_id: singleBrandId, run_id: runId },
+    })
+    .catch(async (err) => {
+      console.error('[find-websites] inngest.send failed:', err);
+      if (runId) {
+        await auth.supabase
+          .from('distributor_backfill_runs')
+          .update({
+            status: 'error',
+            message: err instanceof Error ? err.message : 'dispatch_failed',
+            finished_at: new Date().toISOString(),
+          })
+          .eq('id', runId);
       }
-    })();
-  } else {
-    const baseUrl =
-      process.env.URL || process.env.DEPLOY_URL || `https://${request.headers.get('host')}`;
-    const target = `${baseUrl}/.netlify/functions/find-websites-background`;
-    void fetch(target, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-internal-hmac': signature },
-      body: payload,
-    }).catch((err) => {
-      console.error('[find-websites] failed to trigger background function:', err);
     });
-  }
 
   return NextResponse.json(
     { status: 'processing', total, runId, mode: singleBrandId ? 'single' : 'bulk' },

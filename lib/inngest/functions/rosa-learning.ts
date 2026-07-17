@@ -52,7 +52,7 @@ export const rosaLearningSweep = inngest.createFunction(
     name: 'Rosa learning: weekly curation sweep',
     concurrency: { limit: 1 },
     retries: 1,
-    triggers: [{ event: 'rosa/learning.sweep' }],
+    triggers: [{ event: 'rosa/learning.sweep' }, { cron: '0 9 * * 1' }],
   },
   async ({ step }) => {
     let supabase: SupabaseClient;

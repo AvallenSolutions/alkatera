@@ -1,20 +1,23 @@
-import { createClient } from '@supabase/supabase-js';
+import 'server-only';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
-import { createHmac, timingSafeEqual } from 'crypto';
-import { safeFetch } from '../../lib/utils/safe-fetch';
+import { safeFetch } from '@/lib/utils/safe-fetch';
 
 /**
- * Background Netlify Function for "Import products from website".
- *
- * Netlify's -background suffix gives this function up to 15 minutes of runtime,
- * which is what lets us run the Claude Sonnet extraction (30-60s on big sites
- * like warnersdistillery.com) without hitting the 26s synchronous cap that
- * was producing 504s from app/api/products/import-from-url.
+ * Core worker for "Import products from website" — ported verbatim from
+ * `netlify/functions/import-from-url-background.ts` (a Netlify -background
+ * function, 15-minute runtime) onto Inngest (`lib/inngest/functions/product-import.ts`,
+ * event `products/import-from-url.run`), which gives the same long runtime
+ * without a Netlify-specific invocation path.
  *
  * The Next.js POST route at /api/products/import-from-url enqueues a job row
- * in product_import_jobs and fires a request here with an HMAC-signed payload.
- * We do the scrape + Claude call and write the result back to the job row.
- * The client polls /api/products/import-from-url/[jobId] for completion.
+ * in product_import_jobs and fires the Inngest event. We do the scrape +
+ * Claude call here and write the result back to the job row. The client
+ * polls /api/products/import-from-url/[jobId] for completion.
+ *
+ * All helper functions below are unchanged from the original Netlify
+ * function — only the HMAC-signed-payload plumbing was stripped out, since
+ * Inngest signs and verifies its own events.
  */
 
 interface ImageCandidate {
@@ -36,7 +39,7 @@ interface PageData {
 // ───────────────────────────────────────────────────────────────────────────────
 // SSRF protection.
 //
-// This function fetches user-supplied URLs server-side. The enqueue route
+// This worker fetches user-supplied URLs server-side. The enqueue route
 // (app/api/products/import-from-url) validates the submitted host, but the
 // fetcher previously used redirect:'follow', so a clean public URL could 302
 // to an internal address (e.g. cloud metadata at 169.254.169.254). safeFetch
@@ -414,7 +417,7 @@ function mapShopifyToExtracted(products: ShopifyProduct[]): ExtractedProductShap
     }
   }
   if (skipped > 0) {
-    console.log(`[import-from-url-background] Shopify path skipped ${skipped} non-drink/merchandise item${skipped !== 1 ? 's' : ''}`);
+    console.log(`[import-from-url] Shopify path skipped ${skipped} non-drink/merchandise item${skipped !== 1 ? 's' : ''}`);
   }
   return out;
 }
@@ -512,48 +515,19 @@ async function fetchPageData(url: string): Promise<PageData | null> {
   }
 }
 
-function verifyHmac(body: string, signature: string | undefined, secret: string): boolean {
-  if (!signature) return false;
-  const expected = createHmac('sha256', secret).update(body).digest('hex');
-  try {
-    const a = Buffer.from(expected, 'hex');
-    const b = Buffer.from(signature, 'hex');
-    if (a.length !== b.length) return false;
-    return timingSafeEqual(a, b);
-  } catch {
-    return false;
-  }
-}
-
-export const handler = async (event: { body?: string | null; headers: Record<string, string | undefined> }) => {
-  const secret = process.env.INTERNAL_JOB_HMAC_SECRET;
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-
-  if (!secret || !supabaseUrl || !serviceKey || !anthropicKey) {
-    console.error('[import-from-url-background] Missing required env vars');
-    return { statusCode: 500, body: 'misconfigured' };
-  }
-
-  const rawBody = event.body ?? '';
-  const sigHeader = event.headers['x-internal-hmac'] ?? event.headers['X-Internal-Hmac'];
-  if (!verifyHmac(rawBody, sigHeader, secret)) {
-    return { statusCode: 401, body: 'unauthorized' };
-  }
-
-  let payload: { jobId?: string; url?: string };
-  try {
-    payload = JSON.parse(rawBody);
-  } catch {
-    return { statusCode: 400, body: 'invalid json' };
-  }
-  const { jobId, url } = payload;
-  if (!jobId || !url) return { statusCode: 400, body: 'missing fields' };
-
-  const supabase = createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+/**
+ * Run the whole "import products from website" job: Shopify fast path, then
+ * generic crawl + Claude extraction, writing progress and the final result
+ * onto the `product_import_jobs` row throughout. Never throws — every
+ * failure mode is written onto the job row as `status: 'failed'` so the
+ * client's poll loop always reaches a terminal state.
+ */
+export async function runImportFromUrl(params: {
+  supabase: SupabaseClient;
+  jobId: string;
+  url: string;
+}): Promise<void> {
+  const { supabase, jobId, url } = params;
 
   const updateJob = async (patch: Record<string, any>) => {
     await supabase
@@ -561,6 +535,13 @@ export const handler = async (event: { body?: string | null; headers: Record<str
       .update({ ...patch, updated_at: new Date().toISOString() })
       .eq('id', jobId);
   };
+
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) {
+    console.error('[import-from-url] Missing ANTHROPIC_API_KEY');
+    await updateJob({ status: 'failed', error: 'Import service not configured' });
+    return;
+  }
 
   try {
     await updateJob({ status: 'scraping', phase_message: 'Scanning the homepage…' });
@@ -624,11 +605,11 @@ export const handler = async (event: { body?: string | null; headers: Record<str
             org_description: orgDescription,
             brand_metadata: brandMetadata,
           });
-          return { statusCode: 200, body: 'ok' };
+          return;
         }
       }
     } catch (shopifyErr) {
-      console.error('[import-from-url-background] Shopify fast path failed, falling back:', shopifyErr);
+      console.error('[import-from-url] Shopify fast path failed, falling back:', shopifyErr);
       // fall through to the generic HTML + Claude flow
     }
 
@@ -638,7 +619,7 @@ export const handler = async (event: { body?: string | null; headers: Record<str
         status: 'failed',
         error: 'Could not fetch content from that URL. Please check it is accessible.',
       });
-      return { statusCode: 200, body: 'ok' };
+      return;
     }
 
     let allText = mainPage.text;
@@ -875,7 +856,7 @@ Important:
         org_description: null,
         brand_metadata: mergeBrandMetadata(undefined, htmlBrandMetadata),
       });
-      return { statusCode: 200, body: 'ok' };
+      return;
     }
 
     // ── Truncation guard ─────────────────────────────────────────────────────
@@ -901,13 +882,13 @@ Important:
         throw new Error('tool input did not contain a products array');
       }
     } catch (parseErr) {
-      console.error('[import-from-url-background] Tool input parse failed (likely truncated):', parseErr);
+      console.error('[import-from-url] Tool input parse failed (likely truncated):', parseErr);
       await updateJob({
         status: 'failed',
         error:
           'This catalogue is very large and could not be read in full. Please link directly to a specific product or shop page, then add any remaining products manually.',
       });
-      return { statusCode: 200, body: 'ok' };
+      return;
     }
 
     const products = toolInput.products ?? [];
@@ -916,7 +897,7 @@ Important:
       ? `Only the first ${products.length} products could be read from this large catalogue. Import them, then add the rest manually.`
       : null;
     if (truncated) {
-      console.warn(`[import-from-url-background] Extraction hit max_tokens; returning ${products.length} partial products`);
+      console.warn(`[import-from-url] Extraction hit max_tokens; returning ${products.length} partial products`);
     }
 
     await updateJob({
@@ -928,14 +909,11 @@ Important:
       org_description: toolInput.org_description ?? null,
       brand_metadata: mergeBrandMetadata(toolInput.brand_metadata, htmlBrandMetadata),
     });
-
-    return { statusCode: 200, body: 'ok' };
   } catch (error: any) {
-    console.error('[import-from-url-background] Error:', error);
+    console.error('[import-from-url] Error:', error);
     await updateJob({
       status: 'failed',
       error: error?.message?.slice(0, 500) || 'Failed to import products from URL',
     });
-    return { statusCode: 200, body: 'ok' };
   }
-};
+}

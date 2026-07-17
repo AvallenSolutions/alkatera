@@ -6,7 +6,7 @@ const nextConfig = {
   distDir: process.env.NEXT_DIST_DIR || '.next',
   images: {
     // Enable Next.js image optimisation (auto WebP/AVIF, responsive sizing, lazy loading).
-    // Netlify's @netlify/plugin-nextjs handles the optimisation API in production.
+    // Vercel serves the optimisation API natively; no plugin required.
     // Previously disabled with `unoptimized: true` which served all images at full resolution.
     // AVIF first (≈20-30% smaller than WebP for the large hero JPEGs), WebP fallback.
     // Cache optimised variants for 30 days (default 60s is far too short for our
@@ -55,7 +55,7 @@ const nextConfig = {
   experimental: {
     // The wiki routes (dynamic, inside the authenticated group) and the Rosa
     // sync route read wiki/pages/*.md from disk at request time; include the
-    // folder in their function traces so Netlify bundles the files.
+    // folder in their function traces so the deploy platform bundles the files.
     outputFileTracingIncludes: {
       '/wiki': ['./wiki/pages/**/*'],
       '/wiki/[slug]': ['./wiki/pages/**/*'],

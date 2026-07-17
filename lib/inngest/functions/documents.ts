@@ -44,7 +44,7 @@ export const documentsQueueTick = inngest.createFunction(
     name: 'Documents queue: claim + fan out',
     concurrency: { limit: 1 },
     retries: 0,
-    triggers: [{ event: 'documents/queue.tick' }],
+    triggers: [{ event: 'documents/queue.tick' }, { cron: '*/2 * * * *' }],
   },
   async ({ step }) => {
     const supabase = service();

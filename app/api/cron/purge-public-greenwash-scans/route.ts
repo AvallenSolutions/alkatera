@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { safeCompare } from '@/lib/utils/safe-compare';
+import { purgeStaleGreenwashScans } from '@/lib/retention/purge';
 
 /**
  * Cron: purge stale public Greenwash Guardian scans.
  *
  * POST /api/cron/purge-public-greenwash-scans
  *
- * Deletes public_greenwash_scans rows older than 24 hours. These rows hold
- * marketing-lead emails captured by the free scan tool; the documented
- * retention is 24h. This enforces that retention so lead PII is not kept
- * indefinitely (security review 2026-05-29, HIGH-3).
+ * Manual/admin trigger. In production this runs on the
+ * `retentionPurgeSweep` Inngest native cron (lib/inngest/functions/retention.ts,
+ * daily 04:00 UTC) — this route calls the same `purgeStaleGreenwashScans` for
+ * on-demand use. Deletes public_greenwash_scans rows older than 24 hours
+ * (security review 2026-05-29, HIGH-3).
  *
  * Auth: CRON_SECRET Bearer.
  */
@@ -33,17 +35,11 @@ export async function POST(request: NextRequest) {
     auth: { autoRefreshToken: false, persistSession: false },
   }) as SupabaseClient;
 
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { data, error } = await supabase
-    .from('public_greenwash_scans')
-    .delete()
-    .lt('created_at', cutoff)
-    .select('id');
-
-  if (error) {
-    console.error('[purge-public-greenwash-scans] delete failed:', error.message);
+  try {
+    const result = await purgeStaleGreenwashScans(supabase);
+    return NextResponse.json(result);
+  } catch (err: any) {
+    console.error('[purge-public-greenwash-scans] delete failed:', err?.message);
     return NextResponse.json({ error: 'purge_failed' }, { status: 500 });
   }
-
-  return NextResponse.json({ purged: data?.length ?? 0 });
 }

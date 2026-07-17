@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { safeCompare } from '@/lib/utils/safe-compare';
-import {
-  fetchCurrentNationalIntensity,
-  fetchTodayForecast,
-  fetchRegionalToday,
-} from '@/lib/integrations/uk-carbon-intensity';
+import { refreshGridCarbonReadings } from '@/lib/integrations/uk-carbon-intensity';
 
 /**
  * Cron: refresh UK grid-carbon readings.
  *
  * POST /api/cron/refresh-grid-carbon
  *
- * Polls the free UK Carbon Intensity API and upserts the current reading +
- * today's half-hourly forecast into grid_carbon_readings. Run every 30 min.
+ * Manual/admin trigger. In production this sweep runs on the
+ * `pulseRefreshGridCarbon` Inngest native cron (lib/inngest/functions/pulse-jobs.ts,
+ * every 30 min) — this route calls the same `refreshGridCarbonReadings` for
+ * on-demand use.
  */
 export const runtime = 'nodejs';
 
@@ -30,61 +28,10 @@ export async function POST(request: NextRequest) {
     { auth: { autoRefreshToken: false, persistSession: false } },
   );
 
-  const [current, forecast, regional] = await Promise.all([
-    fetchCurrentNationalIntensity(),
-    fetchTodayForecast(),
-    fetchRegionalToday(),
-  ]);
-
-  // The "current" reading is the same half-hour slot as one of the forecast
-  // entries, so naively concatenating the two lists would send duplicate
-  // (region_code, recorded_at, source) keys to Postgres and the upsert would
-  // fail with "ON CONFLICT DO UPDATE command cannot affect row a second time".
-  // We dedupe with a Map keyed on the conflict columns; later writes (which
-  // we order so the live "current" reading wins over the forecast entry for
-  // the same slot) overwrite earlier ones.
-  const merged = new Map<string, {
-    region_code: string;
-    recorded_at: string;
-    intensity_g_per_kwh: number;
-    forecast_g_per_kwh: number | null;
-    source: string;
-  }>();
-
-  // Forecast first (national + all regions), then overwrite with the actual
-  // reading for the current national slot if we have one.
-  for (const r of [...forecast, ...regional]) {
-    const key = `${r.region_code}|${r.recorded_at}|uk_carbon_intensity`;
-    merged.set(key, {
-      region_code: r.region_code,
-      recorded_at: r.recorded_at,
-      intensity_g_per_kwh: r.intensity_g_per_kwh,
-      forecast_g_per_kwh: r.forecast_g_per_kwh,
-      source: 'uk_carbon_intensity',
-    });
+  try {
+    const result = await refreshGridCarbonReadings(supabase);
+    return NextResponse.json(result);
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message ?? 'Internal error' }, { status: 500 });
   }
-  if (current) {
-    const key = `${current.region_code}|${current.recorded_at}|uk_carbon_intensity`;
-    merged.set(key, {
-      region_code: current.region_code,
-      recorded_at: current.recorded_at,
-      intensity_g_per_kwh: current.intensity_g_per_kwh,
-      forecast_g_per_kwh: current.forecast_g_per_kwh,
-      source: 'uk_carbon_intensity',
-    });
-  }
-
-  const rows = Array.from(merged.values());
-
-  if (rows.length === 0) {
-    return NextResponse.json({ written: 0, message: 'No data from upstream' });
-  }
-
-  const { error } = await supabase
-    .from('grid_carbon_readings')
-    .upsert(rows, { onConflict: 'region_code,recorded_at,source' });
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  return NextResponse.json({ written: rows.length });
 }
