@@ -116,6 +116,27 @@ function FromWebsiteTag() {
   )
 }
 
+/**
+ * Arrival flow's confirm-not-ask framing: a field alkatera already has an
+ * answer for renders as a quiet confirmed row (value + "Edit" tap-target)
+ * instead of an open input. Tapping "Edit" swaps in the real field, one way
+ * — this never toggles back, matching "editable inline".
+ */
+function ConfirmRow({ value, onEdit }: { value: string; onEdit: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onEdit}
+      className="flex w-full items-center justify-between gap-3 rounded-[6px] border border-studio-hairline bg-studio-cream p-3 text-left transition-colors hover:border-studio-ink/25 hover:bg-secondary"
+    >
+      <span className="min-w-0 flex-1 truncate text-sm text-foreground">{value}</span>
+      <span className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+        Edit
+      </span>
+    </button>
+  )
+}
+
 /** Live states for the background website crawl, surfaced next to the
  * website field so it never looks like nothing is happening. */
 type CrawlPhase = 'idle' | 'running' | 'done' | 'failed'
@@ -197,6 +218,13 @@ export function FastTrackSetupStep() {
   )
   const [isSaving, setIsSaving] = useState(false)
   const [logoError, setLogoError] = useState<string | null>(null)
+  // Arrival flow reuses this component for the 'arrival-confirm' screen —
+  // confirm-not-ask framing: fields alkatera already has an answer for
+  // collapse to a confirmed row (ConfirmRow above) instead of an open input.
+  const confirmMode = onboardingFlow === 'arrival'
+  type EditableField = 'name' | 'website' | 'description' | 'country' | 'foundingYear'
+  const [editingFields, setEditingFields] = useState<Set<EditableField>>(new Set())
+  const beginEdit = (field: EditableField) => setEditingFields(prev => new Set(prev).add(field))
   // Track which fields the background crawl filled, so we can show a small
   // "from your website" label next to the field + avoid clobbering anything
   // the user has already typed.
@@ -207,6 +235,11 @@ export function FastTrackSetupStep() {
   // label until the user edits the field.
   const [highlightedFields, setHighlightedFields] = useState<Set<AutofillableField>>(new Set())
   const crawlInflightRef = useRef<string | null>(null)
+  // Arrival flow only: ArrivalWebsiteStep may already have a scrape job
+  // running for this exact URL (personalization.scrapeJobId). Resume it
+  // instead of starting a second crawl of the same site. Only ever
+  // attempted once — after that, a URL change always starts a fresh job.
+  const initialJobPickupDoneRef = useRef(false)
   // Live status for the background crawl, surfaced next to the website
   // field (see ScrapeButterfly + stageLabelForPoll above) so entering a
   // website never looks like nothing happened until results appear.
@@ -288,19 +321,34 @@ export function FastTrackSetupStep() {
       setCrawlPhase('running')
       setCrawlLabel('Reading your website.')
       try {
-        const start = await fetch('/api/products/import-from-url', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: trimmed }),
-        })
-        const startBody = await start.json().catch(() => ({}))
-        if (!start.ok || !startBody?.jobId) {
-          setCrawlPhase('failed')
-          setCrawlLabel("I couldn't read the site. You can fill things in by hand.")
-          crawlSettleTimerRef.current = setTimeout(() => setCrawlPhase('idle'), 6000)
-          return
+        let jobId: string | undefined
+
+        // Resume the arrival ritual's own scrape (ArrivalWebsiteStep) rather
+        // than starting a second one, if this is the same URL it kicked off.
+        const canPickUpExistingJob =
+          !initialJobPickupDoneRef.current &&
+          !!state.personalization?.scrapeJobId &&
+          state.personalization?.websiteUrl?.trim() === trimmed
+        initialJobPickupDoneRef.current = true
+
+        if (canPickUpExistingJob) {
+          jobId = state.personalization!.scrapeJobId
+        } else {
+          const start = await fetch('/api/products/import-from-url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: trimmed }),
+          })
+          const startBody = await start.json().catch(() => ({}))
+          if (!start.ok || !startBody?.jobId) {
+            setCrawlPhase('failed')
+            setCrawlLabel("I couldn't read the site. You can fill things in by hand.")
+            crawlSettleTimerRef.current = setTimeout(() => setCrawlPhase('idle'), 6000)
+            return
+          }
+          jobId = startBody.jobId as string
         }
-        const jobId = startBody.jobId as string
+        if (!jobId) return
 
         // Poll up to ~60s. The crawl typically finishes well before that.
         let settled = false
@@ -510,24 +558,40 @@ export function FastTrackSetupStep() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 py-6 animate-in fade-in duration-300">
       <div className="w-full max-w-md space-y-5">
 
-        <RosaIntro message="Tell me about your company. If you give me a website, I'll go and read it while you finish, which saves you typing." />
+        <RosaIntro
+          message={
+            confirmMode
+              ? "Here's what I found on your website. Have a look, fix anything that's off, and we'll carry on."
+              : "Tell me about your company. If you give me a website, I'll go and read it while you finish, which saves you typing."
+          }
+        />
 
         <div className="text-center space-y-2">
           <div className="mx-auto w-16 h-16 bg-card border border-border rounded-[6px] flex items-center justify-center">
             <Building2 className="w-8 h-8 text-studio-forest" />
           </div>
-          <h3 className="text-xl font-display font-bold tracking-tight text-foreground">Your company.</h3>
-          <p className="text-sm text-muted-foreground">This goes straight into your account profile.</p>
+          <h3 className="text-xl font-display font-bold tracking-tight text-foreground">
+            {confirmMode ? 'Here is what we found.' : 'Your company.'}
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            {confirmMode ? 'Confirmed items are ready to go. Just add what is missing.' : 'This goes straight into your account profile.'}
+          </p>
         </div>
 
         {/* Company name */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium text-foreground">Company name <span className="text-studio-dim">(required)</span></Label>
-          <Input
-            placeholder='e.g., "Oxford Artisan Distillery"'
-            value={companyName}
-            onChange={e => setCompanyName(e.target.value)}
-          />
+          <Label className="text-sm font-medium text-foreground">
+            Company name {!confirmMode && <span className="text-studio-dim">(required)</span>}
+          </Label>
+          {confirmMode && companyName.trim() && !editingFields.has('name') ? (
+            <ConfirmRow value={companyName} onEdit={() => beginEdit('name')} />
+          ) : (
+            <Input
+              placeholder='e.g., "Oxford Artisan Distillery"'
+              value={companyName}
+              onChange={e => setCompanyName(e.target.value)}
+            />
+          )}
         </div>
 
         {/* Logo */}
@@ -585,19 +649,23 @@ export function FastTrackSetupStep() {
         {/* Website */}
         <div className="space-y-2">
           <Label className="text-sm font-medium text-foreground">Website</Label>
-          <div className="relative">
-            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-studio-dim" />
-            <Input
-              placeholder="www.yourcompany.com"
-              value={websiteUrl}
-              onChange={e => setWebsiteUrl(e.target.value)}
-              aria-invalid={!!websiteUrlError}
-              className={cn(
-                'pl-9',
-                websiteUrlError && 'border-studio-stale/60',
-              )}
-            />
-          </div>
+          {confirmMode && websiteUrl.trim() && !editingFields.has('website') ? (
+            <ConfirmRow value={websiteUrl} onEdit={() => beginEdit('website')} />
+          ) : (
+            <div className="relative">
+              <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-studio-dim" />
+              <Input
+                placeholder="www.yourcompany.com"
+                value={websiteUrl}
+                onChange={e => setWebsiteUrl(e.target.value)}
+                aria-invalid={!!websiteUrlError}
+                className={cn(
+                  'pl-9',
+                  websiteUrlError && 'border-studio-stale/60',
+                )}
+              />
+            </div>
+          )}
           {websiteUrlError ? (
             <p className="text-xs text-studio-stale">{websiteUrlError}</p>
           ) : crawlPhase !== 'idle' ? (
@@ -623,13 +691,17 @@ export function FastTrackSetupStep() {
             About your company
             {autofilledFromSite.has('description') && <FromWebsiteTag />}
           </Label>
-          <Textarea
-            placeholder="A few words about what you make and your sustainability ambitions..."
-            value={description}
-            onChange={e => { setDescription(e.target.value); clearAutofill('description') }}
-            rows={2}
-            className={cn('resize-none', highlightClass('description'))}
-          />
+          {confirmMode && autofilledFromSite.has('description') && !editingFields.has('description') ? (
+            <ConfirmRow value={description} onEdit={() => beginEdit('description')} />
+          ) : (
+            <Textarea
+              placeholder="A few words about what you make and your sustainability ambitions..."
+              value={description}
+              onChange={e => { setDescription(e.target.value); clearAutofill('description') }}
+              rows={2}
+              className={cn('resize-none', highlightClass('description'))}
+            />
+          )}
         </div>
 
         {/* Country + Year */}
@@ -639,24 +711,35 @@ export function FastTrackSetupStep() {
               Country
               {autofilledFromSite.has('country') && <FromWebsiteTag />}
             </Label>
-            <CountrySelect
-              value={countryCode}
-              onChange={code => { setCountryCode(code); clearAutofill('country') }}
-              placeholder="Select country"
-              className={highlightClass('country')}
-            />
+            {confirmMode && autofilledFromSite.has('country') && !editingFields.has('country') ? (
+              <ConfirmRow
+                value={COUNTRIES.find(c => c.value === countryCode)?.label ?? countryCode}
+                onEdit={() => beginEdit('country')}
+              />
+            ) : (
+              <CountrySelect
+                value={countryCode}
+                onChange={code => { setCountryCode(code); clearAutofill('country') }}
+                placeholder="Select country"
+                className={highlightClass('country')}
+              />
+            )}
           </div>
           <div className="space-y-2">
             <Label className="text-sm font-medium text-foreground flex items-center gap-2">
               Year founded
               {autofilledFromSite.has('foundingYear') && <FromWebsiteTag />}
             </Label>
-            <Input
-              placeholder="e.g., 2018"
-              value={foundingYear}
-              onChange={e => { setFoundingYear(e.target.value.replace(/\D/g, '').slice(0, 4)); clearAutofill('foundingYear') }}
-              className={highlightClass('foundingYear')}
-            />
+            {confirmMode && autofilledFromSite.has('foundingYear') && !editingFields.has('foundingYear') ? (
+              <ConfirmRow value={foundingYear} onEdit={() => beginEdit('foundingYear')} />
+            ) : (
+              <Input
+                placeholder="e.g., 2018"
+                value={foundingYear}
+                onChange={e => { setFoundingYear(e.target.value.replace(/\D/g, '').slice(0, 4)); clearAutofill('foundingYear') }}
+                className={highlightClass('foundingYear')}
+              />
+            )}
           </div>
         </div>
 

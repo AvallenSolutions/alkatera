@@ -16,6 +16,12 @@ import { getSupabaseServerClient } from '@/lib/supabase/server-client';
  * - billingInterval: Billing interval (monthly, annual)
  * - organizationId: Organization ID to associate the subscription with
  *
+ * Optional (either body shape):
+ * - returnPath: where success_url should return to instead of the legacy
+ *   /complete-subscription page (e.g. '/desk/' for the arrival ritual's
+ *   arrival-plan step). Appends '?arrival=complete' rather than
+ *   '?success=true...'. Never changes the cancel_url.
+ *
  * Returns:
  * - url: Stripe Checkout session URL to redirect the user to
  */
@@ -36,8 +42,16 @@ export async function POST(request: NextRequest) {
     }
     // Parse request body
     const body = await request.json();
-    const { priceId: directPriceId, tierName, billingInterval: requestedInterval, organizationId, trial } = body;
+    const { priceId: directPriceId, tierName, billingInterval: requestedInterval, organizationId, trial, returnPath } = body;
     const isTrial = trial === true;
+    // Optional: send the user back somewhere other than the legacy
+    // /complete-subscription page on success (e.g. the arrival ritual's
+    // arrival-plan step passes '/desk/' so it can pick the return up as
+    // '?arrival=complete' and finish onboarding there). Only ever changes
+    // the SUCCESS destination — never the default, and never the cancel
+    // path, which always falls back to the legacy page.
+    const successReturnPath: string | null =
+      typeof returnPath === 'string' && returnPath.startsWith('/') ? returnPath : null;
     // Determine priceId - either directly provided or derived from tier/interval
     let priceId = directPriceId;
     if (!priceId && tierName && requestedInterval) {
@@ -142,7 +156,9 @@ export async function POST(request: NextRequest) {
           customer: customerId,
           mode: 'setup',
           payment_method_types: ['card'],
-          success_url: `${baseUrl}/complete-subscription?success=true&tier=${tier}&trial=true`,
+          success_url: successReturnPath
+            ? `${baseUrl}${successReturnPath}?arrival=complete&trial=true`
+            : `${baseUrl}/complete-subscription?success=true&tier=${tier}&trial=true`,
           cancel_url: `${baseUrl}/complete-subscription?canceled=true`,
           metadata: {
             organizationId: org.id,
@@ -160,7 +176,9 @@ export async function POST(request: NextRequest) {
           payment_method_types: ['card'],
           line_items: [{ price: priceId, quantity: 1 }],
           mode: 'subscription',
-          success_url: `${baseUrl}/complete-subscription?success=true&tier=${tier}`,
+          success_url: successReturnPath
+            ? `${baseUrl}${successReturnPath}?arrival=complete&tier=${tier}`
+            : `${baseUrl}/complete-subscription?success=true&tier=${tier}`,
           cancel_url: `${baseUrl}/complete-subscription?canceled=true`,
           metadata: {
             organizationId: org.id,

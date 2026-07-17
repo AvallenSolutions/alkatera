@@ -59,13 +59,19 @@ export type OnboardingStep =
   | 'fast-track-estimate'
   | 'fast-track-target'
   | 'fast-track-completion'
-  // Arrival flow steps — the 5-screen studio-language ritual for fresh
-  // owners (see tasks/onboarding-support-plan.md, Phase 1)
+  // Arrival flow steps — the 6-screen studio-language ritual for fresh
+  // owners, now the front door itself (see tasks/arrival-front-door-plan.md).
+  // 'arrival-welcome' and 'arrival-company' are retired but kept as valid
+  // literals so old saved onboarding_state rows still type-check; the
+  // OnboardingContext load path remaps them (see the compat shim there).
   | 'arrival-welcome'
+  | 'arrival-website'
   | 'arrival-persona'
   | 'arrival-company'
+  | 'arrival-confirm'
   | 'arrival-reveal'
   | 'arrival-estimate'
+  | 'arrival-plan'
 
 export interface OnboardingStepConfig {
   id: OnboardingStep
@@ -141,19 +147,23 @@ export const TOTAL_FAST_TRACK_STEPS = FAST_TRACK_STEPS.length
 export const FAST_TRACK_PHASES: OnboardingPhase[] = ['welcome', 'quick-wins', 'first-insights', 'power-features']
 
 /**
- * Arrival onboarding: the 5-screen studio-language ritual for fresh owners
- * (see tasks/onboarding-support-plan.md, Phase 1). Reuses the fast-track
- * company/reveal/estimate step internals rather than rewriting them — only
- * the wrapper components and chrome are new. All five steps share a single
+ * Arrival onboarding: the 6-screen studio-language ritual that is now the
+ * front door itself (see tasks/arrival-front-door-plan.md). Org creation
+ * happens silently inside the first step, and the trial/plan choice moves to
+ * the last step — there is no separate /create-organization or
+ * /complete-subscription detour for a fresh owner. Reuses the fast-track
+ * confirm/reveal/estimate step internals rather than rewriting them — only
+ * the wrapper components and chrome are new. All six steps share a single
  * phase; the wizard renders a quiet mono step counter for this flow instead
  * of a phase bar.
  */
 export const ARRIVAL_STEPS: OnboardingStepConfig[] = [
-  { id: 'arrival-welcome',  phase: 'welcome', title: 'Welcome',       description: 'Welcome to alkatera',          skippable: false, index: 0 },
+  { id: 'arrival-website',  phase: 'welcome', title: 'Welcome',       description: 'Where we can find you',        skippable: false, index: 0 },
   { id: 'arrival-persona',  phase: 'welcome', title: 'You',           description: 'What you do here',             skippable: true,  index: 1 },
-  { id: 'arrival-company',  phase: 'welcome', title: 'Your Company',  description: 'Tell us about your business',  skippable: true,  index: 2 },
+  { id: 'arrival-confirm',  phase: 'welcome', title: 'Your Company',  description: 'Confirm what we found',        skippable: true,  index: 2 },
   { id: 'arrival-reveal',   phase: 'welcome', title: 'Here You Are',  description: 'What we found on your website', skippable: true, index: 3 },
   { id: 'arrival-estimate', phase: 'welcome', title: 'Your Forest',   description: 'Your instant estimate',        skippable: false, index: 4 },
+  { id: 'arrival-plan',     phase: 'welcome', title: 'Your Plan',     description: 'Start your trial',             skippable: false, index: 5 },
 ]
 
 export const TOTAL_ARRIVAL_STEPS = ARRIVAL_STEPS.length
@@ -246,6 +256,13 @@ export interface PersonalizationData {
   annualProductionBucket?: AnnualProductionBucket
   /** Company website URL */
   websiteUrl?: string
+  /**
+   * The product_import_jobs id for the background scrape ArrivalWebsiteStep
+   * kicked off. Lets the arrival-confirm screen (FastTrackSetupStep in
+   * confirm mode) resume polling the same job instead of starting a second
+   * scrape of the same site.
+   */
+  scrapeJobId?: string
   /** Brand colour scraped from the website (or confirmed by the user). */
   brandColour?: string
   /** Brand logo URL scraped from the website. */
@@ -372,7 +389,7 @@ export const INITIAL_FAST_TRACK_STATE: OnboardingState = {
 export const INITIAL_ARRIVAL_STATE: OnboardingState = {
   completed: false,
   dismissed: false,
-  currentStep: 'arrival-welcome',
+  currentStep: 'arrival-website',
   completedSteps: [],
   personalization: {},
   dashboardGuideCompleted: false,

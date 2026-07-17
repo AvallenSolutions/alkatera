@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useMemo } from 'react'
 import { useOnboarding } from '@/lib/onboarding'
 import type { AnnualProductionBucket } from '@/lib/onboarding'
 import { useOrganization } from '@/lib/organizationContext'
@@ -17,8 +16,10 @@ import { RosaIntro } from './RosaIntro'
 // Reuses the fast-track estimate step's calculation and save logic
 // (products, volumes, benchmarks, per-product estimate PCFs) — see
 // FastTrackEstimateStep.tsx, kept in step there for the older 8-step flow.
-// This screen adds the peak-end close: once the estimate is saved, it
-// flips to a "your forest has started" phase and finishes onboarding.
+// The peak-end "your forest has started" close and onboarding completion
+// used to live here; both moved to ArrivalPlanStep, which now runs after
+// this step and owns the trial/plan choice — this screen just calculates,
+// persists, and advances.
 
 const BEVERAGE_TO_CATEGORY: Record<string, string> = {
   beer: 'Lager',
@@ -91,13 +92,8 @@ function volumeToLitres(volume: number, unit: ProductionUnit, product: OrgProduc
 }
 
 export function ArrivalEstimateStep() {
-  const { completeStep, completeOnboarding, state, updatePersonalization } = useOnboarding()
+  const { completeStep, state, updatePersonalization } = useOnboarding()
   const { currentOrganization } = useOrganization()
-  const router = useRouter()
-
-  const [phase, setPhase] = useState<'estimate' | 'forest'>('estimate')
-  const [launching, setLaunching] = useState(false)
-  const seedFiredRef = useRef(false)
 
   const beverageType = state.personalization?.beverageTypes?.[0] ?? null
   const beverageLabel = beverageType ? BEVERAGE_LABELS[beverageType] ?? 'Drinks' : 'Drinks'
@@ -317,65 +313,10 @@ export function ArrivalEstimateStep() {
     }
 
     setIsSaving(false)
-    // Records this step as complete for telemetry/progress; there is no
-    // next arrival step, so the wizard stays put and we flip the local
-    // phase to the peak-end close below.
+    // Advances to arrival-plan — the trial/plan choice, and the "your forest
+    // has started" peak-end close that used to live here, both now live
+    // there instead.
     completeStep()
-    setPhase('forest')
-  }
-
-  // Fire the same server-side seed the older fast-track completion step
-  // uses (persona, tracker, target, agent_exceptions) as soon as the forest
-  // phase is reached, so Rosa's hub has day-one richness by the time the
-  // user lands on it.
-  useEffect(() => {
-    if (phase !== 'forest' || seedFiredRef.current || !currentOrganization?.id) return
-    seedFiredRef.current = true
-    fetch('/api/onboarding/complete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ organizationId: currentOrganization.id }),
-    }).catch((err) => {
-      console.error('[arrival-estimate] seed call failed:', err)
-    })
-  }, [phase, currentOrganization?.id])
-
-  const handleFinish = async () => {
-    if (launching) return
-    setLaunching(true)
-    await completeOnboarding()
-    router.push('/desk/')
-  }
-
-  if (phase === 'forest') {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[65vh] px-4 text-center animate-in fade-in duration-700">
-        <div className="w-full max-w-md space-y-6">
-          <RosaIntro message="Lovely. I've got what I need to start. I'll show you what to look at first on your desk." />
-
-          <div className="space-y-3">
-            <Eyebrow tone="dim" className="justify-center flex">Your forest</Eyebrow>
-            <h2 className="font-display text-3xl font-bold tracking-tight text-foreground">Your forest has started.</h2>
-          </div>
-
-          <div className="inline-block rounded-[6px] border border-studio-hairline bg-studio-cream px-6 py-4">
-            <BigNumber
-              value={<span className="text-studio-forest">~{displayTonnes > 0 ? displayTonnes.toLocaleString() : '<1'}</span>}
-              label="t CO₂e / year, estimated"
-            />
-          </div>
-
-          <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-            Every real number you add from here grows it further. Your desk will show you where to start.
-          </p>
-
-          <PillButton onClick={handleFinish} disabled={launching} variant="ink" size="md" className="px-6">
-            {launching ? 'Loading…' : 'Go to your desk'}
-            {!launching && <ArrowRight className="h-4 w-4" />}
-          </PillButton>
-        </div>
-      </div>
-    )
   }
 
   return (

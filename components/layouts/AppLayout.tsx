@@ -18,7 +18,7 @@ import { TrialBanner } from '@/components/subscription/TrialBanner'
 import { ReadOnlyPaywallBanner } from '@/components/subscription/ReadOnlyPaywallBanner'
 import { UnreadRepliesBanner } from '@/components/feedback/UnreadRepliesBanner'
 import { IntegrationHealthBanner } from '@/components/layouts/IntegrationHealthBanner'
-import { OnboardingProvider } from '@/lib/onboarding'
+import { OnboardingProvider, useOnboarding } from '@/lib/onboarding'
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard'
 import { SupplierOnboardingProvider } from '@/lib/supplier-onboarding'
 import { SupplierOnboardingWizard } from '@/components/supplier-onboarding/SupplierOnboardingWizard'
@@ -97,9 +97,23 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
   const { subscriptionStatus, isLoading: subscriptionLoading } = useSubscription()
   const { persona } = useUserRole()
   const pathname = usePathname()
+  // The arrival ritual is the front door itself for org-less owners (see
+  // tasks/arrival-front-door-plan.md) — read its state here so both the
+  // org-less render and the payment gate below can key off it.
+  const { state: onboardingState, onboardingFlow } = useOnboarding()
 
   const isSupplier = userRole === 'supplier' || user?.user_metadata?.is_supplier === true
   const isSupplierRoute = pathname?.startsWith('/supplier-portal')
+  // Advisors never create an organisation, so an org-less advisor keeps the
+  // legacy redirect (an edge case: normally advisors reach the app via an
+  // active advisor_organization_access row and never hit this branch at
+  // all). Everyone else org-less is a fresh owner about to walk the arrival
+  // ritual, mounted directly below rather than redirected.
+  const isAdvisorRole = userRole === 'advisor'
+  // The payment gate (below) must not bounce a freshly-created 'pending' org
+  // out of the arrival ritual — the trial/plan choice is now the ritual's
+  // own last step (arrival-plan), not a separate page reached afterwards.
+  const arrivalInProgress = onboardingFlow === 'arrival' && !onboardingState.completed
 
   // Single consolidated redirect effect — all routing decisions in one place
   // to prevent flash of wrong content from multiple competing effects.
@@ -126,9 +140,13 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
       return
     }
 
-    // No organization → create one (but never for suppliers — they don't need one)
+    // No organization → the arrival ritual mounts full-screen below and owns
+    // org creation itself (never for suppliers — they don't need one).
+    // Advisors are the one org-less case that still needs the legacy page.
     if (requireOrganization && !currentOrganization && !isSupplier) {
-      router.push('/create-organization')
+      if (isAdvisorRole) {
+        router.push('/create-organization')
+      }
       return
     }
 
@@ -154,10 +172,17 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
       if (userRole === 'advisor') return
 
       if (subscriptionStatus !== 'active' && subscriptionStatus !== 'trial') {
+        // A freshly-created org sits at 'pending' from the moment
+        // ArrivalWebsiteStep creates it until arrival-plan's checkout
+        // resolves it to 'trial'/'active'. Don't bounce it to
+        // /complete-subscription mid-ritual — arrival-plan IS that step now.
+        // A 'pending' org outside the arrival flow (the old safety net)
+        // still bounces, unchanged.
+        if (subscriptionStatus === 'pending' && arrivalInProgress) return
         router.push('/complete-subscription')
       }
     }
-  }, [user, authLoading, isOrganizationLoading, isSupplier, isSupplierRoute, userRole, currentOrganization, requireOrganization, subscriptionLoading, subscriptionStatus, pathname, router])
+  }, [user, authLoading, isOrganizationLoading, isSupplier, isSupplierRoute, isAdvisorRole, userRole, currentOrganization, requireOrganization, subscriptionLoading, subscriptionStatus, pathname, router, arrivalInProgress])
 
   // --- Render gates: show loading spinner until we KNOW who the user is ---
 
@@ -193,7 +218,13 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
   }
 
   if (requireOrganization && !currentOrganization) {
-    return null
+    // Advisor edge case — the redirect effect above is sending them to
+    // /create-organization; render nothing while that happens.
+    if (isAdvisorRole) return null
+    // The front door itself: no room shell, no dark-glass form, no blank
+    // flash. OnboardingContext's pre-org branch has already seeded local
+    // arrival state, so the wizard renders arrival-website immediately.
+    return <OnboardingWizard />
   }
 
   // The house of rooms: which room's colours does this surface wear?

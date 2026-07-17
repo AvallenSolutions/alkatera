@@ -114,7 +114,10 @@ export function SignupForm({ redirectTo }: { redirectTo?: string }) {
         })
 
         setTimeout(async () => {
-          const destination = redirectTo || "/create-organization"
+          // AppLayout mounts the arrival ritual full-screen for org-less
+          // users, so a fresh signup lands on /desk/ and gets the front
+          // door immediately — no separate /create-organization detour.
+          const destination = redirectTo || "/desk/"
           console.log(`🚀 SignupForm: Redirecting to ${destination}...`)
           await new Promise(resolve => setTimeout(resolve, 100))
           router.push(destination)

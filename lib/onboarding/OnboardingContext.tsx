@@ -11,6 +11,7 @@ import {
   PersonalizationData,
   INITIAL_ONBOARDING_STATE,
   INITIAL_MEMBER_ONBOARDING_STATE,
+  INITIAL_ARRIVAL_STATE,
   getNextStep,
   getPreviousStep,
   getStepConfig,
@@ -82,6 +83,14 @@ interface OnboardingContextType {
   setFlow: (flow: OnboardingFlow) => void
   /** Reset onboarding (for testing) */
   resetOnboarding: () => void
+  /**
+   * Called by ArrivalWebsiteStep the instant it creates the organisation
+   * silently. Marks the new org ID as already "loaded" (so the org-appeared
+   * refetch below doesn't clobber the in-memory arrival progress with a
+   * fresh server state) and write-throughs the current state to
+   * /api/onboarding so the row exists under the new org straight away.
+   */
+  attachOrganizationId: (organizationId: string) => void
 }
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined)
@@ -93,11 +102,13 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const { user } = useAuth()
-  const { currentOrganization, userRole } = useOrganization()
+  const { currentOrganization, userRole, isLoading: isOrgResolving } = useOrganization()
   const isOwner = userRole === 'owner'
   const isAdvisor = userRole === 'advisor'
 
-  // Track which org ID we've loaded state for to avoid re-fetching on every render
+  // Track which org ID we've loaded state for to avoid re-fetching on every
+  // render. Also doubles as the pre-org sentinel ('PRE_ORG') and the
+  // attachOrganizationId hand-off marker — see the fetch effect below.
   const loadedOrgIdRef = useRef<string | null>(null)
   // Track the org ID and flow for saves so the callback doesn't need them in deps
   const orgIdRef = useRef<string | null>(null)
@@ -137,7 +148,11 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       setSaveStatus('saving')
       saveTimerRef.current = setTimeout(async () => {
         const orgId = orgIdRef.current
-        if (!orgId) { setSaveStatus('error'); resolve(false); return }
+        // Pre-org (the arrival ritual's first step, before ArrivalWebsiteStep
+        // has created the organisation): there's nothing to save against yet.
+        // This is expected, not a failure — stay quiet rather than flipping
+        // the "Couldn't save" indicator on for a save that was never possible.
+        if (!orgId) { setSaveStatus('idle'); resolve(false); return }
 
         try {
           const res = await fetch('/api/onboarding', {
@@ -165,16 +180,39 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     })
   }, []) // stable — no deps
 
-  // Fetch state from the API for a given org ID
+  // Fetch state from the API for a given org ID — or, pre-org, seed the
+  // arrival ritual from local state (see attachOrganizationId for the
+  // hand-off the moment ArrivalWebsiteStep creates the organisation).
   useEffect(() => {
-    const orgId = currentOrganization?.id
+    // Org membership is still resolving (post-login bootstrap) — wait
+    // rather than treating "no org yet" as settled.
+    if (isOrgResolving) return
+
+    const orgId = currentOrganization?.id ?? null
+
     if (!orgId) {
-      // Don't set isLoading to false here — wait for the org to load
+      // Pre-org: there is no organizationId to fetch or save against. A
+      // fresh owner walks the arrival ritual (arrival-website first) from
+      // local state only; suppliers and advisors never reach this branch —
+      // AppLayout mounts the wizard here only for org-less non-advisor,
+      // non-supplier users. Seed once; the AppLayout org-less render is what
+      // actually shows the wizard full-screen.
+      if (loadedOrgIdRef.current !== 'PRE_ORG') {
+        loadedOrgIdRef.current = 'PRE_ORG'
+        setOnboardingFlow('arrival')
+        setState(prev => (prev.startedAt ? prev : { ...INITIAL_ARRIVAL_STATE, startedAt: new Date().toISOString() }))
+      }
+      setIsLoading(false)
       return
     }
 
-    // Only fetch once per org ID
-    if (loadedOrgIdRef.current === orgId) return
+    // attachOrganizationId already claimed this org ID (the arrival ritual
+    // just created it and wrote the in-memory state through) — nothing to
+    // fetch, the local state is already the source of truth.
+    if (loadedOrgIdRef.current === orgId) {
+      setIsLoading(false)
+      return
+    }
     loadedOrgIdRef.current = orgId
 
     const generation = ++fetchGenerationRef.current
@@ -202,6 +240,19 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
             if ((merged.currentStep as string) === 'connect-tools') {
               merged = { ...merged, currentStep: 'first-product' }
             }
+            // Compat: the arrival ritual's old 'arrival-welcome' (a single
+            // continue button) and 'arrival-company' steps were retired when
+            // org creation moved into arrival-website itself. An org-having
+            // user parked on either one is mapped onto the nearest
+            // equivalent in the new 6-step shape — they already have an
+            // org, so arrival-website (which ArrivalWebsiteStep treats as a
+            // no-op re-confirm when currentOrganization already exists)
+            // isn't re-asked as if it were still step 1.
+            if ((merged.currentStep as string) === 'arrival-welcome') {
+              merged = { ...merged, currentStep: 'arrival-website' }
+            } else if ((merged.currentStep as string) === 'arrival-company') {
+              merged = { ...merged, currentStep: 'arrival-confirm' }
+            }
             const pending = pendingUpdatesRef.current
             pendingUpdatesRef.current = []
             for (const updater of pending) {
@@ -223,7 +274,22 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         }
       }
     })()
-  }, [currentOrganization?.id, isOwner, isAdvisor, saveState])
+  }, [currentOrganization?.id, isOrgResolving, isOwner, isAdvisor, saveState])
+
+  const attachOrganizationId = useCallback((organizationId: string) => {
+    orgIdRef.current = organizationId
+    loadedOrgIdRef.current = organizationId
+    // Write through whatever the arrival ritual currently holds in memory so
+    // the onboarding_state row exists under the new org immediately — the
+    // next debounced save (e.g. the persona step's choice) would otherwise
+    // be the first write, and anything read before then (this org's own
+    // GET /api/onboarding, should something else trigger it) would see
+    // nothing.
+    setState(prev => {
+      saveState(prev)
+      return prev
+    })
+  }, [saveState])
 
   // Helper: update state in memory and persist immediately.
   // If a fetch is in-flight, queue the updater so it can be replayed
@@ -321,9 +387,9 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       flowRef.current === 'member' ? 'member-completion' :
       flowRef.current === 'fast_track' ? 'fast-track-completion' :
       flowRef.current === 'advisor' ? 'advisor-completion' :
-      // The arrival flow has no separate completion step — the estimate
-      // step doubles as the "forest has started" close.
-      flowRef.current === 'arrival' ? 'arrival-estimate' :
+      // arrival-plan (the trial/plan step) doubles as the "forest has
+      // started" close — it's the last screen in the ritual.
+      flowRef.current === 'arrival' ? 'arrival-plan' :
       'completion'
     const completedState: OnboardingState = {
       ...state,
@@ -484,13 +550,17 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     }
   }, [])
 
-  // Both owners and members see the onboarding wizard — just different flows.
+  // Both owners and members see the onboarding wizard — just different
+  // flows. No longer requires currentOrganization: a fresh, org-less owner
+  // walks the arrival ritual's local-state pre-org branch (above) before
+  // ArrivalWebsiteStep creates the org. AppLayout is what actually decides
+  // whether this wizard is on screen for an org-less user (it mounts it only
+  // for non-supplier, non-advisor users), so this stays permissive here.
   const shouldShowOnboarding =
     !state.completed &&
     !state.dismissed &&
     !sessionDismissedRef.current &&
-    !!user &&
-    !!currentOrganization
+    !!user
 
   const progress = getProgressPercentage(state.currentStep, onboardingFlow)
   const canGoBack = getPreviousStep(state.currentStep, onboardingFlow) !== null
@@ -528,6 +598,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         dismissCoachmark,
         setFlow,
         resetOnboarding,
+        attachOrganizationId,
       }}
     >
       {children}

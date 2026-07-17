@@ -48,11 +48,16 @@ import { FastTrackEstimateStep } from './steps/FastTrackEstimateStep'
 import { FastTrackTargetStep } from './steps/FastTrackTargetStep'
 import { FastTrackCompletionStep } from './steps/FastTrackCompletionStep'
 
-// Step components — arrival flow (the 5-screen studio-language ritual;
-// company + reveal reuse the fast-track step components directly)
-import { ArrivalWelcomeStep } from './steps/ArrivalWelcomeStep'
+// Step components — arrival flow (the 6-screen studio-language ritual that
+// is now the front door itself; confirm + reveal reuse the fast-track step
+// components directly). ArrivalWelcomeStep is retired from the flow — the
+// website question (ArrivalWebsiteStep) carries its one welcome sentence
+// instead — but the file is kept for the compat step-id it might still be
+// referenced from in old telemetry/analytics.
+import { ArrivalWebsiteStep } from './steps/ArrivalWebsiteStep'
 import { ArrivalPersonaStep } from './steps/ArrivalPersonaStep'
 import { ArrivalEstimateStep } from './steps/ArrivalEstimateStep'
+import { ArrivalPlanStep } from './steps/ArrivalPlanStep'
 
 const STEP_COMPONENTS: Record<string, React.ComponentType> = {
   // Owner steps
@@ -89,13 +94,14 @@ const STEP_COMPONENTS: Record<string, React.ComponentType> = {
   'fast-track-estimate': FastTrackEstimateStep,
   'fast-track-target': FastTrackTargetStep,
   'fast-track-completion': FastTrackCompletionStep,
-  // Arrival steps — company and reveal reuse the fast-track internals
+  // Arrival steps — confirm and reveal reuse the fast-track internals
   // directly rather than re-implementing the same data logic.
-  'arrival-welcome': ArrivalWelcomeStep,
+  'arrival-website': ArrivalWebsiteStep,
   'arrival-persona': ArrivalPersonaStep,
-  'arrival-company': FastTrackSetupStep,
+  'arrival-confirm': FastTrackSetupStep,
   'arrival-reveal': FastTrackRevealStep,
   'arrival-estimate': ArrivalEstimateStep,
+  'arrival-plan': ArrivalPlanStep,
 }
 
 const OWNER_PHASES: OnboardingPhase[] = ['welcome', 'quick-wins', 'core-setup', 'first-insights', 'power-features']
@@ -106,6 +112,10 @@ export function OnboardingWizard() {
     saveStatus, canGoBack, previousStep,
   } = useOnboarding()
   const { currentOrganization } = useOrganization()
+  // Pre-org (arrival-website, before the org exists): there is nowhere to
+  // dismiss TO — the wizard IS the front door. Suppress every dismiss
+  // control while org-less rather than risk a blank page.
+  const isPreOrg = !currentOrganization
 
   // Fire a 'view' telemetry event whenever the visible step changes. Tracked
   // via ref so we don't double-fire on the cosmetic re-renders that the
@@ -126,7 +136,7 @@ export function OnboardingWizard() {
   // a11y: keyboard dismiss via Escape. Matches what users expect from any
   // full-screen modal; previously they had to find the X button.
   useEffect(() => {
-    if (!shouldShowOnboarding) return
+    if (!shouldShowOnboarding || isPreOrg) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       // Don't dismiss if an inner dialog (Radix Dialog) is open — its own
@@ -137,7 +147,7 @@ export function OnboardingWizard() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [shouldShowOnboarding, dismissOnboarding])
+  }, [shouldShowOnboarding, isPreOrg, dismissOnboarding])
 
   if (isLoading || !shouldShowOnboarding) {
     return null
@@ -156,7 +166,7 @@ export function OnboardingWizard() {
   const phases = isMemberFlow ? MEMBER_PHASES : isFastTrack ? FAST_TRACK_PHASES : isAdvisorFlow ? ADVISOR_PHASES : OWNER_PHASES
   const flowSteps = isMemberFlow ? MEMBER_ONBOARDING_STEPS : isFastTrack ? FAST_TRACK_STEPS : isAdvisorFlow ? ADVISOR_ONBOARDING_STEPS : ONBOARDING_STEPS
 
-  const isWelcome = state.currentStep === 'welcome-screen' || state.currentStep === 'member-welcome' || state.currentStep === 'advisor-welcome' || state.currentStep === 'arrival-welcome'
+  const isWelcome = state.currentStep === 'welcome-screen' || state.currentStep === 'member-welcome' || state.currentStep === 'advisor-welcome'
   const isCompletion = state.currentStep === 'completion' || state.currentStep === 'member-completion' || state.currentStep === 'fast-track-completion' || state.currentStep === 'advisor-completion'
 
   // The arrival ritual's quiet mono step counter (cream ground, no phase
@@ -197,15 +207,17 @@ export function OnboardingWizard() {
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={dismissOnboarding}
-                className="text-muted-foreground hover:text-foreground hover:bg-studio-ink/5 -mr-2"
-                aria-label="Skip onboarding"
-              >
-                <X className="w-4 h-4" />
-              </Button>
+              {!isPreOrg && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={dismissOnboarding}
+                  className="text-muted-foreground hover:text-foreground hover:bg-studio-ink/5 -mr-2"
+                  aria-label="Skip onboarding"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
