@@ -18,7 +18,7 @@ import { classifyIngestJob } from '@/lib/ingest/run-classify-job';
  * not fan-out queues like scraping/documents.
  */
 
-function service(): SupabaseClient {
+export function service(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
   if (!url || !key) throw new Error('Missing Supabase service-role config');

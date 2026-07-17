@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { waitUntil } from '@vercel/functions';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { inngest } from '@/lib/inngest/client';
 import { runImportFromUrl } from '@/lib/products/import-from-url-worker';
+import { service } from '@/lib/inngest/functions/product-import';
 
-// Inline fallback (see dispatch below) can run the full scrape + Claude
-// extraction synchronously within the request. Vercel Fluid Compute allows
-// up to 300s; the worker's own poll budget on the client side is 60s, so
-// this is headroom, not the expected duration.
+// The no-Inngest fallback (see dispatch below) schedules the full scrape +
+// Claude extraction to run in the background via `waitUntil()`, within the
+// same function invocation. (This repo is on Next 14.2.5, which predates
+// `unstable_after`/`after` in next/server — confirmed absent from both the
+// package's type declarations and its runtime exports — so `@vercel/functions`
+// `waitUntil` is the supported equivalent: it tells Vercel not to freeze the
+// function instance until the passed promise settles, while `next dev` and
+// any other non-Vercel host just let the already-running promise continue on
+// the normal Node event loop.) Vercel Fluid Compute allows up to 300s for
+// that; the worker's own poll budget on the client side is 60s, so this is
+// headroom, not the expected duration.
 export const maxDuration = 300;
 
 // SSRF protection: block private/internal IP ranges
@@ -130,17 +139,37 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to start import' }, { status: 502 });
       }
     } else {
-      try {
-        await runImportFromUrl({ supabase: client as any, jobId: job.id, url: normalizedUrl });
-      } catch (err) {
-        // Belt and braces only — runImportFromUrl already writes a 'failed'
-        // status for every failure mode it knows about.
-        console.error('[import-from-url] Inline worker run threw:', err);
-        await (client as any)
-          .from('product_import_jobs')
-          .update({ status: 'failed', error: 'Failed to import products from URL' })
-          .eq('id', job.id);
-      }
+      // No Inngest worker listening for the event, so run the same worker
+      // function ourselves — but in the BACKGROUND, not inline before the
+      // response. Holding the POST open for the full 60-120s scrape is
+      // fragile on Vercel (function/proxy/browser timeouts strand the job
+      // at 'pending', and the 20-min janitor in .../[jobId]/route.ts
+      // eventually marks it 'failed' — this is what made the arrival
+      // "confirm" step arrive empty on Tim's staging test). The client
+      // already polls GET .../[jobId] for the result, so return the job id
+      // immediately; the import keeps running on the event loop after the
+      // response is sent, and `waitUntil` tells Vercel not to freeze the
+      // function instance until it settles.
+      //
+      // Use a service-role client here, not the request-scoped `client` —
+      // that one is tied to the request/response lifecycle and isn't
+      // reliable once the response has already gone out. This mirrors the
+      // `service()` helper the Inngest path uses in
+      // lib/inngest/functions/product-import.ts.
+      const backgroundImport = runImportFromUrl({ supabase: service(), jobId: job.id, url: normalizedUrl }).catch(async err => {
+        // Belt and braces only — runImportFromUrl already writes a
+        // 'failed' status for every failure mode it knows about.
+        console.error('[import-from-url] Background worker run threw:', err);
+        try {
+          await service()
+            .from('product_import_jobs')
+            .update({ status: 'failed', error: 'Failed to import products from URL' })
+            .eq('id', job.id);
+        } catch (updateErr) {
+          console.error('[import-from-url] Failed to record background failure:', updateErr);
+        }
+      });
+      waitUntil(backgroundImport);
     }
 
     return NextResponse.json({ jobId: job.id }, { status: 202 });
