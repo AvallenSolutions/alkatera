@@ -1156,6 +1156,14 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
   const materialsPct = reconcileTotal > 0 ? (materialsSubtotal / reconcileTotal) * 100 : 0;
   const otherPct = Math.max(100 - materialsPct, 0);
 
+  // Fossil/biogenic split so the Total row ties out with the headline figure
+  // (Section 01/05) and Section 06. This table's total is the all-species
+  // GWP-100 (incl. biogenic); the headline elsewhere is fossil-only per
+  // ISO 14067:2018 §6.4.9.3. Labelling both "carbon footprint" without the
+  // split is exactly what makes the two numbers look contradictory.
+  const fossilHeadline = parseFloat(data.climateImpact.totalCarbon || '0');
+  const biogenicSeparate = reconcileTotal - fossilHeadline;
+
   for (let i = 0; i < ingredients.length; i += perPage) {
     const pageIngredients = ingredients.slice(i, i + perPage);
     const isFirstPage = i === 0;
@@ -1177,14 +1185,16 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
             </td>
             <td></td><td></td>
             <td style="font-weight: 500;">${otherStages.toFixed(4)}</td>
-            <td><span style="color: #ccff00;">${otherPct.toFixed(1)}%</span></td>
+            <td><span style="color: ${isFirstPage ? '#ccff00' : '#4d5c00'};">${otherPct.toFixed(1)}%</span></td>
             <td></td><td></td><td></td>
           </tr>` : ''}
           <tr style="font-weight: 700; color: ${strongColor}; border-top: 2px solid ${ruleColor};">
-            <td>Total carbon footprint</td>
+            <td>Total carbon footprint (incl. biogenic)
+              ${biogenicSeparate > 0.0005 ? `<div style="font-size: 7.5px; font-weight: 400; color: ${subtleColor}; margin-top: 2px;">Of which fossil ${fossilHeadline.toFixed(3)} kg (the headline figure) &#183; biogenic ${biogenicSeparate.toFixed(3)} kg, reported separately per ISO 14067:2018 &sect;6.4.9.3</div>` : ''}
+            </td>
             <td></td><td></td>
             <td>${reconcileTotal.toFixed(3)}</td>
-            <td><span style="color: #ccff00;">100%</span></td>
+            <td><span style="color: ${isFirstPage ? '#ccff00' : '#4d5c00'};">100%</span></td>
             <td></td><td></td><td></td>
           </tr>`
       : '';
@@ -1261,7 +1271,7 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
         <td>${escapeHtml(ing.quantity)} ${escapeHtml(ing.unit)}</td>
         <td>${escapeHtml(ing.origin)}${originWarning}</td>
         <td style="font-weight: 500;">${escapeHtml(ing.climateImpact)}${containerNote}${transportNote}</td>
-        <td><span style="color: #ccff00;">${escapeHtml(ing.climatePercentage)}</span></td>
+        <td><span style="color: ${isFirstPage ? '#ccff00' : '#4d5c00'};">${escapeHtml(ing.climatePercentage)}</span></td>
         <td>${escapeHtml(ing.acidification)}</td>
         <td>${escapeHtml(ing.eutrophication)}</td>
         <td>${dataSourceBadge}${gradeChip}${ing.confidenceScore > 0 ? `<div style="font-size: 7.5px; color: #78716c; margin-top: 2px;">${ing.confidenceScore}% confidence</div>` : ''}</td>
@@ -1944,9 +1954,12 @@ function renderAiCriticalReviewPage(data: LCAReportData): string {
 
 function renderSectionHeader(number: string, title: string, dark = false, continuation = false): string {
   const borderColor = dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)';
+  // Neon chartreuse only reads on the dark pages; on the white pages use a dark
+  // olive so the section number stays legible while keeping the brand accent.
+  const numberColor = dark ? '#ccff00' : '#4d5c00';
   return `
     <div style="display: flex; align-items: baseline; gap: 16px; margin-bottom: ${continuation ? '24px' : '32px'}; border-bottom: 1px solid ${borderColor}; padding-bottom: 12px;">
-      <span style="color: #ccff00; font-family: 'Fira Code', monospace; font-size: 14px; font-weight: 700; letter-spacing: 3px;">${number}</span>
+      <span style="color: ${numberColor}; font-family: 'Fira Code', monospace; font-size: 14px; font-weight: 700; letter-spacing: 3px;">${number}</span>
       <h2 style="font-size: ${continuation ? '24px' : '32px'}; font-family: 'Playfair Display', serif; font-weight: 300;">${escapeHtml(title)}</h2>
       ${continuation ? '<span style="font-size: 10px; color: #a8a29e; font-family: \'Fira Code\', monospace;">(continued)</span>' : ''}
     </div>`;
