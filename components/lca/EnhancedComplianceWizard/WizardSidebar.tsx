@@ -48,9 +48,9 @@ export const STEP_HELP: Record<string, { tips: string[]; terms: TermExplanation[
   },
   'materials': {
     tips: [
-      'All materials need verified emission factors',
-      'Click "Fix" to search and assign missing factors',
-      'Proxy factors can be used if an exact match is not available',
+      'We match every material to an emission factor for you when you open this step',
+      'Check anything that looks wrong, and use "Not right? Choose yourself." to change it',
+      'Where we cannot find an exact match, we use a conservative stand-in and flag it for our team',
     ],
     terms: [
       { term: 'Emission Factor', explanation: 'A coefficient that quantifies the environmental impact per unit of a material (e.g., kg CO₂e per kg of barley)' },

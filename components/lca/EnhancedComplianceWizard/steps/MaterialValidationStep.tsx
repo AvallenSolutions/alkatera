@@ -1,8 +1,7 @@
 'use client';
 
-import React, { Fragment } from 'react';
+import React, { Fragment, useEffect, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Table,
@@ -26,14 +25,18 @@ import {
   Info,
   TrendingUp,
   Database,
-  Search,
-  ArrowRight,
   FlaskConical,
 } from 'lucide-react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { validateMaterialsBeforeCalculation } from '@/lib/impact-waterfall-resolver';
 import { toast } from 'sonner';
 import { InlineIngredientSearch } from '@/components/lca/InlineIngredientSearch';
+import { MatchStatusBadge } from '@/components/products/MatchStatusBadge';
+import { ProvenanceChip } from '@/components/studio/provenance-chip';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { provenanceFromEfSourceType } from '@/lib/provenance';
+import { autoMatchEmissionFactor } from '@/lib/products/ef-auto-match';
+import { autoApplyConservativeProxy } from '@/lib/factors/auto-proxy';
 import type { DataSource } from '@/lib/types/lca';
 import type { MaterialWithValidation } from '../types';
 import { materialHasAssignedFactor } from '../types';
@@ -57,11 +60,12 @@ function getQualityBadgeProps(tag: string) {
   }
 }
 
-function getConfidenceColor(score: number) {
-  if (score >= 85) return 'text-green-600 dark:text-green-400';
-  if (score >= 70) return 'text-blue-600 dark:text-blue-400';
-  return 'text-slate-600 dark:text-slate-400';
-}
+/** How many search+write operations run at once during the silent auto-resolve pass. */
+const AUTO_RESOLVE_CONCURRENCY = 3;
+
+/** Shared "demoted picker" link styling, matching IngredientFormCard/PackagingFormCard. */
+const CHOOSE_YOURSELF_LINK_CLASS =
+  'shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-studio-dim underline-offset-2 hover:text-foreground hover:underline';
 
 // ============================================================================
 // MAIN COMPONENT
@@ -84,6 +88,179 @@ export function MaterialValidationStep() {
     setPreCalcState((prev) => ({ ...prev, editingMaterialId: id }));
   };
 
+  // ── Silent auto-resolution (data-revolution Pillar 2) ──────────────────
+  // Factor selection is not a user task any more: any material the resolver
+  // couldn't assign a factor to gets a confident auto-match first, else a
+  // conservative proxy, applied automatically as soon as materials finish
+  // loading. Runs once per wizard mount.
+  const autoResolveRanRef = useRef(false);
+  const [autoResolveProgress, setAutoResolveProgress] = useState<{ current: number; total: number } | null>(null);
+  const [pendingResolveIds, setPendingResolveIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (materialDataLoading) return;
+    if (autoResolveRanRef.current) return;
+    const targets = materials.filter((m) => m.validationStatus === 'missing');
+    if (targets.length === 0) return;
+    const organizationId = product?.organization_id;
+    if (!organizationId) return;
+
+    autoResolveRanRef.current = true;
+    void resolveUnmatchedMaterials(targets, organizationId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [materialDataLoading]);
+
+  async function resolveUnmatchedMaterials(
+    targets: MaterialWithValidation[],
+    organizationId: string
+  ) {
+    setPendingResolveIds(new Set(targets.map((m) => m.id)));
+    setAutoResolveProgress({ current: 0, total: targets.length });
+
+    let completed = 0;
+    let matchedCount = 0;
+    let proxyCount = 0;
+    let failedCount = 0;
+    let cursor = 0;
+
+    const markDone = (materialId: string) => {
+      completed += 1;
+      setAutoResolveProgress({ current: completed, total: targets.length });
+      setPendingResolveIds((prev) => {
+        if (!prev.has(materialId)) return prev;
+        const next = new Set(prev);
+        next.delete(materialId);
+        return next;
+      });
+    };
+
+    async function worker() {
+      while (cursor < targets.length) {
+        const material = targets[cursor];
+        cursor += 1;
+
+        const query = material.material_name?.trim();
+        if (!query) {
+          failedCount += 1;
+          markDone(material.id);
+          continue;
+        }
+
+        const materialType: 'ingredient' | 'packaging' =
+          material.material_type === 'packaging' ? 'packaging' : 'ingredient';
+
+        try {
+          const confident = await autoMatchEmissionFactor({
+            query,
+            organizationId,
+            materialType,
+            packagingCategory: material.packaging_category,
+          });
+
+          if (confident) {
+            await handleEmissionFactorSelect(
+              material.id,
+              {
+                name: confident.matched_source_name,
+                data_source: confident.data_source,
+                data_source_id: confident.data_source_id,
+                supplier_product_id: confident.supplier_product_id,
+                unit: material.unit,
+                carbon_intensity: confident.carbon_intensity,
+                openlca_database: confident.openlca_database,
+                ef_source: confident.ef_source,
+                ef_source_type: confident.ef_source_type,
+                ef_data_quality_grade: confident.ef_data_quality_grade,
+                ef_uncertainty_percent: confident.ef_uncertainty_percent,
+                auto_matched: true,
+              },
+              { silent: true }
+            );
+            matchedCount += 1;
+          } else {
+            const proxy = await autoApplyConservativeProxy({
+              query,
+              organizationId,
+              materialType,
+              packagingCategory: material.packaging_category,
+            });
+            await handleEmissionFactorSelect(
+              material.id,
+              {
+                name: proxy.matched_source_name,
+                data_source: proxy.data_source,
+                data_source_id: proxy.data_source_id,
+                supplier_product_id: proxy.supplier_product_id,
+                unit: material.unit,
+                carbon_intensity: proxy.carbon_intensity,
+                openlca_database: proxy.openlca_database,
+                ef_source: proxy.ef_source,
+                ef_source_type: proxy.ef_source_type,
+                ef_data_quality_grade: proxy.ef_data_quality_grade,
+                ef_uncertainty_percent: proxy.ef_uncertainty_percent,
+                auto_matched: true,
+              },
+              { silent: true }
+            );
+            proxyCount += 1;
+          }
+        } catch (error) {
+          // Never block the step: a material that fails even the proxy
+          // write (e.g. a transient network error) simply stays visibly
+          // unresolved, reviewable via "Choose a factor" below.
+          console.warn('[MaterialValidationStep] Auto-resolve failed for', material.material_name, error);
+          failedCount += 1;
+        } finally {
+          markDone(material.id);
+        }
+      }
+    }
+
+    await Promise.all(
+      Array.from({ length: Math.min(AUTO_RESOLVE_CONCURRENCY, targets.length) }, () => worker())
+    );
+
+    setAutoResolveProgress(null);
+
+    const summaryParts: string[] = [];
+    if (matchedCount > 0) summaryParts.push(`${matchedCount} matched`);
+    if (proxyCount > 0) summaryParts.push(`${proxyCount} estimated`);
+    if (summaryParts.length > 0) {
+      toast.success(`We matched your materials. ${summaryParts.join(', ')}.`);
+    }
+    if (failedCount > 0) {
+      toast.error(
+        `${failedCount} material${failedCount !== 1 ? 's' : ''} could not be matched automatically. Choose a factor for ${failedCount !== 1 ? 'them' : 'it'} below.`
+      );
+    }
+  }
+
+  /**
+   * Confirm an auto-matched (or proxy) row as reviewed, without changing
+   * which factor is used. Mirrors the "Looks right" affordance already
+   * shipped in IngredientFormCard/PackagingFormCard (MatchStatusBadge).
+   */
+  async function handleConfirmMatch(materialId: string) {
+    const supabase = getSupabaseBrowserClient();
+    const { error } = await supabase
+      .from('product_materials')
+      .update({ match_status: 'verified' })
+      .eq('id', materialId);
+
+    if (error) {
+      console.error('[MaterialValidationStep] Confirm match failed:', error);
+      toast.error('Could not confirm this match. Please try again.');
+      return;
+    }
+
+    setPreCalcState((prev) => ({
+      ...prev,
+      materials: prev.materials.map((m) =>
+        m.id === materialId ? { ...m, match_status: 'verified' } : m
+      ),
+    }));
+  }
+
   async function handleEmissionFactorSelect(
     materialId: string,
     selection: {
@@ -94,7 +271,14 @@ export function MaterialValidationStep() {
       unit: string;
       carbon_intensity?: number;
       openlca_database?: string;
-    }
+      ef_source?: string;
+      ef_source_type?: string;
+      ef_data_quality_grade?: string;
+      ef_uncertainty_percent?: number;
+      /** True when software picked this (auto-match/proxy/AI proxy suggestion) rather than the user. */
+      auto_matched?: boolean;
+    },
+    options?: { silent?: boolean }
   ) {
     const supabase = getSupabaseBrowserClient();
     setPreCalcState((prev) => ({ ...prev, savingMaterialId: materialId }));
@@ -114,6 +298,15 @@ export function MaterialValidationStep() {
         openlca_database: selection.openlca_database || null,
         // Cache the CO2 factor as a last-resort fallback in case OpenLCA is unreachable
         cached_co2_factor: selection.carbon_intensity || null,
+        // Provenance columns — same shape IngredientFormCard/PackagingFormCard
+        // write (lib/products/ingredient-material-data.ts) so a proxy applied
+        // here shows up in /admin-tools/factor-queue identically to one
+        // applied from the recipe tab or by Rosa.
+        ef_source: selection.ef_source || null,
+        ef_source_type: selection.ef_source_type || null,
+        ef_data_quality_grade: selection.ef_data_quality_grade || null,
+        ef_uncertainty_percent: selection.ef_uncertainty_percent ?? null,
+        match_status: selection.auto_matched ? 'auto_matched' : 'verified',
       };
       if (
         selection.data_source === 'supplier' &&
@@ -201,11 +394,16 @@ export function MaterialValidationStep() {
         };
       });
 
-      toast.success(`Emission factor assigned for ${updatedRow.material_name}`);
+      if (!options?.silent) {
+        toast.success(`Emission factor assigned for ${updatedRow.material_name}`);
+      }
     } catch (error: any) {
       console.error('Error updating emission factor:', error);
-      toast.error(error.message || 'Failed to update emission factor');
+      if (!options?.silent) {
+        toast.error(error.message || 'Failed to update emission factor');
+      }
       setPreCalcState((prev) => ({ ...prev, savingMaterialId: null }));
+      if (options?.silent) throw error;
     }
   }
 
@@ -221,16 +419,27 @@ export function MaterialValidationStep() {
   }
 
   const validatingCount = materials.filter(m => m.validationStatus === 'validating').length;
+  const isAutoResolving = autoResolveProgress !== null;
 
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold">Material Validation</h3>
+        <h3 className="text-lg font-semibold">Your materials</h3>
         <p className="text-sm text-muted-foreground">
-          All materials need verified emission data before calculating the
-          lifecycle assessment. Review the table below and fix any missing data.
+          {materialDataLoading || isAutoResolving
+            ? 'We are matching your materials to emission data now.'
+            : missingCount === 0
+              ? 'We have matched everything. Check anything that looks wrong.'
+              : `${missingCount} material${missingCount !== 1 ? 's' : ''} still ${missingCount !== 1 ? 'need' : 'needs'} a factor. Choose one for ${missingCount !== 1 ? 'them' : 'it'} below.`}
         </p>
       </div>
+
+      {/* Quiet mono progress readout for the silent auto-resolve pass */}
+      {isAutoResolving && (
+        <Eyebrow tone="dim">
+          Matching your materials. {autoResolveProgress!.current} of {autoResolveProgress!.total}.
+        </Eyebrow>
+      )}
 
       {/* Validating banner */}
       {materialDataLoading && validatingCount > 0 && (
@@ -243,25 +452,25 @@ export function MaterialValidationStep() {
       )}
 
       {/* Status */}
-      {!materialDataLoading && !canCalculate && (
+      {!materialDataLoading && !isAutoResolving && !canCalculate && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Missing Emission Data</AlertTitle>
+          <AlertTitle>A few materials still need a factor</AlertTitle>
           <AlertDescription>
-            {missingCount} material{missingCount !== 1 ? 's are' : ' is'}{' '}
-            missing emission factors. Click &quot;Fix&quot; next to each missing
-            material to search and assign one.
+            {missingCount} material{missingCount !== 1 ? 's' : ''} still{' '}
+            {missingCount !== 1 ? 'need' : 'needs'} an emission factor. Use
+            &quot;Choose a factor&quot; next to each one below.
           </AlertDescription>
         </Alert>
       )}
-      {!materialDataLoading && canCalculate && (
+      {!materialDataLoading && !isAutoResolving && canCalculate && (
         <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
           <CheckCircle2 className="h-4 w-4 text-green-600" />
           <AlertTitle className="text-green-900 dark:text-green-100">
             Ready to Calculate
           </AlertTitle>
           <AlertDescription className="text-green-800 dark:text-green-200">
-            All {materials.length} materials have verified emission data.
+            All {materials.length} materials have emission data. Check anything that looks wrong below.
           </AlertDescription>
         </Alert>
       )}
@@ -276,22 +485,18 @@ export function MaterialValidationStep() {
         </Alert>
       )}
 
-      {/* Proxy explanation note */}
-      {materials.some(
-        (m) =>
-          m.hasData &&
-          m.matched_source_name &&
-          m.matched_source_name !== m.material_name
-      ) && (
+      {/* Estimated-factor explanation note */}
+      {materials.some((m) => m.ef_source_type === 'proxy') && (
         <Alert className="border-amber-500/30 bg-amber-500/5">
           <FlaskConical className="h-4 w-4 text-amber-500" />
           <AlertDescription className="text-amber-700 dark:text-amber-400 text-xs">
-            <strong>Proxy factors in use.</strong> Some ingredients are
-            calculated using a proxy emission factor (shown in the
-            &quot;Calculation Factor&quot; column below). The proxy is the
-            closest matching dataset from ecoinvent, AGRIBALYSE, or your
-            supplier data. Both your ingredient name and the proxy used are
-            shown in the final LCA report for full transparency.
+            <strong>Estimated factors in use.</strong> Where we could not find
+            an exact match, we applied a conservative estimate so your
+            calculation can proceed. Estimated materials are marked
+            &quot;Estimated.&quot; below — both your material name and the
+            estimate used are shown in the final report for full transparency.
+            You can pick your own match any time with &quot;Not right? Choose
+            yourself.&quot;
           </AlertDescription>
         </Alert>
       )}
@@ -305,13 +510,12 @@ export function MaterialValidationStep() {
           const MobileIcon = badgeProps?.icon;
           const isEditing = editingMaterialId === material.id;
           const isSaving = savingMaterialId === material.id;
+          const isPendingAutoResolve = pendingResolveIds.has(material.id);
           const calcFactorName =
             material.resolvedFactorName ||
             material.matched_source_name ||
             material.material_name;
-          const isProxy =
-            material.hasData &&
-            calcFactorName !== material.material_name;
+          const isProxy = material.hasData && material.ef_source_type === 'proxy';
 
           return (
             <div key={material.id} className="rounded-lg border p-3 space-y-2">
@@ -323,39 +527,26 @@ export function MaterialValidationStep() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {material.validationStatus === 'validating' ? (
+                  {material.validationStatus === 'validating' || isSaving || (isPendingAutoResolve && !material.hasData) ? (
                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                   ) : material.hasData ? (
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
                   ) : material.validationStatus === 'assigned' ? (
                     <CheckCircle2 className="h-4 w-4 text-amber-500" />
-                  ) : isSaving ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs"
-                      onClick={() =>
-                        setEditingMaterialId(isEditing ? null : material.id)
-                      }
-                    >
-                      <Search className="h-3 w-3 mr-1" />
-                      {isEditing ? 'Cancel' : 'Fix'}
-                    </Button>
-                  )}
+                  ) : null}
                 </div>
               </div>
 
               {material.hasData && (
                 <div className="flex items-center gap-2 flex-wrap">
-                  {isProxy && (
-                    <span className="inline-flex items-center gap-1 rounded-sm bg-amber-500/10 px-1.5 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
-                      <FlaskConical className="h-2.5 w-2.5" />
-                      Proxy
-                    </span>
-                  )}
                   <span className="text-xs text-muted-foreground">{calcFactorName}</span>
+                  {isProxy && (
+                    <ProvenanceChip provenance={provenanceFromEfSourceType(material.ef_source_type)} compact />
+                  )}
+                  <MatchStatusBadge
+                    status={material.match_status}
+                    onConfirm={() => handleConfirmMatch(material.id)}
+                  />
                   {badgeProps && (
                     <Badge
                       variant={badgeProps.variant}
@@ -374,6 +565,9 @@ export function MaterialValidationStep() {
                   <span className="text-xs text-muted-foreground">Validating...</span>
                 </div>
               )}
+              {!material.hasData && isPendingAutoResolve && (
+                <span className="text-xs text-muted-foreground">Matching…</span>
+              )}
               {!material.hasData && material.validationStatus === 'assigned' && (
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="secondary" className="text-xs bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30">
@@ -384,29 +578,35 @@ export function MaterialValidationStep() {
                   </span>
                 </div>
               )}
-              {!material.hasData && material.validationStatus === 'missing' && (
+              {!material.hasData && !isPendingAutoResolve && material.validationStatus === 'missing' && (
                 <Badge variant="destructive" className="text-xs">
                   Missing emission factor
                 </Badge>
               )}
 
-              {isEditing && !material.hasData && (
-                <div className="pt-2">
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Search for an emission factor for &quot;
-                    {material.material_name}&quot;:
-                  </p>
-                  <InlineIngredientSearch
-                    organizationId={product.organization_id}
-                    value={material.material_name}
-                    placeholder={`Search emission factor for ${material.material_name}...`}
-                    materialType={
-                      material.material_type as 'ingredient' | 'packaging'
-                    }
-                    onSelect={(selection) =>
-                      handleEmissionFactorSelect(material.id, selection)
-                    }
-                  />
+              {!isPendingAutoResolve && (
+                <div className="pt-1">
+                  {isEditing ? (
+                    <InlineIngredientSearch
+                      organizationId={product.organization_id}
+                      value={material.material_name}
+                      placeholder={`Search for an emission factor for ${material.material_name}...`}
+                      materialType={
+                        material.material_type as 'ingredient' | 'packaging'
+                      }
+                      onSelect={(selection) =>
+                        handleEmissionFactorSelect(material.id, selection)
+                      }
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setEditingMaterialId(material.id)}
+                      className={CHOOSE_YOURSELF_LINK_CLASS}
+                    >
+                      {material.hasData ? 'Not right? Choose yourself.' : 'Choose a factor.'}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -435,15 +635,14 @@ export function MaterialValidationStep() {
                 const Icon = badgeProps?.icon;
                 const isEditing = editingMaterialId === material.id;
                 const isSaving = savingMaterialId === material.id;
+                const isPendingAutoResolve = pendingResolveIds.has(material.id);
 
                 // Determine what factor name is used for calculation
                 const calcFactorName =
                   material.resolvedFactorName ||
                   material.matched_source_name ||
                   material.material_name;
-                const isProxy =
-                  material.hasData &&
-                  calcFactorName !== material.material_name;
+                const isProxy = material.hasData && material.ef_source_type === 'proxy';
                 const factorSource = material.resolvedFactorSource || null;
                 const confidenceScore = material.confidenceScore;
 
@@ -458,94 +657,121 @@ export function MaterialValidationStep() {
                         </div>
                       </TableCell>
 
-                      {/* Column 2: What factor is actually used for calculation */}
+                      {/* Column 2: What factor is actually used for calculation, review-first */}
                       <TableCell className="text-sm">
-                        {material.hasData ? (
-                          <div className="flex flex-col gap-0.5">
-                            <div className="flex items-center gap-1.5">
-                              {isProxy && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="inline-flex items-center gap-1 rounded-sm bg-amber-500/10 px-1.5 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400 cursor-help">
-                                      <FlaskConical className="h-2.5 w-2.5" />
-                                      Proxy
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="right" className="max-w-[220px] text-xs">
-                                    <p>
-                                      <strong>Proxy factor</strong>: the closest
-                                      matching dataset for &ldquo;
-                                      {material.material_name}&rdquo; found in the
-                                      LCA database. This will be documented in
-                                      the report.
-                                    </p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              )}
-                              <span
-                                className={cn(
-                                  'text-xs leading-snug',
-                                  isProxy
-                                    ? 'text-amber-700 dark:text-amber-400'
-                                    : 'text-muted-foreground'
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {material.hasData ? (
+                              <>
+                                {isProxy && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="inline-flex items-center gap-1 rounded-sm bg-amber-500/10 px-1.5 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400 cursor-help">
+                                        <FlaskConical className="h-2.5 w-2.5" />
+                                        Estimated
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" className="max-w-[220px] text-xs">
+                                      <p>
+                                        <strong>Estimated factor</strong>: the
+                                        closest reasonable stand-in for &ldquo;
+                                        {material.material_name}&rdquo; that we
+                                        could find. This will be documented in
+                                        the report.
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
                                 )}
-                              >
-                                {calcFactorName}
-                              </span>
-                            </div>
-                            {factorSource && (
-                              <span className="text-xs text-muted-foreground/70">
-                                {factorSource}
-                                {confidenceScore != null &&
-                                  ` · ${confidenceScore}% confidence`}
-                              </span>
-                            )}
-                            {/* Decomposition transparency: show embedded transport/electricity % */}
-                            {material.embeddedTransportPercent != null && material.embeddedTransportPercent > 0 && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="text-[10px] text-muted-foreground/50 cursor-help">
-                                    Includes ~{material.embeddedTransportPercent.toFixed(0)}% transport
-                                    {material.embeddedElectricityPercent != null && material.embeddedElectricityPercent > 0 &&
-                                      `, ~${material.embeddedElectricityPercent.toFixed(0)}% electricity`}
-                                    {material.embeddedElectricityGeography &&
-                                      ` (${material.embeddedElectricityGeography})`}
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent side="bottom" className="max-w-[280px] text-xs">
-                                  <p>
-                                    This cradle-to-gate factor includes generic upstream
-                                    transport and processing electricity from the ecoinvent
-                                    database. If you specify your ingredient&apos;s origin and
-                                    transport mode, your actual transport will replace this
-                                    estimate during calculation.
-                                  </p>
-                                  {material.embeddedElectricityGeography && material.origin_country &&
-                                    material.embeddedElectricityGeography !== (material as any).origin_country_code && (
-                                    <p className="mt-1 text-amber-600 dark:text-amber-400">
-                                      ⚠ Factor electricity uses {material.embeddedElectricityGeography} grid.
-                                      Your ingredient origin ({material.origin_country}) may have a different
-                                      grid intensity — this will be adjusted during calculation.
-                                    </p>
+                                <span
+                                  className={cn(
+                                    'text-xs leading-snug',
+                                    isProxy
+                                      ? 'text-amber-700 dark:text-amber-400'
+                                      : 'text-muted-foreground'
                                   )}
-                                </TooltipContent>
-                              </Tooltip>
+                                >
+                                  {calcFactorName}
+                                </span>
+                                <ProvenanceChip
+                                  provenance={provenanceFromEfSourceType(material.ef_source_type, {
+                                    userAccepted: material.match_status === 'verified',
+                                  })}
+                                  compact
+                                />
+                                <MatchStatusBadge
+                                  status={material.match_status}
+                                  onConfirm={() => handleConfirmMatch(material.id)}
+                                />
+                              </>
+                            ) : isPendingAutoResolve ? (
+                              <span className="text-xs text-muted-foreground italic">
+                                Matching…
+                              </span>
+                            ) : material.validationStatus === 'assigned' ? (
+                              <span className="text-xs text-amber-600 dark:text-amber-400">
+                                {material.resolvedFactorName || material.matched_source_name || material.material_name}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground italic">
+                                No factor yet
+                              </span>
                             )}
                           </div>
-                        ) : material.validationStatus === 'assigned' ? (
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-xs text-amber-600 dark:text-amber-400">
-                              {material.resolvedFactorName || material.matched_source_name || material.material_name}
+                          {factorSource && material.hasData && (
+                            <span className="text-xs text-muted-foreground/70">
+                              {factorSource}
+                              {confidenceScore != null &&
+                                ` · ${confidenceScore}% confidence`}
                             </span>
+                          )}
+                          {!material.hasData && material.validationStatus === 'assigned' && (
                             <span className="text-xs text-muted-foreground/70 italic">
                               Factor assigned · verification pending
                             </span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground italic">
-                            No factor assigned
-                          </span>
-                        )}
+                          )}
+                          {/* Decomposition transparency: show embedded transport/electricity % */}
+                          {material.embeddedTransportPercent != null && material.embeddedTransportPercent > 0 && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="text-[10px] text-muted-foreground/50 cursor-help">
+                                  Includes ~{material.embeddedTransportPercent.toFixed(0)}% transport
+                                  {material.embeddedElectricityPercent != null && material.embeddedElectricityPercent > 0 &&
+                                    `, ~${material.embeddedElectricityPercent.toFixed(0)}% electricity`}
+                                  {material.embeddedElectricityGeography &&
+                                    ` (${material.embeddedElectricityGeography})`}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="max-w-[280px] text-xs">
+                                <p>
+                                  This cradle-to-gate factor includes generic upstream
+                                  transport and processing electricity. If you specify
+                                  your ingredient&apos;s origin and transport mode, your
+                                  actual transport will replace this estimate during
+                                  calculation.
+                                </p>
+                                {material.embeddedElectricityGeography && material.origin_country &&
+                                  material.embeddedElectricityGeography !== (material as any).origin_country_code && (
+                                  <p className="mt-1 text-amber-600 dark:text-amber-400">
+                                    ⚠ Factor electricity uses {material.embeddedElectricityGeography} grid.
+                                    Your ingredient origin ({material.origin_country}) may have a different
+                                    grid intensity — this will be adjusted during calculation.
+                                  </p>
+                                )}
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+
+                          {/* Demoted picker: quiet link, not the search box itself */}
+                          {!isPendingAutoResolve && !isEditing && (
+                            <button
+                              type="button"
+                              onClick={() => setEditingMaterialId(material.id)}
+                              className={cn(CHOOSE_YOURSELF_LINK_CLASS, 'w-fit')}
+                            >
+                              {material.hasData ? 'Not right? Choose yourself.' : 'Choose a factor.'}
+                            </button>
+                          )}
+                        </div>
                       </TableCell>
 
                       {/* Column 3: Quantity */}
@@ -572,6 +798,11 @@ export function MaterialValidationStep() {
                           <Badge variant="secondary" className="text-xs bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30">
                             Assigned
                           </Badge>
+                        ) : isPendingAutoResolve ? (
+                          <Badge variant="secondary" className="text-xs">
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Matching
+                          </Badge>
                         ) : (
                           <Badge variant="destructive" className="text-xs">
                             Missing
@@ -579,34 +810,22 @@ export function MaterialValidationStep() {
                         )}
                       </TableCell>
 
-                      {/* Column 5: Status / Fix button */}
+                      {/* Column 5: Status icon (interaction lives in column 2 now) */}
                       <TableCell>
-                        {material.validationStatus === 'validating' ? (
+                        {material.validationStatus === 'validating' || isSaving || isPendingAutoResolve ? (
                           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                         ) : material.hasData ? (
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
                         ) : material.validationStatus === 'assigned' ? (
                           <CheckCircle2 className="h-4 w-4 text-amber-500" />
-                        ) : isSaving ? (
-                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
                         ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-xs text-lime-600 hover:text-lime-700 hover:bg-lime-50 dark:text-lime-400 dark:hover:text-lime-300 dark:hover:bg-lime-950/30"
-                            onClick={() =>
-                              setEditingMaterialId(isEditing ? null : material.id)
-                            }
-                          >
-                            <Search className="h-3 w-3 mr-1" />
-                            {isEditing ? 'Cancel' : 'Fix'}
-                          </Button>
+                          <AlertCircle className="h-4 w-4 text-destructive" />
                         )}
                       </TableCell>
                     </TableRow>
 
-                    {/* Inline search row for missing materials */}
-                    {isEditing && !material.hasData && (
+                    {/* Inline search row, expanded from the "Choose yourself"/"Choose a factor" link */}
+                    {isEditing && (
                       <TableRow className="bg-muted/30 hover:bg-muted/30">
                         <TableCell colSpan={5} className="py-3">
                           <div className="max-w-lg">
@@ -617,7 +836,7 @@ export function MaterialValidationStep() {
                             <InlineIngredientSearch
                               organizationId={product.organization_id}
                               value={material.material_name}
-                              placeholder={`Search emission factor for ${material.material_name}...`}
+                              placeholder={`Search for an emission factor for ${material.material_name}...`}
                               materialType={
                                 material.material_type as
                                   | 'ingredient'

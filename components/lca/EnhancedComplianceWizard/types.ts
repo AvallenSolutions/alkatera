@@ -5,6 +5,7 @@
 
 import type { ProductMaterial } from '@/lib/impact-waterfall-resolver';
 import type { OperationStep } from '@/components/ui/operation-progress';
+import type { MatchStatus } from '@/lib/types/lca';
 
 // ============================================================================
 // MATERIAL VALIDATION
@@ -38,6 +39,18 @@ export interface MaterialWithValidation extends ProductMaterial {
   hasData: boolean;
   /** Tri-state status distinguishing fully resolved, assigned-but-unresolved, and truly missing */
   validationStatus: MaterialValidationStatus;
+
+  // Emission-factor provenance columns (product_materials.match_status /
+  // ef_*), written by ef-auto-match.ts / auto-proxy.ts / InlineIngredientSearch
+  // but not yet declared on the shared ProductMaterial type. Declared here
+  // (rather than widened on the shared type, which feeds the calculation
+  // engine) so the review step can read them without an `as any` cast.
+  match_status?: MatchStatus | null;
+  ef_source?: string | null;
+  ef_source_type?: string | null;
+  ef_data_quality_grade?: string | null;
+  ef_uncertainty_percent?: number | null;
+
   dataQuality?: string;
   confidenceScore?: number;
   error?: string;
