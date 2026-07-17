@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { inngest } from '@/lib/inngest/client';
+import { runImportFromUrl } from '@/lib/products/import-from-url-worker';
+
+// Inline fallback (see dispatch below) can run the full scrape + Claude
+// extraction synchronously within the request. Vercel Fluid Compute allows
+// up to 300s; the worker's own poll budget on the client side is 60s, so
+// this is headroom, not the expected duration.
+export const maxDuration = 300;
 
 // SSRF protection: block private/internal IP ranges
 const BLOCKED_HOSTS = [
@@ -91,21 +98,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to start import' }, { status: 500 });
     }
 
-    // Dispatch the long-running import (scrape + Claude extract) to Inngest —
-    // no Netlify-only background-function URL to construct, and it runs
-    // identically in local dev (via the Inngest dev server) and production.
-    try {
-      await inngest.send({
-        name: 'products/import-from-url.run',
-        data: { job_id: job.id, url: normalizedUrl },
-      });
-    } catch (err) {
-      console.error('[import-from-url] Failed to dispatch import job:', err);
-      await (client as any)
-        .from('product_import_jobs')
-        .update({ status: 'failed', error: 'Could not start the import worker. Please try again.' })
-        .eq('id', job.id);
-      return NextResponse.json({ error: 'Failed to start import' }, { status: 502 });
+    // Dispatch the long-running import (scrape + Claude extract) to Inngest
+    // when it's configured — no Netlify-only background-function URL to
+    // construct, and it runs identically in local dev (via the Inngest dev
+    // server) and production.
+    //
+    // When Inngest isn't configured (no event key — true on staging/local
+    // unless someone has run up the Inngest dev server), there is no worker
+    // listening for the event, so `inngest.send` would silently no-op and
+    // the job would sit at 'pending' forever, which is what made the
+    // arrival "confirm" step arrive empty on Tim's staging test. Instead,
+    // run the same worker function inline, synchronously, within this
+    // request. It's the same `runImportFromUrl` the Inngest function calls
+    // (lib/inngest/functions/product-import.ts) — it never throws, every
+    // failure path writes `status: 'failed'` onto the job row itself — so
+    // calling it directly with no `step` context is safe. The client's poll
+    // loop against GET .../[jobId] doesn't change either way: inline
+    // completion just means the very first poll already sees the result.
+    if (process.env.INNGEST_EVENT_KEY) {
+      try {
+        await inngest.send({
+          name: 'products/import-from-url.run',
+          data: { job_id: job.id, url: normalizedUrl },
+        });
+      } catch (err) {
+        console.error('[import-from-url] Failed to dispatch import job:', err);
+        await (client as any)
+          .from('product_import_jobs')
+          .update({ status: 'failed', error: 'Could not start the import worker. Please try again.' })
+          .eq('id', job.id);
+        return NextResponse.json({ error: 'Failed to start import' }, { status: 502 });
+      }
+    } else {
+      try {
+        await runImportFromUrl({ supabase: client as any, jobId: job.id, url: normalizedUrl });
+      } catch (err) {
+        // Belt and braces only — runImportFromUrl already writes a 'failed'
+        // status for every failure mode it knows about.
+        console.error('[import-from-url] Inline worker run threw:', err);
+        await (client as any)
+          .from('product_import_jobs')
+          .update({ status: 'failed', error: 'Failed to import products from URL' })
+          .eq('id', job.id);
+      }
     }
 
     return NextResponse.json({ jobId: job.id }, { status: 202 });

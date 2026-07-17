@@ -5,26 +5,26 @@ import { useOnboarding } from '@/lib/onboarding'
 import type { BeverageType, CompanySize } from '@/lib/onboarding'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowRight, Building2, Globe, Upload, X } from 'lucide-react'
+import { ArrowRight, Globe, Upload, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CountrySelect } from '@/components/shared/CountrySelect'
 import { COUNTRIES } from '@/lib/countries'
 import { RosaIntro } from './RosaIntro'
+import { BeverageIcon } from './beverage-icons'
 import { UniversalDropzone } from '@/components/layouts/UniversalDropzone'
 import { GROWTH_PALETTE, STUDIO } from '@/components/studio/theme'
+import { Eyebrow, Panel, PillButton } from '@/components/studio'
 
-const BEVERAGE_OPTIONS: { value: BeverageType; label: string; icon: string }[] = [
-  { value: 'beer', label: 'Beer', icon: '🍺' },
-  { value: 'cider', label: 'Cider', icon: '🍏' },
-  { value: 'spirits', label: 'Spirits', icon: '🥃' },
-  { value: 'wine', label: 'Wine', icon: '🍷' },
-  { value: 'rtd', label: 'RTD', icon: '🥤' },
-  { value: 'non_alcoholic', label: 'Non-Alcoholic', icon: '💧' },
-  { value: 'functional', label: 'Functional', icon: '⚡' },
+const BEVERAGE_OPTIONS: { value: BeverageType; label: string }[] = [
+  { value: 'beer', label: 'Beer' },
+  { value: 'cider', label: 'Cider' },
+  { value: 'spirits', label: 'Spirits' },
+  { value: 'wine', label: 'Wine' },
+  { value: 'rtd', label: 'RTD' },
+  { value: 'non_alcoholic', label: 'Non-Alcoholic' },
+  { value: 'functional', label: 'Functional' },
 ]
 
 const TEAM_SIZE_OPTIONS: { value: CompanySize; label: string }[] = [
@@ -106,36 +106,78 @@ function mapScrapedCountry(raw: string | null | undefined): string | null {
   return COUNTRY_ALIASES[trimmed.toLowerCase()] ?? null
 }
 
-/** Quiet mono label shown beside a field's Label when its value came from
- * the background website scrape, not the user's own typing. */
+/** Quiet mono tag shown against a field once its value came from the
+ * background website scrape, not the user's own typing. */
 function FromWebsiteTag() {
   return (
-    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-studio-forest">
+    <span className="shrink-0 font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-studio-forest">
       From your website.
     </span>
   )
 }
 
 /**
- * Arrival flow's confirm-not-ask framing: a field alkatera already has an
- * answer for renders as a quiet confirmed row (value + "Edit" tap-target)
- * instead of an open input. Tapping "Edit" swaps in the real field, one way
- * — this never toggles back, matching "editable inline".
+ * The studio's fact-list rhythm, adapted for a form that mostly doesn't
+ * need to be one: a mono label, then either a confirmed value (bold,
+ * quietly editable) or the live control — one row per fact, hairlines
+ * between them rather than a bordered box per field. This is the arrival
+ * flow's confirm-not-ask framing: a field alkatera already has an answer
+ * for reads as a fact, not a question.
  */
-function ConfirmRow({ value, onEdit }: { value: string; onEdit: () => void }) {
+function FieldRow({
+  label,
+  tag,
+  required,
+  children,
+  className,
+}: {
+  label: string
+  tag?: React.ReactNode
+  required?: boolean
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <div className={cn('py-3.5 first:pt-0 last:pb-0', className)}>
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-studio-dim">
+          {label}
+          {required && <span className="text-studio-stale"> · required</span>}
+        </span>
+        {tag}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+/**
+ * Arrival flow's confirm-not-ask framing: a field alkatera already has an
+ * answer for renders as this quiet confirmed value (bold text + an "Edit"
+ * tap-target) instead of an open input. Tapping "Edit" swaps in the real
+ * field, one way — this never toggles back.
+ */
+function ConfirmedValue({ value, onEdit }: { value: string; onEdit: () => void }) {
   return (
     <button
       type="button"
       onClick={onEdit}
-      className="flex w-full items-center justify-between gap-3 rounded-[6px] border border-studio-hairline bg-studio-cream p-3 text-left transition-colors hover:border-studio-ink/25 hover:bg-secondary"
+      className="group flex w-full items-baseline justify-between gap-3 text-left"
     >
-      <span className="min-w-0 flex-1 truncate text-sm text-foreground">{value}</span>
-      <span className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+      <span className="min-w-0 flex-1 truncate font-display text-sm font-semibold text-foreground">
+        {value}
+      </span>
+      <span className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground transition-colors duration-150 ease-studio group-hover:text-foreground">
         Edit
       </span>
     </button>
   )
 }
+
+/** Quiet underline field: the studio's take on an input when it sits inside
+ * a fact panel rather than standing alone in a bordered box. */
+const quietInputClass =
+  'h-9 rounded-none border-0 border-b-2 border-studio-hairline bg-transparent px-0 font-display text-sm font-semibold shadow-none focus-visible:border-studio-forest focus-visible:ring-0 focus-visible:ring-offset-0'
 
 /** Live states for the background website crawl, surfaced next to the
  * website field so it never looks like nothing is happening. */
@@ -554,9 +596,14 @@ export function FastTrackSetupStep() {
     completeStep()
   }
 
+  // Confirm mode is "populated" once at least one fact has actually landed
+  // from the scrape — otherwise even confirmMode has nothing to confirm yet,
+  // and the heading should read as an open invitation, not a claim.
+  const hasConfirmedFacts = confirmMode && autofilledFromSite.size > 0
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 py-6 animate-in fade-in duration-300">
-      <div className="w-full max-w-md space-y-5">
+      <div className="w-full max-w-md space-y-6">
 
         <RosaIntro
           message={
@@ -566,221 +613,235 @@ export function FastTrackSetupStep() {
           }
         />
 
-        <div className="text-center space-y-2">
-          <div className="mx-auto w-16 h-16 bg-card border border-border rounded-[6px] flex items-center justify-center">
-            <Building2 className="w-8 h-8 text-studio-forest" />
-          </div>
-          <h3 className="text-xl font-display font-bold tracking-tight text-foreground">
-            {confirmMode ? 'Here is what we found.' : 'Your company.'}
-          </h3>
+        {/* The statement: says what this screen is, in one sentence. */}
+        <div className="text-center space-y-1.5">
+          <Eyebrow tone="dim" className="justify-center flex">
+            {confirmMode ? 'Arrival · confirm' : 'Arrival · your company'}
+          </Eyebrow>
+          <h1 className="font-display text-[clamp(1.5rem,4vw,2.125rem)] font-bold leading-[1.05] tracking-[-0.02em] text-foreground">
+            {hasConfirmedFacts ? 'Here is what we found.' : confirmMode ? 'Tell us a little.' : 'Your company.'}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            {confirmMode ? 'Confirmed items are ready to go. Just add what is missing.' : 'This goes straight into your account profile.'}
+            {hasConfirmedFacts
+              ? 'Confirmed facts are ready to go. Just add what is missing.'
+              : confirmMode
+                ? 'We could not read your website yet. Fill in what you can, by hand.'
+                : 'This goes straight into your account profile.'}
           </p>
         </div>
 
-        {/* Company name */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium text-foreground">
-            Company name {!confirmMode && <span className="text-studio-dim">(required)</span>}
-          </Label>
-          {confirmMode && companyName.trim() && !editingFields.has('name') ? (
-            <ConfirmRow value={companyName} onEdit={() => beginEdit('name')} />
-          ) : (
-            <Input
-              placeholder='e.g., "Oxford Artisan Distillery"'
-              value={companyName}
-              onChange={e => setCompanyName(e.target.value)}
+        {/* Identity: logo and name as one considered header, not two
+            separate stacked form fields. */}
+        <div className="flex items-center gap-4">
+          <div className="relative shrink-0">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleLogoUpload}
+              disabled={uploadingLogo}
             />
-          )}
-        </div>
-
-        {/* Logo */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium text-foreground flex items-center gap-2">
-            Logo
-            {autofilledFromSite.has('logo') && <FromWebsiteTag />}
-          </Label>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleLogoUpload}
-            disabled={uploadingLogo}
-          />
-          {logoUrl ? (
-            <div className={cn('flex items-center gap-3 p-3 bg-card border border-border', highlightClass('logo'))}>
-              <img
-                src={logoUrl}
-                alt="Company logo"
-                className="h-12 w-12 rounded-[6px] object-contain bg-secondary p-1"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-muted-foreground truncate">Logo uploaded</p>
+            {logoUrl ? (
+              <div className={cn('h-16 w-16 overflow-hidden rounded-[6px] border border-studio-hairline bg-studio-cream p-1.5', highlightClass('logo'))}>
+                <img src={logoUrl} alt="Company logo" className="h-full w-full object-contain" />
               </div>
+            ) : (
               <button
+                type="button"
+                onClick={() => { setLogoError(null); fileInputRef.current?.click() }}
+                disabled={uploadingLogo}
+                className="flex h-16 w-16 flex-col items-center justify-center gap-1 rounded-[6px] border border-dashed border-studio-hairline bg-studio-cream text-studio-dim transition-colors hover:border-studio-ink/30 hover:text-foreground"
+              >
+                <Upload className="h-4 w-4" />
+                <span className="font-mono text-[8px] font-bold uppercase tracking-[0.14em]">
+                  {uploadingLogo ? '…' : 'Logo'}
+                </span>
+              </button>
+            )}
+            {logoUrl && (
+              <button
+                type="button"
                 onClick={() => {
                   setLogoUrl(null)
                   setLogoError(null)
                   clearAutofill('logo')
                   if (fileInputRef.current) fileInputRef.current.value = ''
                 }}
-                className="text-studio-dim hover:text-foreground transition-colors"
+                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-studio-ink text-studio-cream transition-colors hover:bg-studio-ink/85"
+                aria-label="Remove logo"
               >
-                <X className="w-4 h-4" />
+                <X className="h-3 w-3" />
               </button>
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-studio-dim">
+                Company
+                {!confirmMode && <span className="text-studio-stale"> · required</span>}
+              </span>
+              {autofilledFromSite.has('logo') && <FromWebsiteTag />}
             </div>
-          ) : (
-            <button
-              onClick={() => { setLogoError(null); fileInputRef.current?.click() }}
-              disabled={uploadingLogo}
-              className="w-full flex items-center gap-3 p-4 bg-card border border-dashed border-border hover:bg-secondary hover:border-studio-ink/25 rounded-[6px] transition-colors text-left"
-            >
-              <Upload className="w-5 h-5 text-studio-dim shrink-0" />
-              <div>
-                <p className="text-sm text-muted-foreground">{uploadingLogo ? 'Uploading...' : 'Upload your logo'}</p>
-                <p className="text-xs text-studio-dim">PNG, JPG or SVG, max 10MB</p>
+            {confirmMode && companyName.trim() && !editingFields.has('name') ? (
+              <div className="mt-0.5">
+                <ConfirmedValue value={companyName} onEdit={() => beginEdit('name')} />
               </div>
-            </button>
-          )}
-          {logoError && <p className="text-xs text-studio-stale">{logoError}</p>}
-        </div>
-
-        {/* Website */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium text-foreground">Website</Label>
-          {confirmMode && websiteUrl.trim() && !editingFields.has('website') ? (
-            <ConfirmRow value={websiteUrl} onEdit={() => beginEdit('website')} />
-          ) : (
-            <div className="relative">
-              <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-studio-dim" />
-              <Input
-                placeholder="www.yourcompany.com"
-                value={websiteUrl}
-                onChange={e => setWebsiteUrl(e.target.value)}
-                aria-invalid={!!websiteUrlError}
-                className={cn(
-                  'pl-9',
-                  websiteUrlError && 'border-studio-stale/60',
-                )}
-              />
-            </div>
-          )}
-          {websiteUrlError ? (
-            <p className="text-xs text-studio-stale">{websiteUrlError}</p>
-          ) : crawlPhase !== 'idle' ? (
-            <div className="flex items-center gap-1.5 animate-in fade-in duration-300">
-              <ScrapeButterfly active={crawlPhase === 'running'} />
-              <p
-                className={cn(
-                  'font-mono text-xs',
-                  crawlPhase === 'failed' ? 'text-studio-dim' : 'text-studio-forest',
-                )}
-              >
-                {crawlLabel}
-              </p>
-            </div>
-          ) : (
-            <p className="text-xs text-studio-dim">We'll scan this to import your products automatically in the next step.</p>
-          )}
-        </div>
-
-        {/* Description */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium text-foreground flex items-center gap-2">
-            About your company
-            {autofilledFromSite.has('description') && <FromWebsiteTag />}
-          </Label>
-          {confirmMode && autofilledFromSite.has('description') && !editingFields.has('description') ? (
-            <ConfirmRow value={description} onEdit={() => beginEdit('description')} />
-          ) : (
-            <Textarea
-              placeholder="A few words about what you make and your sustainability ambitions..."
-              value={description}
-              onChange={e => { setDescription(e.target.value); clearAutofill('description') }}
-              rows={2}
-              className={cn('resize-none', highlightClass('description'))}
-            />
-          )}
-        </div>
-
-        {/* Country + Year */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <Label className="text-sm font-medium text-foreground flex items-center gap-2">
-              Country
-              {autofilledFromSite.has('country') && <FromWebsiteTag />}
-            </Label>
-            {confirmMode && autofilledFromSite.has('country') && !editingFields.has('country') ? (
-              <ConfirmRow
-                value={COUNTRIES.find(c => c.value === countryCode)?.label ?? countryCode}
-                onEdit={() => beginEdit('country')}
-              />
-            ) : (
-              <CountrySelect
-                value={countryCode}
-                onChange={code => { setCountryCode(code); clearAutofill('country') }}
-                placeholder="Select country"
-                className={highlightClass('country')}
-              />
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label className="text-sm font-medium text-foreground flex items-center gap-2">
-              Year founded
-              {autofilledFromSite.has('foundingYear') && <FromWebsiteTag />}
-            </Label>
-            {confirmMode && autofilledFromSite.has('foundingYear') && !editingFields.has('foundingYear') ? (
-              <ConfirmRow value={foundingYear} onEdit={() => beginEdit('foundingYear')} />
             ) : (
               <Input
-                placeholder="e.g., 2018"
-                value={foundingYear}
-                onChange={e => { setFoundingYear(e.target.value.replace(/\D/g, '').slice(0, 4)); clearAutofill('foundingYear') }}
-                className={highlightClass('foundingYear')}
+                placeholder='e.g., "Oxford Artisan Distillery"'
+                value={companyName}
+                onChange={e => setCompanyName(e.target.value)}
+                className={cn(quietInputClass, 'mt-0.5 w-full text-lg')}
               />
             )}
           </div>
         </div>
+        {logoError && <p className="-mt-3 text-xs text-studio-stale">{logoError}</p>}
+
+        {/* Facts: a quiet fact-list rhythm, hairlines between rows rather
+            than a bordered box per field. Most of these collapse to a
+            confirmed value once the scrape has landed. */}
+        <Panel className="divide-y divide-studio-hairline">
+          <FieldRow label="Website">
+            {confirmMode && websiteUrl.trim() && !editingFields.has('website') ? (
+              <ConfirmedValue value={websiteUrl} onEdit={() => beginEdit('website')} />
+            ) : (
+              <div className="relative">
+                <Globe className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4 text-studio-dim" />
+                <Input
+                  placeholder="www.yourcompany.com"
+                  value={websiteUrl}
+                  onChange={e => setWebsiteUrl(e.target.value)}
+                  aria-invalid={!!websiteUrlError}
+                  className={cn(
+                    quietInputClass,
+                    'pl-6',
+                    websiteUrlError && 'border-studio-stale/60',
+                  )}
+                />
+              </div>
+            )}
+            {websiteUrlError ? (
+              <p className="mt-1.5 text-xs text-studio-stale">{websiteUrlError}</p>
+            ) : crawlPhase !== 'idle' ? (
+              <div className="mt-1.5 flex items-center gap-1.5 animate-in fade-in duration-300">
+                <ScrapeButterfly active={crawlPhase === 'running'} />
+                <p
+                  className={cn(
+                    'font-mono text-xs',
+                    crawlPhase === 'failed' ? 'text-studio-dim' : 'text-studio-forest',
+                  )}
+                >
+                  {crawlLabel}
+                </p>
+              </div>
+            ) : (
+              <p className="mt-1.5 text-xs text-studio-dim">We'll scan this to import your products automatically in the next step.</p>
+            )}
+          </FieldRow>
+
+          <FieldRow label="About your company" tag={autofilledFromSite.has('description') && <FromWebsiteTag />}>
+            {confirmMode && autofilledFromSite.has('description') && !editingFields.has('description') ? (
+              <ConfirmedValue value={description} onEdit={() => beginEdit('description')} />
+            ) : (
+              <Textarea
+                placeholder="A few words about what you make and your sustainability ambitions..."
+                value={description}
+                onChange={e => { setDescription(e.target.value); clearAutofill('description') }}
+                rows={2}
+                className={cn('resize-none rounded-[6px] border-studio-hairline bg-transparent text-sm', highlightClass('description'))}
+              />
+            )}
+          </FieldRow>
+
+          {/* Country + Year founded share a row, same rhythm as every other
+              fact, paired rather than each taking a full-width line. */}
+          <div className="grid grid-cols-2 gap-x-3 py-3.5 first:pt-0 last:pb-0">
+            <div>
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-studio-dim">Country</span>
+                {autofilledFromSite.has('country') && <FromWebsiteTag />}
+              </div>
+              {confirmMode && autofilledFromSite.has('country') && !editingFields.has('country') ? (
+                <ConfirmedValue
+                  value={COUNTRIES.find(c => c.value === countryCode)?.label ?? countryCode}
+                  onEdit={() => beginEdit('country')}
+                />
+              ) : (
+                <CountrySelect
+                  value={countryCode}
+                  onChange={code => { setCountryCode(code); clearAutofill('country') }}
+                  placeholder="Select country"
+                  className={highlightClass('country')}
+                />
+              )}
+            </div>
+            <div>
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-studio-dim">Year founded</span>
+                {autofilledFromSite.has('foundingYear') && <FromWebsiteTag />}
+              </div>
+              {confirmMode && autofilledFromSite.has('foundingYear') && !editingFields.has('foundingYear') ? (
+                <ConfirmedValue value={foundingYear} onEdit={() => beginEdit('foundingYear')} />
+              ) : (
+                <Input
+                  placeholder="e.g., 2018"
+                  value={foundingYear}
+                  onChange={e => { setFoundingYear(e.target.value.replace(/\D/g, '').slice(0, 4)); clearAutofill('foundingYear') }}
+                  className={cn(quietInputClass, 'w-full', highlightClass('foundingYear'))}
+                />
+              )}
+            </div>
+          </div>
+        </Panel>
 
         {/* Drink type — maps to organizations.product_type */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium text-foreground flex items-center gap-2">
-            What do you make? <span className="text-studio-dim">(required)</span>
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-studio-dim">
+              What do you make? <span className="text-studio-stale">· required</span>
+            </span>
             {autofilledFromSite.has('beverageType') && <FromWebsiteTag />}
-          </Label>
-          <div className={cn('grid grid-cols-3 gap-2 p-1 -m-1', highlightClass('beverageType'))}>
+          </div>
+          <div className={cn('flex flex-wrap gap-2', highlightClass('beverageType'))}>
             {BEVERAGE_OPTIONS.map(opt => (
               <button
                 key={opt.value}
+                type="button"
                 onClick={() => { setBeverageType(opt.value); clearAutofill('beverageType') }}
                 className={cn(
-                  'flex flex-col items-center gap-1 p-3 rounded-[6px] border text-xs font-medium transition-colors',
+                  'flex flex-1 basis-[88px] flex-col items-center gap-1.5 rounded-[6px] border px-2 py-3 transition-colors duration-150 ease-studio',
                   beverageType === opt.value
-                    ? 'bg-secondary border-studio-forest text-studio-forest'
-                    : 'bg-card border-border text-muted-foreground hover:bg-secondary hover:border-studio-ink/25'
+                    ? 'border-studio-forest bg-studio-forest/[0.07] text-studio-forest'
+                    : 'border-studio-hairline bg-studio-cream text-studio-dim hover:border-studio-ink/25 hover:text-foreground'
                 )}
               >
-                <span className="text-xl">{opt.icon}</span>
-                {opt.label}
+                <BeverageIcon type={opt.value} />
+                <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.12em]">{opt.label}</span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Team size — maps to organizations.company_size */}
+        {/* Team size — maps to organizations.company_size, shown as quiet
+            mono chips rather than a bordered-box grid. */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium text-foreground">Team size <span className="text-studio-dim">(required)</span></Label>
-          <div className="grid grid-cols-4 gap-2">
+          <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-studio-dim">
+            Team size <span className="text-studio-stale">· required</span>
+          </span>
+          <div className="flex flex-wrap gap-2">
             {TEAM_SIZE_OPTIONS.map(opt => (
               <button
                 key={opt.value}
+                type="button"
                 onClick={() => setTeamSize(opt.value)}
                 className={cn(
-                  'py-2 px-3 rounded-[6px] border text-xs font-semibold transition-colors',
+                  'rounded-full border px-4 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.1em] transition-colors duration-150 ease-studio',
                   teamSize === opt.value
-                    ? 'bg-secondary border-studio-forest text-studio-forest'
-                    : 'bg-card border-border text-muted-foreground hover:bg-secondary hover:border-studio-ink/25'
+                    ? 'border-studio-forest bg-studio-forest text-studio-cream'
+                    : 'border-studio-hairline bg-studio-cream text-studio-dim hover:border-studio-ink/25 hover:text-foreground'
                 )}
               >
                 {opt.label}
@@ -789,17 +850,19 @@ export function FastTrackSetupStep() {
           </div>
         </div>
 
-        <Button
+        <PillButton
+          type="button"
+          variant="ink"
           onClick={handleContinue}
           disabled={!isValid || isSaving}
-          className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
+          className="w-full"
         >
           {isSaving ? (
-            <>Saving...</>
+            <>Saving…</>
           ) : (
-            <>Continue <ArrowRight className="w-4 h-4 ml-2" /></>
+            <>Continue <ArrowRight className="w-4 h-4" /></>
           )}
-        </Button>
+        </PillButton>
 
         {/* Migration engine v1 (data-revolution plan, Pillar 2b): a quiet door
             for brands arriving with a prior consultant LCA, B Corp report or
@@ -809,7 +872,7 @@ export function FastTrackSetupStep() {
           trigger={
             <button
               type="button"
-              className="block w-full text-center text-xs text-muted-foreground underline decoration-dotted underline-offset-4 hover:text-foreground transition-colors"
+              className="block w-full text-center font-mono text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground transition-colors duration-150 ease-studio hover:text-foreground"
             >
               Already have a sustainability report? Drop it here.
             </button>
