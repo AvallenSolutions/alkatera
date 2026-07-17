@@ -26,6 +26,13 @@ import { generateNarratives, type LcaContext } from '@/lib/claude/lca-assistant'
 import { enforceExportAllowed } from '@/middleware/subscription-check';
 import { computeLcaStaleness } from '@/lib/lca/staleness';
 
+// Next.js patches global fetch and, on this route pattern (no next/headers
+// call to auto-trigger dynamic mode), would otherwise cache these outbound
+// Supabase requests across invocations — a GET with an identical URL every
+// time would keep returning the first response it ever saw. no-store on
+// every call is what makes this route actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' });
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -61,7 +68,7 @@ export async function POST(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
-        global: { headers: { Authorization: `Bearer ${token}` } },
+        global: { headers: { Authorization: `Bearer ${token}` }, fetch: noStoreFetch },
       }
     );
 
@@ -292,7 +299,8 @@ export async function POST(
     try {
       const serviceClient = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { global: { fetch: noStoreFetch } }
       );
       await serviceClient.rpc('increment_report_count', {
         p_organization_id: pcf.organization_id,

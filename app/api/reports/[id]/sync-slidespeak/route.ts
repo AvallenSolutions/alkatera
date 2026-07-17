@@ -3,6 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
+// Next.js patches global fetch and, on this route pattern (no next/headers
+// call to auto-trigger dynamic mode), would otherwise cache these outbound
+// Supabase requests across invocations — a GET with an identical URL every
+// time would keep returning the first response it ever saw. no-store on
+// every call is what makes this route actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' });
+
 /**
  * POST /api/reports/[id]/sync-slidespeak
  *
@@ -26,7 +33,7 @@ export async function POST(
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
   const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
+    global: { headers: { Authorization: `Bearer ${token}` }, fetch: noStoreFetch },
   });
 
   const { data: userData, error: authError } = await userClient.auth.getUser();
@@ -37,7 +44,8 @@ export async function POST(
   // Use service role client for updates (bypass RLS)
   const serviceClient = createClient(
     supabaseUrl,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { global: { fetch: noStoreFetch } }
   );
 
   // Look up report

@@ -3,6 +3,13 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { safeCompare } from '@/lib/utils/safe-compare';
 import { syncAlkateraDataForBrand } from '@/lib/distributor/integration/alkatera-sync';
 
+// Next.js patches global fetch and, on this route pattern (no next/headers
+// call to auto-trigger dynamic mode), would otherwise cache these outbound
+// Supabase requests across invocations — a GET with an identical URL every
+// time would keep returning the first response it ever saw. no-store on
+// every call is what makes this route actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' });
+
 /**
  * Cron: drain the alkatera_sync_queue.
  *
@@ -60,6 +67,7 @@ async function processQueue(request: NextRequest) {
   }
   const supabase = createClient(supabaseUrl, supabaseKey, {
     auth: { autoRefreshToken: false, persistSession: false },
+    global: { fetch: noStoreFetch },
   }) as SupabaseClient;
 
   // 1. Claim a batch by transitioning pending → running. We do this in

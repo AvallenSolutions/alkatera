@@ -7,6 +7,13 @@ import {
 } from '@/lib/pdf/render-iso14064-worksheet-html';
 import { convertHtmlToPdf } from '@/lib/pdf/pdfshift-client';
 
+// Next.js patches global fetch and, on this route pattern (no next/headers
+// call to auto-trigger dynamic mode), would otherwise cache these outbound
+// Supabase requests across invocations — a GET with an identical URL every
+// time would keep returning the first response it ever saw. no-store on
+// every call is what makes this route actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' });
+
 /**
  * Generate the ISO 14064-1:2018 Auditor / Verification Worksheet PDF.
  *
@@ -44,7 +51,7 @@ export async function POST(
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
+      global: { headers: { Authorization: `Bearer ${token}` }, fetch: noStoreFetch },
     });
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();

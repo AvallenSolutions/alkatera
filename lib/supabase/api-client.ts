@@ -5,6 +5,13 @@ import type { Database } from '@/types/db_types'
 import { getSupabaseServerClient } from './server-client'
 import { getSupabasePortalServerClient } from './portal-server-client'
 
+// Next.js patches global fetch and, on the getSupabaseAdminClient() code path
+// (no next/headers call to auto-trigger dynamic mode), would otherwise cache
+// these outbound Supabase requests across invocations — a GET with an
+// identical URL every time would keep returning the first response it ever
+// saw. no-store on every call is what makes the service-role client live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' })
+
 /**
  * Create a Supabase admin client using the service role key.
  * This bypasses RLS and the PostgREST schema cache restrictions,
@@ -23,6 +30,7 @@ function getServiceRoleClient() {
       autoRefreshToken: false,
       persistSession: false,
     },
+    global: { fetch: noStoreFetch },
   })
 }
 
@@ -76,6 +84,7 @@ export async function getSupabaseAPIClient(opts?: { portalCookie?: boolean }) {
         autoRefreshToken: false,
         detectSessionInUrl: false,
       },
+      global: { fetch: noStoreFetch },
     });
 
     // Get the token from the header
@@ -101,6 +110,7 @@ export async function getSupabaseAPIClient(opts?: { portalCookie?: boolean }) {
           headers: {
             Authorization: authHeader,
           },
+          fetch: noStoreFetch,
         },
         auth: {
           persistSession: false,

@@ -4,6 +4,13 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/db_types';
 import Stripe from 'stripe';
 
+// Next.js patches global fetch and, on this route pattern (no next/headers
+// call to auto-trigger dynamic mode), would otherwise cache these outbound
+// Supabase requests across invocations — a GET with an identical URL every
+// time would keep returning the first response it ever saw. no-store on
+// every call is what makes this route actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' });
+
 /**
  * Stripe Webhook Handler
  *
@@ -105,6 +112,7 @@ function getSupabaseAdmin() {
         autoRefreshToken: false,
         persistSession: false,
       },
+      global: { fetch: noStoreFetch },
     });
   }
   return _supabaseAdmin;

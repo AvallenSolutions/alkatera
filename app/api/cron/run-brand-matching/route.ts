@@ -5,6 +5,13 @@ import { attemptAutoMatch } from '@/lib/distributor/integration/linker';
 import { syncBrandTier } from '@/lib/distributor/integration/linker';
 import { syncAlkateraDataForBrand } from '@/lib/distributor/integration/alkatera-sync';
 
+// Next.js patches global fetch and, on this route pattern (no next/headers
+// call to auto-trigger dynamic mode), would otherwise cache these outbound
+// Supabase requests across invocations — a GET with an identical URL every
+// time would keep returning the first response it ever saw. no-store on
+// every call is what makes this route actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' });
+
 /**
  * Cron: daily alkatera brand-matching sweep.
  *
@@ -39,6 +46,7 @@ export async function POST(request: NextRequest) {
   }
   const supabase = createClient(supabaseUrl, supabaseKey, {
     auth: { autoRefreshToken: false, persistSession: false },
+    global: { fetch: noStoreFetch },
   }) as SupabaseClient;
 
   // Phase A — try to match every still-unlinked brand profile.

@@ -3,6 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { escapeHtml } from '@/lib/utils/escape-html';
 
+// Next.js patches global fetch and, on this route pattern (no next/headers
+// call to auto-trigger dynamic mode), would otherwise cache these outbound
+// Supabase requests across invocations — a GET with an identical URL every
+// time would keep returning the first response it ever saw. no-store on
+// every call is what makes this route actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' });
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
@@ -29,6 +36,7 @@ export async function POST(request: NextRequest) {
     const token = authHeader.replace('Bearer ', '');
     const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
+      global: { fetch: noStoreFetch },
     });
 
     // Verify the user

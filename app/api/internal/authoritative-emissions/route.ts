@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { calculateCorporateEmissions } from '@/lib/calculations/corporate-emissions'
 
+// Next.js patches global fetch and, on this route pattern (no next/headers
+// call to auto-trigger dynamic mode), would otherwise cache these outbound
+// Supabase requests across invocations — a GET with an identical URL every
+// time would keep returning the first response it ever saw. no-store on
+// every call is what makes this route actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' })
+
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
@@ -40,6 +47,7 @@ export async function POST(request: NextRequest) {
 
   const supabase = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: noStoreFetch },
   })
 
   const result = await calculateCorporateEmissions(supabase, body.organizationId, body.year)
