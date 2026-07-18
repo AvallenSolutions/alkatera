@@ -127,12 +127,28 @@ is in KG while every other figure in the renderer is tonnes. Divide by 1000, gua
 (separate task-chip session, task_9f49442d — do not touch) and untracked supabase/.temp.
 
 ## Next
-1. **Phase D** — org brand kit, imagery library, ungate foreword/photos, section reorder,
-   truthful preview.
-3. Smaller: screenMode restyle polish audits (Board/Editorial), share-link expiry UI
+1. **Finish the report sections work — steps 2-10 of `tasks/report-sections-plan.md`.**
+   The biggest open correctness gap: five sections silently do not render, and every report
+   ever generated claims "No climate commitments have been recorded yet". Tim's original ask
+   (warn when a section's data is incomplete) is step 9 and depends on the rest. Step 3 (six
+   fetcher modules) is the bulk. ⚠️ The kg/tonnes conversion on facility emissions is the
+   single highest-consequence line in it.
+2. **Staging click-through of the WHOLE report programme.** Every phase (A-E) is verified on
+   LOCAL ONLY, with fallback narratives (no GEMINI key locally) and no PDFShift run. On
+   staging both keys exist: create a draft and confirm real prose replaces the fallbacks,
+   that switching the voice genuinely changes the register, accept a foreword, ship a PDF
+   end to end, and share it. This is the main go-live risk.
+3. **Decide what "products confirmed" should mean for a whole-company report** (see the
+   open question under the confirmed-data gate above), and check the corrected metric reads
+   sensibly on a real org (Everleaf) rather than only on demo data.
+4. Same-family bugs recorded while planning the sections work: `hasVineyards` gates the
+   vineyards page with no section check; the dashboards' invented fallbacks
+   (livingWageCompliance 50, genderPayGap 0) will disagree with the report once the sections
+   render (the report is the correct one); three availability oracles want consolidating.
+5. Smaller: screenMode restyle polish audits (Board/Editorial), share-link expiry UI
    (expires_at column exists, no picker yet), a11y aria-labels on the style cards
    (accessible names come only from inner text), design-scout leftovers (/uploads rebuild,
-   Tabs→MonoTabs on /settings, dead pulse widgets deletion).
+   Tabs→MonoTabs on /settings, dead pulse widgets deletion ~740 LOC zero refs).
 
 ## Gotchas and decisions
 - ⚠️ CWD DISCIPLINE: shell cwd resets between Bash calls; always cd this worktree.
