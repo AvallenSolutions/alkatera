@@ -82,6 +82,17 @@ export function NarrativeReview({
     (async () => {
       try {
         const supabase = getSupabaseBrowserClient();
+        // Honour a deliberate products scope, else a picked subset would
+        // read as data drift forever.
+        let productsQuery = supabase
+          .from('product_carbon_footprints')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', organizationId)
+          .eq('status', 'completed');
+        const scopedIds = config.sectionScopes?.products?.pcfIds;
+        if (scopedIds?.length) {
+          productsQuery = productsQuery.in('id', scopedIds);
+        }
         const [corp, products] = await Promise.all([
           supabase
             .from('corporate_reports')
@@ -91,11 +102,7 @@ export function NarrativeReview({
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle(),
-          supabase
-            .from('product_carbon_footprints')
-            .select('id', { count: 'exact', head: true })
-            .eq('organization_id', organizationId)
-            .eq('status', 'completed'),
+          productsQuery,
         ]);
         if (cancelled) return;
         const bj = corp.data?.breakdown_json as any;
@@ -110,7 +117,7 @@ export function NarrativeReview({
       }
     })();
     return () => { cancelled = true; };
-  }, [organizationId, config.reportYear, config.sections, meta.inputs_digest]);
+  }, [organizationId, config.reportYear, config.sections, config.sectionScopes, meta.inputs_digest]);
 
   const chipFor = (blockId: string, aiGenerated: boolean): NarrativeChipState =>
     !aiGenerated ? 'edited' : fallbackSet.has(blockId) ? 'fallback' : 'ai';
@@ -124,11 +131,13 @@ export function NarrativeReview({
     }
   };
 
-  // Section cards in the style's narrative arc; anything unlisted follows.
+  // Section cards in the user's running order when set, else the style's
+  // narrative arc; anything unlisted follows.
   const sectionIds = Object.keys(snapshot.narratives.sections);
+  const baseOrder = config.sectionOrder?.length ? config.sectionOrder : style.sectionOrder;
   const ordered = [
-    ...style.sectionOrder.filter(id => sectionIds.includes(id)),
-    ...sectionIds.filter(id => !style.sectionOrder.includes(id)),
+    ...baseOrder.filter(id => sectionIds.includes(id)),
+    ...sectionIds.filter(id => !baseOrder.includes(id)),
   ];
 
   const foreword = snapshot.narratives.foreword;

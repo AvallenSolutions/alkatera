@@ -8,6 +8,7 @@ import { StylePicker } from '@/components/report-builder/StylePicker';
 import { FunnelSections } from '@/components/report-builder/FunnelSections';
 import { FunnelBranding } from '@/components/report-builder/FunnelBranding';
 import { GenerationProgress } from '@/components/report-builder/GenerationProgress';
+import { FunnelPreview } from '@/components/report-builder/FunnelPreview';
 import { NarrativeReview } from '@/components/report-builder/NarrativeReview';
 import { useReportBuilder } from '@/hooks/useReportBuilder';
 import { useReportProgress } from '@/hooks/useReportProgress';
@@ -20,7 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { PageLoader } from '@/components/ui/page-loader';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { cn } from '@/lib/utils';
-import type { ReportConfig } from '@/types/report-builder';
+import type { BrandImage, ReportConfig } from '@/types/report-builder';
 import { REPORTING_STANDARDS, STANDARDS_LABELS } from '@/types/report-builder';
 import {
   REPORT_STYLES,
@@ -110,6 +111,8 @@ function ReportFunnelInner() {
     regenerateBlock,
     shipReport,
     loadDefaults,
+    loadImageLibrary,
+    addToImageLibrary,
     loading: creating,
   } = useReportBuilder();
   const currentYear = new Date().getFullYear();
@@ -137,6 +140,8 @@ function ReportFunnelInner() {
   const [snapshot, setSnapshot] = useState<ReportDataSnapshot | null>(null);
   const [drafting, setDrafting] = useState(false);
   const [reviewBusy, setReviewBusy] = useState(false);
+  // Phase D: the org's reusable image library (brand kit)
+  const [imageLibrary, setImageLibrary] = useState<BrandImage[]>([]);
 
   const availability = useReportDataAvailability(currentOrganization?.id, config.reportYear);
   const progress = useReportProgress(generatingReportId);
@@ -155,6 +160,7 @@ function ReportFunnelInner() {
   // picks everything else, the data trims the section list.
   useEffect(() => {
     if (initialised || !currentOrganization || availability.loading) return;
+    setImageLibrary(loadImageLibrary(currentOrganization));
     const saved = loadDefaults(currentOrganization);
     const styleId: ReportStyleId =
       saved?.style && saved.style in REPORT_STYLES
@@ -186,7 +192,17 @@ function ReportFunnelInner() {
       orientation: undefined,
       sections: sections.includes('executive-summary') ? sections : ['executive-summary', ...sections],
       standards: next.defaultStandards,
+      // Styles own the default arc and scope; a new style resets both.
+      sectionOrder: undefined,
+      sectionScopes: undefined,
     });
+  };
+
+  const handleAddToLibrary = (image: BrandImage) => {
+    setImageLibrary(prev => (prev.some(i => i.url === image.url) ? prev : [...prev, image]));
+    if (currentOrganization?.id) {
+      addToImageLibrary(currentOrganization.id, image).catch(() => {});
+    }
   };
 
   const openRow = (row: string) => setOpenRows(prev => new Set(prev).add(row));
@@ -510,13 +526,20 @@ function ReportFunnelInner() {
           <FactRow
             label="Sections"
             editing={isOpen('sections')}
-            confirmed={`${config.sections.length} sections · picked for ${style.name} readers, ${dataReadyCount} backed by your data`}
+            confirmed={[
+              `${config.sections.length} sections · picked for ${style.name} readers, ${dataReadyCount} backed by your data`,
+              config.sectionOrder?.length ? 'custom order' : null,
+              config.sectionScopes?.products ? `${config.sectionScopes.products.pcfIds.length} picked products` : null,
+              config.sectionScopes?.trends ? `trends ${config.sectionScopes.trends.fromYear} to ${config.sectionScopes.trends.toYear}` : null,
+            ].filter(Boolean).join(' · ')}
             onEdit={() => openRow('sections')}
           >
             <FunnelSections
               config={config}
               availability={availability}
               styleDefaults={styleDefaults}
+              styleOrder={style.sectionOrder}
+              organizationId={currentOrganization?.id || null}
               onChange={update}
             />
           </FactRow>
@@ -594,10 +617,19 @@ function ReportFunnelInner() {
             }
             onEdit={() => openRow('brand')}
           >
-            <FunnelBranding config={config} style={style} onChange={update} />
+            <FunnelBranding
+              config={config}
+              style={style}
+              imageLibrary={imageLibrary}
+              onAddToLibrary={handleAddToLibrary}
+              onChange={update}
+            />
           </FactRow>
         </div>
       </Panel>
+
+      {/* ── Truthful preview ────────────────────────────────────────────────── */}
+      <FunnelPreview config={config} organizationId={currentOrganization?.id || null} />
 
       {/* ── Create the draft ────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-3 border-t border-studio-hairline pt-5 sm:flex-row sm:items-center sm:justify-between">

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/lib/organizationContext';
-import type { ReportConfig, ReportDefaults } from '@/types/report-builder';
+import type { BrandImage, BrandKit, ReportConfig, ReportDefaults } from '@/types/report-builder';
 
 interface GenerateReportResponse {
   success: boolean;
@@ -24,11 +24,22 @@ export function useReportBuilder() {
     const partial: Partial<ReportConfig> = {};
 
     if (defaults.branding) {
+      const heroImages: string[] | undefined = (defaults.branding as any).heroImages ?? undefined;
+      // Map legacy positional heroImages onto the named slots once at load,
+      // so the funnel only ever thinks in slots. The stored defaults are not
+      // rewritten; new saves write `images` and never touch `heroImages`.
+      const images = defaults.branding.images ?? (heroImages?.length
+        ? {
+            ...(heroImages[0] ? { cover: heroImages[0] } : {}),
+            ...(heroImages[1] ? { divider1: heroImages[1] } : {}),
+            ...(heroImages[2] ? { divider2: heroImages[2] } : {}),
+          }
+        : undefined);
       partial.branding = {
         logo: defaults.branding.logo ?? null,
         primaryColor: defaults.branding.primaryColor ?? '#2563eb',
         secondaryColor: defaults.branding.secondaryColor ?? '#10b981',
-        heroImages: (defaults.branding as any).heroImages ?? undefined,
+        images: images && Object.keys(images).length > 0 ? images : undefined,
         leadership: (defaults.branding as any).leadership ?? undefined,
       };
     }
@@ -69,8 +80,14 @@ export function useReportBuilder() {
    */
   const saveDefaults = async (orgId: string, config: ReportConfig): Promise<boolean> => {
     try {
+      // The leadership MESSAGE is per-report (drafted and accepted in the
+      // funnel); only the author's name/title/photo persist as defaults.
+      const { message: _dropMessage, ...leadershipDefaults } = config.branding.leadership ?? {};
       const defaults: ReportDefaults = {
-        branding: config.branding,
+        branding: {
+          ...config.branding,
+          leadership: Object.keys(leadershipDefaults).length > 0 ? leadershipDefaults : undefined,
+        },
         audience: config.audience,
         standards: config.standards,
         style: config.style,
@@ -110,6 +127,74 @@ export function useReportBuilder() {
     const token = sessionData?.session?.access_token;
     if (!token) throw new Error('Not authenticated');
     return token;
+  };
+
+  /** The org's reusable image library (report_defaults.imageLibrary). */
+  const loadImageLibrary = (org: any): BrandImage[] => {
+    const library = org?.report_defaults?.imageLibrary;
+    if (!Array.isArray(library)) return [];
+    return library.filter((i: any): i is BrandImage => typeof i?.url === 'string' && i.url);
+  };
+
+  /**
+   * Save the brand kit: merge-write touching ONLY the branding and
+   * imageLibrary keys (report_defaults is shared with hospitality and
+   * reporting-period settings). Branding itself is key-merged over the
+   * existing branding.
+   */
+  const saveBrandKit = async (orgId: string, kit: BrandKit): Promise<boolean> => {
+    try {
+      const { data: existingRow } = await supabase
+        .from('organizations')
+        .select('report_defaults')
+        .eq('id', orgId)
+        .maybeSingle();
+      const existing = (existingRow?.report_defaults as Record<string, any>) || {};
+
+      const merged: Record<string, any> = { ...existing };
+      if (kit.branding) merged.branding = { ...(existing.branding ?? {}), ...kit.branding };
+      if (kit.imageLibrary) merged.imageLibrary = kit.imageLibrary;
+
+      const { error } = await supabase
+        .from('organizations')
+        .update({ report_defaults: merged })
+        .eq('id', orgId);
+      if (error) {
+        console.error('Failed to save brand kit:', error);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Save brand kit error:', error);
+      return false;
+    }
+  };
+
+  /** Append one image to the org library (read-merge-append). */
+  const addToImageLibrary = async (orgId: string, image: BrandImage): Promise<boolean> => {
+    try {
+      const { data: existingRow } = await supabase
+        .from('organizations')
+        .select('report_defaults')
+        .eq('id', orgId)
+        .maybeSingle();
+      const existing = (existingRow?.report_defaults as Record<string, any>) || {};
+      const library: BrandImage[] = Array.isArray(existing.imageLibrary) ? existing.imageLibrary : [];
+      if (library.some(i => i?.url === image.url)) return true;
+
+      const { error } = await supabase
+        .from('organizations')
+        .update({ report_defaults: { ...existing, imageLibrary: [...library, image] } })
+        .eq('id', orgId);
+      if (error) {
+        console.error('Failed to add to image library:', error);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Add to image library error:', error);
+      return false;
+    }
   };
 
   /**
@@ -340,6 +425,10 @@ export function useReportBuilder() {
     shipReport,
     saveDefaults,
     loadDefaults,
+    loadImageLibrary,
+    saveBrandKit,
+    addToImageLibrary,
+    getAccessToken,
     loading,
   };
 }

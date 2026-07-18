@@ -336,11 +336,20 @@ interface ReportConfig {
   /** Theme id (lib/pdf/templates/themes.ts); falls back to the style's theme. */
   template?: string;
   orientation?: 'portrait' | 'landscape';
+  /** User-defined section order; unset = the style's narrative arc. */
+  sectionOrder?: string[];
   branding: {
     logo: string | null;
     primaryColor: string;
     secondaryColor: string;
     heroImages?: string[];
+    /** Named imagery slots; heroImages[0..2] remain as legacy fallbacks. */
+    images?: {
+      cover?: string;
+      divider1?: string;
+      divider2?: string;
+      people?: string;
+    };
     leadership?: {
       name?: string;
       title?: string;
@@ -654,8 +663,9 @@ function renderMaterialityCallout(config: ReportConfig, sectionId: string, data:
 // ============================================================================
 
 /**
- * Full-page leadership message. Only rendered when config.branding.leadership.message is set
- * and the audience tier is 'full'. Placed immediately after the cover page.
+ * Full-page leadership message. Rendered when config.branding.leadership.message
+ * is set and the theme allows it (showLeadershipPage). Placed immediately after
+ * the cover page.
  */
 /**
  * Leadership foreword: a brand poster block on the paper ground. The message
@@ -708,10 +718,11 @@ function renderSectionDividerPage(
   subtitle: string,
   chapterLabel: string,
   theme?: ReportTheme,
+  heroUrl?: string,
 ): string {
   const brandColor = getBrandColor(config);
   const on = onBand(brandColor);
-  const dividerHero = (theme?.showHeroImages !== false) ? config.branding?.heroImages?.[1] : undefined;
+  const dividerHero = (theme?.showHeroImages !== false) ? heroUrl : undefined;
 
   return `
     <div class="page" style="position: relative;">
@@ -750,7 +761,9 @@ function renderCoverPage(config: ReportConfig, data: ReportData, theme?: ReportT
   const brandColor = getBrandColor(config);
   const on = onBand(brandColor);
   const coverStyle = theme?.coverStyle ?? 'hero-photo';
-  const coverHero = (theme?.showHeroImages !== false) ? config.branding?.heroImages?.[0] : undefined;
+  const coverHero = (theme?.showHeroImages !== false)
+    ? (config.branding?.images?.cover ?? config.branding?.heroImages?.[0])
+    : undefined;
 
   const standardsLine = config.standards.map(s => escapeHtml(getStandardName(s).toUpperCase())).join(' &nbsp;·&nbsp; ');
   const periodLine = (config.reportingPeriodStart && config.reportingPeriodEnd)
@@ -1316,6 +1329,10 @@ function renderPeopleCulturePage(config: ReportConfig, data: ReportData, theme?:
 
       ${renderMaterialityCallout(config, 'people', data)}
       ${(theme?.showNarratives !== false) && peopleCultureNarrative ? renderNarrativeBlock(peopleCultureNarrative) : ''}
+      ${(theme?.showHeroImages !== false) && config.branding?.images?.people ? `
+      <div style="height: 150px; border-radius: 6px; overflow: hidden; margin-bottom: 24px;">
+        <img src="${escapeHtml(config.branding.images.people)}" alt="" style="width: 100%; height: 100%; object-fit: cover;" />
+      </div>` : ''}
 
       <div style="display: flex; gap: 24px; margin-bottom: 28px;">
         <div style="flex: 1; background: ${brandColor}; border-radius: 6px; padding: 28px; color: ${onBand(brandColor).fg};">
@@ -2188,7 +2205,6 @@ export function renderSustainabilityReportHtml(
   const theme = resolveTheme(config.template || style.themeId, config.orientation);
   const ds = getDensityStyles(theme);
   const tier = style.tier;
-  const showImagery = style.imagery !== 'none';
 
   // Compute values used for section dividers
   const totalEmissions = data.emissions?.total ?? 0;
@@ -2243,11 +2259,13 @@ export function renderSustainabilityReportHtml(
   }
   sectionPages.set('methodology', renderMethodologyPage(config, data, theme));
 
-  // Order by the style's narrative arc; anything unlisted follows in the
-  // order it was built. Vineyards always ride directly behind products.
+  // Order by the user's running order when set, else the style's narrative
+  // arc; anything unlisted follows in the order it was built. Vineyards
+  // always ride directly behind products.
+  const baseOrder = config.sectionOrder?.length ? config.sectionOrder : style.sectionOrder;
   const orderedIds = [
-    ...style.sectionOrder.filter(id => sectionPages.has(id)),
-    ...Array.from(sectionPages.keys()).filter(id => !style.sectionOrder.includes(id)),
+    ...baseOrder.filter(id => sectionPages.has(id)),
+    ...Array.from(sectionPages.keys()).filter(id => !baseOrder.includes(id)),
   ];
   const vIdx = orderedIds.indexOf('vineyards');
   const pIdx = orderedIds.indexOf('product-footprints');
@@ -2257,8 +2275,9 @@ export function renderSustainabilityReportHtml(
   }
 
   // Chapter dividers precede the carbon and commitments chapters for
-  // storytelling tiers, when the theme and imagery policy allow them.
-  const showDividers = (theme.showSectionDividers !== false) && showImagery && (tier === 'full' || tier === 'balanced');
+  // storytelling tiers, when the theme allows them (the theme is the single
+  // look authority; the style's imagery policy no longer gates separately).
+  const showDividers = (theme.showSectionDividers !== false) && (tier === 'full' || tier === 'balanced');
   const dividerBefore = new Map<string, string>();
   if (showDividers && totalEmissions > 0) {
     dividerBefore.set('scope-1-2-3', renderSectionDividerPage(
@@ -2268,6 +2287,7 @@ export function renderSustainabilityReportHtml(
       `Our carbon footprint is measured across all three GHG Protocol scopes${emissionsDividerYoY}. The following section presents the complete picture.`,
       'Our Carbon Footprint',
       theme,
+      config.branding?.images?.divider1 ?? config.branding?.heroImages?.[1],
     ));
   }
   if (showDividers && reductionTarget) {
@@ -2278,6 +2298,7 @@ export function renderSustainabilityReportHtml(
       `Our transition plan sets out the milestones, investments, and actions required to reach this goal. Progress is independently verified and reported annually.`,
       'Our Commitments',
       theme,
+      config.branding?.images?.divider2 ?? config.branding?.heroImages?.[2],
     ));
   }
 
@@ -2285,7 +2306,9 @@ export function renderSustainabilityReportHtml(
 
   const pages = [
     renderCoverPage(config, data, theme),
-    (theme.showLeadershipPage !== false) && tier === 'full'
+    // The theme is the sole gate: any style whose look allows a leadership
+    // page prints one once a message has been accepted (Phase D ungating).
+    (theme.showLeadershipPage !== false)
       ? renderLeadershipPage(config, theme) : '',
     ...orderedContent,
     data.csrdGatingWarning ? renderCsrdGatingWarningPage(config, theme) : '',

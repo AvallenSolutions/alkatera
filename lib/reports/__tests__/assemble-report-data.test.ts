@@ -3,6 +3,8 @@ import {
   buildReportConfig,
   deriveEmissionsTrends,
   normaliseTargets,
+  normaliseImageSlots,
+  normaliseSectionScopes,
 } from '@/lib/reports/assemble-report-data';
 
 describe('buildReportConfig', () => {
@@ -36,6 +38,44 @@ describe('buildReportConfig', () => {
     expect(buildReportConfig(baseRow).toneOverride).toBeUndefined();
     expect(buildReportConfig({ ...baseRow, config: { toneOverride: 7 } }).toneOverride).toBeUndefined();
   });
+
+  it('reads sectionOrder, sectionScopes and image slots from the jsonb', () => {
+    const config = buildReportConfig({
+      ...baseRow,
+      config: {
+        sectionOrder: ['targets', 'scope-1-2-3', 42, null],
+        sectionScopes: { products: { pcfIds: ['a', 'b'] }, trends: { fromYear: 2022, toYear: 2026 } },
+        branding: { images: { cover: 'https://img/c.jpg', bogus: 'x', people: '' } },
+      },
+    });
+    expect(config.sectionOrder).toEqual(['targets', 'scope-1-2-3']);
+    expect(config.sectionScopes).toEqual({ products: { pcfIds: ['a', 'b'] }, trends: { fromYear: 2022, toYear: 2026 } });
+    expect(config.branding.images).toEqual({ cover: 'https://img/c.jpg' });
+  });
+});
+
+describe('normaliseImageSlots', () => {
+  it('keeps only known string slots and collapses empties to undefined', () => {
+    expect(normaliseImageSlots({ cover: 'u', divider1: 1, unknown: 'x' })).toEqual({ cover: 'u' });
+    expect(normaliseImageSlots({})).toBeUndefined();
+    expect(normaliseImageSlots(null)).toBeUndefined();
+    expect(normaliseImageSlots('nope')).toBeUndefined();
+  });
+});
+
+describe('normaliseSectionScopes', () => {
+  it('accepts well-formed scopes', () => {
+    expect(normaliseSectionScopes({ products: { pcfIds: ['x'] } })).toEqual({ products: { pcfIds: ['x'] } });
+    expect(normaliseSectionScopes({ trends: { fromYear: 2020, toYear: 2020 } })).toEqual({ trends: { fromYear: 2020, toYear: 2020 } });
+  });
+
+  it('rejects empty id lists, inverted ranges and junk', () => {
+    expect(normaliseSectionScopes({ products: { pcfIds: [] } })).toBeUndefined();
+    expect(normaliseSectionScopes({ products: { pcfIds: [7, ''] } })).toBeUndefined();
+    expect(normaliseSectionScopes({ trends: { fromYear: 2026, toYear: 2020 } })).toBeUndefined();
+    expect(normaliseSectionScopes({ trends: { fromYear: 'a', toYear: 2020 } })).toBeUndefined();
+    expect(normaliseSectionScopes(undefined)).toBeUndefined();
+  });
 });
 
 describe('deriveEmissionsTrends', () => {
@@ -66,6 +106,16 @@ describe('deriveEmissionsTrends', () => {
     const trends = deriveEmissionsTrends(rows, { reportYear: 2026, isMultiYear: true, reportYears: [2026, 2023] });
     expect(trends.map(t => t.year)).toEqual([2023, 2026]);
     expect(trends[1].yoyChange).toBe(-15);     // 1000 -> 850
+  });
+
+  it('lets an explicit trends scope beat both reportYears and the fallback window', () => {
+    const scoped = deriveEmissionsTrends(rows, {
+      reportYear: 2026,
+      isMultiYear: true,
+      reportYears: [2026, 2023],
+      sectionScopes: { trends: { fromYear: 2022, toYear: 2024 } },
+    });
+    expect(scoped.map(t => t.year)).toEqual([2022, 2023, 2024]);
   });
 
   it('caps the single-year window at five trailing years', () => {

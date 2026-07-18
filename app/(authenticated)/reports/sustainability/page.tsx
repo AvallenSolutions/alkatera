@@ -14,6 +14,7 @@ import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client'
 import { useOrganization } from '@/lib/organizationContext'
 import { PageLoader } from '@/components/ui/page-loader'
 import { VerificationCard } from '@/components/partners/VerificationCard'
+import { BrandKitEditor } from '@/components/report-builder/BrandKitEditor'
 import { useToast } from '@/hooks/use-toast'
 import { AUDIENCE_LABELS } from '@/types/report-builder'
 import { toast as sonnerToast } from 'sonner'
@@ -420,7 +421,7 @@ function SustainabilityReportsHub() {
 
       {/* ── Tabs ────────────────────────────────────────────────────────────── */}
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="grid w-full max-w-md grid-cols-3">
+        <TabsList className="grid w-full max-w-xl grid-cols-4">
           <TabsTrigger value="reports" className="gap-2">
             Reports
             {activeReports.length > 0 && (
@@ -429,6 +430,7 @@ function SustainabilityReportsHub() {
           </TabsTrigger>
           <TabsTrigger value="materiality">Materiality</TabsTrigger>
           <TabsTrigger value="transition-plan">Transition Plan</TabsTrigger>
+          <TabsTrigger value="brand-kit">Brand kit</TabsTrigger>
         </TabsList>
 
         {/* ── Reports tab ─────────────────────────────────────────────────── */}
@@ -795,6 +797,11 @@ function SustainabilityReportsHub() {
               </div>
             </Panel>
           </div>
+        </TabsContent>
+
+        {/* ── Brand kit tab ────────────────────────────────────────────────── */}
+        <TabsContent value="brand-kit" className="mt-6">
+          <BrandKitEditor />
         </TabsContent>
       </Tabs>
     </div>

@@ -10,6 +10,7 @@ import {
 } from '@/lib/claude/executive-summary-assistant';
 import { generateForeword, type ForewordNarrative } from '@/lib/claude/foreword-assistant';
 import { resolveReportStyle } from '@/lib/pdf/templates/report-styles';
+import { resolveTheme } from '@/lib/pdf/templates/themes';
 import { GEMINI_FAST_MODEL } from '@/lib/ai/models';
 import type { ReportConfigShape } from '@/lib/reports/assemble-report-data';
 import {
@@ -76,7 +77,7 @@ export function deriveYoyChangePct(reportData: Record<string, any>): string | un
 export interface BuiltNarratives {
   sections: ReportNarratives;
   executiveSummary: ExecutiveSummaryNarrative;
-  /** Only drafted for tier-'full' (storytelling) styles. */
+  /** Only drafted when the resolved theme's look allows a leadership page. */
   foreword?: ForewordNarrative;
   tone: string;
   toneOverride: string | null;
@@ -136,8 +137,17 @@ export async function buildNarratives(params: {
     reportFramingStatement: config.reportFramingStatement,
   }, force);
 
+  // The theme is the single look authority: draft a foreword exactly when
+  // the resolved theme would print a leadership page (mirrors the renderer's
+  // gate, so drafts and prints never disagree).
+  const themeAllowsForeword =
+    resolveTheme(
+      config.template || resolveReportStyle(config.style, config.audience).themeId,
+      config.orientation
+    ).showLeadershipPage !== false;
+
   let foreword: ForewordNarrative | undefined;
-  if (includeForeword && resolveReportStyle(config.style, config.audience).tier === 'full') {
+  if (includeForeword && themeAllowsForeword) {
     foreword = await generateForeword({
       organisationName: org?.name || 'Organisation',
       sector: org?.industry_sector,

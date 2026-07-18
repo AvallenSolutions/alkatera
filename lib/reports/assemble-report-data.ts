@@ -34,13 +34,53 @@ export interface ReportConfigShape {
   /** Theme id from the wizard's style picker (lib/pdf/templates/themes.ts). */
   template?: string;
   orientation?: 'portrait' | 'landscape';
+  /** User-defined running order of the selected sections; unset = the style's arc. */
+  sectionOrder?: string[];
+  /** Per-section data scopes (picked SKUs, trends year range). */
+  sectionScopes?: {
+    products?: { pcfIds: string[] };
+    trends?: { fromYear: number; toYear: number };
+  };
   branding: {
     logo: string | null;
     primaryColor: string;
     secondaryColor: string;
     heroImages?: string[];
+    /** Named imagery slots; heroImages[0..2] remain legacy fallbacks. */
+    images?: { cover?: string; divider1?: string; divider2?: string; people?: string };
     leadership?: { name?: string; title?: string; message?: string; photo?: string };
   };
+}
+
+const IMAGE_SLOT_KEYS = ['cover', 'divider1', 'divider2', 'people'] as const;
+
+/** Defensive jsonb parsing: keep only string-valued known slots. */
+export function normaliseImageSlots(raw: unknown): ReportConfigShape['branding']['images'] {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const out: Record<string, string> = {};
+  for (const key of IMAGE_SLOT_KEYS) {
+    const value = (raw as Record<string, unknown>)[key];
+    if (typeof value === 'string' && value) out[key] = value;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/** Defensive jsonb parsing: reject malformed or inverted scopes. */
+export function normaliseSectionScopes(raw: unknown): ReportConfigShape['sectionScopes'] {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const input = raw as Record<string, any>;
+  const out: NonNullable<ReportConfigShape['sectionScopes']> = {};
+  const pcfIds = input.products?.pcfIds;
+  if (Array.isArray(pcfIds)) {
+    const ids = pcfIds.filter((id: unknown) => typeof id === 'string' && id);
+    if (ids.length > 0) out.products = { pcfIds: ids };
+  }
+  const fromYear = input.trends?.fromYear;
+  const toYear = input.trends?.toYear;
+  if (Number.isFinite(fromYear) && Number.isFinite(toYear) && fromYear <= toYear) {
+    out.trends = { fromYear, toYear };
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 export function buildReportConfig(report: Record<string, any>): ReportConfigShape {
@@ -63,11 +103,16 @@ export function buildReportConfig(report: Record<string, any>): ReportConfigShap
     toneOverride: typeof jsonConfig.toneOverride === 'string' ? jsonConfig.toneOverride : undefined,
     template: jsonConfig.template || undefined,
     orientation: jsonConfig.orientation === 'landscape' ? 'landscape' : jsonConfig.orientation === 'portrait' ? 'portrait' : undefined,
+    sectionOrder: Array.isArray(jsonConfig.sectionOrder)
+      ? jsonConfig.sectionOrder.filter((s: unknown) => typeof s === 'string')
+      : undefined,
+    sectionScopes: normaliseSectionScopes(jsonConfig.sectionScopes),
     branding: {
       logo: report.logo_url || null,
       primaryColor: report.primary_color || '#205E40',
       secondaryColor: report.secondary_color || '#047857',
       heroImages: Array.isArray(jsonConfig.branding?.heroImages) ? jsonConfig.branding.heroImages : undefined,
+      images: normaliseImageSlots(jsonConfig.branding?.images),
       leadership: jsonConfig.branding?.leadership || undefined,
     },
   };
@@ -101,18 +146,22 @@ function scope3Total(breakdown: any): number {
 
 /**
  * Derive the multi-year emissions trend from corporate_reports rows.
- * Exported for unit testing.
+ * Year selection precedence: an explicit trends scope (fromYear..toYear)
+ * beats the multi-year reportYears selection, which beats the default
+ * five-trailing-years window. Exported for unit testing.
  */
 export function deriveEmissionsTrends(
   rows: Array<{ year: number; total_emissions: number | null; breakdown_json: any }>,
-  config: Pick<ReportConfigShape, 'reportYear' | 'isMultiYear' | 'reportYears'>
+  config: Pick<ReportConfigShape, 'reportYear' | 'isMultiYear' | 'reportYears' | 'sectionScopes'>
 ): EmissionsTrendEntry[] {
-  const wantedYears = config.isMultiYear && config.reportYears.length > 0
+  const trendScope = config.sectionScopes?.trends;
+  const wantedYears = !trendScope && config.isMultiYear && config.reportYears.length > 0
     ? new Set(config.reportYears)
     : null;
 
   const entries = rows
     .filter(r => {
+      if (trendScope) return r.year >= trendScope.fromYear && r.year <= trendScope.toYear;
       if (wantedYears) return wantedYears.has(r.year);
       return r.year <= config.reportYear && r.year > config.reportYear - 5;
     })
@@ -261,13 +310,18 @@ export async function assembleReportData(
     // Non-fatal
   }
 
-  // Products
+  // Products (optionally scoped to the user's picked footprints)
   if (config.sections.includes('product-footprints')) {
-    const { data: products } = await supabase
+    let productsQuery = supabase
       .from('product_carbon_footprints')
       .select('id, products!product_lcas_product_id_fkey!inner(name), functional_unit, aggregated_impacts, status')
       .eq('organization_id', orgId)
       .eq('status', 'completed');
+    const pcfIds = config.sectionScopes?.products?.pcfIds;
+    if (pcfIds?.length) {
+      productsQuery = productsQuery.in('id', pcfIds);
+    }
+    const { data: products } = await productsQuery;
 
     if (products && products.length > 0) {
       reportData.products = products.map((p: any) => ({

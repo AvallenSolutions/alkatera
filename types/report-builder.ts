@@ -2,6 +2,32 @@
 // Shared types and constants for the Report Builder
 // ============================================================================
 
+/** One reusable image in the org brand library (report_defaults.imageLibrary). */
+export interface BrandImage {
+  url: string;
+  label?: string;
+}
+
+/** Named imagery slots. Legacy branding.heroImages[0..2] remain render-time fallbacks. */
+export interface ReportImageSlots {
+  /** Cover hero photo. */
+  cover?: string;
+  /** Chapter divider before the carbon chapter. */
+  divider1?: string;
+  /** Chapter divider before the commitments chapter. */
+  divider2?: string;
+  /** Photo band on the People & Culture page. */
+  people?: string;
+}
+
+/** Per-section data scopes; absent = everything (the default behaviour). */
+export interface ReportSectionScopes {
+  /** Exactly these completed product footprints; absent = all. */
+  products?: { pcfIds: string[] };
+  /** Inclusive year range for the trends section; absent = the 5-year window. */
+  trends?: { fromYear: number; toYear: number };
+}
+
 export interface ReportConfig {
   reportName: string;
   reportYear: number;
@@ -17,12 +43,18 @@ export interface ReportConfig {
   orientation?: 'portrait' | 'landscape';
   standards: string[];
   sections: string[];
+  /** User-defined running order of the selected sections; unset = the style's arc. */
+  sectionOrder?: string[];
+  /** Per-section data scopes (picked SKUs, trends year range). */
+  sectionScopes?: ReportSectionScopes;
   branding: {
     logo: string | null;
     primaryColor: string;
     secondaryColor: string;
-    /** Photos uploaded by the user. First image is used as the cover hero. */
+    /** Legacy positional photos; superseded by the named `images` slots. */
     heroImages?: string[];
+    /** Named imagery slots (cover, dividers, people page). */
+    images?: ReportImageSlots;
     /** Leadership message to appear as a full page in storytelling reports. */
     leadership?: {
       name?: string;
@@ -46,7 +78,12 @@ export interface ReportDefaults {
   style?: ReportConfig['style'];
   template?: ReportConfig['template'];
   orientation?: ReportConfig['orientation'];
+  /** The org's reusable image library, managed from the Brand kit tab. */
+  imageLibrary?: BrandImage[];
 }
+
+/** The two report_defaults keys the Brand kit editor is allowed to touch. */
+export type BrandKit = Pick<ReportDefaults, 'branding' | 'imageLibrary'>;
 
 export interface SectionDefinition {
   id: string;

@@ -97,7 +97,8 @@ describe('buildNarratives', () => {
     expect(prompt).toContain(TONE_OVERRIDES.measured);
   });
 
-  it('drafts a foreword only for tier-full (marketing) styles', async () => {
+  it('drafts a foreword exactly when the resolved theme allows a leadership page', async () => {
+    // Marketing (narrative theme) and Customers (modern theme) both allow it.
     const marketing = await buildNarratives({
       config: makeConfig({ style: 'marketing', audience: 'customers' }),
       reportData: REPORT_DATA,
@@ -106,16 +107,36 @@ describe('buildNarratives', () => {
     });
     expect(marketing.foreword?.message).toBe('Mock foreword.');
 
-    vi.clearAllMocks();
     const customers = await buildNarratives({
       config: makeConfig({ style: 'customers' }),
       reportData: REPORT_DATA,
       force: true,
       includeForeword: true,
     });
-    expect(customers.foreword).toBeUndefined();
+    expect(customers.foreword?.message).toBe('Mock foreword.');
+
+    // Compliance (data-dense) and Investors (executive) keep the page off.
+    vi.clearAllMocks();
+    const compliance = await buildNarratives({
+      config: makeConfig({ style: 'compliance', audience: 'regulators' }),
+      reportData: REPORT_DATA,
+      force: true,
+      includeForeword: true,
+    });
+    expect(compliance.foreword).toBeUndefined();
     const forewordCalls = vi.mocked(runJsonPrompt).mock.calls.filter(c => c[0].op === 'report_foreword');
     expect(forewordCalls).toHaveLength(0);
+  });
+
+  it('respects an explicit template override for the foreword gate', async () => {
+    // Compliance style forced onto the classic template gains the page.
+    const overridden = await buildNarratives({
+      config: makeConfig({ style: 'compliance', audience: 'regulators', template: 'classic' }),
+      reportData: REPORT_DATA,
+      force: true,
+      includeForeword: true,
+    });
+    expect(overridden.foreword?.message).toBe('Mock foreword.');
   });
 
   it('never drafts a foreword unless asked (the inline render paths)', async () => {

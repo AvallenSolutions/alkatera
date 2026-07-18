@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { renderSustainabilityReportHtml } from '@/lib/pdf/render-sustainability-report-html';
+import { getAuthedClient } from '@/lib/reports/route-auth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 15; // Fast — no AI, no PDFShift
@@ -8,25 +8,23 @@ export const maxDuration = 15; // Fast — no AI, no PDFShift
 /**
  * POST /api/reports/preview
  *
- * Renders a lightweight HTML preview of the first few pages of a sustainability report.
- * Skips AI narrative generation. Uses live org data for realism.
- * Returns raw HTML suitable for embedding in an iframe.
+ * Renders a truthful HTML preview of a sustainability report: the real
+ * renderer, the caller's exact config (styles, image slots, section order),
+ * and a thin slice of live data for realism. Returns raw HTML for a
+ * sandboxed iframe.
+ *
+ * INVARIANT: this route makes NO AI calls and never should. It deliberately
+ * does not use assembleReportData (which can trigger key-findings
+ * generation); the preview's promise is the cover and first pages, fast.
  *
  * Body: { config: ReportConfig, organizationId: string }
  */
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
+    const supabase = getAuthedClient(request);
+    if (!supabase) {
       return NextResponse.json({ error: 'Missing authorisation' }, { status: 401 });
     }
-    const token = authHeader.replace('Bearer ', '');
-
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { global: { headers: { Authorization: `Bearer ${token}` } } }
-    );
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
@@ -95,14 +93,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Fetch products for preview
+    // Fetch products for preview, honouring a picked-products scope
     if (config.sections?.includes('product-footprints')) {
-      const { data: products } = await supabase
+      let productsQuery = supabase
         .from('product_carbon_footprints')
         .select('id, products!product_lcas_product_id_fkey!inner(name), functional_unit, aggregated_impacts, status')
         .eq('organization_id', organizationId)
-        .eq('status', 'completed')
-        .limit(5);
+        .eq('status', 'completed');
+      const pcfIds = config.sectionScopes?.products?.pcfIds;
+      if (Array.isArray(pcfIds) && pcfIds.length > 0) {
+        productsQuery = productsQuery.in('id', pcfIds);
+      }
+      const { data: products } = await productsQuery.limit(5);
 
       if (products && products.length > 0) {
         reportData.products = products.map((p: any) => ({
@@ -118,7 +120,10 @@ export async function POST(request: NextRequest) {
     const html = renderSustainabilityReportHtml(config as any, reportData as any, { screenMode: true });
 
     return new NextResponse(html, {
-      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store',
+      },
     });
   } catch (error: any) {
     console.error('[Preview] Error:', error);
