@@ -58,6 +58,14 @@ export async function POST(
       return NextResponse.json({ error: 'Report not found' }, { status: 404 });
     }
 
+    // In-flight signal. Also releases the Phase C draft lock (draft-only
+    // narrative writes carry .eq('status','draft')) the moment shipping
+    // starts, and stops HTML reports sitting on 'pending' while building.
+    await supabase
+      .from('generated_reports')
+      .update({ status: 'generating_document', updated_at: new Date().toISOString() })
+      .eq('id', reportId);
+
     const html = await buildScreenReportHtml(supabase, report);
 
     await supabase

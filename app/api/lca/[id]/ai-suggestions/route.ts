@@ -168,7 +168,7 @@ export async function POST(
       .from('product_carbon_footprints')
       .select(`
         *,
-        products!inner(name, category)
+        products!product_lcas_product_id_fkey!inner(name, category)
       `)
       .eq('id', pcfId)
       .single();

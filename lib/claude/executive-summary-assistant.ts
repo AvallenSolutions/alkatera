@@ -28,6 +28,8 @@ export interface ExecutiveSummaryNarrative {
   /** One sentence: the single most important thing this report communicates */
   primaryMessage: string;
   readonly aiGenerated: true;
+  /** True when this block is the deterministic fallback (AI unavailable). */
+  usedFallback?: boolean;
 }
 
 export interface ExecutiveSummaryContext {
@@ -60,6 +62,8 @@ export interface ExecutiveSummaryContext {
   hasTransitionPlan?: boolean;
   /** Optional editorial framing from the report author — shapes tone and emphasis */
   reportFramingStatement?: string;
+  /** Free-text reviewer instruction for a single-block regeneration. */
+  toneHint?: string;
 }
 
 // ============================================================================
@@ -186,6 +190,10 @@ ${sectionInsights}`;
 Write the Executive Summary so that this framing is evident — but only if the data supports it. Do not contradict the data to serve the framing.`;
   }
 
+  if (ctx.toneHint) {
+    prompt += `\n\nAdditional instruction from the reviewer for this block: "${ctx.toneHint}"`;
+  }
+
   prompt += `\n\nReturn JSON only.`;
 
   return prompt;
@@ -246,5 +254,6 @@ function buildFallbackSummary(ctx: ExecutiveSummaryContext): ExecutiveSummaryNar
     primaryMessage: `${ctx.organisationName} recorded total GHG emissions of ${formattedTotal} tCO2e in ${ctx.reportingYear}.`,
     summaryText: `${ctx.organisationName}'s ${ctx.reportingYear} sustainability report covers emissions across Scopes 1, 2, and 3, totalling ${formattedTotal} tCO2e. ${ctx.yoyChangePct ? `Emissions changed by ${ctx.yoyChangePct} compared to the previous year.` : ''} This report represents the organisation's commitment to transparent sustainability disclosure. Review the full report for section-level detail, targets, and methodology.`,
     aiGenerated: true,
+    usedFallback: true,
   };
 }

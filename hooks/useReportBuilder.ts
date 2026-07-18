@@ -104,11 +104,20 @@ export function useReportBuilder() {
     }
   };
 
+  /** Bearer token for the report API routes. */
+  const getAccessToken = async (): Promise<string> => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (!token) throw new Error('Not authenticated');
+    return token;
+  };
+
   /**
-   * Generate report — creates DB record, calls edge function, returns reportId immediately
-   * for progress tracking. Edge function runs async.
+   * Phase C step 1: create the report row as a DRAFT. No generation is
+   * dispatched; the narratives draft next and the user reviews them before
+   * shipping.
    */
-  const generateReport = async (config: ReportConfig): Promise<GenerateReportResponse> => {
+  const createDraftReport = async (config: ReportConfig): Promise<GenerateReportResponse> => {
     setLoading(true);
 
     try {
@@ -155,7 +164,7 @@ export function useReportBuilder() {
         }
       }
 
-      // Create report record
+      // Create report record as a draft
       const { data: reportRecord, error: insertError } = await supabase
         .from('generated_reports')
         .insert({
@@ -176,7 +185,7 @@ export function useReportBuilder() {
           is_multi_year: config.isMultiYear || false,
           report_years: config.reportYears || [config.reportYear],
           report_framing_statement: config.reportFramingStatement || null,
-          status: 'pending',
+          status: 'draft',
         })
         .select()
         .single();
@@ -190,80 +199,12 @@ export function useReportBuilder() {
         throw new Error('Failed to create report record: No data returned');
       }
 
-      if (config.outputFormat === 'pdf') {
-        // PDF: call the API route directly. The route uploads the PDF to Supabase
-        // Storage and updates generated_reports.document_url — the frontend progress
-        // hook will pick up the completion + URL via polling, so we don't need to
-        // download here.
-        const { data: sessionData } = await supabase.auth.getSession();
-        const accessToken = sessionData?.session?.access_token;
-
-        fetch(`/api/reports/${reportRecord.id}/generate-pdf`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({}),
-        }).then(async (response) => {
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || 'PDF generation failed');
-          }
-          // Success — document_url is already set by the API route, the progress
-          // hook will pick it up on its next poll and flip the UI to the download state.
-        }).catch(async (err) => {
-          console.error('PDF generation failed:', err);
-          await supabase
-            .from('generated_reports')
-            .update({
-              status: 'failed',
-              error_message: err?.message || 'PDF generation failed',
-            })
-            .eq('id', reportRecord.id);
-        });
-      } else if (config.outputFormat === 'html') {
-        // HTML: call the generate-html API route, open result in a new tab
-        const { data: sessionData } = await supabase.auth.getSession();
-        const accessToken = sessionData?.session?.access_token;
-
-        fetch(`/api/reports/${reportRecord.id}/generate-html`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }).then(async (response) => {
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.error || 'HTML generation failed');
-          }
-          const htmlContent = await response.text();
-          const blob = new Blob([htmlContent], { type: 'text/html' });
-          const url = window.URL.createObjectURL(blob);
-          window.open(url, '_blank');
-          // Revoke after a short delay to allow the new tab to load
-          setTimeout(() => window.URL.revokeObjectURL(url), 60000);
-        }).catch(async (err) => {
-          console.error('HTML generation failed:', err);
-          await supabase
-            .from('generated_reports')
-            .update({
-              status: 'failed',
-              error_message: err?.message || 'HTML generation failed',
-            })
-            .eq('id', reportRecord.id);
-        });
-      }
-
-      // Auto-save defaults after generation
+      // Save defaults so the next report starts here
       saveDefaults(organizationId, config).catch(() => {});
 
-      return {
-        success: true,
-        report_id: reportRecord.id,
-      };
+      return { success: true, report_id: reportRecord.id };
     } catch (error) {
-      console.error('Report generation error:', error);
+      console.error('Report draft error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'An unknown error occurred',
@@ -273,8 +214,130 @@ export function useReportBuilder() {
     }
   };
 
+  /** Phase C step 2: draft every narrative block into the report's snapshot. */
+  const draftNarratives = async (
+    reportId: string,
+    opts: { toneOverride?: string | null; force?: boolean } = {}
+  ): Promise<any> => {
+    const token = await getAccessToken();
+    const response = await fetch(`/api/reports/${reportId}/narratives`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(opts),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to draft the narratives');
+    }
+    const { snapshot } = await response.json();
+    return snapshot;
+  };
+
+  /** Persist review edits; the server flips the aiGenerated flags. */
+  const patchNarratives = async (reportId: string, patch: Record<string, any>): Promise<any> => {
+    const token = await getAccessToken();
+    const response = await fetch(`/api/reports/${reportId}/narratives`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(patch),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to save the edits');
+    }
+    const { snapshot } = await response.json();
+    return snapshot;
+  };
+
+  /** Regenerate one block, optionally steered by a free-text tone hint. */
+  const regenerateBlock = async (
+    reportId: string,
+    blockId: string,
+    toneHint?: string
+  ): Promise<any> => {
+    const token = await getAccessToken();
+    const response = await fetch(`/api/reports/${reportId}/narratives/regenerate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ blockId, toneHint }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to regenerate the block');
+    }
+    const { snapshot } = await response.json();
+    return snapshot;
+  };
+
+  /**
+   * Phase C step 3: ship the reviewed report. Dispatches the existing PDF
+   * (Inngest) or HTML (sync) pipeline; both consume the stored narratives.
+   */
+  const shipReport = async (reportId: string, config: ReportConfig): Promise<void> => {
+    const accessToken = await getAccessToken();
+
+    if (config.outputFormat === 'pdf') {
+      // PDF: the route uploads to Storage and updates document_url — the
+      // progress hook picks up completion via polling.
+      fetch(`/api/reports/${reportId}/generate-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({}),
+      }).then(async (response) => {
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'PDF generation failed');
+        }
+      }).catch(async (err) => {
+        console.error('PDF generation failed:', err);
+        await supabase
+          .from('generated_reports')
+          .update({
+            status: 'failed',
+            error_message: err?.message || 'PDF generation failed',
+          })
+          .eq('id', reportId);
+      });
+    } else if (config.outputFormat === 'html') {
+      // HTML: call the generate-html API route, open result in a new tab
+      fetch(`/api/reports/${reportId}/generate-html`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }).then(async (response) => {
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'HTML generation failed');
+        }
+        const htmlContent = await response.text();
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const url = window.URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        // Revoke after a short delay to allow the new tab to load
+        setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+      }).catch(async (err) => {
+        console.error('HTML generation failed:', err);
+        await supabase
+          .from('generated_reports')
+          .update({
+            status: 'failed',
+            error_message: err?.message || 'HTML generation failed',
+          })
+          .eq('id', reportId);
+      });
+    }
+  };
+
   return {
-    generateReport,
+    createDraftReport,
+    draftNarratives,
+    patchNarratives,
+    regenerateBlock,
+    shipReport,
     saveDefaults,
     loadDefaults,
     loading,

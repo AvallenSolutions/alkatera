@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { format } from 'date-fns';
-import { Statement, Panel, FieldLabel, PillButton } from '@/components/studio';
+import { Statement, Panel, FieldLabel, PillButton, StateChip } from '@/components/studio';
 import { StylePicker } from '@/components/report-builder/StylePicker';
 import { FunnelSections } from '@/components/report-builder/FunnelSections';
 import { FunnelBranding } from '@/components/report-builder/FunnelBranding';
 import { GenerationProgress } from '@/components/report-builder/GenerationProgress';
+import { NarrativeReview } from '@/components/report-builder/NarrativeReview';
 import { useReportBuilder } from '@/hooks/useReportBuilder';
 import { useReportProgress } from '@/hooks/useReportProgress';
 import {
@@ -16,6 +18,7 @@ import {
 import { useOrganization } from '@/lib/organizationContext';
 import { useToast } from '@/hooks/use-toast';
 import { PageLoader } from '@/components/ui/page-loader';
+import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { cn } from '@/lib/utils';
 import type { ReportConfig } from '@/types/report-builder';
 import { REPORTING_STANDARDS, STANDARDS_LABELS } from '@/types/report-builder';
@@ -24,6 +27,7 @@ import {
   resolveReportStyle,
   type ReportStyleId,
 } from '@/lib/pdf/templates/report-styles';
+import type { ReportDataSnapshot } from '@/lib/reports/narrative-store';
 
 const quietInputClass =
   'h-9 w-full rounded-none border-0 border-b-2 border-studio-hairline bg-transparent px-0 font-display text-sm font-semibold shadow-none outline-none focus-visible:border-studio-forest focus-visible:ring-0';
@@ -95,10 +99,19 @@ function ChoicePill({
   );
 }
 
-export default function ReportFunnelPage() {
+function ReportFunnelInner() {
   const { toast } = useToast();
+  const searchParams = useSearchParams();
   const { currentOrganization } = useOrganization();
-  const { generateReport, loadDefaults, loading: generating } = useReportBuilder();
+  const {
+    createDraftReport,
+    draftNarratives,
+    patchNarratives,
+    regenerateBlock,
+    shipReport,
+    loadDefaults,
+    loading: creating,
+  } = useReportBuilder();
   const currentYear = new Date().getFullYear();
 
   const [config, setConfig] = useState<ReportConfig>({
@@ -119,6 +132,11 @@ export default function ReportFunnelPage() {
   const [initialised, setInitialised] = useState(false);
   const [openRows, setOpenRows] = useState<Set<string>>(new Set());
   const [generatingReportId, setGeneratingReportId] = useState<string | null>(null);
+  // Phase C draft-then-edit state
+  const [draftReportId, setDraftReportId] = useState<string | null>(null);
+  const [snapshot, setSnapshot] = useState<ReportDataSnapshot | null>(null);
+  const [drafting, setDrafting] = useState(false);
+  const [reviewBusy, setReviewBusy] = useState(false);
 
   const availability = useReportDataAvailability(currentOrganization?.id, config.reportYear);
   const progress = useReportProgress(generatingReportId);
@@ -174,7 +192,46 @@ export default function ReportFunnelPage() {
   const openRow = (row: string) => setOpenRows(prev => new Set(prev).add(row));
   const isOpen = (row: string) => openRows.has(row);
 
-  const handleGenerate = async () => {
+  // ── Resume a parked draft via /reports/builder?draft={id} ───────────────────
+  const resumeDraftId = searchParams.get('draft');
+  useEffect(() => {
+    if (!resumeDraftId || !currentOrganization?.id || draftReportId) return;
+    let cancelled = false;
+    (async () => {
+      const supabase = getSupabaseBrowserClient();
+      const { data: row } = await supabase
+        .from('generated_reports')
+        .select('*')
+        .eq('id', resumeDraftId)
+        .maybeSingle();
+      if (cancelled || !row) return;
+      if (row.status !== 'draft') {
+        toast({ title: 'Already shipped', description: 'That report is no longer a draft.' });
+        return;
+      }
+      if (row.config) setConfig(prev => ({ ...prev, ...(row.config as ReportConfig) }));
+      setInitialised(true);
+      setDraftReportId(row.id);
+      const snap = row.data_snapshot as ReportDataSnapshot | null;
+      if (snap?.narratives) {
+        setSnapshot(snap);
+      } else {
+        // Draft row exists but the narratives never landed; draft them now.
+        setDrafting(true);
+        try {
+          setSnapshot(await draftNarratives(row.id));
+        } catch (err) {
+          toast({ title: 'Drafting failed', description: err instanceof Error ? err.message : 'Try again.', variant: 'destructive' });
+        } finally {
+          setDrafting(false);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeDraftId, currentOrganization?.id]);
+
+  const handleCreate = async () => {
     if (!config.reportName.trim()) {
       toast({ title: 'Name the report', description: 'Give the report a name before generating.', variant: 'destructive' });
       return;
@@ -183,17 +240,72 @@ export default function ReportFunnelPage() {
       toast({ title: 'Pick a section', description: 'Choose at least one section to include.', variant: 'destructive' });
       return;
     }
-    const result = await generateReport(config);
-    if (result.success && result.report_id) {
-      setGeneratingReportId(result.report_id);
-    } else {
-      toast({ title: 'Generation failed', description: result.error || 'An error occurred.', variant: 'destructive' });
+    const result = await createDraftReport(config);
+    if (!result.success || !result.report_id) {
+      toast({ title: 'Could not create the draft', description: result.error || 'An error occurred.', variant: 'destructive' });
+      return;
+    }
+    setDraftReportId(result.report_id);
+    setDrafting(true);
+    try {
+      setSnapshot(await draftNarratives(result.report_id));
+    } catch (err) {
+      toast({ title: 'Drafting failed', description: err instanceof Error ? err.message : 'Try again.', variant: 'destructive' });
+    } finally {
+      setDrafting(false);
+    }
+  };
+
+  const handlePatch = async (patch: Record<string, any>) => {
+    if (!draftReportId) return;
+    setReviewBusy(true);
+    try {
+      setSnapshot(await patchNarratives(draftReportId, patch));
+    } catch (err) {
+      toast({ title: 'Save failed', description: err instanceof Error ? err.message : 'Try again.', variant: 'destructive' });
+    } finally {
+      setReviewBusy(false);
+    }
+  };
+
+  const handleRegenerateBlock = async (blockId: string, toneHint?: string) => {
+    if (!draftReportId) return;
+    setReviewBusy(true);
+    try {
+      setSnapshot(await regenerateBlock(draftReportId, blockId, toneHint));
+    } catch (err) {
+      toast({ title: 'Regeneration failed', description: err instanceof Error ? err.message : 'Try again.', variant: 'destructive' });
+    } finally {
+      setReviewBusy(false);
+    }
+  };
+
+  const handleToneChange = async (toneOverride: 'confident' | 'measured' | 'technical' | null) => {
+    if (!draftReportId) return;
+    setReviewBusy(true);
+    try {
+      setSnapshot(await draftNarratives(draftReportId, { toneOverride, force: true }));
+      update({ toneOverride: toneOverride ?? undefined });
+    } catch (err) {
+      toast({ title: 'Regeneration failed', description: err instanceof Error ? err.message : 'Try again.', variant: 'destructive' });
+    } finally {
+      setReviewBusy(false);
+    }
+  };
+
+  const handleShip = async () => {
+    if (!draftReportId) return;
+    try {
+      await shipReport(draftReportId, config);
+      setGeneratingReportId(draftReportId);
+    } catch (err) {
+      toast({ title: 'Shipping failed', description: err instanceof Error ? err.message : 'Try again.', variant: 'destructive' });
     }
   };
 
   if (!initialised) return <PageLoader message="Reading your data..." />;
 
-  // ── Generation view ─────────────────────────────────────────────────────────
+  // ── Generation view (post-ship) ─────────────────────────────────────────────
   if (generatingReportId) {
     return (
       <div className="mx-auto max-w-3xl space-y-8 py-2">
@@ -204,7 +316,52 @@ export default function ReportFunnelPage() {
           error={progress.error}
           reportName={config.reportName}
           onDownload={() => progress.documentUrl && window.open(progress.documentUrl, '_blank')}
-          onReset={() => setGeneratingReportId(null)}
+          onReset={() => {
+            setGeneratingReportId(null);
+            setDraftReportId(null);
+            setSnapshot(null);
+          }}
+        />
+      </div>
+    );
+  }
+
+  // ── Drafting interstitial ───────────────────────────────────────────────────
+  if (draftReportId && drafting) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-8 py-2">
+        <Statement eyebrow="THE EVIDENCE · NEW REPORT" headline="Drafting the narratives." />
+        <Panel className="flex items-baseline justify-between gap-4">
+          <p className="text-sm text-muted-foreground">
+            Reading your data and writing a first draft of every section. You review and edit
+            everything before it ships.
+          </p>
+          <StateChip tone="attention" className="shrink-0">Working</StateChip>
+        </Panel>
+      </div>
+    );
+  }
+
+  // ── Review view (Phase C) ───────────────────────────────────────────────────
+  if (draftReportId && snapshot) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-8 py-2">
+        <div className="space-y-3">
+          <Statement eyebrow="THE EVIDENCE · NEW REPORT" headline="Read it before it ships." />
+          <p className="text-sm text-muted-foreground">
+            Every narrative below is a draft written from your data. Edit anything, regenerate a
+            block, or change the voice. Nothing ships until you say so.
+          </p>
+        </div>
+        <NarrativeReview
+          organizationId={currentOrganization?.id || null}
+          config={config}
+          snapshot={snapshot}
+          busy={reviewBusy}
+          onPatch={handlePatch}
+          onRegenerateBlock={handleRegenerateBlock}
+          onToneChange={handleToneChange}
+          onShip={handleShip}
         />
       </div>
     );
@@ -442,16 +599,24 @@ export default function ReportFunnelPage() {
         </div>
       </Panel>
 
-      {/* ── Generate ────────────────────────────────────────────────────────── */}
+      {/* ── Create the draft ────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-3 border-t border-studio-hairline pt-5 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs text-muted-foreground">
-          About a minute for {config.sections.length} section{config.sections.length !== 1 ? 's' : ''}.
-          Narratives are written for {style.name} readers in this style&apos;s voice.
+          Next: a first draft of every narrative, written for {style.name} readers in this
+          style&apos;s voice. You read and edit it all before anything ships.
         </p>
-        <PillButton variant="room" onClick={handleGenerate} disabled={generating} className="shrink-0">
-          {generating ? 'Starting.' : 'Create the report'}
+        <PillButton variant="room" onClick={handleCreate} disabled={creating} className="shrink-0">
+          {creating ? 'Starting.' : 'Draft the report'}
         </PillButton>
       </div>
     </div>
+  );
+}
+
+export default function ReportFunnelPage() {
+  return (
+    <Suspense fallback={<PageLoader message="Loading..." />}>
+      <ReportFunnelInner />
+    </Suspense>
   );
 }

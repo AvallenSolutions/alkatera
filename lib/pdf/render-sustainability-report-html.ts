@@ -220,13 +220,15 @@ interface SectionNarrative {
   nextStepPrompt: string;
   dataConfidenceStatement: string | null;
   methodologyFootnote: string | null;
-  readonly aiGenerated: true;
+  /** True while the text is an unreviewed AI draft (Phase C flips it on edit). */
+  aiGenerated: boolean;
 }
 
 interface ExecutiveSummaryNarrative {
   summaryText: string;
   primaryMessage: string;
-  readonly aiGenerated: true;
+  /** True while the text is an unreviewed AI draft (Phase C flips it on edit). */
+  aiGenerated: boolean;
 }
 
 interface ReportNarratives {
@@ -581,6 +583,8 @@ function renderNarrativeBlock(narrative: SectionNarrative): string {
       <div class="narrative-next-step">${escapeHtml(narrative.nextStepPrompt)}</div>
       ${narrative.dataConfidenceStatement ? `
       <div class="narrative-confidence">${escapeHtml(narrative.dataConfidenceStatement)}</div>` : ''}
+      ${narrative.aiGenerated ? `
+      <div class="narrative-ai-note">AI-assisted draft</div>` : ''}
     </div>
     ${narrative.methodologyFootnote ? `
     <div class="narrative-footnote">${escapeHtml(narrative.methodologyFootnote)}</div>` : ''}`;
@@ -595,6 +599,8 @@ function renderExecutiveSummaryNarrativeBlock(narrative: ExecutiveSummaryNarrati
     <div class="narrative-block" style="border-left-width: 4px; margin-bottom: 24px;">
       <div class="narrative-headline" style="font-size: 16px;">${escapeHtml(narrative.primaryMessage)}</div>
       <div class="narrative-context" style="font-size: 14px; line-height: 1.7;">${escapeHtml(narrative.summaryText)}</div>
+      ${narrative.aiGenerated ? `
+      <div class="narrative-ai-note">AI-assisted draft</div>` : ''}
     </div>`;
 }
 
@@ -2477,6 +2483,16 @@ export function renderSustainabilityReportHtml(
       font-family: 'JetBrains Mono', monospace;
       color: #6F6F68;
       margin-top: 8px;
+    }
+
+    .narrative-ai-note {
+      font-size: 8.5px;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #A8A29E;
+      margin-top: 10px;
     }
 
     @media print {

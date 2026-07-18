@@ -1,0 +1,109 @@
+import { describe, it, expect } from 'vitest';
+import {
+  buildReportConfig,
+  deriveEmissionsTrends,
+  normaliseTargets,
+} from '@/lib/reports/assemble-report-data';
+
+describe('buildReportConfig', () => {
+  const baseRow = {
+    report_name: 'Test Report',
+    report_year: 2026,
+    reporting_period_start: '2026-01-01',
+    reporting_period_end: '2026-12-31',
+    audience: 'customers',
+    standards: ['iso-14067'],
+    sections: ['executive-summary'],
+    is_multi_year: false,
+    report_years: [2026],
+    logo_url: null,
+    primary_color: null,
+    secondary_color: null,
+    config: {},
+  };
+
+  it('reads style, template and toneOverride from the config jsonb', () => {
+    const config = buildReportConfig({
+      ...baseRow,
+      config: { style: 'marketing', template: 'narrative', toneOverride: 'measured' },
+    });
+    expect(config.style).toBe('marketing');
+    expect(config.template).toBe('narrative');
+    expect(config.toneOverride).toBe('measured');
+  });
+
+  it('leaves toneOverride undefined when absent or malformed', () => {
+    expect(buildReportConfig(baseRow).toneOverride).toBeUndefined();
+    expect(buildReportConfig({ ...baseRow, config: { toneOverride: 7 } }).toneOverride).toBeUndefined();
+  });
+});
+
+describe('deriveEmissionsTrends', () => {
+  const rows = [
+    { year: 2022, total_emissions: 800, breakdown_json: { total: 800, scope1: 100, scope2: 200, scope3: 500 } },
+    { year: 2023, total_emissions: 1000, breakdown_json: { total: 1000, scope1: 120, scope2: 230, scope3: 650 } },
+    { year: 2024, total_emissions: 900, breakdown_json: { total: 900, scope1: 110, scope2: 190, scope3: { total: 600 } } },
+    { year: 2025, total_emissions: 0, breakdown_json: null },
+    { year: 2026, total_emissions: 850, breakdown_json: { total: 850, scope1: 100, scope2: 150, scope3: 600 } },
+  ];
+
+  it('computes year-on-year percentage change between consecutive listed years', () => {
+    const trends = deriveEmissionsTrends(rows, { reportYear: 2026, isMultiYear: false, reportYears: [] });
+    // 2025 is excluded (zero total), so the chain is 2022 -> 2023 -> 2024 -> 2026
+    expect(trends.map(t => t.year)).toEqual([2022, 2023, 2024, 2026]);
+    expect(trends[0].yoyChange).toBeNull();
+    expect(trends[1].yoyChange).toBe(25);      // 800 -> 1000
+    expect(trends[2].yoyChange).toBe(-10);     // 1000 -> 900
+    expect(trends[3].yoyChange).toBe(-5.6);    // 900 -> 850, 1dp
+  });
+
+  it('unwraps object-shaped scope3 breakdowns', () => {
+    const trends = deriveEmissionsTrends(rows, { reportYear: 2026, isMultiYear: false, reportYears: [] });
+    expect(trends.find(t => t.year === 2024)?.scope3).toBe(600);
+  });
+
+  it('filters to reportYears for multi-year reports', () => {
+    const trends = deriveEmissionsTrends(rows, { reportYear: 2026, isMultiYear: true, reportYears: [2026, 2023] });
+    expect(trends.map(t => t.year)).toEqual([2023, 2026]);
+    expect(trends[1].yoyChange).toBe(-15);     // 1000 -> 850
+  });
+
+  it('caps the single-year window at five trailing years', () => {
+    const longRows = Array.from({ length: 10 }, (_, i) => ({
+      year: 2017 + i,
+      total_emissions: 100 + i,
+      breakdown_json: { total: 100 + i },
+    }));
+    const trends = deriveEmissionsTrends(longRows, { reportYear: 2026, isMultiYear: false, reportYears: [] });
+    expect(trends.map(t => t.year)).toEqual([2022, 2023, 2024, 2025, 2026]);
+  });
+
+  it('never includes years after the reporting year', () => {
+    const trends = deriveEmissionsTrends(
+      [...rows, { year: 2027, total_emissions: 500, breakdown_json: { total: 500 } }],
+      { reportYear: 2026, isMultiYear: false, reportYears: [] }
+    );
+    expect(trends.map(t => t.year)).not.toContain(2027);
+  });
+});
+
+describe('normaliseTargets', () => {
+  it('unions transition-plan targets and sustainability_targets rows', () => {
+    const targets = normaliseTargets(
+      [{ scope: 'scope1', reductionPct: 42, targetYear: 2030 }],
+      [{ metric_key: 'water_use', baseline_value: 10, target_value: 6, target_date: '2028-12-31', scope: 'scope3', status: 'on_track' }]
+    );
+    expect(targets).toHaveLength(2);
+    expect(targets[0]).toMatchObject({ source: 'transition_plan', scope: 'scope1', reductionPct: 42, targetYear: 2030 });
+    expect(targets[0].label).toContain('42%');
+    expect(targets[0].label).toContain('2030');
+    expect(targets[1]).toMatchObject({ source: 'sustainability_targets', targetYear: 2028, status: 'on_track' });
+    expect(targets[1].label).toContain('water use');
+  });
+
+  it('handles null and empty inputs', () => {
+    expect(normaliseTargets(null, null)).toEqual([]);
+    expect(normaliseTargets([], [])).toEqual([]);
+    expect(normaliseTargets([null as any], [undefined as any])).toEqual([]);
+  });
+});

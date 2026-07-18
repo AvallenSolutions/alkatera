@@ -31,6 +31,8 @@ export interface SectionNarrative {
   /** One-line methodology footnote */
   methodologyFootnote: string | null;
   readonly aiGenerated: true;
+  /** True when this block is the deterministic fallback (AI unavailable). */
+  usedFallback?: boolean;
 }
 
 /** Map of section IDs to their generated narratives */
@@ -74,6 +76,8 @@ export interface SectionNarrativeContext {
   dataQuality?: DataQualityInfo;
   /** Optional editorial framing from the report author — shapes the interpretive lens */
   reportFramingStatement?: string;
+  /** Free-text reviewer instruction for a single-block regeneration. */
+  toneHint?: string;
 }
 
 // ============================================================================
@@ -245,6 +249,10 @@ ${JSON.stringify(ctx.yoyData, null, 2)}`;
 Interpret this section's data in light of this framing. If the data supports or challenges it, say so — do not force the framing if the data contradicts it.`;
   }
 
+  if (ctx.toneHint) {
+    prompt += `\n\nAdditional instruction from the reviewer for this block: "${ctx.toneHint}"`;
+  }
+
   prompt += `
 
 IMPORTANT: Do not describe the data. Interpret it. Answer: what does this mean for ${ctx.organisationName}, why does it matter to the specified audience, and what should they take away from it?
@@ -318,6 +326,7 @@ function buildFallbackNarrative(ctx: SectionNarrativeContext): SectionNarrative 
     dataConfidenceStatement: buildDataConfidenceStatement(ctx.sectionId, ctx.dataQuality),
     methodologyFootnote: buildMethodologyFootnote(ctx.sectionId, ctx.dataQuality),
     aiGenerated: true,
+    usedFallback: true,
   };
 }
 
@@ -350,11 +359,15 @@ export async function generateAllSectionNarratives(params: {
   dataQuality?: DataQualityInfo;
   materiality?: MaterialityAssessmentSummary;
   reportFramingStatement?: string;
+  /** Bypass the cache (the cache key ignores tone, so tone changes MUST force). */
+  force?: boolean;
+  /** Free-text reviewer instruction (single-section regeneration). */
+  toneHint?: string;
 }): Promise<ReportNarratives> {
   const {
     organisationName, sector, reportingYear, previousYear,
     standards, audience, sections, reportData, dataQuality, materiality,
-    reportFramingStatement, tone,
+    reportFramingStatement, tone, force = false, toneHint,
   } = params;
 
   const SECTION_LABELS: Record<string, string> = {
@@ -463,7 +476,8 @@ export async function generateAllSectionNarratives(params: {
         dataQuality,
         materiality: materialityCtx,
         reportFramingStatement,
-      });
+        toneHint,
+      }, force);
     })
   );
 

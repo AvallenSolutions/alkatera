@@ -88,7 +88,8 @@ function SustainabilityReportsHub() {
 
   // While any report is still generating (kicked off from the funnel page),
   // refresh the list every few seconds so cards flip to Complete on their own.
-  const hasInFlight = reports.some(r => r.status !== 'completed' && r.status !== 'failed')
+  // Drafts are parked, not in flight: they never poll.
+  const hasInFlight = reports.some(r => r.status !== 'completed' && r.status !== 'failed' && r.status !== 'draft')
   useEffect(() => {
     if (!hasInFlight) return
     const interval = setInterval(fetchReportList, 5000)
@@ -151,7 +152,7 @@ function SustainabilityReportsHub() {
       // rows too but belong to the hospitality module, not the LCA count).
       supabase
         .from('product_carbon_footprints')
-        .select('id, products!inner(product_kind)', { count: 'exact', head: true })
+        .select('id, products!product_lcas_product_id_fkey!inner(product_kind)', { count: 'exact', head: true })
         .eq('organization_id', orgId)
         .eq('status', 'completed')
         .eq('products.product_kind', 'product')
@@ -281,6 +282,8 @@ function SustainabilityReportsHub() {
         return <StateChip tone="good" className="shrink-0">Complete</StateChip>
       case 'failed':
         return <StateChip tone="stale" className="shrink-0">Failed</StateChip>
+      case 'draft':
+        return <StateChip className="shrink-0">Draft</StateChip>
       default:
         return <StateChip tone="attention" className="shrink-0">Generating</StateChip>
     }
@@ -303,10 +306,11 @@ function SustainabilityReportsHub() {
   const tpComplete = tpHasTargets && tpHasMilestones && tpHasRisks
   const tpInProgress = (tpHasTargets || tpHasMilestones) && !tpComplete
 
-  // Treat any in-flight report older than 2 hours as stale (generation process died)
+  // Treat any in-flight report older than 2 hours as stale (generation process
+  // died). Drafts are exempt: parking one for days is legitimate.
   const TWO_HOURS_MS = 2 * 60 * 60 * 1000
   const isStaleGenerating = (r: GeneratedReport) =>
-    r.status !== 'completed' && r.status !== 'failed' &&
+    r.status !== 'completed' && r.status !== 'failed' && r.status !== 'draft' &&
     Date.now() - new Date(r.created_at).getTime() > TWO_HOURS_MS
   const activeReports = reports.filter(r => r.status !== 'failed' && !isStaleGenerating(r))
   const failedReports = reports.filter(r => r.status === 'failed' || isStaleGenerating(r))
@@ -449,6 +453,15 @@ function SustainabilityReportsHub() {
                   <p className="text-xs text-muted-foreground mb-auto">
                     Generated {formatDistanceToNow(new Date(report.created_at), { addSuffix: true })}
                   </p>
+
+                  {/* Draft: back into the review step */}
+                  {report.status === 'draft' && (
+                    <div className="flex flex-wrap gap-2 pt-3 mt-3 border-t border-studio-hairline">
+                      <PillButton size="sm" href={`/reports/builder?draft=${report.id}`}>
+                        Review draft
+                      </PillButton>
+                    </div>
+                  )}
 
                   {/* Actions — only for completed reports */}
                   {report.status === 'completed' && (

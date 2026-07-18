@@ -83,7 +83,7 @@ export function ReportingPeriodTimeline({
           temporal_anchor_end,
           status,
           aggregated_impacts,
-          product:products!inner(
+          product:products!product_lcas_product_id_fkey!inner(
             id,
             name
           )

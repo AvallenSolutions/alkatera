@@ -107,7 +107,7 @@ export async function POST(
       .select(
         `
         *,
-        products!inner(name, category),
+        products!product_lcas_product_id_fkey!inner(name, category),
         lca_interpretation_results(
           contribution_analysis,
           sensitivity_results,

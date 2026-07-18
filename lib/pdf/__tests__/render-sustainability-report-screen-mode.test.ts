@@ -161,6 +161,45 @@ describe('renderSustainabilityReportHtml — screen mode', () => {
   });
 });
 
+describe('renderSustainabilityReportHtml — AI-assisted draft marking', () => {
+  // The executive theme (investors) sets showNarratives: false, so these
+  // tests use the customers style, whose modern theme shows narratives.
+  const narrativeConfig = { ...minimalConfig, audience: 'customers' };
+  const narratives = (aiGenerated: boolean) => ({
+    executiveSummary: { primaryMessage: 'The headline.', summaryText: 'The summary.', aiGenerated },
+    sections: {
+      'scope-1-2-3': {
+        headlineInsight: 'Insight.', contextParagraph: 'Context.', nextStepPrompt: 'Next.',
+        dataConfidenceStatement: null, methodologyFootnote: null, aiGenerated,
+      },
+    },
+  });
+
+  it('marks unreviewed AI blocks with the mono note', () => {
+    const html = renderSustainabilityReportHtml(
+      narrativeConfig as any,
+      { ...minimalData, narratives: narratives(true) } as any
+    );
+    expect(html).toContain('AI-assisted draft');
+    expect(html).toContain('narrative-ai-note');
+  });
+
+  it('renders human-reviewed blocks clean', () => {
+    const html = renderSustainabilityReportHtml(
+      narrativeConfig as any,
+      { ...minimalData, narratives: narratives(false) } as any
+    );
+    // The narrative text renders, unmarked
+    expect(html).toContain('The headline.');
+    expect(html).not.toContain('AI-assisted draft');
+  });
+
+  it('renders nothing extra when there are no narratives', () => {
+    const html = renderSustainabilityReportHtml(minimalConfig as any, minimalData as any);
+    expect(html).not.toContain('AI-assisted draft');
+  });
+});
+
 describe('renderSustainabilityReportHtml — options default behaviour', () => {
   it('defaults to PDF mode when no options are provided', () => {
     const html = renderSustainabilityReportHtml(minimalConfig as any, minimalData as any);

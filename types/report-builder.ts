@@ -35,6 +35,8 @@ export interface ReportConfig {
   reportYears?: number[];
   /** Step 0 framing: what the report author wants the audience to take away */
   reportFramingStatement?: string;
+  /** Review-step tone override; unset = the style's own voice. */
+  toneOverride?: 'confident' | 'measured' | 'technical';
 }
 
 export interface ReportDefaults {
