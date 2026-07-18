@@ -1,14 +1,15 @@
 # Handoff: redesign — studio design system + sustainability report programme
-Updated: 2026-07-18 16:15 | Branch: redesign | Worktree: /Users/timej/Documents/GitHub/alkatera/.claude/worktrees/redesign | Dev port: 8896 (preview_start name "redesign"); a second config "redesign-verify" exists for sessions locked out of the first (harness may shift its port)
+Updated: 2026-07-18 16:40 | Branch: redesign | Worktree: /Users/timej/Documents/GitHub/alkatera/.claude/worktrees/redesign | Dev port: 8896 (preview_start name "redesign"); a second config "redesign-verify" exists for sessions locked out of the first (harness may shift its port)
 
 ## Goal
 The alkatera redesign ("house of rooms" studio design language) lives on branch `redesign`,
 auto-deployed on push to Vercel staging. Current programme: rebuild the DOCUMENT GENERATORS
 in the studio design and upgrade sustainability-report customisation (plan:
 `tasks/sustainability-report-redesign-plan.md`, phases A–E, Tim-approved order A→B→C→E→D).
-**ALL FIVE PHASES (A+B+C+D+E) ARE DONE — the report programme is complete.** Next work is
-staging click-throughs, the provenance-gate decision, and the design-scout leftovers.
-Redesign NEVER merges to main until go-live.
+**All five phases (A+B+C+D+E) are done.** IN FLIGHT: making the social and value-chain
+sections actually render, with honest "not yet measured" gaps — plan at
+`tasks/report-sections-plan.md`, step 1 of 10 shipped. Redesign NEVER merges to main
+until go-live.
 
 ## Done (verified)
 - **Confirmed-data gate fixed + widened (37777b31), verified live.** The gate only sat on the
@@ -104,7 +105,25 @@ Redesign NEVER merges to main until go-live.
 - Real PDFShift PDF generation post-redesign still not exercised (needs staging).
 
 ## In flight
-Nothing mid-edit. Worktree clean EXCEPT `lib/pulse/__tests__/widget-tier.test.ts`
+**Report sections: render them, and be honest about what is missing.** Full plan (approved by
+Tim) at `tasks/report-sections-plan.md` — 10 ordered steps, each independently green.
+STEP 1 SHIPPED (372c4f6e): `lib/reports/sections/types.ts` owns the five payload interfaces
+(moved out of the renderer), nullability tightened, and the notMeasured* skeleton helpers
+exist in the renderer. No production behaviour change yet.
+STEPS 2-10 REMAIN, and step 3 (six fetcher modules) is the bulk of the work.
+THE FINDING that started this: `assembleReportData` never fetches people / governance /
+community / suppliers / facilities; the page renderers early-return empty; and the sections
+are skipped because `dataAvailability.hasX` is never set. So ticking People & Culture yields
+a report with NO such page, silently. Facilities has no renderer at all. Predates Phase C.
+Four more silent failures found while planning, all scheduled in the plan: SECTION_TO_TOPIC
+values point at topic ids that do not exist (materiality callouts can never appear on
+governance/community/supply-chain); renderTargetsPage reads never-populated
+`data.governance`, so EVERY report ever generated says "No climate commitments have been
+recorded yet"; `app/api/reports/preview-data` counts four nonexistent tables and has zero
+callers; `app/api/reports/sample` passes 0-1 where the renderer wants 0-100.
+⚠️ HIGHEST-CONSEQUENCE LINE in the remaining work: `facility_emissions_aggregated.total_co2e`
+is in KG while every other figure in the renderer is tonnes. Divide by 1000, guarded on the
+`unit` column, or one site publishes at 1000x the whole company. Worktree clean EXCEPT `lib/pulse/__tests__/widget-tier.test.ts`
 (separate task-chip session, task_9f49442d — do not touch) and untracked supabase/.temp.
 
 ## Next
