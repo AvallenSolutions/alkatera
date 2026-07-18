@@ -368,8 +368,25 @@ export function FastTrackSetupStep() {
         initialJobPickupDoneRef.current = true
 
         if (canPickUpExistingJob) {
-          jobId = state.personalization!.scrapeJobId
-        } else {
+          // The stored job may already be dead: it failed while the user was
+          // on earlier steps, or it's a stale ID from a previous session that
+          // persisted in onboarding state (personalization survives reloads).
+          // Probe it once before trusting it — resuming a failed job would
+          // just report "couldn't read the site" instantly and, worse, block
+          // any fresh crawl of the same URL forever. Dead or unreachable →
+          // fall through to starting a new job below.
+          const candidate = state.personalization!.scrapeJobId
+          try {
+            const probe = await fetch(`/api/products/import-from-url/${candidate}`)
+            const probeData = await probe.json().catch(() => ({}))
+            if (probe.ok && probeData?.status && probeData.status !== 'failed') {
+              jobId = candidate
+            }
+          } catch {
+            // Probe failed — treat the stored job as dead and start fresh.
+          }
+        }
+        if (!jobId) {
           const start = await fetch('/api/products/import-from-url', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -384,7 +401,6 @@ export function FastTrackSetupStep() {
           }
           jobId = startBody.jobId as string
         }
-        if (!jobId) return
 
         // Poll up to ~60s. The crawl typically finishes well before that.
         let settled = false
