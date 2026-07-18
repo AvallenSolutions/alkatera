@@ -1772,6 +1772,25 @@ function renderUncertaintySensitivityPage(data: LCAReportData): string {
         </div>
       </div>
 
+      ${us.monteCarlo ? `
+      <div style="display: flex; gap: 16px; margin-bottom: 24px;">
+        <div class="metric-card" style="flex: 1; text-align: center;">
+          <div class="metric-label">Monte Carlo 95% Interval</div>
+          <div style="font-size: 18px; font-weight: 700;">${us.monteCarlo.p2_5} – ${us.monteCarlo.p97_5}</div>
+          <div style="font-size: 11px; color: #78716c;">kg CO₂e · ${us.monteCarlo.iterations.toLocaleString()} iterations · ±${us.monteCarlo.relative95IntervalPct}%</div>
+        </div>
+        <div class="metric-card" style="flex: 1; text-align: center;">
+          <div class="metric-label">Monte Carlo Mean</div>
+          <div style="font-size: 18px; font-weight: 700;">${us.monteCarlo.mean}</div>
+          <div style="font-size: 11px; color: #78716c;">kg CO₂e · CV ${us.monteCarlo.coefficientOfVariationPct}%</div>
+        </div>
+      </div>
+      <p style="font-size: 11px; color: #78716c; margin: 0 0 20px;">
+        Monte Carlo simulation samples each material emission factor independently from a lognormal
+        distribution (median = point estimate, log-space &sigma; = pedigree geometric standard deviation).
+        Emission factors are treated as uncorrelated across materials, which may understate the tail.
+      </p>
+      ` : ''}
       <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Sensitivity Analysis</h3>
       <p style="font-size: 13px; color: #78716c; margin-bottom: 16px;">${escapeHtml(us.sensitivityAnalysis.method)}</p>
       ${paramsHtml}

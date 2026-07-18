@@ -280,6 +280,18 @@ export interface LCAReportData {
       }>;
       conclusion: string;
     };
+    monteCarlo?: {
+      iterations: number;
+      seed: number;
+      mean: number;
+      median: number;
+      p2_5: number;
+      p97_5: number;
+      stdDev: number;
+      coefficientOfVariationPct: number;
+      relative95IntervalPct: number;
+      assumptions: string[];
+    };
   };
 
   /** ISO 14044 §6 Critical review disclosure */

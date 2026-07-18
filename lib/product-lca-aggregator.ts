@@ -22,6 +22,7 @@ import {
   assessMaterialDataQuality,
   assessAggregateDataQuality,
   propagateUncertainty,
+  runMonteCarloSimulation,
   type MaterialDataQuality,
 } from './data-quality-assessment';
 import { generateInterpretation } from './lca-interpretation';
@@ -1129,6 +1130,7 @@ export async function aggregateProductImpacts(
 
   const aggregateQuality = assessAggregateDataQuality(materialAssessments);
   const propagatedUncertaintyPct = propagateUncertainty(materialAssessments, totalCarbonFootprint);
+  const monteCarlo = runMonteCarloSimulation(materialAssessments);
 
   // 95% confidence interval for total footprint (lognormal distribution)
   const uncertaintyFraction = propagatedUncertaintyPct / 100;
@@ -1408,6 +1410,20 @@ export async function aggregateProductImpacts(
         parameters: sensitivityResults,
         conclusion: sensitivityConclusion,
       },
+      monte_carlo: monteCarlo
+        ? {
+            iterations: monteCarlo.iterations,
+            seed: monteCarlo.seed,
+            mean: monteCarlo.mean,
+            median: monteCarlo.median,
+            p2_5: monteCarlo.p2_5,
+            p97_5: monteCarlo.p97_5,
+            std_dev: monteCarlo.stdDev,
+            coefficient_of_variation_pct: monteCarlo.coefficientOfVariationPct,
+            relative_95_interval_pct: monteCarlo.relative95IntervalPct,
+            assumptions: monteCarlo.assumptions,
+          }
+        : null,
     },
 
     // MAJOR 1: LULUC CO₂e justification note (ISO 14067 §6.4.9.4)

@@ -3,6 +3,7 @@ import {
   assessMaterialDataQuality,
   assessAggregateDataQuality,
   propagateUncertainty,
+  runMonteCarloSimulation,
   calculatePedigreeDqi,
   calculateTemporalScore,
   calculateGeographicalScore,
@@ -961,5 +962,96 @@ describe('edge cases', () => {
       expect(pa[key]).toBeGreaterThanOrEqual(1);
       expect(pa[key]).toBeLessThanOrEqual(5);
     }
+  });
+});
+
+
+// ============================================================================
+// runMonteCarloSimulation
+// ============================================================================
+
+describe('runMonteCarloSimulation', () => {
+  it('returns null when there are no active (positive-impact) materials', () => {
+    expect(runMonteCarloSimulation([])).toBeNull();
+    expect(runMonteCarloSimulation([makeAssessedMaterial({ impactValue: 0 })])).toBeNull();
+  });
+
+  it('is deterministic for identical inputs (default seed)', () => {
+    const mats = [
+      makeAssessedMaterial({ materialId: 'a', impactValue: 10, uncertaintyPercent: 20 }),
+      makeAssessedMaterial({ materialId: 'b', impactValue: 20, uncertaintyPercent: 30 }),
+    ];
+    const a = runMonteCarloSimulation(mats, { iterations: 4000 });
+    const b = runMonteCarloSimulation(mats, { iterations: 4000 });
+    expect(a).toEqual(b);
+  });
+
+  it('is deterministic for an explicit seed', () => {
+    const mats = [makeAssessedMaterial({ impactValue: 15, uncertaintyPercent: 25 })];
+    const a = runMonteCarloSimulation(mats, { iterations: 4000, seed: 123 });
+    const b = runMonteCarloSimulation(mats, { iterations: 4000, seed: 123 });
+    expect(a!.mean).toBe(b!.mean);
+    expect(a!.p2_5).toBe(b!.p2_5);
+    expect(a!.p97_5).toBe(b!.p97_5);
+  });
+
+  it('95% interval brackets the mean and median', () => {
+    const mats = [
+      makeAssessedMaterial({ materialId: 'a', impactValue: 10, uncertaintyPercent: 20 }),
+      makeAssessedMaterial({ materialId: 'b', impactValue: 5, uncertaintyPercent: 40 }),
+    ];
+    const r = runMonteCarloSimulation(mats)!;
+    expect(r.p2_5).toBeLessThan(r.mean);
+    expect(r.mean).toBeLessThan(r.p97_5);
+    expect(r.p2_5).toBeLessThan(r.median);
+    expect(r.median).toBeLessThan(r.p97_5);
+  });
+
+  it('matches the analytical lognormal for a single material', () => {
+    // M = 10, sigma_g = 0.2 -> mean = M*exp(s^2/2) = 10.202, median = 10,
+    // p2.5 = 10*exp(-1.96*0.2) = 6.757, p97.5 = 10*exp(1.96*0.2) = 14.798
+    const r = runMonteCarloSimulation(
+      [makeAssessedMaterial({ impactValue: 10, uncertaintyPercent: 20 })],
+      { iterations: 20000 }
+    )!;
+    expect(Math.abs(r.mean - 10.202) / 10.202).toBeLessThan(0.05);
+    expect(Math.abs(r.median - 10) / 10).toBeLessThan(0.05);
+    expect(Math.abs(r.p2_5 - 6.757) / 6.757).toBeLessThan(0.1);
+    expect(Math.abs(r.p97_5 - 14.798) / 14.798).toBeLessThan(0.1);
+    expect(r.relative95IntervalPct).toBeGreaterThan(30);
+    expect(r.relative95IntervalPct).toBeLessThan(50);
+  });
+
+  it('collapses to a point when uncertainty is negligible', () => {
+    const r = runMonteCarloSimulation(
+      [makeAssessedMaterial({ impactValue: 42, uncertaintyPercent: 0.1 })],
+      { iterations: 4000 }
+    )!;
+    expect(r.relative95IntervalPct).toBe(0);
+    expect(Math.abs(r.p97_5 - r.p2_5)).toBeLessThan(0.5);
+    expect(Math.abs(r.median - 42)).toBeLessThan(0.2);
+  });
+
+  it('higher input uncertainty widens the interval', () => {
+    const low = runMonteCarloSimulation(
+      [makeAssessedMaterial({ impactValue: 10, uncertaintyPercent: 10 })],
+      { iterations: 8000, seed: 7 }
+    )!;
+    const high = runMonteCarloSimulation(
+      [makeAssessedMaterial({ impactValue: 10, uncertaintyPercent: 40 })],
+      { iterations: 8000, seed: 7 }
+    )!;
+    expect(high.relative95IntervalPct).toBeGreaterThan(low.relative95IntervalPct);
+  });
+
+  it('records iterations, seed and the stated v1 assumptions', () => {
+    const r = runMonteCarloSimulation(
+      [makeAssessedMaterial({ impactValue: 10, uncertaintyPercent: 20 })],
+      { iterations: 1000 }
+    )!;
+    expect(r.iterations).toBe(1000);
+    expect(Number.isFinite(r.seed)).toBe(true);
+    expect(r.assumptions.length).toBeGreaterThan(0);
+    expect(r.assumptions.some((a) => /uncorrelated/i.test(a))).toBe(true);
   });
 });
