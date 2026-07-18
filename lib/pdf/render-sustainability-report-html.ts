@@ -854,7 +854,7 @@ function renderExecSummaryPage(config: ReportConfig, data: ReportData, theme?: R
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('01', 'Executive Summary', false, false, brandColor, theme)}
+      ${renderSectionHeader('__SECTION_NUM__', 'Executive Summary', false, false, brandColor, theme)}
 
       ${(theme?.showNarratives !== false) && execNarrative ? renderExecutiveSummaryNarrativeBlock(execNarrative) : ''}
 
@@ -951,7 +951,7 @@ function renderEmissionsPage(config: ReportConfig, data: ReportData, theme?: Rep
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('02', 'Emissions Breakdown', false, false, getBrandColor(config), theme)}
+      ${renderSectionHeader('__SECTION_NUM__', 'Emissions Breakdown', false, false, getBrandColor(config), theme)}
 
       ${renderMaterialityCallout(config, 'scope-1-2-3', data)}
       ${(theme?.showNarratives !== false) && emissionsNarrative ? renderNarrativeBlock(emissionsNarrative) : ''}
@@ -1050,12 +1050,9 @@ function renderKeyFindingsPage(config: ReportConfig, data: ReportData, theme?: R
         </div>
         <p style="font-size: 13px; color: #1A1B1D; line-height: 1.6; margin-bottom: 14px;">${escapeHtml(f.narrative)}</p>
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-          <span style="display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 500; font-family: 'JetBrains Mono', monospace; background: #ECEAE3; color: #6F6F68; text-transform: uppercase; letter-spacing: 1px;">${escapeHtml(f.scope)}</span>
-          <span style="display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 600; background: ${isDecrease ? '#F2F1EA' : '#F2F1EA'}; color: ${isDecrease ? '#047857' : '#BE123C'};">${directionLabel} ${Math.abs(f.magnitude_pct).toFixed(1)}%</span>
-          <span style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 500; background: #ECEAE3; color: ${confidenceColour};">
-            <span style="width: 6px; height: 6px; border-radius: 50%; background: ${confidenceColour}; display: inline-block;"></span>
-            ${escapeHtml(f.confidence)} confidence
-          </span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #6F6F68;">${escapeHtml(f.scope)}</span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: ${isDecrease ? '#047857' : '#BE123C'};">${directionLabel} ${Math.abs(f.magnitude_pct).toFixed(1)}%</span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: ${confidenceColour};">${escapeHtml(f.confidence)} confidence</span>
         </div>
       </div>`;
   }).join('');
@@ -1064,7 +1061,7 @@ function renderKeyFindingsPage(config: ReportConfig, data: ReportData, theme?: R
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('02', 'Key Findings', false, false, getBrandColor(config), theme)}
+      ${renderSectionHeader('__SECTION_NUM__', 'Key Findings', false, false, getBrandColor(config), theme)}
 
       ${(theme?.showNarratives !== false) && keyFindingsNarrative ? renderNarrativeBlock(keyFindingsNarrative) : ''}
 
@@ -1103,7 +1100,7 @@ function renderTrendsPage(config: ReportConfig, data: ReportData, theme?: Report
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('03', 'Emissions Trends', false, false, getBrandColor(config), theme)}
+      ${renderSectionHeader('__SECTION_NUM__', 'Emissions Trends', false, false, getBrandColor(config), theme)}
 
       ${(theme?.showNarratives !== false) && trendsNarrative ? renderNarrativeBlock(trendsNarrative) : ''}
 
@@ -1180,7 +1177,7 @@ function renderProductsPage(config: ReportConfig, data: ReportData, theme?: Repo
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('04', 'Product Impact', false, false, getBrandColor(config), theme)}
+      ${renderSectionHeader('__SECTION_NUM__', 'Product Impact', false, false, getBrandColor(config), theme)}
 
       ${(theme?.showNarratives !== false) && productsNarrative ? renderNarrativeBlock(productsNarrative) : ''}
 
@@ -1241,7 +1238,7 @@ function renderVineyardsPage(config: ReportConfig, data: ReportData, theme?: Rep
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('05', 'Viticulture & Land Stewardship', false, false, getBrandColor(config), theme)}
+      ${renderSectionHeader('__SECTION_NUM__', 'Viticulture & Land Stewardship', false, false, getBrandColor(config), theme)}
 
       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
         <div class="metric-card" style="text-align: center;">
@@ -1309,7 +1306,7 @@ function renderPeopleCulturePage(config: ReportConfig, data: ReportData, theme?:
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('05', 'People & Culture', false, false, brandColor, theme)}
+      ${renderSectionHeader('__SECTION_NUM__', 'People & Culture', false, false, brandColor, theme)}
 
       ${renderMaterialityCallout(config, 'people', data)}
       ${(theme?.showNarratives !== false) && peopleCultureNarrative ? renderNarrativeBlock(peopleCultureNarrative) : ''}
@@ -1401,7 +1398,7 @@ function renderGovernancePage(config: ReportConfig, data: ReportData, theme?: Re
     <tr>
       <td style="font-weight: 500;">${escapeHtml(p.name)}</td>
       <td style="font-size: 11px; color: #6F6F68;">${escapeHtml(p.type)}</td>
-      <td><span style="display: inline-block; padding: 2px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; background: ${statusColor}20; color: ${statusColor};">${escapeHtml(p.status)}</span></td>
+      <td><span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: ${statusColor};">${escapeHtml(p.status)}</span></td>
       <td>${p.isPublic ? '&#10003; Public' : 'Internal'}</td>
     </tr>`;
   }).join('');
@@ -1410,7 +1407,7 @@ function renderGovernancePage(config: ReportConfig, data: ReportData, theme?: Re
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('06', 'Governance', false, false, getBrandColor(config), theme)}
+      ${renderSectionHeader('__SECTION_NUM__', 'Governance', false, false, getBrandColor(config), theme)}
 
       ${renderMaterialityCallout(config, 'governance', data)}
       ${(theme?.showNarratives !== false) && governanceNarrative ? renderNarrativeBlock(governanceNarrative) : ''}
@@ -1480,7 +1477,7 @@ function renderCommunityImpactPage(config: ReportConfig, data: ReportData, theme
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('07', 'Community Impact', false, false, brandColor, theme)}
+      ${renderSectionHeader('__SECTION_NUM__', 'Community Impact', false, false, brandColor, theme)}
 
       ${renderMaterialityCallout(config, 'community', data)}
       ${(theme?.showNarratives !== false) && communityNarrative ? renderNarrativeBlock(communityNarrative) : ''}
@@ -1582,7 +1579,7 @@ function renderSupplyChainPage(config: ReportConfig, data: ReportData, theme?: R
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('08', 'Supply Chain', false, false, getBrandColor(config), theme)}
+      ${renderSectionHeader('__SECTION_NUM__', 'Supply Chain', false, false, getBrandColor(config), theme)}
 
       ${renderMaterialityCallout(config, 'supply-chain', data)}
       ${(theme?.showNarratives !== false) && supplyChainNarrative ? renderNarrativeBlock(supplyChainNarrative) : ''}
@@ -1625,7 +1622,7 @@ function renderTargetsPage(config: ReportConfig, data: ReportData, theme?: Repor
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('09', 'Targets & Commitments', false, false, brandColor, theme)}
+      ${renderSectionHeader('__SECTION_NUM__', 'Targets & Commitments', false, false, brandColor, theme)}
 
       ${(theme?.showNarratives !== false) && targetsNarrative ? renderNarrativeBlock(targetsNarrative) : ''}
 
@@ -1648,8 +1645,8 @@ function renderTargetsPage(config: ReportConfig, data: ReportData, theme?: Repor
         <div style="font-size: 11px; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 2px; color: #6F6F68; margin-bottom: 12px;">UN Sustainable Development Goals</div>
         <div style="display: flex; flex-wrap: wrap; gap: 8px;">
           ${data.governance.sdgCommitments.map(sdg => `
-            <div style="width: 48px; height: 48px; border-radius: 8px; background: #1A1B1D; display: flex; align-items: center; justify-content: center;">
-              <span style="font-size: 18px; font-weight: 700; color: ${brandColor};">${sdg}</span>
+            <div style="width: 48px; height: 48px; border-radius: 6px; background: ${brandColor}; display: flex; align-items: center; justify-content: center;">
+              <span style="font-family: ${SG}; font-size: 18px; font-weight: 700; color: ${onBand(brandColor).fg}; font-variant-numeric: tabular-nums;">${sdg}</span>
             </div>
           `).join('')}
         </div>
@@ -1693,7 +1690,7 @@ function renderMethodologyPage(config: ReportConfig, data: ReportData, theme?: R
     <tr>
       <td style="font-weight: 500;">${escapeHtml(s.code)}</td>
       <td>${escapeHtml(s.name)}</td>
-      <td><span style="display: inline-block; padding: 2px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; background: ${statusColor}20; color: ${statusColor};">${escapeHtml(s.status)}</span></td>
+      <td><span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: ${statusColor};">${escapeHtml(s.status)}</span></td>
       <td style="font-size: 11px; color: #6F6F68;">${escapeHtml(s.detail)}</td>
     </tr>`;
   }).join('');
@@ -1707,7 +1704,7 @@ function renderMethodologyPage(config: ReportConfig, data: ReportData, theme?: R
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('10', 'Methodology & Standards', false, false, getBrandColor(config), theme)}
+      ${renderSectionHeader('__SECTION_NUM__', 'Methodology & Standards', false, false, getBrandColor(config), theme)}
 
       <div style="font-size: 9px; font-family: 'JetBrains Mono', monospace; color: #6F6F68; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">REPORTING FRAMEWORK COMPLIANCE</div>
 
@@ -2031,7 +2028,7 @@ function renderTransitionRoadmapPage(config: ReportConfig, data: ReportData, the
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('T1', 'Transition Roadmap', false, false, brandColor, theme)}
+      ${renderSectionHeader('__SECTION_NUM__', 'Transition Roadmap', false, false, brandColor, theme)}
 
       <div style="display: flex; gap: 32px;">
         <!-- Timeline (left) -->
@@ -2127,7 +2124,7 @@ function renderRisksOpportunitiesPage(config: ReportConfig, data: ReportData, th
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('T2', 'Climate Risks & Opportunities', false, false, getBrandColor(config), theme)}
+      ${renderSectionHeader('__SECTION_NUM__', 'Climate Risks & Opportunities', false, false, getBrandColor(config), theme)}
 
       <p style="font-size: 12px; color: #6F6F68; margin-bottom: 20px; line-height: 1.5;">
         The following risks and opportunities were identified through analysis of ${escapeHtml(data.organization?.name || 'the organisation')}'s
@@ -2292,8 +2289,13 @@ export function renderSustainabilityReportHtml(
 
   // Replace __PAGE_NUM__ placeholders with sequential page numbers.
   // The cover page has no page number, so the first __PAGE_NUM__ is page 1.
+  // Section numbers are computed the same way: the style's narrative order
+  // decides the sequence, so hardcoded numbers would lie after reordering.
   let pageCounter = 0;
-  const pagesWithNumbers = pages.replace(/__PAGE_NUM__/g, () => String(++pageCounter));
+  let sectionCounter = 0;
+  const pagesWithNumbers = pages
+    .replace(/__SECTION_NUM__/g, () => String(++sectionCounter).padStart(2, '0'))
+    .replace(/__PAGE_NUM__/g, () => String(++pageCounter));
 
   const brandColor = getBrandColor(config);
 
