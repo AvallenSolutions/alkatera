@@ -35,6 +35,9 @@ export function useReportBuilder() {
     if (defaults.audience) {
       partial.audience = defaults.audience;
     }
+    if (defaults.style) {
+      partial.style = defaults.style;
+    }
     if (defaults.standards && defaults.standards.length > 0) {
       partial.standards = defaults.standards;
     }
@@ -70,13 +73,24 @@ export function useReportBuilder() {
         branding: config.branding,
         audience: config.audience,
         standards: config.standards,
+        style: config.style,
         template: config.template,
         orientation: config.orientation,
       };
 
+      // report_defaults is a shared jsonb column (hospitality also keeps
+      // band thresholds and marketplace flags on it), so merge rather than
+      // overwrite.
+      const { data: existingRow } = await supabase
+        .from('organizations')
+        .select('report_defaults')
+        .eq('id', orgId)
+        .maybeSingle();
+      const existing = (existingRow?.report_defaults as Record<string, unknown>) || {};
+
       const { error } = await supabase
         .from('organizations')
-        .update({ report_defaults: defaults })
+        .update({ report_defaults: { ...existing, ...defaults } })
         .eq('id', orgId);
 
       if (error) {

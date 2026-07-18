@@ -41,6 +41,7 @@ export interface ReportDefaults {
   branding: ReportConfig['branding'];
   audience: ReportConfig['audience'];
   standards: string[];
+  style?: ReportConfig['style'];
   template?: ReportConfig['template'];
   orientation?: ReportConfig['orientation'];
 }
@@ -233,65 +234,6 @@ export const SECTION_CATEGORIES = [
   'Strategy',
   'Compliance',
   'Technical',
-];
-
-/**
- * The five audience-led report styles. Each bundles the reader, the look
- * (theme), the narrative structure and the tone of voice; picking one is the
- * builder's primary choice. Section/standard suggestions land as editable
- * defaults.
- */
-export const REPORT_STYLE_CHOICES = [
-  {
-    value: 'marketing' as const,
-    label: 'Marketing',
-    description: 'Storytelling and imagery, brand-forward',
-    audience: 'customers' as const,
-    template: 'narrative',
-    sections: ['executive-summary', 'scope-1-2-3', 'key-findings', 'community-impact', 'people-culture', 'product-footprints', 'targets'],
-    standards: ['ghg-protocol'],
-    cues: ['The story of the year, told through people and progress', 'Hero photography, chapter dividers and the leadership foreword', 'A few numbers that carry the story, not tables of them'],
-  },
-  {
-    value: 'customers' as const,
-    label: 'Customers',
-    description: 'Product focus, plain and honest',
-    audience: 'customers' as const,
-    template: 'modern',
-    sections: ['executive-summary', 'scope-1-2-3', 'product-footprints', 'key-findings', 'trends', 'targets'],
-    standards: ['iso-14067'],
-    cues: ['Per-product footprints front and centre', 'What changed this year, in plain language', 'Honest about what is not yet measured'],
-  },
-  {
-    value: 'compliance' as const,
-    label: 'Compliance',
-    description: 'The full technical document, standards-first',
-    audience: 'regulators' as const,
-    template: 'data-dense',
-    sections: ['executive-summary', 'scope-1-2-3', 'trends', 'key-findings', 'product-footprints', 'supply-chain', 'governance', 'targets', 'transition-roadmap', 'risks-and-opportunities', 'methodology', 'regulatory'],
-    standards: ['csrd', 'iso-14064', 'gri'],
-    cues: ['Framework compliance (CSRD, GRI, ISO)', 'Methodology transparency and data quality', 'Complete disclosure, tables before stories'],
-  },
-  {
-    value: 'investors' as const,
-    label: 'Investors &amp; Board'.replace('&amp;', '&'),
-    description: 'Financially focused board brief',
-    audience: 'investors' as const,
-    template: 'executive',
-    sections: ['executive-summary', 'scope-1-2-3', 'targets', 'risks-and-opportunities', 'trends', 'transition-roadmap', 'key-findings', 'governance'],
-    standards: ['csrd', 'tcfd'],
-    cues: ['Material risks, targets and transition economics first', 'Emissions connected to cost and revenue exposure', 'Board-brief register: landscape, metrics-led'],
-  },
-  {
-    value: 'supply-chain' as const,
-    label: 'Supply Chain Partners',
-    description: 'Collaborative, with mutual goals',
-    audience: 'supply-chain' as const,
-    template: 'modern',
-    sections: ['executive-summary', 'scope-1-2-3', 'supply-chain', 'key-findings', 'targets', 'transition-roadmap'],
-    standards: ['ghg-protocol'],
-    cues: ['Shared footprint and joint achievements', 'What we ask of partners next, and the support offered', 'Mutual goals over one-way reporting'],
-  },
 ];
 
 export const AUDIENCE_TYPES = [

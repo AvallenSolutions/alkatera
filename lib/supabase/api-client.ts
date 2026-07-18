@@ -5,6 +5,13 @@ import type { Database } from '@/types/db_types'
 import { getSupabaseServerClient } from './server-client'
 import { getSupabasePortalServerClient } from './portal-server-client'
 
+// Next.js patches global fetch and, in routes that never touch next/headers,
+// caches outbound Supabase GETs (PostgREST selects, storage downloads) across
+// invocations even under dynamic = 'force-dynamic' — a revoked share link kept
+// serving its cached document until this override. no-store on every call is
+// what makes service-role reads actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' })
+
 /**
  * Create a Supabase admin client using the service role key.
  * This bypasses RLS and the PostgREST schema cache restrictions,
@@ -23,6 +30,7 @@ function getServiceRoleClient() {
       autoRefreshToken: false,
       persistSession: false,
     },
+    global: { fetch: noStoreFetch },
   })
 }
 

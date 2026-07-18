@@ -46,6 +46,10 @@ export interface ReportStyle {
   sectionOrder: string[];
   /** Sections preselected when this style is chosen in the builder. */
   defaultSections: string[];
+  /** Reporting standards preselected when this style is chosen. */
+  defaultStandards: string[];
+  /** Three short lines the builder shows for the selected style. */
+  cues: string[];
 }
 
 const CORE = ['executive-summary', 'scope-1-2-3'];
@@ -66,6 +70,12 @@ export const REPORT_STYLES: Record<ReportStyleId, ReportStyle> = {
       'supply-chain', 'governance', 'methodology',
     ],
     defaultSections: [...CORE, 'key-findings', 'community-impact', 'people-culture', 'product-footprints', 'targets'],
+    defaultStandards: ['ghg-protocol'],
+    cues: [
+      'The story of the year, told through people and progress',
+      'Hero photography, chapter dividers and the leadership foreword',
+      'A few numbers that carry the story, not tables of them',
+    ],
   },
   customers: {
     id: 'customers',
@@ -82,6 +92,12 @@ export const REPORT_STYLES: Record<ReportStyleId, ReportStyle> = {
       'governance', 'methodology',
     ],
     defaultSections: [...CORE, 'product-footprints', 'key-findings', 'trends', 'targets'],
+    defaultStandards: ['iso-14067'],
+    cues: [
+      'Per-product footprints front and centre',
+      'What changed this year, in plain language',
+      'Honest about what is not yet measured',
+    ],
   },
   compliance: {
     id: 'compliance',
@@ -103,6 +119,12 @@ export const REPORT_STYLES: Record<ReportStyleId, ReportStyle> = {
       'governance', 'targets', 'transition-roadmap', 'risks-and-opportunities',
       'methodology', 'regulatory',
     ],
+    defaultStandards: ['csrd', 'iso-14064', 'gri'],
+    cues: [
+      'Framework compliance (CSRD, GRI, ISO)',
+      'Methodology transparency and data quality',
+      'Complete disclosure, tables before stories',
+    ],
   },
   investors: {
     id: 'investors',
@@ -119,6 +141,12 @@ export const REPORT_STYLES: Record<ReportStyleId, ReportStyle> = {
       'product-footprints', 'supply-chain', 'methodology',
     ],
     defaultSections: [...CORE, 'targets', 'risks-and-opportunities', 'trends', 'transition-roadmap', 'key-findings', 'governance'],
+    defaultStandards: ['csrd', 'tcfd'],
+    cues: [
+      'Material risks, targets and transition economics first',
+      'Emissions connected to cost and revenue exposure',
+      'Board-brief register: landscape, metrics-led',
+    ],
   },
   'supply-chain': {
     id: 'supply-chain',
@@ -135,6 +163,12 @@ export const REPORT_STYLES: Record<ReportStyleId, ReportStyle> = {
       'governance', 'methodology',
     ],
     defaultSections: [...CORE, 'supply-chain', 'key-findings', 'targets', 'transition-roadmap'],
+    defaultStandards: ['ghg-protocol'],
+    cues: [
+      'Shared footprint and joint achievements',
+      'What we ask of partners next, and the support offered',
+      'Mutual goals over one-way reporting',
+    ],
   },
 };
 

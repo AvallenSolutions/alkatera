@@ -39,6 +39,7 @@ const DISALLOW = [
   '/team-invite/',
   '/advisor-invite/',
   '/r/', // private per-prospect footprint reports (capability-token links)
+  '/report/', // shared sustainability reports (capability-token links)
 ];
 
 // AI crawlers. Explicitly allowed (same private-path exclusions as everyone

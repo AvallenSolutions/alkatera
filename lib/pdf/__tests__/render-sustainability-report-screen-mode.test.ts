@@ -37,8 +37,17 @@ describe('renderSustainabilityReportHtml — PDF mode (default)', () => {
     expect(html).toContain('Acme Brewery');
   });
 
-  it('includes fixed A4 page dimensions', () => {
+  it('includes fixed A4 page dimensions (landscape for the investors style)', () => {
+    // audience: 'investors' resolves to the Investors & Board style, whose
+    // executive theme is landscape A4.
     const html = renderSustainabilityReportHtml(minimalConfig as any, minimalData as any);
+    expect(html).toContain('width: 1123px');
+    expect(html).toContain('height: 794px');
+  });
+
+  it('renders portrait A4 for a portrait style (compliance)', () => {
+    const config = { ...minimalConfig, audience: 'regulators' };
+    const html = renderSustainabilityReportHtml(config as any, minimalData as any);
     expect(html).toContain('width: 794px');
     expect(html).toContain('height: 1123px');
   });
@@ -60,9 +69,14 @@ describe('renderSustainabilityReportHtml — PDF mode (default)', () => {
     expect(html).not.toContain('max-width: 860px');
   });
 
-  it('includes @page rule for A4', () => {
+  it('includes an @page rule matching the theme orientation', () => {
     const html = renderSustainabilityReportHtml(minimalConfig as any, minimalData as any);
-    expect(html).toContain('@page { size: A4; margin: 0; }');
+    expect(html).toContain('@page { size: A4 landscape; margin: 0; }');
+    const portrait = renderSustainabilityReportHtml(
+      { ...minimalConfig, audience: 'regulators' } as any,
+      minimalData as any
+    );
+    expect(portrait).toContain('@page { size: A4; margin: 0; }');
   });
 
   it('includes report name in title tag', () => {
@@ -141,22 +155,22 @@ describe('renderSustainabilityReportHtml — screen mode', () => {
     expect(html).toContain('Acme Brewery');
   });
 
-  it('background is light grey for screen reading', () => {
+  it('background is the studio cream for screen reading', () => {
     const html = renderSustainabilityReportHtml(minimalConfig as any, minimalData as any, { screenMode: true });
-    expect(html).toContain('background: #f5f5f4');
+    expect(html).toContain('background: #F2F1EA');
   });
 });
 
 describe('renderSustainabilityReportHtml — options default behaviour', () => {
   it('defaults to PDF mode when no options are provided', () => {
     const html = renderSustainabilityReportHtml(minimalConfig as any, minimalData as any);
-    expect(html).toContain('height: 1123px');
+    expect(html).toContain('height: 794px');
     expect(html).not.toContain('class="screen-nav"');
   });
 
   it('defaults to PDF mode when screenMode is explicitly false', () => {
     const html = renderSustainabilityReportHtml(minimalConfig as any, minimalData as any, { screenMode: false });
-    expect(html).toContain('height: 1123px');
+    expect(html).toContain('height: 794px');
     expect(html).not.toContain('class="screen-nav"');
   });
 });

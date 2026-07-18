@@ -1,44 +1,105 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Zap, ArrowLeft, ArrowRight, FileText } from 'lucide-react';
-import { Eyebrow } from '@/components/studio';
-import { WizardStepIndicator } from '@/components/report-builder/WizardStepIndicator';
-import { FramingStep, getAudienceDefaults } from '@/components/report-builder/FramingStep';
-import { ReportPreviewPanel } from '@/components/report-builder/ReportPreviewPanel';
-import { ConfigureStep } from '@/components/report-builder/ConfigureStep';
-import { ContentSelectionStep } from '@/components/report-builder/ContentSelectionStep';
-import { ReviewStep } from '@/components/report-builder/ReviewStep';
-import { QuickGenerateDialog } from '@/components/report-builder/QuickGenerateDialog';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { format } from 'date-fns';
+import { Statement, Panel, FieldLabel, PillButton } from '@/components/studio';
+import { StylePicker } from '@/components/report-builder/StylePicker';
+import { FunnelSections } from '@/components/report-builder/FunnelSections';
+import { FunnelBranding } from '@/components/report-builder/FunnelBranding';
 import { GenerationProgress } from '@/components/report-builder/GenerationProgress';
 import { useReportBuilder } from '@/hooks/useReportBuilder';
 import { useReportProgress } from '@/hooks/useReportProgress';
+import {
+  useReportDataAvailability,
+  sectionHasData,
+} from '@/hooks/useReportDataAvailability';
 import { useOrganization } from '@/lib/organizationContext';
 import { useToast } from '@/hooks/use-toast';
-import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
+import { PageLoader } from '@/components/ui/page-loader';
+import { cn } from '@/lib/utils';
 import type { ReportConfig } from '@/types/report-builder';
+import { REPORTING_STANDARDS, STANDARDS_LABELS } from '@/types/report-builder';
+import {
+  REPORT_STYLES,
+  resolveReportStyle,
+  type ReportStyleId,
+} from '@/lib/pdf/templates/report-styles';
 
-const WIZARD_STEPS = [
-  { label: 'Framing', description: 'Audience and intent' },
-  { label: 'Configure', description: 'Name, year, format' },
-  { label: 'Select Content', description: 'Choose report sections' },
-  { label: 'Review & Generate', description: 'Branding and final review' },
-];
+const quietInputClass =
+  'h-9 w-full rounded-none border-0 border-b-2 border-studio-hairline bg-transparent px-0 font-display text-sm font-semibold shadow-none outline-none focus-visible:border-studio-forest focus-visible:ring-0';
 
-export default function ReportBuilderPage() {
+/** A fact the funnel already answered: bold value with a quiet Edit
+ * tap-target that swaps in the live control, one way (the arrival idiom). */
+function ConfirmedValue({ value, onEdit }: { value: ReactNode; onEdit: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onEdit}
+      className="group flex w-full items-baseline justify-between gap-3 text-left"
+    >
+      <span className="min-w-0 flex-1 truncate font-display text-sm font-semibold text-foreground">
+        {value}
+      </span>
+      <span className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground transition-colors duration-150 ease-studio group-hover:text-foreground">
+        Edit
+      </span>
+    </button>
+  );
+}
+
+function FactRow({
+  label,
+  editing,
+  confirmed,
+  onEdit,
+  children,
+}: {
+  label: string;
+  editing: boolean;
+  confirmed: ReactNode;
+  onEdit: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="py-3.5 first:pt-0 last:pb-0">
+      <FieldLabel className="mb-1.5">{label}</FieldLabel>
+      {editing ? children : <ConfirmedValue value={confirmed} onEdit={onEdit} />}
+    </div>
+  );
+}
+
+/** Small toggle pill for inline choices (years, standards, format). */
+function ChoicePill({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        'inline-flex h-7 items-center rounded-full px-3 text-xs font-medium transition-colors duration-150 ease-studio',
+        active
+          ? 'bg-studio-ink text-studio-cream'
+          : 'border border-studio-ink/25 text-foreground hover:border-studio-ink/60'
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+export default function ReportFunnelPage() {
   const { toast } = useToast();
   const { currentOrganization } = useOrganization();
-  const { generateReport, saveDefaults, loadDefaults, loading: generating } = useReportBuilder();
+  const { generateReport, loadDefaults, loading: generating } = useReportBuilder();
   const currentYear = new Date().getFullYear();
-
-  const [step, setStep] = useState(1);
-  const [quickGenerateOpen, setQuickGenerateOpen] = useState(false);
-  const [generatingReportId, setGeneratingReportId] = useState<string | null>(null);
-  const [defaultsSaved, setDefaultsSaved] = useState(false);
-  const [smartDefaultsApplied, setSmartDefaultsApplied] = useState(false);
-  const [applyingDefaults, setApplyingDefaults] = useState(false);
 
   const [config, setConfig] = useState<ReportConfig>({
     reportName: `Sustainability Report ${currentYear}`,
@@ -46,289 +107,351 @@ export default function ReportBuilderPage() {
     reportingPeriodStart: `${currentYear}-01-01`,
     reportingPeriodEnd: `${currentYear}-12-31`,
     audience: 'investors',
+    style: 'investors',
     outputFormat: 'pdf',
-    template: 'classic',
-    standards: ['csrd', 'iso-14067'],
+    template: 'executive',
+    standards: ['csrd', 'tcfd'],
     sections: ['executive-summary'],
-    branding: {
-      logo: null,
-      primaryColor: '#2563eb',
-      secondaryColor: '#10b981',
-    },
+    branding: { logo: null, primaryColor: '#2563eb', secondaryColor: '#10b981' },
     isMultiYear: false,
     reportYears: [currentYear],
   });
+  const [initialised, setInitialised] = useState(false);
+  const [openRows, setOpenRows] = useState<Set<string>>(new Set());
+  const [generatingReportId, setGeneratingReportId] = useState<string | null>(null);
 
-  // Load saved defaults from org context on mount
-  useEffect(() => {
-    if (currentOrganization) {
-      const saved = loadDefaults(currentOrganization);
-      if (saved) {
-        setConfig(prev => ({ ...prev, ...saved }));
-      }
-    }
-  }, [currentOrganization]);
-
-  // Progress tracking
+  const availability = useReportDataAvailability(currentOrganization?.id, config.reportYear);
   const progress = useReportProgress(generatingReportId);
 
-  const handleUpdateConfig = (updates: Partial<ReportConfig>) => {
-    setConfig(prev => ({ ...prev, ...updates }));
-    // If audience changed, reset smart defaults so they can be re-applied on next step
-    if ('audience' in updates) {
-      setSmartDefaultsApplied(false);
-    }
+  const style = REPORT_STYLES[(config.style as ReportStyleId) ?? 'investors'];
+
+  /** The selected style's default sections, kept honest against the data. */
+  const styleDefaults = useMemo(() => {
+    const sections = style.defaultSections.filter(id => sectionHasData(id, availability));
+    return sections.includes('executive-summary')
+      ? sections
+      : ['executive-summary', ...sections];
+  }, [style, availability]);
+
+  // One-time initialisation: saved org defaults pick the style, the style
+  // picks everything else, the data trims the section list.
+  useEffect(() => {
+    if (initialised || !currentOrganization || availability.loading) return;
+    const saved = loadDefaults(currentOrganization);
+    const styleId: ReportStyleId =
+      saved?.style && saved.style in REPORT_STYLES
+        ? (saved.style as ReportStyleId)
+        : (resolveReportStyle(null, saved?.audience ?? 'investors').id);
+    const initialStyle = REPORT_STYLES[styleId];
+    const sections = initialStyle.defaultSections.filter(id => sectionHasData(id, availability));
+    setConfig(prev => ({
+      ...prev,
+      ...saved,
+      style: styleId,
+      audience: initialStyle.audience as ReportConfig['audience'],
+      template: initialStyle.themeId as ReportConfig['template'],
+      sections: sections.includes('executive-summary') ? sections : ['executive-summary', ...sections],
+      standards: saved?.standards?.length ? saved.standards : initialStyle.defaultStandards,
+    }));
+    setInitialised(true);
+  }, [initialised, currentOrganization, availability, loadDefaults]);
+
+  const update = (updates: Partial<ReportConfig>) => setConfig(prev => ({ ...prev, ...updates }));
+
+  const pickStyle = (styleId: ReportStyleId) => {
+    const next = REPORT_STYLES[styleId];
+    const sections = next.defaultSections.filter(id => sectionHasData(id, availability));
+    update({
+      style: styleId,
+      audience: next.audience as ReportConfig['audience'],
+      template: next.themeId as ReportConfig['template'],
+      orientation: undefined,
+      sections: sections.includes('executive-summary') ? sections : ['executive-summary', ...sections],
+      standards: next.defaultStandards,
+    });
   };
 
-  // Apply smart defaults when leaving the Framing step
-  const applySmartDefaults = useCallback(async () => {
-    if (!currentOrganization?.id || smartDefaultsApplied) return;
+  const openRow = (row: string) => setOpenRows(prev => new Set(prev).add(row));
+  const isOpen = (row: string) => openRows.has(row);
 
-    setApplyingDefaults(true);
-    try {
-      const supabase = getSupabaseBrowserClient();
-      const year = config.reportYear;
-      const orgId = currentOrganization.id;
-
-      // Get audience-based section/standard suggestions
-      const audienceDefaults = getAudienceDefaults(config.audience);
-      let sections = [...audienceDefaults.sections];
-      let standards = [...audienceDefaults.standards];
-
-      // Check for completed materiality assessment
-      const { data: matData } = await supabase
-        .from('materiality_assessments')
-        .select('completed_at')
-        .eq('organization_id', orgId)
-        .eq('assessment_year', year)
-        .maybeSingle();
-
-      // If CSRD-relevant audience and materiality is complete, ensure CSRD is included
-      if (matData?.completed_at && !standards.includes('csrd')) {
-        standards = ['csrd', ...standards];
-      }
-
-      // Check for a transition plan
-      const { data: tpData } = await supabase
-        .from('transition_plans')
-        .select('id')
-        .eq('organization_id', orgId)
-        .eq('plan_year', year)
-        .maybeSingle();
-
-      // If transition plan exists, add roadmap and R&O sections
-      if (tpData) {
-        if (!sections.includes('transition-roadmap')) sections.push('transition-roadmap');
-        if (!sections.includes('risks-and-opportunities')) sections.push('risks-and-opportunities');
-      }
-
-      // Always include executive-summary
-      if (!sections.includes('executive-summary')) {
-        sections = ['executive-summary', ...sections];
-      }
-
-      setConfig(prev => ({ ...prev, sections, standards }));
-      setSmartDefaultsApplied(true);
-    } catch {
-      // Non-fatal — proceed without smart defaults
-    } finally {
-      setApplyingDefaults(false);
-    }
-  }, [currentOrganization, config.audience, config.reportYear, smartDefaultsApplied]);
-
-  const handleNext = async () => {
-    if (step === 1) {
-      // Leaving Framing step — apply smart defaults before advancing
-      await applySmartDefaults();
-    }
-    setStep(s => s + 1);
-  };
-
-  const handleGenerate = async (reportConfig?: ReportConfig) => {
-    const cfg = reportConfig || config;
-
-    if (!cfg.reportName.trim()) {
-      toast({ title: 'Error', description: 'Please enter a report name', variant: 'destructive' });
+  const handleGenerate = async () => {
+    if (!config.reportName.trim()) {
+      toast({ title: 'Name the report', description: 'Give the report a name before generating.', variant: 'destructive' });
       return;
     }
-    if (cfg.sections.length === 0) {
-      toast({ title: 'Error', description: 'Please select at least one section', variant: 'destructive' });
+    if (config.sections.length === 0) {
+      toast({ title: 'Pick a section', description: 'Choose at least one section to include.', variant: 'destructive' });
       return;
     }
-
-    const result = await generateReport(cfg);
-
+    const result = await generateReport(config);
     if (result.success && result.report_id) {
       setGeneratingReportId(result.report_id);
-      setQuickGenerateOpen(false);
-      toast({ title: 'Report generation started', description: 'You can track progress below' });
     } else {
-      toast({
-        title: 'Generation Failed',
-        description: result.error || 'An error occurred',
-        variant: 'destructive',
-      });
+      toast({ title: 'Generation failed', description: result.error || 'An error occurred.', variant: 'destructive' });
     }
   };
 
-  const handleSaveDefaults = async () => {
-    if (!currentOrganization) return;
-    const success = await saveDefaults(currentOrganization.id, config);
-    if (success) {
-      setDefaultsSaved(true);
-      toast({ title: 'Defaults saved', description: 'Your branding and preferences will be pre-filled next time' });
-    }
-  };
+  if (!initialised) return <PageLoader message="Reading your data..." />;
 
-  const handleDownload = () => {
-    if (progress.documentUrl) {
-      window.open(progress.documentUrl, '_blank');
-    }
-  };
-
-  const handleReset = () => {
-    setGeneratingReportId(null);
-    setStep(1);
-  };
-
-  // If generating/completed, show progress view
+  // ── Generation view ─────────────────────────────────────────────────────────
   if (generatingReportId) {
     return (
-      <div className="container mx-auto py-8 px-4 max-w-6xl">
-        <div className="mb-8 space-y-2">
-          <Eyebrow>THE EVIDENCE · REPORT BUILDER</Eyebrow>
-          <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
-            The report builder.
-          </h1>
-        </div>
+      <div className="mx-auto max-w-3xl space-y-8 py-2">
+        <Statement eyebrow="THE EVIDENCE · NEW REPORT" headline="On its way." />
         <GenerationProgress
           status={progress.status}
           documentUrl={progress.documentUrl}
           error={progress.error}
           reportName={config.reportName}
-          onDownload={handleDownload}
-          onReset={handleReset}
+          onDownload={() => progress.documentUrl && window.open(progress.documentUrl, '_blank')}
+          onReset={() => setGeneratingReportId(null)}
         />
       </div>
     );
   }
 
+  const periodLabel = `${format(new Date(config.reportingPeriodStart), 'd MMM yyyy')} to ${format(new Date(config.reportingPeriodEnd), 'd MMM yyyy')}`;
+  const dataReadyCount = config.sections.filter(id => sectionHasData(id, availability)).length;
+
   return (
-    <div className="container mx-auto py-8 px-4 max-w-6xl">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="space-y-2">
-          <Eyebrow>THE EVIDENCE · REPORT BUILDER</Eyebrow>
-          <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
-            The report builder.
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Create a data-driven sustainability report with AI-powered document generation
-          </p>
-        </div>
-        <Button
-          variant="default"
-          size="lg"
-          className="bg-primary text-primary-foreground"
-          onClick={() => setQuickGenerateOpen(true)}
-        >
-          <Zap className="mr-2 h-5 w-5" />
-          Quick Generate
-        </Button>
+    <div className="mx-auto max-w-3xl space-y-8 py-2">
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      <div className="space-y-3">
+        <Statement eyebrow="THE EVIDENCE · NEW REPORT" headline="Tell the year's story." />
+        <p className="text-sm text-muted-foreground">
+          Pick the reader, confirm the details, generate. Everything is prefilled from your data.
+        </p>
       </div>
 
-      {/* Wizard Steps */}
-      <WizardStepIndicator currentStep={step} steps={WIZARD_STEPS} />
-
-      {/* 2-column layout: wizard left, preview panel right */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6 items-start">
-        {/* Step Content */}
-        <Card>
-          <CardHeader>
-            <CardTitle>{WIZARD_STEPS[step - 1].label}</CardTitle>
-            <CardDescription>{WIZARD_STEPS[step - 1].description}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {step === 1 && (
-              <FramingStep
-                config={config}
-                onChange={handleUpdateConfig}
-                smartDefaultsApplied={smartDefaultsApplied}
-              />
-            )}
-            {step === 2 && (
-              <ConfigureStep config={config} onChange={handleUpdateConfig} />
-            )}
-            {step === 3 && (
-              <ContentSelectionStep
-                config={config}
-                onChange={handleUpdateConfig}
-                organizationId={currentOrganization?.id || null}
-              />
-            )}
-            {step === 4 && (
-              <ReviewStep
-                config={config}
-                onChange={handleUpdateConfig}
-                onSaveDefaults={handleSaveDefaults}
-                defaultsSaved={defaultsSaved}
-              />
-            )}
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button
-              variant="outline"
-              onClick={() => setStep(s => s - 1)}
-              disabled={step === 1}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
-
-            {step < 4 ? (
-              <Button onClick={handleNext} disabled={applyingDefaults}>
-                {applyingDefaults ? (
-                  <>Applying...</>
-                ) : (
-                  <>
-                    Next
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </>
-                )}
-              </Button>
-            ) : (
-              <Button onClick={() => handleGenerate()} disabled={generating} size="lg">
-                {generating ? (
-                  <>Starting...</>
-                ) : (
-                  <>
-                    <FileText className="mr-2 h-4 w-4" />
-                    Generate Report
-                  </>
-                )}
-              </Button>
-            )}
-          </CardFooter>
-        </Card>
-
-        {/* Preview panel — sticky on large screens */}
-        <div className="hidden lg:block sticky top-6">
-          <ReportPreviewPanel
-            config={config}
-            organizationId={currentOrganization?.id || null}
-          />
-        </div>
+      {/* ── The reader ──────────────────────────────────────────────────────── */}
+      <div className="space-y-3">
+        <FieldLabel>Who is this report for</FieldLabel>
+        <StylePicker value={style.id} onSelect={pickStyle} />
       </div>
 
-      {/* Quick Generate Dialog */}
-      <QuickGenerateDialog
-        open={quickGenerateOpen}
-        onOpenChange={setQuickGenerateOpen}
-        config={config}
-        onGenerate={handleGenerate}
-        generating={generating}
-        organizationId={currentOrganization?.id || null}
-      />
+      {/* ── The one open question ───────────────────────────────────────────── */}
+      <div className="space-y-2">
+        <FieldLabel>The one thing this reader should take away</FieldLabel>
+        <textarea
+          value={config.reportFramingStatement ?? ''}
+          onChange={e => update({ reportFramingStatement: e.target.value || undefined })}
+          placeholder="One or two sentences. This becomes the editorial lens for every narrative in the report. Leave blank to let the data speak."
+          className="h-24 w-full resize-none rounded-[6px] border border-studio-hairline bg-studio-cream p-3 text-sm outline-none transition-colors focus-visible:border-studio-forest"
+        />
+      </div>
+
+      {/* ── Confirmed details ───────────────────────────────────────────────── */}
+      <Panel>
+        <div className="mb-2">
+          <FieldLabel>Confirmed from your data</FieldLabel>
+        </div>
+        <div className="divide-y divide-studio-hairline">
+          <FactRow
+            label="Report name"
+            editing={isOpen('name')}
+            confirmed={config.reportName}
+            onEdit={() => openRow('name')}
+          >
+            <input
+              type="text"
+              value={config.reportName}
+              onChange={e => update({ reportName: e.target.value })}
+              className={quietInputClass}
+              autoFocus
+            />
+          </FactRow>
+
+          <FactRow
+            label="Reporting period"
+            editing={isOpen('period')}
+            confirmed={`${config.reportYear} · ${periodLabel}${config.isMultiYear ? ` · compared with ${(config.reportYears || []).filter(y => y !== config.reportYear).join(', ')}` : ''}`}
+            onEdit={() => openRow('period')}
+          >
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {Array.from({ length: 5 }, (_, i) => currentYear - i).map(year => (
+                  <ChoicePill
+                    key={year}
+                    active={config.reportYear === year}
+                    onClick={() =>
+                      update({
+                        reportYear: year,
+                        reportingPeriodStart: `${year}-01-01`,
+                        reportingPeriodEnd: `${year}-12-31`,
+                        reportYears: config.isMultiYear ? config.reportYears : [year],
+                      })
+                    }
+                  >
+                    {year}
+                  </ChoicePill>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <FieldLabel className="mb-1">Period start</FieldLabel>
+                  <input
+                    type="date"
+                    value={config.reportingPeriodStart}
+                    onChange={e => e.target.value && update({ reportingPeriodStart: e.target.value })}
+                    className={quietInputClass}
+                  />
+                </div>
+                <div>
+                  <FieldLabel className="mb-1">Period end</FieldLabel>
+                  <input
+                    type="date"
+                    value={config.reportingPeriodEnd}
+                    onChange={e => e.target.value && update({ reportingPeriodEnd: e.target.value })}
+                    className={quietInputClass}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <ChoicePill
+                  active={!config.isMultiYear}
+                  onClick={() => update({ isMultiYear: false, reportYears: [config.reportYear] })}
+                >
+                  This year only
+                </ChoicePill>
+                <ChoicePill
+                  active={!!config.isMultiYear}
+                  onClick={() =>
+                    update({
+                      isMultiYear: true,
+                      reportYears: [config.reportYear, config.reportYear - 1],
+                    })
+                  }
+                >
+                  Compare years
+                </ChoicePill>
+                {config.isMultiYear && (
+                  <span className="ml-1 flex flex-wrap gap-2">
+                    {Array.from({ length: 5 }, (_, i) => currentYear - i).map(year => {
+                      const selected = (config.reportYears || []).includes(year);
+                      return (
+                        <ChoicePill
+                          key={year}
+                          active={selected}
+                          onClick={() => {
+                            const years = config.reportYears || [];
+                            const next = selected
+                              ? years.filter(y => y !== year)
+                              : [...years, year].sort((a, b) => b - a);
+                            if (next.length > 0) update({ reportYears: next });
+                          }}
+                        >
+                          {year}
+                        </ChoicePill>
+                      );
+                    })}
+                  </span>
+                )}
+              </div>
+            </div>
+          </FactRow>
+
+          <FactRow
+            label="Sections"
+            editing={isOpen('sections')}
+            confirmed={`${config.sections.length} sections · picked for ${style.name} readers, ${dataReadyCount} backed by your data`}
+            onEdit={() => openRow('sections')}
+          >
+            <FunnelSections
+              config={config}
+              availability={availability}
+              styleDefaults={styleDefaults}
+              onChange={update}
+            />
+          </FactRow>
+
+          <FactRow
+            label="Standards"
+            editing={isOpen('standards')}
+            confirmed={
+              config.standards.length > 0
+                ? config.standards.map(s => STANDARDS_LABELS[s] || s).join(' · ')
+                : 'None selected'
+            }
+            onEdit={() => openRow('standards')}
+          >
+            <div className="flex flex-wrap gap-2">
+              {REPORTING_STANDARDS.map(standard => {
+                const selected = config.standards.includes(standard.id);
+                return (
+                  <ChoicePill
+                    key={standard.id}
+                    active={selected}
+                    onClick={() =>
+                      update({
+                        standards: selected
+                          ? config.standards.filter(id => id !== standard.id)
+                          : [...config.standards, standard.id],
+                      })
+                    }
+                  >
+                    {standard.label}
+                  </ChoicePill>
+                );
+              })}
+            </div>
+          </FactRow>
+
+          <FactRow
+            label="Format"
+            editing={isOpen('format')}
+            confirmed={config.outputFormat === 'pdf' ? 'PDF document' : 'Interactive HTML'}
+            onEdit={() => openRow('format')}
+          >
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <ChoicePill active={config.outputFormat === 'pdf'} onClick={() => update({ outputFormat: 'pdf' })}>
+                  PDF document
+                </ChoicePill>
+                <ChoicePill active={config.outputFormat === 'html'} onClick={() => update({ outputFormat: 'html' })}>
+                  Interactive HTML
+                </ChoicePill>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {config.outputFormat === 'pdf'
+                  ? 'A branded document with charts and tables, ready to share and publish.'
+                  : 'A web document that opens in your browser and can be shared as a link.'}
+              </p>
+            </div>
+          </FactRow>
+
+          <FactRow
+            label="Brand"
+            editing={isOpen('brand')}
+            confirmed={
+              <span className="flex items-center gap-2">
+                <span
+                  className="inline-block h-3.5 w-3.5 rounded-full border border-studio-hairline"
+                  style={{ backgroundColor: config.branding.primaryColor }}
+                />
+                <span
+                  className="inline-block h-3.5 w-3.5 rounded-full border border-studio-hairline"
+                  style={{ backgroundColor: config.branding.secondaryColor }}
+                />
+                <span>{config.branding.logo ? 'Logo and colours set' : 'Colours set, no logo yet'}</span>
+              </span>
+            }
+            onEdit={() => openRow('brand')}
+          >
+            <FunnelBranding config={config} style={style} onChange={update} />
+          </FactRow>
+        </div>
+      </Panel>
+
+      {/* ── Generate ────────────────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-3 border-t border-studio-hairline pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs text-muted-foreground">
+          About a minute for {config.sections.length} section{config.sections.length !== 1 ? 's' : ''}.
+          Narratives are written for {style.name} readers in this style&apos;s voice.
+        </p>
+        <PillButton variant="room" onClick={handleGenerate} disabled={generating} className="shrink-0">
+          {generating ? 'Starting.' : 'Create the report'}
+        </PillButton>
+      </div>
     </div>
   );
 }

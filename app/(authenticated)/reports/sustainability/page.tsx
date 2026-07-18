@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
-  Download, TrendingUp, Scale,
+  Download, TrendingUp, Scale, Link2,
 } from 'lucide-react'
 import {
   Statement, Eyebrow, StateChip, BigNumber, PillButton, Panel, FactRow,
@@ -13,13 +13,8 @@ import {
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client'
 import { useOrganization } from '@/lib/organizationContext'
 import { PageLoader } from '@/components/ui/page-loader'
-import { QuickGenerateDialog } from '@/components/report-builder/QuickGenerateDialog'
 import { VerificationCard } from '@/components/partners/VerificationCard'
-import { GenerationProgress } from '@/components/report-builder/GenerationProgress'
-import { useReportBuilder } from '@/hooks/useReportBuilder'
-import { useReportProgress } from '@/hooks/useReportProgress'
 import { useToast } from '@/hooks/use-toast'
-import type { ReportConfig } from '@/types/report-builder'
 import { AUDIENCE_LABELS } from '@/types/report-builder'
 import { toast as sonnerToast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
@@ -66,7 +61,6 @@ function SustainabilityReportsHub() {
   const router = useRouter()
   const { toast } = useToast()
   const { currentOrganization } = useOrganization()
-  const { generateReport, loadDefaults, loading: generating } = useReportBuilder()
 
   const currentYear = new Date().getFullYear()
   const activeTab = searchParams.get('tab') || 'reports'
@@ -74,10 +68,11 @@ function SustainabilityReportsHub() {
   // ── Core state ───────────────────────────────────────────────────────────────
   const [isLoading, setIsLoading] = useState(true)
   const [reports, setReports] = useState<GeneratedReport[]>([])
-  const [quickGenerateOpen, setQuickGenerateOpen] = useState(false)
-  const [generatingReportId, setGeneratingReportId] = useState<string | null>(null)
   const [exportingId, setExportingId] = useState<string | null>(null)
   const [showFailedReports, setShowFailedReports] = useState(false)
+  // Active share links by report id (report_shares rows with no revocation)
+  const [shareTokens, setShareTokens] = useState<Record<string, string>>({})
+  const [shareBusyId, setShareBusyId] = useState<string | null>(null)
 
   // ── Readiness + tab data (fetched together on mount) ─────────────────────────
   const [hasEmissions, setHasEmissions] = useState(false)
@@ -85,43 +80,20 @@ function SustainabilityReportsHub() {
   const [transitionPlan, setTransitionPlan] = useState<TransitionPlan | null>(null)
   const [lcaCount, setLcaCount] = useState(0)
 
-  // ── Default config for Quick Generate ────────────────────────────────────────
-  const [config, setConfig] = useState<ReportConfig>({
-    reportName: `Sustainability Report ${currentYear}`,
-    reportYear: currentYear,
-    reportingPeriodStart: `${currentYear}-01-01`,
-    reportingPeriodEnd: `${currentYear}-12-31`,
-    audience: 'investors',
-    outputFormat: 'pdf',
-    standards: ['csrd', 'iso-14067'],
-    sections: ['executive-summary'],
-    branding: { logo: null, primaryColor: '#2563eb', secondaryColor: '#10b981' },
-    isMultiYear: false,
-    reportYears: [currentYear],
-  })
-
-  const progress = useReportProgress(generatingReportId)
-
-  // ── Load saved branding/audience defaults ─────────────────────────────────────
-  useEffect(() => {
-    if (currentOrganization) {
-      const saved = loadDefaults(currentOrganization)
-      if (saved) setConfig(prev => ({ ...prev, ...saved }))
-    }
-  }, [currentOrganization])
-
   // ── Initial data load ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!currentOrganization?.id) return
     fetchAllData()
   }, [currentOrganization?.id])
 
-  // Refresh report list when generation finishes
+  // While any report is still generating (kicked off from the funnel page),
+  // refresh the list every few seconds so cards flip to Complete on their own.
+  const hasInFlight = reports.some(r => r.status !== 'completed' && r.status !== 'failed')
   useEffect(() => {
-    if (progress.status === 'completed' || progress.status === 'failed') {
-      fetchReportList()
-    }
-  }, [progress.status])
+    if (!hasInFlight) return
+    const interval = setInterval(fetchReportList, 5000)
+    return () => clearInterval(interval)
+  }, [hasInFlight, currentOrganization?.id])
 
   const fetchAllData = async () => {
     if (!currentOrganization?.id) return
@@ -138,6 +110,15 @@ function SustainabilityReportsHub() {
         .eq('is_latest', true)
         .order('created_at', { ascending: false })
         .then(({ data }) => setReports(data || [])),
+
+      // Active share links (report_shares is newer than the generated types)
+      (supabase as any)
+        .from('report_shares')
+        .select('report_id, token')
+        .eq('organization_id', orgId)
+        .is('revoked_at', null)
+        .then(({ data }: { data: { report_id: string; token: string }[] | null }) =>
+          setShareTokens(Object.fromEntries((data || []).map(s => [s.report_id, s.token])))),
 
       // Emissions check
       supabase
@@ -201,25 +182,65 @@ function SustainabilityReportsHub() {
     router.replace(`/reports/sustainability?tab=${tab}`, { scroll: false })
   }
 
-  // ── Report generation ─────────────────────────────────────────────────────────
-  const handleGenerate = async (reportConfig?: ReportConfig) => {
-    const cfg = reportConfig || config
-    if (cfg.sections.length === 0) {
-      toast({ title: 'Error', description: 'Please select at least one section', variant: 'destructive' })
-      return
-    }
-    const result = await generateReport(cfg)
-    if (result.success && result.report_id) {
-      setGeneratingReportId(result.report_id)
-      setQuickGenerateOpen(false)
-      handleTabChange('reports')
-      toast({ title: 'Report generation started', description: 'This usually takes 30 to 60 seconds.' })
-    } else {
-      toast({ title: 'Generation failed', description: result.error || 'An error occurred', variant: 'destructive' })
+  const handleDownload = (url: string) => window.open(url, '_blank')
+
+  // ── Share links ───────────────────────────────────────────────────────────────
+  const copyShareUrl = async (token: string) => {
+    const url = `${window.location.origin}/report/${token}`
+    try {
+      await navigator.clipboard.writeText(url)
+      toast({ title: 'Link copied', description: 'Anyone with the link can view the report until you revoke it.' })
+    } catch {
+      toast({ title: 'Copy failed', description: url })
     }
   }
 
-  const handleDownload = (url: string) => window.open(url, '_blank')
+  const handleShare = async (reportId: string) => {
+    setShareBusyId(reportId)
+    try {
+      const supabase = getSupabaseBrowserClient()
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
+      if (!token) throw new Error('Not authenticated')
+      const response = await fetch(`/api/reports/${reportId}/share`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) throw new Error('Share failed')
+      const { token: shareToken } = await response.json()
+      setShareTokens(prev => ({ ...prev, [reportId]: shareToken }))
+      await copyShareUrl(shareToken)
+    } catch {
+      toast({ title: 'Share failed', description: 'Could not create the share link.', variant: 'destructive' })
+    } finally {
+      setShareBusyId(null)
+    }
+  }
+
+  const handleRevokeShare = async (reportId: string) => {
+    setShareBusyId(reportId)
+    try {
+      const supabase = getSupabaseBrowserClient()
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
+      if (!token) throw new Error('Not authenticated')
+      const response = await fetch(`/api/reports/${reportId}/share`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) throw new Error('Revoke failed')
+      setShareTokens(prev => {
+        const next = { ...prev }
+        delete next[reportId]
+        return next
+      })
+      toast({ title: 'Link revoked', description: 'The shared report is no longer accessible.' })
+    } catch {
+      toast({ title: 'Revoke failed', description: 'Could not revoke the share link.', variant: 'destructive' })
+    } finally {
+      setShareBusyId(null)
+    }
+  }
 
   const downloadSummary = async (reportId: string, type: 'investor-summary' | 'regulatory-index') => {
     setExportingId(`${reportId}-${type}`)
@@ -282,10 +303,11 @@ function SustainabilityReportsHub() {
   const tpComplete = tpHasTargets && tpHasMilestones && tpHasRisks
   const tpInProgress = (tpHasTargets || tpHasMilestones) && !tpComplete
 
-  // Treat any "generating" report older than 2 hours as stale (generation process died)
+  // Treat any in-flight report older than 2 hours as stale (generation process died)
   const TWO_HOURS_MS = 2 * 60 * 60 * 1000
   const isStaleGenerating = (r: GeneratedReport) =>
-    r.status === 'generating' && Date.now() - new Date(r.created_at).getTime() > TWO_HOURS_MS
+    r.status !== 'completed' && r.status !== 'failed' &&
+    Date.now() - new Date(r.created_at).getTime() > TWO_HOURS_MS
   const activeReports = reports.filter(r => r.status !== 'failed' && !isStaleGenerating(r))
   const failedReports = reports.filter(r => r.status === 'failed' || isStaleGenerating(r))
 
@@ -370,24 +392,14 @@ function SustainabilityReportsHub() {
           </Link>
         </div>
 
-        {/* CTAs */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
-            <PillButton variant="room" className="w-full" onClick={() => setQuickGenerateOpen(true)}>
-              Quick Generate
-            </PillButton>
-            <p className="text-xs text-muted-foreground text-center mt-1.5">
-              Auto-selects sections from your data. Ready in about 60 seconds.
-            </p>
-          </div>
-          <div className="flex-1">
-            <PillButton variant="outline" href="/reports/builder" className="w-full">
-              Custom Builder
-            </PillButton>
-            <p className="text-xs text-muted-foreground text-center mt-1.5">
-              Choose your audience, sections, branding and more.
-            </p>
-          </div>
+        {/* CTA */}
+        <div>
+          <PillButton variant="room" href="/reports/builder" className="w-full">
+            Create a report
+          </PillButton>
+          <p className="text-xs text-muted-foreground text-center mt-1.5">
+            One page, prefilled from your data. Pick who it is for, confirm, generate.
+          </p>
         </div>
       </Panel>
 
@@ -417,39 +429,6 @@ function SustainabilityReportsHub() {
 
         {/* ── Reports tab ─────────────────────────────────────────────────── */}
         <TabsContent value="reports" className="mt-6 space-y-4">
-
-          {/* Active generation progress */}
-          {generatingReportId && progress.status !== 'completed' && progress.status !== 'failed' && (
-            <GenerationProgress
-              status={progress.status}
-              documentUrl={progress.documentUrl}
-              error={progress.error}
-              reportName={config.reportName}
-              onDownload={() => progress.documentUrl && handleDownload(progress.documentUrl)}
-              onReset={() => setGeneratingReportId(null)}
-            />
-          )}
-
-          {/* Completed generation banner */}
-          {generatingReportId && progress.status === 'completed' && progress.documentUrl && (
-            <Panel>
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-baseline gap-3">
-                    <p className="font-display font-semibold text-foreground">Report ready</p>
-                    <StateChip tone="good">Complete</StateChip>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-0.5">{config.reportName}</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <PillButton size="sm" onClick={() => handleDownload(progress.documentUrl!)}>
-                    <Download className="h-3.5 w-3.5" />Download
-                  </PillButton>
-                  <PillButton variant="ghost" size="sm" onClick={() => setGeneratingReportId(null)}>Dismiss</PillButton>
-                </div>
-              </div>
-            </Panel>
-          )}
 
           {/* Reports card grid — completed/generating only */}
           {activeReports.length > 0 ? (
@@ -498,22 +477,50 @@ function SustainabilityReportsHub() {
                         <Scale className="h-3.5 w-3.5" />
                         {exportingId === `${report.id}-regulatory-index` ? 'Exporting...' : 'Regulatory index'}
                       </PillButton>
+                      {shareTokens[report.id] ? (
+                        <>
+                          <PillButton
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copyShareUrl(shareTokens[report.id])}
+                          >
+                            <Link2 className="h-3.5 w-3.5" />
+                            Copy link
+                          </PillButton>
+                          <PillButton
+                            variant="ghost"
+                            size="sm"
+                            disabled={shareBusyId === report.id}
+                            onClick={() => handleRevokeShare(report.id)}
+                          >
+                            {shareBusyId === report.id ? 'Revoking...' : 'Revoke link'}
+                          </PillButton>
+                        </>
+                      ) : (
+                        <PillButton
+                          variant="outline"
+                          size="sm"
+                          disabled={shareBusyId === report.id}
+                          onClick={() => handleShare(report.id)}
+                        >
+                          <Link2 className="h-3.5 w-3.5" />
+                          {shareBusyId === report.id ? 'Creating...' : 'Share link'}
+                        </PillButton>
+                      )}
                     </div>
                   )}
                 </Panel>
               ))}
             </div>
           ) : (
-            !generatingReportId && (
-              <div className="border-t border-studio-hairline py-10 text-center">
-                <p className="text-sm text-muted-foreground mb-4">
-                  No reports yet. Generate your first in seconds, we pull your emissions, products and facility data automatically.
-                </p>
-                <PillButton variant="room" onClick={() => setQuickGenerateOpen(true)}>
-                  Quick Generate
-                </PillButton>
-              </div>
-            )
+            <div className="border-t border-studio-hairline py-10 text-center">
+              <p className="text-sm text-muted-foreground mb-4">
+                No reports yet. Create your first in about a minute, we pull your emissions, products and facility data automatically.
+              </p>
+              <PillButton variant="room" href="/reports/builder">
+                Create a report
+              </PillButton>
+            </div>
           )}
 
           {/* Failed reports — one quiet stale line + a quiet retry */}
@@ -543,7 +550,7 @@ function SustainabilityReportsHub() {
                         variant="ghost"
                         size="sm"
                         className="shrink-0"
-                        onClick={() => setQuickGenerateOpen(true)}
+                        href="/reports/builder"
                       >
                         Retry
                       </PillButton>
@@ -777,16 +784,6 @@ function SustainabilityReportsHub() {
           </div>
         </TabsContent>
       </Tabs>
-
-      {/* Quick Generate Dialog */}
-      <QuickGenerateDialog
-        open={quickGenerateOpen}
-        onOpenChange={setQuickGenerateOpen}
-        config={config}
-        onGenerate={handleGenerate}
-        generating={generating}
-        organizationId={currentOrganization?.id || null}
-      />
     </div>
   )
 }

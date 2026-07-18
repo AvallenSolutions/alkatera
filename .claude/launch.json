@@ -35,6 +35,13 @@
       "runtimeArgs": ["-c", "cd /Users/timej/Documents/GitHub/alkatera/.claude/worktrees/redesign && export PATH=/usr/local/bin:$PATH && export NEXT_DIST_DIR=.next-8896 && pnpm dev --port 8896"],
       "port": 8896,
       "autoPort": false
+    },
+    {
+      "name": "redesign-verify",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "cd /Users/timej/Documents/GitHub/alkatera/.claude/worktrees/redesign && export PATH=/usr/local/bin:$PATH && export NEXT_DIST_DIR=.next-8894 && pnpm dev --port 8894"],
+      "port": 8894,
+      "autoPort": false
     }
   ]
 }
