@@ -131,7 +131,7 @@ export async function POST(
     if (config.sections.includes('product-footprints')) {
       const { data: products } = await supabase
         .from('product_carbon_footprints')
-        .select('id, products!inner(name), functional_unit, aggregated_impacts, status')
+        .select('id, products!product_lcas_product_id_fkey!inner(name), functional_unit, aggregated_impacts, status')
         .eq('organization_id', orgId)
         .eq('status', 'completed');
 
