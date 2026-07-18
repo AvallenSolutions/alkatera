@@ -28,6 +28,13 @@ import {
   INK, CREAM, PAPER, HAIR, DIM, GOOD, ATTN, STALE, MONO, SG, INTER,
   onBand, wordmark, toneChip,
 } from '@/lib/pdf/studio-kit';
+import type {
+  FacilityInfo,
+  SupplierData,
+  PeopleCultureData,
+  GovernanceData,
+  CommunityImpactData,
+} from '@/lib/reports/sections/types';
 
 // ============================================================================
 // DENSITY HELPERS
@@ -86,20 +93,7 @@ interface ProductFootprint {
   climateImpact: number;
 }
 
-interface FacilityInfo {
-  name: string;
-  type: string;
-  location: string;
-  totalEmissions: number;
-  unitsProduced: number;
-  hasData: boolean;
-}
 
-interface SupplierData {
-  name: string;
-  category: string;
-  emissionsData: Record<string, any>;
-}
 
 interface StandardStatus {
   code: string;
@@ -114,80 +108,8 @@ interface DataQualityMetrics {
   confidenceScore: number;
 }
 
-interface PeopleCultureData {
-  overallScore: number;
-  fairWorkScore: number;
-  diversityScore: number;
-  wellbeingScore: number;
-  trainingScore: number;
-  dataCompleteness: number;
-  livingWageCompliance: number | null;
-  genderPayGapMean: number | null;
-  ceoWorkerPayRatio: number | null;
-  trainingHoursPerEmployee: number | null;
-  engagementScore: number | null;
-  totalEmployees: number;
-  femalePercentage: number | null;
-  newHires: number;
-  departures: number;
-  turnoverRate: number | null;
-  deiActionsTotal: number;
-  deiActionsCompleted: number;
-  benefits: string[];
-}
 
-interface GovernanceData {
-  missionStatement: string | null;
-  visionStatement: string | null;
-  purposeStatement: string | null;
-  isBenefitCorp: boolean;
-  sdgCommitments: number[];
-  climateCommitments: string[];
-  boardMembers: {
-    name: string;
-    role: string;
-    gender: string | null;
-    isIndependent: boolean | null;
-    attendanceRate: number | null;
-  }[];
-  boardDiversityMetrics: {
-    totalMembers: number;
-    femalePercentage: number;
-    independentPercentage: number;
-    averageAttendance: number;
-  };
-  policies: {
-    name: string;
-    type: string;
-    status: string;
-    isPublic: boolean;
-  }[];
-  policyCompleteness: number;
-  ethicsTrainingRate: number | null;
-  ethicsIncidents: number;
-  lobbyingActivities: number;
-}
 
-interface CommunityImpactData {
-  overallScore: number;
-  givingScore: number;
-  localImpactScore: number;
-  volunteeringScore: number;
-  engagementScore: number;
-  dataCompleteness: number;
-  totalDonations: number;
-  donationCount: number;
-  totalVolunteerHours: number;
-  volunteerActivities: number;
-  impactStories: {
-    title: string;
-    category: string;
-    summary: string;
-    photo?: string;
-  }[];
-  localEmploymentRate: number | null;
-  localSourcingRate: number | null;
-}
 
 interface VineyardReportData {
   name: string;
@@ -611,6 +533,51 @@ function renderExecutiveSummaryNarrativeBlock(narrative: ExecutiveSummaryNarrati
       ${narrative.aiGenerated ? `
       <div class="narrative-ai-note">AI-assisted draft</div>` : ''}
     </div>`;
+}
+
+// ============================================================================
+// NOT-YET-MEASURED SKELETONS
+// ============================================================================
+
+/**
+ * A metric tile whose value has not been recorded yet.
+ *
+ * Keeps the card shell so neighbouring tiles never reflow, and says plainly
+ * that the number is missing rather than printing "N/A" (which reads as "not
+ * applicable to this business", a different and false claim) or 0 (which
+ * claims something was measured and came to nothing). The value line is
+ * deliberately small and quiet: a gap must never out-shout a real number.
+ */
+function notMeasuredMetric(label: string, hint: string): string {
+  return `
+        <div class="metric-card" style="text-align: center;">
+          <div class="metric-label">${escapeHtml(label)}</div>
+          <div style="font-size: 14px; font-weight: 500; color: ${DIM}; line-height: 1.3; margin: 4px 0 2px;">Not yet measured</div>
+          <div class="metric-unit" style="opacity: .65;">${escapeHtml(hint)}</div>
+        </div>`;
+}
+
+/** A full-width block (table, prose or card grid) with nothing recorded yet. */
+function notMeasuredBlock(title: string, hint: string): string {
+  return `
+      <div style="background: ${CREAM}; border: 1px solid ${HAIR}; border-radius: 6px; padding: 16px;">
+        <div style="font-family: ${MONO}; font-size: 9px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: ${DIM};">${escapeHtml(title)}</div>
+        <div style="font-size: 12px; color: ${INK}; margin-top: 8px;">Not yet recorded.</div>
+        <div style="font-size: 11px; color: ${DIM}; margin-top: 4px;">${escapeHtml(hint)}</div>
+      </div>`;
+}
+
+/** A table body row standing in for "no rows recorded yet". */
+function notMeasuredRow(colspan: number, hint: string): string {
+  return `<tr><td colspan="${colspan}" style="color: ${DIM}; font-size: 11px; padding: 12px;">Not yet recorded. ${escapeHtml(hint)}</td></tr>`;
+}
+
+/** The lead-in when a section was selected but nothing in it has been recorded. */
+function nothingRecordedYet(year: number): string {
+  return `
+      <p style="font-size: 12px; color: ${DIM}; margin-bottom: 16px;">
+        This section was included in the report, but none of its measures have been recorded for ${year} yet.
+      </p>`;
 }
 
 // Maps section IDs to materiality topic IDs (mirrors section-narrative-assistant.ts)
@@ -1441,21 +1408,24 @@ function renderGovernancePage(config: ReportConfig, data: ReportData, theme?: Re
           <div class="metric-value" style="font-size: 24px;">${gov.boardDiversityMetrics.totalMembers}</div>
           <div class="metric-unit">members</div>
         </div>
+        ${gov.boardDiversityMetrics.femalePercentage !== null ? `
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Female %</div>
           <div class="metric-value" style="font-size: 24px; color: #2B46C0;">${gov.boardDiversityMetrics.femalePercentage.toFixed(0)}%</div>
           <div class="metric-unit">board diversity</div>
-        </div>
+        </div>` : notMeasuredMetric('Female %', 'add in governance > board')}
+        ${gov.boardDiversityMetrics.independentPercentage !== null ? `
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Independent %</div>
           <div class="metric-value" style="font-size: 24px;">${gov.boardDiversityMetrics.independentPercentage.toFixed(0)}%</div>
           <div class="metric-unit">of directors</div>
-        </div>
+        </div>` : notMeasuredMetric('Independent %', 'add in governance > board')}
+        ${gov.policyCompleteness !== null ? `
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Policy Score</div>
           <div class="metric-value" style="font-size: 24px; color: ${gov.policyCompleteness >= 75 ? '#047857' : '#BF4B2A'};">${gov.policyCompleteness.toFixed(0)}%</div>
           <div class="metric-unit">completeness</div>
-        </div>
+        </div>` : notMeasuredMetric('Policy Score', 'add in governance > policies')}
       </div>
 
       <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px;">Board Composition</div>
@@ -1525,16 +1495,18 @@ function renderCommunityImpactPage(config: ReportConfig, data: ReportData, theme
       </div>
 
       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px;">
+        ${ci.totalDonations !== null ? `
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Donations</div>
           <div class="metric-value" style="font-size: 20px;">${formatGBP(ci.totalDonations)}</div>
-          <div class="metric-unit">${ci.donationCount} contributions</div>
-        </div>
+          <div class="metric-unit">${ci.donationCount ?? 0} contributions</div>
+        </div>` : notMeasuredMetric('Donations', 'add in community > giving')}
+        ${ci.totalVolunteerHours !== null ? `
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Volunteer Hours</div>
           <div class="metric-value" style="font-size: 20px;">${formatNumber(ci.totalVolunteerHours, 0)}</div>
-          <div class="metric-unit">${ci.volunteerActivities} activities</div>
-        </div>
+          <div class="metric-unit">${ci.volunteerActivities ?? 0} activities</div>
+        </div>` : notMeasuredMetric('Volunteer Hours', 'add in community > volunteering')}
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Local Employment</div>
           <div class="metric-value" style="font-size: 20px;">${ci.localEmploymentRate !== null ? ci.localEmploymentRate.toFixed(0) + '%' : 'N/A'}</div>
