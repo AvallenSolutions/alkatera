@@ -42,9 +42,9 @@ merges to main until go-live.
 
 ## Done (unverified)
 - ToV threading into AI writers (8f631439): no live AI run until Anthropic quota resets ~1 Aug.
-- Share flow on STAGING: code deployed on push, but the migration is NOT yet applied to
-  staging (MCP write was permission-blocked; SQL handed to Tim in chat). Until it runs,
-  Share link on staging 500s; funnel itself works.
+- Share flow on STAGING: code deployed and migration APPLIED to staging via MCP
+  (2026-07-18, verified: table + 3 policies + private bucket). A real staging click-through
+  (share, open in a private window, revoke) has not been done yet.
 - Real PDFShift PDF generation post-redesign still not exercised (needs staging).
 
 ## In flight
@@ -52,14 +52,12 @@ Nothing mid-edit. Worktree clean EXCEPT `lib/pulse/__tests__/widget-tier.test.ts
 (separate task-chip session, task_9f49442d — do not touch) and untracked supabase/.temp.
 
 ## Next
-1. **Tim: run the report_shares migration on staging** (vwhdyqvlgjqmlzmsvaes SQL editor —
-   block posted in chat 2026-07-18). NOT prod.
-2. **Phase C — draft-then-edit narratives**: generate into a store BEFORE render, review/edit
+1. **Phase C — draft-then-edit narratives**: generate into a store BEFORE render, review/edit
    step, per-section regenerate with tone hint, CEO-foreword drafting. Build any time;
    live-test after 1 Aug (Anthropic quota).
-3. **Phase D** — org brand kit, imagery library, ungate foreword/photos, section reorder,
+2. **Phase D** — org brand kit, imagery library, ungate foreword/photos, section reorder,
    truthful preview.
-4. Smaller: screenMode restyle polish audits (Board/Editorial), share-link expiry UI
+3. Smaller: screenMode restyle polish audits (Board/Editorial), share-link expiry UI
    (expires_at column exists, no picker yet), a11y aria-labels on the style cards
    (accessible names come only from inner text), design-scout leftovers (/uploads rebuild,
    Tabs→MonoTabs on /settings, dead pulse widgets deletion).
@@ -83,7 +81,6 @@ Nothing mid-edit. Worktree clean EXCEPT `lib/pulse/__tests__/widget-tier.test.ts
 - Full `vitest` hangs — always scope. Local Supabase has the migration + bucket applied.
 
 ## Pending Tim actions
-- **report_shares migration on STAGING** (SQL block in chat, 2026-07-18). Do NOT run in prod.
 - ~1 Aug (Anthropic quota): staging scrape retest; styled-report narratives; Phase C live test.
 - Any time on staging (after migration): generate a report → Share link → open in a private
   window → Revoke → confirm the link dies.
