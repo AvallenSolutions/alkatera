@@ -31,8 +31,11 @@ export interface PulseCardStatus {
 }
 
 export interface PulseCardProps {
-  /** Lucide icon for the header. */
-  icon: ComponentType<{ className?: string }>;
+  /** Accepted for call-site compatibility but no longer rendered — the
+   * studio has no general icon set; the mono label carries the meaning
+   * (design/studio-design-language.md). Widgets can drop the prop at
+   * leisure. */
+  icon?: ComponentType<{ className?: string }>;
   /** Short label, uppercase tracking in the header (e.g. "Annual liability"). */
   label: string;
   /** Headline figure, rendered large (e.g. "£1.24M"). */
@@ -82,7 +85,6 @@ const VISUAL_HEIGHT: Record<PulseCardFootprint, string> = {
 };
 
 export function PulseCard({
-  icon: Icon,
   label,
   headline,
   sub,
@@ -103,7 +105,7 @@ export function PulseCard({
   return (
     <div
       className={cn(
-        'group relative flex h-full w-full flex-col overflow-hidden rounded-[6px] border transition',
+        'group relative flex h-full w-full flex-col overflow-hidden rounded-[6px] border transition-colors duration-150 ease-studio',
         error
           ? 'border-studio-stale/40 bg-card'
           : 'border-border bg-card',
@@ -126,10 +128,9 @@ export function PulseCard({
       )}
 
       <div className="pointer-events-none relative z-10 flex h-full flex-col p-4">
-        {/* Header row */}
+        {/* Header row: a mono eyebrow, no glyph — type carries the meaning. */}
         <div className="pointer-events-auto flex items-center gap-2">
-          <Icon className="h-3.5 w-3.5 flex-shrink-0 text-studio-forest" />
-          <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <span className="truncate font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-studio-dim">
             {label}
           </span>
 
@@ -179,7 +180,9 @@ export function PulseCard({
             <div className="h-8 w-3/4 rounded bg-muted/60" />
           ) : (
             <div className="flex items-baseline gap-2">
-              <span className="truncate text-2xl font-semibold tabular-nums text-foreground sm:text-3xl">
+              {/* The number is the subject: display voice, bold, tabular —
+                  same scale as BigNumber's panel size. */}
+              <span className="truncate font-display text-[1.75rem] font-bold leading-none tabular-nums text-foreground">
                 {headline}
               </span>
             </div>
