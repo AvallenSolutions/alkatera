@@ -1,88 +1,99 @@
-# Handoff: redesign staging + arrival flow + design-system adoption
-Updated: 2026-07-17 22:05 | Branch: redesign | Worktree: /Users/timej/Documents/GitHub/alkatera/.claude/worktrees/redesign | Dev port: 8891 (preview_start name "redesign")
+# Handoff: redesign — studio design system + sustainability report programme
+Updated: 2026-07-18 12:30 | Branch: redesign | Worktree: /Users/timej/Documents/GitHub/alkatera/.claude/worktrees/redesign | Dev port: 8891 (preview_start name "redesign")
 
 ## Goal
-The alkatera redesign (studio "house of rooms") lives on branch `redesign`, deployed to a Vercel STAGING project so Tim can test against real integrations. We just rebuilt the new-user arrival ritual (org creation folded in, website-first) and are now adopting Tim's canonical **Claude Design system** (project id `dcd0e757-0ba1-4f98-aae3-b114fee7cd6a`, "Alkatera Redesign Design System") so surfaces stop being "old forms recoloured". Redesign NEVER merges to main until go-live.
-
-## Staging environment (LIVE)
-- URL: https://alkatera-staging-git-redesign-avallen-solutions.vercel.app (Vercel project `alkatera-staging`, team avallen-solutions, deploys `redesign` on every push)
-- Login: tim@alkatera.com / `alkatera-staging-2026` (org-less, so it hits the arrival ritual). Confirmed working.
-- **Vercel Deployment Protection is ON** for this project: the branch alias serves Vercel's own SSO login to anyone not authed to the Vercel team. Tim's own browser passes transparently; a headless/in-app browser (and Claude's browser tools) cannot reach the app. To let automated verification through, either disable protection for the project or issue a protection-bypass secret (`?x-vercel-protection-bypass=…`).
-- Supabase staging: ref `vwhdyqvlgjqmlzmsvaes` (fresh, eu-west-2). Full schema (356 tables, 59 migrations), roles seeded, `create-organization` edge fn deployed (verify_jwt=false). Vercel env set: staging Supabase + Anthropic + Gemini + OpenLCA + Google Maps + PDFShift + Resend. NO Inngest (deliberate), NO Stripe test keys yet.
-- Diagnose staging DB / deploy edge fns via the Supabase MCP (project vwhdyqvlgjqmlzmsvaes). Read Vercel build/runtime logs via the local `vercel` CLI (authed) — the Vercel MCP connector is scoped to 4 old projects and 404s alkatera-staging.
+The alkatera redesign ("house of rooms" studio design language) lives on branch `redesign`,
+auto-deployed on push to Vercel staging. Current programme: rebuild the DOCUMENT GENERATORS
+in the studio design and upgrade sustainability-report customisation (plan:
+`tasks/sustainability-report-redesign-plan.md`, phases A–E, Tim-approved order A→B→C→E→D).
+A+B are done; **next is Phase E: one studio funnel + real share links**. Redesign NEVER
+merges to main until go-live.
 
 ## Done (verified)
-- Data-revolution + onboarding programme + Vercel platform-neutralisation (Inngest-everywhere, Netlify removed) all committed on redesign; builds + deploys clean on Vercel.
-- Arrival front door (2c73989d): org-less user lands in "Where can we find you?", org created silently, 6-step flow to desk. Walked live on staging past org creation.
-- Custom hairline beverage icons replaced emojis (831c4ef8); confirm step redesigned (fact-list, confirmed rows). Verified on staging.
-- Duplicate migration version fixed (1825939c): `trial_tier_limits` shared version 20260622120000 with drop_pulse_beta_flag — that collision is what left every fresh `supabase db reset` empty. Now 20260622120001. (This is why staging needed a brand-new Supabase project; the old repurposed one was un-cleanable due to Postgres lock exhaustion on the reset.)
+- **LCA PDF template in studio design** (0ef5f515): faithful implementation of Tim's Claude
+  Design project d03d39b6 (`LCA Report Template.dc.html`); 26-page fixture PDF inspected
+  page-by-page via headless Chromium (the PDFShift engine).
+- **Shared studio PDF kit** `lib/pdf/studio-kit.ts` (99481453): all primitives incl.
+  `onBand()` (luminance → ink/cream text on any brand colour). LCA re-render byte-identical.
+- **Report Phase A** (99481453+fe49b65a): theme/heroImages/leadership were persisted but
+  NEVER read back (placebo picker; forewords/photos never reached PDFs) — fixed + typed;
+  dead `config_snapshot` reads removed; SlideSpeak fully retired; generate-html shares
+  buildReportConfig.
+- **Report Phase B** (4b3a2454, e16e69db, 3710089a, 263a9d55): themes studio-native
+  (Annual/Working/Board/Technical/Editorial, ids unchanged); full colour/font sweep; cover,
+  foreword, dividers, score panels, closing = brand poster blocks (NO dark pages); dynamic
+  section numbers (`__SECTION_NUM__`, appendix '!'/'A' kept); SDG tiles on-brand; zero pills.
+- **Five audience-led styles** (8f631439): `lib/pdf/templates/report-styles.ts` — Marketing /
+  Customers / Compliance / Investors&Board / Supply-Chain. Style binds theme + legacy
+  audience + tier + imagery + ToV + narrative section ORDER + default sections. Renderer
+  assembles in the style's arc; FramingStep's primary choice is the 5 styles. Verified:
+  investors = landscape brief w/ targets p2, sequential numbering; compliance/marketing OK.
+- Earlier today (all verified, see git log): scrape background fix chain (74640aea, 55c9cdec,
+  9af65370), beverage illustrations (5ca73b92), studio FieldLabel (7c7a28f8), PulseCard
+  studio refactor (c5606339).
+- Verification harnesses in session scratchpad (recreate if gone — pattern is simple):
+  `render-fixture.ts` (LCA) + `render-sust-fixture.ts` (report; arg = style id or theme id)
+  → run `cd WORKTREE && npx tsx <script> <style> out.html`, then headless-chrome
+  `--print-to-pdf`, then Read the PDF pages.
 
-## Done (2026-07-17 late — jobs 1 & 2 SHIPPED, reviewed from the prior session's uncommitted WIP)
-- **Job 1 — scrape background fix SHIPPED** (74640aea). The prior session's uncommitted draft was complete and sound; kept it. The no-Inngest branch now returns the jobId immediately (202) and runs `runImportFromUrl` in the BACKGROUND via `@vercel/functions` `waitUntil` (NOT `unstable_after` — Next 14.2.5 predates `after`; confirmed absent from the package), using a service-role client (`service()` now exported from lib/inngest/functions/product-import.ts). `maxDuration=300`, Inngest branch untouched. `@vercel/functions` added to package.json + lockfile. Typecheck clean.
-  - **Live re-test rounds 1-2 (2026-07-18) exposed TWO stacked issues, both now fixed:**
-    1. Round 1: no new job row at all — arrival-confirm trusted `personalization.scrapeJobId` unconditionally, and that ID pointed at the dead pre-fix job (persists in onboarding state across reloads), so every visit resumed the corpse and never POSTed. Fixed 55c9cdec: probe the stored job once; failed/unreachable falls through to a fresh POST.
-    2. Round 2: probe fix confirmed working (Vercel logs: probe GET → POST 202 instant → fresh job → ~30 client polls), but the job strandeded `pending`, untouched. ROOT CAUSE: **stray `INNGEST_EVENT_KEY`/`INNGEST_SIGNING_KEY` on the staging Vercel project** (swept in by the bulk env push 19h earlier; Tim confirms they were never meant to be set — the handoff's "NO Inngest" was the intent). With the key present, the route takes the Inngest branch and fires the event into the void (no worker registered for this deployment; Deployment Protection would block Inngest callbacks anyway) — the waitUntil fallback never ran. Tim deleted both vars; empty-commit redeploy pushed. NOTE the `waitUntil` fallback has therefore STILL never been exercised on Vercel — round 3 is its first real test.
-    3. Round 3 (2026-07-18 08:45, after Tim deleted the stray keys + redeploy): **BACKGROUND FALLBACK VERIFIED WORKING.** Job 3a2956b6: POST 202 instant → worker ran via waitUntil → pending→scraping→"Extracting products with AI…" with real status writes (created 07:45:12Z, updated :18Z) → failed ONLY at the Claude call with an Anthropic quota error: "You have reached your specified API usage limits. You will regain access on 2026-08-01." So the code path is proven end-to-end minus the final LLM leg.
-    4. **PARKED until ~1 Aug 2026 (Anthropic quota reset)** — Tim can't add spend right now. No code change needed; when quota resets (or a key with headroom is set as ANTHROPIC_API_KEY on the Vercel project + redeploy), the same reload should carry a job to `completed`. Old rows 01ab08ee/60bd029f are dead debris; the janitor or a manual delete can clear them.
-    5. The 4x image-400 console errors on arrival-confirm: FIXED (9af65370). RosaIntro requested the non-existent /images/rosa-avatar.png; next/image 400s on a missing source. Now points at the real /images/rosa-the-dog.jpg (verified: old src 400s via the optimiser, new src 200s).
-- **Job 2 — beverage selector uses Tim's studio illustrations SHIPPED** (5ca73b92). Replaced the bespoke hairline `BeverageIcon` SVG set with Tim's 18 full-colour studio illustrations in `public/assets/drinks/` (baked palette). `BeverageIcon` now renders `<img src=/assets/drinks/{name}.svg>` in a fixed square box, object-contain, used as-is (no recolour). Mapping beer→beer-glass, cider→cider-apple, spirits→spirits-bottle, wine→wine-glass, rtd→soda-can, non_alcoholic→non-alcoholic, functional→functional. Only consumer is FastTrackSetupStep (no className → default 44x44 box, compatible). Verified: typecheck clean, all 7 assets serve 200 image/svg+xml on local :8891, dev compiles clean. (Full visual walk-through of the arrival row not done — behind local auth; low risk.)
+## Done (unverified)
+- **ToV threading into AI writers** (8f631439): tone param wired into section-narrative +
+  exec-summary assistants from both build paths; code compiles, fails gracefully, but NO
+  live AI run possible until Anthropic quota resets (~1 Aug). Fixture narratives are static.
+- FramingStep style-picker UI: typechecks, never browser-clicked.
+- Report generation on staging (real PDFShift run) never exercised post-redesign.
 
-## Job 3 progress (2026-07-18) — arrival forms reviewed + one real refactor SHIPPED
-- Tim's steer: "refactor arrival forms first." FINDING: the three arrival surfaces (ArrivalWebsiteStep = front door, FastTrackSetupStep = company + arrival-confirm) are ALREADY studio-native — they were rebuilt recently (2c73989d, 831c4ef8) and compose Eyebrow/Panel/PillButton, the fact-list rhythm, hairline dividers, mono eyebrows, ease-studio, statements ending in full stops. They are NOT "old forms recoloured". `Statement` (a 4.25rem left-aligned poster header) and `FactRow`/`FactList` (display-only, no inputs) deliberately don't fit the narrow centered editable arrival layout, so forcing them would regress the design.
-- The one genuine, non-cosmetic improvement, SHIPPED (7c7a28f8): the mono field-label markup was hand-duplicated 5x in FastTrackSetupStep. Extracted a reusable **`FieldLabel`** studio primitive (`components/studio/field-label.tsx`, exported from index) and routed the FieldRow helper + identity/country/year/beverage/team-size labels through it. Zero visual change; whole-app forms now share one field-label treatment. Typecheck clean, app compiles clean on :8891.
-- CANON OBSERVATION (not changed, flag for Tim): the "· required" marker uses `text-studio-stale` (#BE123C, the "lost" working tone). Canon says working tones are states not decoration; "required" isn't "lost". Kept faithful for now; consider dim or the "attention" tone (#B45309). Baked into FieldLabel so it's a one-line change if Tim agrees.
-- RECOMMENDATION: arrival is essentially done for studio adoption. The bigger job-3 wins are on OTHER surfaces — see the scout below.
-
-## Job 3 SCOUT (2026-07-18) — ranked pre-studio targets across the live rooms
-Method: per-route-group grep signals, then 3 parallel Explore audits (Pulse / Hospitality / breadth over the remaining live room routes) against a studio-adoption rubric. NOTE `/dashboard/**` is LEGACY (not in `platform-rooms.ts`) — do not spend effort there. Farms (`/vineyards`,`/orchards`,`/arable-fields` via shared `components/growing/GrowingSitesPage.tsx`), `/products`, `/reports/lcas`, `/network`, `/company/fleet`, `/knowledge-bank`, `/data/scope-1-2` are already ADOPTED. `/performance` is adopted (large file = size trap, not debt).
-
-TIER 1 (best leverage, do first)
-1. **DONE (c5606339): `components/pulse/PulseCard.tsx`** — header label → mono eyebrow idiom, lucide glyph dropped (icon prop kept optional so no call-site churn), headline → Space Grotesk bold 1.75rem tabular (BigNumber panel parity), 150ms ease-studio. Chrome colours were already the mapped tokens (border-border/bg-card = hairline/cream) — left alone. VERIFIED live on local :8891 /pulse + /pulse/financial (login pulse-verify@local.test / localdev123, onboarding pre-completed in DB; Local Dev Co demo data). Scoped lib/pulse vitest 176/178 — the 2 fails are PRE-EXISTING stale widget-tier expectations (energy-timing widget added without updating the test); spawned as a task chip.
-2. **`/uploads`** (`app/(authenticated)/uploads/page.tsx`) — the ONLY fully PRE-STUDIO live surface, and it's the intake funnel every workbench tab deep-links into. Zero studio imports; 21 Card/Badge sites; hand-rolled `bg-green-600`/`bg-red-600` status badges (`:135`) which also BREAK CANON (working tones must be small bold mono caps, never badge pills with backgrounds). Size L.
-3. **shadcn Tabs → MonoTabs on `/settings` (`:138`) and `/reports/sustainability` (`:407`)** — two ROOM LANDINGS whose first interactive element announces a different design language. MonoTabs already exists; a swap, not a rebuild. Size S.
-
-TIER 2
-4. **Dead-code deletion (free):** `components/pulse/widgets/FinancialFootprintWidget.tsx` (359) + `MaccChartWidget.tsx` (380) have ZERO live references (superseded by the `financial-footprint/` and `macc/` compact+expanded pairs). ~740 LOC and 2 ui/card importers gone for nothing.
-5. **Data-room table batch:** `/data/quality`, `/data/sources`, `/data/inventory-ledger`, `/company/facilities` all share the same "studio header over a shadcn Table" mismatch. One shared studio table/FactList treatment retires four weekly-core surfaces.
-6. **`/data/spend-data` + `components/xero/TransactionBrowser.tsx`** — studio header over a shadcn Accordion + Badge-heavy table; the xero panels are shared so one fix lands several tabs.
-
-TIER 3 (long tail)
-7. `components/pulse/WidgetDrillOverlay.tsx` — frames all 21 drill-ins in studio even while their bodies stay legacy; good containment before the long tail.
-8. `components/hospitality/RecipeEditor.tsx` (761 LOC, 24 Cards, serves meals/drinks/rooms detail routes) — biggest single pre-studio file; hospitality is ~60% adopted (all list/index surfaces done, all detail/editor/settings left behind).
-9. Remaining tails: 15 legacy `pulse/widgets/*Widget.tsx` bodies (L), `/pulse/targets` (entirely pre-studio, 5 components), hospitality settings/marketplace/events (6 files), `/nature-assessment` raw shadcn form controls.
+## In flight
+Nothing mid-edit. Worktree clean EXCEPT `lib/pulse/__tests__/widget-tier.test.ts` — that is
+a SEPARATE task-chip session's work (task_9f49442d); do not touch or commit it.
 
 ## Next
-- **JOB 3 — THE BIG ONE — adopt the Claude Design system** (project `dcd0e757-...`). REFRAMED after inspecting the repo: adoption is FURTHER ALONG than the handoff implied.
-  - Already in place on redesign: the palette/tokens are wired into `tailwind.config.ts` (`studio.*` colours, `ease-studio`, `--room-*`) + `app/globals.css` + `components/studio/theme.ts`, and match the canonical `tokens/colors.css`/`typography.css` exactly. ALL 8 canonical core components have repo equivalents in `components/studio/` (Button→pill-button, Panel→panel, FactRow→fact-row, BigNumber→big-number, StateChip→state-chip, Tabs→mono-tabs, StageBar→stage-bar, AccentPanel→poster-block), and the whole **GrowthField** pack is ported to `components/studio/growth/`.
-  - So remaining job-3 work is NOT a from-scratch import. It is: (a) OPTIONAL reconciliation — diff each `components/studio/*` against its canonical `components/core/*.jsx`+`.prompt.md` and fix drift (they were built in parallel; canonical may have refined details); (b) the REAL bulk — refactor product SURFACES still shaped like "old forms recoloured" to compose these studio components, starting with the arrival forms (FastTrackSetupStep, ArrivalWebsiteStep, arrival-confirm). Incremental, one surface at a time; do NOT wholesale-replace.
-  - AWAITING TIM'S STEER on scope/priority for job 3 (which surfaces first, and whether to run the reconciliation pass at all) before refactoring. Design tools: `DesignSync` MCP (read list_files/get_file) + `/design-sync` skill. Canon design laws already noted below and in readme.md.
-
-## LCA PDF redesign (2026-07-18) — SHIPPED (0ef5f515)
-Tim's canonical LCA report design (Claude Design project d03d39b6, `LCA Report Template.dc.html`) implemented as the PDF template. `lib/pdf/render-lca-html.ts` fully rewritten (2,409 → ~1,550 lines), every design literal bound to LCAReportData; conditional sections (viticulture/FLAG, facility proxy disclosure, 15b AI review) kept and restyled. Fixed A4 page architecture RETAINED deliberately — a headless-Chromium spike proved CSS-flow page approaches fail (canvas bg doesn't paint margins; fixed footers land unpredictably), and the design itself models discrete pages with CONT. bands. Route + PDFShift client untouched. Verified: tsc clean, lib/pdf vitest 64/64, 26-page fixture PDF (design's own Everleaf data) rendered via headless Chromium and inspected page-by-page. Fixture harness in scratchpad (`render-fixture.ts`); plan+review in `tasks/lca-pdf-redesign-todo.md`. NOT yet verified with a real product via the generate-pdf route on staging (needs PDFShift key + a product with a PCF; Anthropic-quota-independent, PDFShift is a separate service).
-
-## Sustainability report programme (2026-07-18) — IN PROGRESS
-Full plan: `tasks/sustainability-report-redesign-plan.md` (5 phases A–E, Tim approved "Let's get on with it", order A→B→C→E→D).
-- **Phase A SHIPPED (99481453 + fe49b65a):** theme picker was a placebo (template/orientation + heroImages + leadership persisted to `config` jsonb but never read back — CEO forewords/cover photos NEVER reached PDFs); now typed + threaded through buildReportConfig, which generate-html also now shares (was a drifted inline copy). Dead `config_snapshot` merges deleted (column never existed). SlideSpeak fully retired (3 routes deleted, useReportProgress backstop removed, admin webhook card removed). Honest share-link copy. tsc clean, lib/pdf 64/64.
-- **Studio PDF kit SHIPPED (99481453):** `lib/pdf/studio-kit.ts` — all LCA-template primitives extracted (palette, wordmark, leafMark, band/heroBand, statCard, cardTitle/bodyP/defBlock/bullet, th/td, toneChip, gradeTone, meter, createPageShell with landscape, studioPageCss/studioFontLinks, and `onBand()` generalised to luminance-based ink/cream so CUSTOMER brand colours pick legible text automatically — the "ochre rule"). `render-lca-html.ts` refactored onto the kit; fixture PDF re-rendered BYTE-IDENTICAL (verification harness: scratchpad `render-fixture.ts`, run `npx tsx` FROM THE WORKTREE cwd so the @/ alias resolves).
-- **Phase B IN PROGRESS — rebuilding `render-sustainability-report-html.ts` on the kit.**
-  - DONE (4b3a2454): themes.ts studio-native (Annual/Working/Board/Technical/Editorial, ids unchanged, studio fonts/surfaces, all covers 'brand').
-  - DONE (e16e69db): global chrome — full off-palette colour sweep to studio tokens; section headers = brand band via onBand (3 theme registers); studio footer with lowercase wordmark; COVER rebuilt (brand poster block on paper, statement title with full stop, hairline fact grid, standards as mono line, hero-behind-scrim, minimal=quiet paper); LEADERSHIP page rebuilt (poster block, statement voice, hairline signature); CHAPTER DIVIDERS rebuilt (poster block, big tabular number). NO dark pages remain in the chrome.
-  - **Fixture harness:** scratchpad `render-sust-fixture.ts` (Meridian Botanical Drinks synthetic data, teal #1E5F5B brand) — run `cd WORKTREE && npx tsx <scratchpad>/render-sust-fixture.ts <themeId> out.html` then headless-chrome print-to-pdf. BEFORE baseline: `sust-before.pdf`; latest AFTER: `sust-after3.pdf`.
-  - DONE (3710089a): every remaining dark panel is now the brand poster block (exec total-emissions, people/community/targets score panels, closing page = commitment statement + hairline sign-off); radii normalised to 6px. Annual theme verified coherent end-to-end on the fixture (sust-classic.pdf).
-  - REMAINING in B (polish): de-pill the key-findings chips (scope/direction/confidence) and policy-status chips into mono working-tone text (canon: no pills — sites around lines 1050-1052 & ~1401 pre-edit); page-by-page audit of Board (landscape, sust-executive.pdf rendered but uninspected) + Editorial + Technical; screenMode CSS restyle to the studio web document; a 5-theme fixture matrix; light-brand-colour test (e.g. ochre-like brand → ink text via onBand).
-  - NOTE a separate task-chip session may be editing lib/pulse/__tests__/widget-tier.test.ts in this worktree — do not commit that file from report work.
-  - ⚠️ CWD DISCIPLINE: the shell cwd resets between commands and half the session's python/git commands accidentally hit the MAIN repo (main's render-sustainability file was contaminated and restored via checkout). ALWAYS `cd /Users/timej/Documents/GitHub/alkatera/.claude/worktrees/redesign &&` or use absolute paths in EVERY command touching files.
-- **FIVE AUDIENCE-LED STYLES SHIPPED (8f631439):** `lib/pdf/templates/report-styles.ts` — Marketing / Customers / Compliance / Investors&Board / Supply-Chain Partners. Each binds theme + legacy audience + tier + imagery policy + ToV instruction + narrative section ORDER + default sections. Renderer assembles pages in the style's arc (keyed map ordered by sectionOrder; dividers before carbon/commitments; vineyards behind products); resolveReportStyle falls back from legacy audience. Tone threads into section-narrative + exec-summary assistants from both build paths. FramingStep's primary choice is now the five styles. Verified: investors = landscape Board brief w/ targets page 2; marketing = Editorial arc.
-  - POLISH DONE (263a9d55): (a) section numbers now COMPUTED in final page order via __SECTION_NUM__ placeholder (appendix '!'/'A' markers kept); (b) SDG tiles brand-coloured with on-band numerals; (c) all remaining pills de-pilled to mono working-tone text (key findings + policy/standards status). STILL OWED in B: Board/Editorial full page-by-page audits; screenMode (interactive HTML) restyle; risk/opportunity cards keep tinted pink/green panel backgrounds (tolerated as quiet tints, purist cleanup optional); light-brand onBand test.
-- Then C (draft-then-edit AI narratives; NOTE Anthropic quota blocked until ~1 Aug for live tests), E (one funnel + share links), D (brand kit + imagery).
+1. **Phase E — one funnel + share links** (the big one):
+   a. Collapse QuickGenerateDialog + 4-step wizard (`reports/builder`) into ONE studio-native
+      flow in the arrival confirm-not-ask idiom: style picker first (5 styles), smart
+      defaults prefilled from data + org `report_defaults`, framing statement as the one
+      open question, progressive disclosure for the rest. Rebuild the 19 pre-studio
+      `components/report-builder/**` files on the studio kit (FieldLabel/Panel/FactList/
+      StateChip/PillButton/MonoTabs) as part of this — not a separate restyle pass.
+   b. Share links: `report_shares` table (token, report_id, expires_at, revoked_at) +
+      public route `app/(public)/report/[token]` serving the screenMode document +
+      share/revoke actions on the report card. Migration → post SQL in chat (/migration).
+2. screenMode (interactive HTML) restyle to the studio web document; Board/Editorial full
+   page audits; risk/opportunity tinted panels purist cleanup; light-brand onBand test.
+3. **Phase C** — draft-then-edit narratives: generate into a store BEFORE render, review/edit
+   step, per-section regenerate with tone hint, CEO-foreword drafting. Build any time;
+   live-test after 1 Aug.
+4. **Phase D** — org brand kit (extend `organizations.report_defaults`), imagery library,
+   ungate foreword/photos from storytelling audiences, section reorder UI, truthful preview.
+5. Design-scout leftovers (scout details in git history of this file): /uploads rebuild (L),
+   shadcn Tabs→MonoTabs on /settings + /reports/sustainability (S), delete dead pulse
+   widgets FinancialFootprintWidget/MaccChartWidget (~740 LOC, zero refs).
 
 ## Gotchas and decisions
-- Design rules in memory (feedback_no_emojis_custom_graphics): NEVER emojis, always custom graphics; redesign don't recolour. Palette: paper #ECEAE3, cream #F2F1EA, hairline #D9D6CB, ink #1A1B1D; rooms forest #205E40 / cobalt #2B46C0 / ochre #DFA32B (ink text always) / brick #BF4B2A. Never coloured text on coloured blocks; one saturated block per surface.
-- Vercel CLI file-upload deploys ("Upload aborted") fail for this big repo — deploy via git push only.
-- Never point staging at production Supabase; Stripe on staging must be TEST keys (live = real charges); do NOT copy prod Inngest keys (hijacks prod's Inngest app).
-- Push to redesign auto-deploys staging. British English, no em dashes, plain language.
+- ⚠️ **CWD DISCIPLINE**: shell cwd resets between Bash calls; several commands this session
+  accidentally hit the MAIN repo (its report renderer was contaminated + restored via
+  checkout). ALWAYS `cd` the worktree or use absolute paths in EVERY file-touching command.
+- Push to redesign auto-deploys staging. British English, no em dashes, plain language,
+  brand is alka**tera** lowercase.
+- Studio canon: no dark pages (poster blocks carry contrast); customer brand colour takes
+  the saturated-band slot with `onBand()` contrast; working tones = mono caps, NEVER pills;
+  radius 6; Space Grotesk speaks / Inter explains / JetBrains Mono annotates.
+- Fixed A4 page divs are DELIBERATE (Chromium spike: canvas bg doesn't paint margins, fixed
+  footers land unpredictably). Don't "improve" to CSS flow.
+- `generated_reports.audience` CHECK constraint predates styles → style id lives in `config`
+  jsonb; legacy audience maps via `resolveReportStyle()` fallback.
+- Vercel Deployment Protection is ON for staging: only Tim's browser can drive the app;
+  Claude verifies via staging Supabase MCP (project vwhdyqvlgjqmlzmsvaes) + `vercel` CLI
+  logs. Staging login tim@alkatera.com / alkatera-staging-2026.
+- Staging is deliberately NO-Inngest: never set INNGEST_* env there (a stray key silently
+  reroutes background dispatch into the void — burned us twice; memory saved).
+- URL-import scrape: fully verified except the final Claude leg — Anthropic key hit its
+  monthly cap, resets 1 Aug. No code change needed.
+- Full `vitest` hangs — always scope (`npx vitest run lib/pdf` etc). lib/pdf 64/64 green.
 
 ## Pending Tim actions
-- 10+ migrations + arrival/design work PENDING PROD (redesign never merged). See tasks/data-revolution-plan.md build log.
-- Staging Inngest env + Stripe test keys optional for fuller staging (scrape fix in job 1 removes the Inngest need for the scrape).
-- Pre-existing prod bugs as task chips: staging_emission_factors RLS regression (fixed on main, prod run pending); admin routes stale fetch-cache.
+- **~1 Aug (Anthropic quota reset):** reload staging arrival-confirm → scrape should
+  complete; generate a styled report → narratives should carry each style's ToV.
+- **Any time:** on staging, generate a report and click Download to exercise the new
+  template through real PDFShift (works without AI narratives).
+- Prod: 10+ redesign migrations pending (never merged); staging Stripe test keys optional.
