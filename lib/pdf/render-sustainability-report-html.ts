@@ -856,11 +856,10 @@ function renderExecSummaryPage(config: ReportConfig, data: ReportData, theme?: R
       ${(theme?.showNarratives !== false) && execNarrative ? renderExecutiveSummaryNarrativeBlock(execNarrative) : ''}
 
       <div style="display: flex; gap: 24px; margin-bottom: 28px;">
-        <div style="flex: 1; background: ${darkBg}; border-radius: 16px; padding: 32px; color: white;">
-          <div style="font-size: 12px; font-family: 'JetBrains Mono', monospace; color: ${brandColor}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Total Emissions</div>
-          <div style="font-size: 48px; font-family: ${headingFont}; font-weight: 700; color: ${brandColor};">${formatNumber(total, 1)}</div>
-          <div style="font-size: 16px; color: ${mutedColor}; margin-top: 4px;">tonnes CO&#8322;e</div>
-          <div style="font-size: 12px; color: ${mutedColor}; margin-top: 4px;">${config.reportYear} reporting year</div>
+        <div style="flex: 1; background: ${brandColor}; border-radius: 6px; padding: 28px 32px; color: ${onBand(brandColor).fg};">
+          <div style="font-family: ${MONO}; font-size: 9.5px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; opacity: .75; margin-bottom: 10px;">TOTAL EMISSIONS</div>
+          <div style="font-family: ${SG}; font-size: 48px; font-weight: 700; line-height: .95; letter-spacing: -.035em; font-variant-numeric: tabular-nums;">${formatNumber(total, 1)}</div>
+          <div style="font-family: ${MONO}; font-size: 9.5px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; opacity: .75; margin-top: 10px;">TONNES CO&#8322;E · ${config.reportYear} REPORTING YEAR</div>
         </div>
 
         <div style="width: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
@@ -917,7 +916,7 @@ function renderExecSummaryPage(config: ReportConfig, data: ReportData, theme?: R
       </div>` : ''}
 
       ${socialHighlights.length > 0 ? `
-      <div style="background: #F2F1EA; border: 1px solid #D9D6CB; border-radius: 12px; padding: 20px;">
+      <div style="background: #F2F1EA; border: 1px solid #D9D6CB; border-radius: 6px; padding: 20px;">
         <div style="font-size: 11px; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 2px; color: #6F6F68; margin-bottom: 12px;">Social Highlights</div>
         <div style="display: flex; gap: 24px;">
           ${socialHighlights.map(h => `<div style="font-size: 14px; color: #1A1B1D; font-weight: 500;">${escapeHtml(h)}</div>`).join('')}
@@ -1041,16 +1040,16 @@ function renderKeyFindingsPage(config: ReportConfig, data: ReportData, theme?: R
       f.confidence === 'medium' ? '#B45309' : '#6F6F68';
 
     return `
-      <div style="background: #F2F1EA; border: 1px solid #D9D6CB; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
+      <div style="background: #F2F1EA; border: 1px solid #D9D6CB; border-radius: 6px; padding: 20px; margin-bottom: 16px;">
         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
           <span style="font-size: 20px; color: ${directionColour}; line-height: 1;">${directionIcon}</span>
           <span style="font-size: 15px; font-weight: 600; color: #1A1B1D; flex: 1;">${escapeHtml(f.title)}</span>
         </div>
         <p style="font-size: 13px; color: #1A1B1D; line-height: 1.6; margin-bottom: 14px;">${escapeHtml(f.narrative)}</p>
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-          <span style="display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 500; font-family: 'JetBrains Mono', monospace; background: #ECEAE3; color: #6F6F68; text-transform: uppercase; letter-spacing: 1px;">${escapeHtml(f.scope)}</span>
-          <span style="display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 600; background: ${isDecrease ? '#F2F1EA' : '#F2F1EA'}; color: ${isDecrease ? '#047857' : '#BE123C'};">${directionLabel} ${Math.abs(f.magnitude_pct).toFixed(1)}%</span>
-          <span style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 500; background: #ECEAE3; color: ${confidenceColour};">
+          <span style="display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 500; font-family: 'JetBrains Mono', monospace; background: #ECEAE3; color: #6F6F68; text-transform: uppercase; letter-spacing: 1px;">${escapeHtml(f.scope)}</span>
+          <span style="display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 600; background: ${isDecrease ? '#F2F1EA' : '#F2F1EA'}; color: ${isDecrease ? '#047857' : '#BE123C'};">${directionLabel} ${Math.abs(f.magnitude_pct).toFixed(1)}%</span>
+          <span style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 6px; font-size: 10px; font-weight: 500; background: #ECEAE3; color: ${confidenceColour};">
             <span style="width: 6px; height: 6px; border-radius: 50%; background: ${confidenceColour}; display: inline-block;"></span>
             ${escapeHtml(f.confidence)} confidence
           </span>
@@ -1313,10 +1312,10 @@ function renderPeopleCulturePage(config: ReportConfig, data: ReportData, theme?:
       ${(theme?.showNarratives !== false) && peopleCultureNarrative ? renderNarrativeBlock(peopleCultureNarrative) : ''}
 
       <div style="display: flex; gap: 24px; margin-bottom: 28px;">
-        <div style="flex: 1; background: ${theme?.pageDarkBackground ?? '#1A1B1D'}; border-radius: 16px; padding: 28px; color: white;">
-          <div style="font-size: 12px; font-family: 'JetBrains Mono', monospace; color: ${brandColor}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Overall Score</div>
-          <div style="font-size: 56px; font-family: ${theme?.headingFont ?? "'Space Grotesk', sans-serif"}; font-weight: 700; color: ${brandColor};">${pc.overallScore}<span style="font-size: 20px; color: ${theme?.mutedTextColor ?? '#6F6F68'};">/100</span></div>
-          <div style="font-size: 12px; color: ${theme?.mutedTextColor ?? '#6F6F68'}; margin-top: 4px;">${pc.dataCompleteness.toFixed(0)}% data completeness</div>
+        <div style="flex: 1; background: ${brandColor}; border-radius: 6px; padding: 28px; color: ${onBand(brandColor).fg};">
+          <div style="font-size: 12px; font-family: 'JetBrains Mono', monospace; opacity: .75; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Overall Score</div>
+          <div style="font-size: 56px; font-family: ${theme?.headingFont ?? "'Space Grotesk', sans-serif"}; font-weight: 700;">${pc.overallScore}<span style="font-size: 20px; opacity: .7;">/100</span></div>
+          <div style="font-size: 12px; opacity: .7; margin-top: 4px;">${pc.dataCompleteness.toFixed(0)}% data completeness</div>
         </div>
         <div style="flex: 1;">
           ${pillars.map(p => `
@@ -1399,7 +1398,7 @@ function renderGovernancePage(config: ReportConfig, data: ReportData, theme?: Re
     <tr>
       <td style="font-weight: 500;">${escapeHtml(p.name)}</td>
       <td style="font-size: 11px; color: #6F6F68;">${escapeHtml(p.type)}</td>
-      <td><span style="display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; background: ${statusColor}20; color: ${statusColor};">${escapeHtml(p.status)}</span></td>
+      <td><span style="display: inline-block; padding: 2px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; background: ${statusColor}20; color: ${statusColor};">${escapeHtml(p.status)}</span></td>
       <td>${p.isPublic ? '&#10003; Public' : 'Internal'}</td>
     </tr>`;
   }).join('');
@@ -1453,7 +1452,7 @@ function renderGovernancePage(config: ReportConfig, data: ReportData, theme?: Re
       </table>
 
       ${gov.missionStatement ? `
-      <div style="background: #F2F1EA; border: 1px solid #D9D6CB; border-radius: 12px; padding: 16px;">
+      <div style="background: #F2F1EA; border: 1px solid #D9D6CB; border-radius: 6px; padding: 16px;">
         <div style="font-size: 11px; font-weight: 600; color: #1A1B1D; margin-bottom: 6px;">Mission Statement</div>
         <p style="font-size: 12px; color: #1A1B1D; line-height: 1.6; font-style: italic;">${escapeHtml(gov.missionStatement)}</p>
       </div>` : ''}
@@ -1484,10 +1483,10 @@ function renderCommunityImpactPage(config: ReportConfig, data: ReportData, theme
       ${(theme?.showNarratives !== false) && communityNarrative ? renderNarrativeBlock(communityNarrative) : ''}
 
       <div style="display: flex; gap: 24px; margin-bottom: 24px;">
-        <div style="flex: 1; background: ${theme?.pageDarkBackground ?? '#1A1B1D'}; border-radius: 16px; padding: 28px; color: white;">
-          <div style="font-size: 12px; font-family: 'JetBrains Mono', monospace; color: ${brandColor}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Community Score</div>
-          <div style="font-size: 56px; font-family: ${theme?.headingFont ?? "'Space Grotesk', sans-serif"}; font-weight: 700; color: ${brandColor};">${ci.overallScore}<span style="font-size: 20px; color: ${theme?.mutedTextColor ?? '#6F6F68'};">/100</span></div>
-          <div style="font-size: 12px; color: ${theme?.mutedTextColor ?? '#6F6F68'}; margin-top: 4px;">${ci.dataCompleteness.toFixed(0)}% data completeness</div>
+        <div style="flex: 1; background: ${brandColor}; border-radius: 6px; padding: 28px; color: ${onBand(brandColor).fg};">
+          <div style="font-size: 12px; font-family: 'JetBrains Mono', monospace; opacity: .75; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Community Score</div>
+          <div style="font-size: 56px; font-family: ${theme?.headingFont ?? "'Space Grotesk', sans-serif"}; font-weight: 700;">${ci.overallScore}<span style="font-size: 20px; opacity: .7;">/100</span></div>
+          <div style="font-size: 12px; opacity: .7; margin-top: 4px;">${ci.dataCompleteness.toFixed(0)}% data completeness</div>
         </div>
         <div style="flex: 1;">
           ${pillarScores.map(p => `
@@ -1627,8 +1626,8 @@ function renderTargetsPage(config: ReportConfig, data: ReportData, theme?: Repor
 
       ${(theme?.showNarratives !== false) && targetsNarrative ? renderNarrativeBlock(targetsNarrative) : ''}
 
-      <div style="background: ${theme?.pageDarkBackground ?? '#1A1B1D'}; border-radius: 16px; padding: 28px; color: white; margin-bottom: 24px;">
-        <div style="font-size: 12px; font-family: 'JetBrains Mono', monospace; color: ${brandColor}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">Climate Commitments</div>
+      <div style="background: ${brandColor}; border-radius: 6px; padding: 28px; color: ${onBand(brandColor).fg}; margin-bottom: 24px;">
+        <div style="font-size: 12px; font-family: 'JetBrains Mono', monospace; opacity: .75; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">Climate Commitments</div>
         ${commitments.length > 0 ? commitments.map((c, i) => `
           <div style="display: flex; gap: 16px; align-items: flex-start; margin-bottom: 16px; padding-bottom: 16px; ${i < commitments.length - 1 ? 'border-bottom: 1px solid rgba(242,241,234,0.1);' : ''}">
             <div style="width: 32px; height: 32px; border-radius: 50%; background: ${brandColor}26; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
@@ -1642,7 +1641,7 @@ function renderTargetsPage(config: ReportConfig, data: ReportData, theme?: Repor
       </div>
 
       ${data.governance?.sdgCommitments && data.governance.sdgCommitments.length > 0 ? `
-      <div style="background: #F2F1EA; border: 1px solid #D9D6CB; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+      <div style="background: #F2F1EA; border: 1px solid #D9D6CB; border-radius: 6px; padding: 20px; margin-bottom: 24px;">
         <div style="font-size: 11px; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 2px; color: #6F6F68; margin-bottom: 12px;">UN Sustainable Development Goals</div>
         <div style="display: flex; flex-wrap: wrap; gap: 8px;">
           ${data.governance.sdgCommitments.map(sdg => `
@@ -1653,7 +1652,7 @@ function renderTargetsPage(config: ReportConfig, data: ReportData, theme?: Repor
         </div>
       </div>` : ''}
 
-      <div style="background: #F2F1EA; border: 1px solid #D9D6CB; border-radius: 12px; padding: 20px;">
+      <div style="background: #F2F1EA; border: 1px solid #D9D6CB; border-radius: 6px; padding: 20px;">
         <div style="font-size: 11px; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 2px; color: #6F6F68; margin-bottom: 12px;">Emissions Trajectory</div>
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
           <div style="text-align: center;">
@@ -1691,7 +1690,7 @@ function renderMethodologyPage(config: ReportConfig, data: ReportData, theme?: R
     <tr>
       <td style="font-weight: 500;">${escapeHtml(s.code)}</td>
       <td>${escapeHtml(s.name)}</td>
-      <td><span style="display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; background: ${statusColor}20; color: ${statusColor};">${escapeHtml(s.status)}</span></td>
+      <td><span style="display: inline-block; padding: 2px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; background: ${statusColor}20; color: ${statusColor};">${escapeHtml(s.status)}</span></td>
       <td style="font-size: 11px; color: #6F6F68;">${escapeHtml(s.detail)}</td>
     </tr>`;
   }).join('');
@@ -1732,7 +1731,7 @@ function renderMethodologyPage(config: ReportConfig, data: ReportData, theme?: R
         </div>
       </div>` : ''}
 
-      <div style="background: #F2F1EA; border: 1px solid #D9D6CB; border-radius: 12px; padding: 20px;">
+      <div style="background: #F2F1EA; border: 1px solid #D9D6CB; border-radius: 6px; padding: 20px;">
         <div style="font-size: 12px; font-weight: 600; margin-bottom: 12px;">Data Sources</div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12px; color: #1A1B1D;">
           <div style="padding: 8px 12px; background: #ECEAE3; border-radius: 8px;">
@@ -1756,30 +1755,23 @@ function renderMethodologyPage(config: ReportConfig, data: ReportData, theme?: R
 
 function renderClosingPage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
   const brandColor = getBrandColor(config);
-  const headingFont = theme?.headingFont ?? "'Space Grotesk', sans-serif";
-  const darkBg = theme?.pageDarkBackground ?? '#1A1B1D';
+  const on = onBand(brandColor);
+  const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase();
   return `
-    <div class="page dark-page" style="justify-content: center; align-items: center; text-align: center; background: ${darkBg};">
-      <div style="margin-bottom: 48px;">
-        ${orgLogo(config, 56)}
-      </div>
-
-      <h1 style="font-size: 48px; font-family: ${headingFont}; font-weight: 300; color: white; margin-bottom: 16px;">Thank You</h1>
-      <p style="font-size: 16px; color: #6F6F68; max-width: 400px; line-height: 1.8; margin-bottom: 48px;">
-        This sustainability report was prepared for ${escapeHtml(data.organization.name)} covering the ${config.reportYear} reporting period.
-      </p>
-
-      <div style="border-top: 1px solid rgba(242,241,234,0.15); padding-top: 32px; max-width: 400px;">
-        <div style="font-size: 11px; font-family: 'JetBrains Mono', monospace; color: ${brandColor}; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 16px;">Prepared By</div>
-        <p style="font-size: 14px; color: #D9D6CB; margin-bottom: 4px;">${escapeHtml(data.organization.name)}</p>
-        ${data.organization.industry_sector ? `<p style="font-size: 12px; color: #6F6F68; margin-bottom: 16px;">${escapeHtml(data.organization.industry_sector)}</p>` : ''}
-        <p style="font-size: 12px; color: #6F6F68; margin-bottom: 4px;">Generated with alkatera</p>
-        <p style="font-size: 11px; color: #6F6F68;">alkatera.com</p>
-      </div>
-
-      <div style="position: absolute; bottom: 48px; left: 48px; right: 48px; display: flex; justify-content: space-between; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: rgba(242,241,234,0.2); text-transform: uppercase; letter-spacing: 3px;">
-        <div>Confidential</div>
-        <div>${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+    <div class="page" style="position: relative;">
+      <div style="background:${brandColor};border-radius:6px;color:${on.fg};position:relative;overflow:hidden;height:calc(100% - 30px);display:flex;flex-direction:column;justify-content:space-between;padding:48px 52px;box-sizing:border-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;position:relative">
+          ${config.branding.logo ? `<img src="${escapeHtml(config.branding.logo)}" alt="" style="max-height:36px;width:auto;object-fit:contain" />` : `<div style="font-family:${SG};font-size:18px;font-weight:700">${escapeHtml(data.organization.name)}</div>`}
+          <div style="font-family:${MONO};font-size:9.5px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;opacity:.75">THANK YOU</div>
+        </div>
+        <div style="position:relative;max-width:520px">
+          <div style="font-family:${SG};font-size:40px;font-weight:700;line-height:.98;letter-spacing:-.035em">Measured honestly. Improved deliberately.</div>
+          <p style="font-family:${INTER};font-size:13px;line-height:1.6;opacity:.9;margin:22px 0 0">This sustainability report was prepared for ${escapeHtml(data.organization.name)} covering the ${config.reportYear} reporting period.${data.organization.industry_sector ? ` ${escapeHtml(data.organization.industry_sector)}.` : ''}</p>
+        </div>
+        <div style="position:relative;display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid ${on.hairline};padding-top:20px">
+          <div style="font-family:${MONO};font-size:9.5px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;opacity:.8">CONFIDENTIAL</div>
+          <div style="font-family:${MONO};font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;opacity:.8">GENERATED WITH ALKATERA · ${dateStr} · ALKATERA.COM</div>
+        </div>
       </div>
     </div>`;
 }
@@ -1824,7 +1816,7 @@ function renderCsrdGatingWarningPage(config: ReportConfig, theme?: ReportTheme):
           </p>
         </div>
 
-        <div style="background: #F2F1EA; border: 1px solid #B45309; border-radius: 12px; padding: 24px 32px; max-width: 520px; width: 100%; text-align: left;">
+        <div style="background: #F2F1EA; border: 1px solid #B45309; border-radius: 6px; padding: 24px 32px; max-width: 520px; width: 100%; text-align: left;">
           <div style="font-size: 12px; font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #B45309; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">
             Steps to achieve CSRD compliance:
           </div>
@@ -2317,7 +2309,7 @@ export function renderSustainabilityReportHtml(
       flex-direction: column;
       padding: ${theme.pagePadding}px;
       overflow: visible;
-      border-radius: 12px;
+      border-radius: 6px;
       box-shadow: 0 2px 20px rgba(0,0,0,0.08);
     }
     /* In screen mode footers render in normal flow — no absolute overlap */
@@ -2350,7 +2342,7 @@ export function renderSustainabilityReportHtml(
     .metric-card {
       background: #F2F1EA;
       border: 1px solid #D9D6CB;
-      border-radius: 12px;
+      border-radius: 6px;
       padding: 20px;
     }
 
@@ -2404,7 +2396,7 @@ export function renderSustainabilityReportHtml(
     .badge {
       display: inline-block;
       padding: 2px 10px;
-      border-radius: 12px;
+      border-radius: 6px;
       font-size: 11px;
       font-weight: 500;
     }
@@ -2477,7 +2469,7 @@ export function renderSustainabilityReportHtml(
       align-items: center;
       justify-content: space-between;
       margin-bottom: 32px;
-      border-radius: 12px;
+      border-radius: 6px;
       max-width: 860px;
       margin-left: auto;
       margin-right: auto;
