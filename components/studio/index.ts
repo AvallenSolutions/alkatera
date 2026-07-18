@@ -12,6 +12,7 @@ export { InkBand } from './ink-band';
 export { MonoTabs } from './mono-tabs';
 export { Statement } from './statement';
 export { Eyebrow } from './eyebrow';
+export { FieldLabel } from './field-label';
 export { BigNumber } from './big-number';
 export { Panel } from './panel';
 export { PosterBlock } from './poster-block';

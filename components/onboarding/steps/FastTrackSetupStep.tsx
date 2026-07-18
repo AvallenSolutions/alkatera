@@ -15,7 +15,7 @@ import { RosaIntro } from './RosaIntro'
 import { BeverageIcon } from './beverage-icons'
 import { UniversalDropzone } from '@/components/layouts/UniversalDropzone'
 import { GROWTH_PALETTE, STUDIO } from '@/components/studio/theme'
-import { Eyebrow, Panel, PillButton } from '@/components/studio'
+import { Eyebrow, FieldLabel, Panel, PillButton } from '@/components/studio'
 
 const BEVERAGE_OPTIONS: { value: BeverageType; label: string }[] = [
   { value: 'beer', label: 'Beer' },
@@ -139,13 +139,7 @@ function FieldRow({
 }) {
   return (
     <div className={cn('py-3.5 first:pt-0 last:pb-0', className)}>
-      <div className="mb-1.5 flex items-center justify-between gap-2">
-        <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-studio-dim">
-          {label}
-          {required && <span className="text-studio-stale"> · required</span>}
-        </span>
-        {tag}
-      </div>
+      <FieldLabel required={required} tag={tag} className="mb-1.5">{label}</FieldLabel>
       {children}
     </div>
   )
@@ -677,13 +671,12 @@ export function FastTrackSetupStep() {
           </div>
 
           <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-studio-dim">
-                Company
-                {!confirmMode && <span className="text-studio-stale"> · required</span>}
-              </span>
-              {autofilledFromSite.has('logo') && <FromWebsiteTag />}
-            </div>
+            <FieldLabel
+              required={!confirmMode}
+              tag={autofilledFromSite.has('logo') ? <FromWebsiteTag /> : undefined}
+            >
+              Company
+            </FieldLabel>
             {confirmMode && companyName.trim() && !editingFields.has('name') ? (
               <div className="mt-0.5">
                 <ConfirmedValue value={companyName} onEdit={() => beginEdit('name')} />
@@ -760,10 +753,12 @@ export function FastTrackSetupStep() {
               fact, paired rather than each taking a full-width line. */}
           <div className="grid grid-cols-2 gap-x-3 py-3.5 first:pt-0 last:pb-0">
             <div>
-              <div className="mb-1.5 flex items-center justify-between gap-2">
-                <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-studio-dim">Country</span>
-                {autofilledFromSite.has('country') && <FromWebsiteTag />}
-              </div>
+              <FieldLabel
+                className="mb-1.5"
+                tag={autofilledFromSite.has('country') ? <FromWebsiteTag /> : undefined}
+              >
+                Country
+              </FieldLabel>
               {confirmMode && autofilledFromSite.has('country') && !editingFields.has('country') ? (
                 <ConfirmedValue
                   value={COUNTRIES.find(c => c.value === countryCode)?.label ?? countryCode}
@@ -779,10 +774,12 @@ export function FastTrackSetupStep() {
               )}
             </div>
             <div>
-              <div className="mb-1.5 flex items-center justify-between gap-2">
-                <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-studio-dim">Year founded</span>
-                {autofilledFromSite.has('foundingYear') && <FromWebsiteTag />}
-              </div>
+              <FieldLabel
+                className="mb-1.5"
+                tag={autofilledFromSite.has('foundingYear') ? <FromWebsiteTag /> : undefined}
+              >
+                Year founded
+              </FieldLabel>
               {confirmMode && autofilledFromSite.has('foundingYear') && !editingFields.has('foundingYear') ? (
                 <ConfirmedValue value={foundingYear} onEdit={() => beginEdit('foundingYear')} />
               ) : (
@@ -799,12 +796,12 @@ export function FastTrackSetupStep() {
 
         {/* Drink type — maps to organizations.product_type */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-studio-dim">
-              What do you make? <span className="text-studio-stale">· required</span>
-            </span>
-            {autofilledFromSite.has('beverageType') && <FromWebsiteTag />}
-          </div>
+          <FieldLabel
+            required
+            tag={autofilledFromSite.has('beverageType') ? <FromWebsiteTag /> : undefined}
+          >
+            What do you make?
+          </FieldLabel>
           <div className={cn('flex flex-wrap gap-2', highlightClass('beverageType'))}>
             {BEVERAGE_OPTIONS.map(opt => (
               <button
@@ -828,9 +825,7 @@ export function FastTrackSetupStep() {
         {/* Team size — maps to organizations.company_size, shown as quiet
             mono chips rather than a bordered-box grid. */}
         <div className="space-y-2">
-          <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-studio-dim">
-            Team size <span className="text-studio-stale">· required</span>
-          </span>
+          <FieldLabel required>Team size</FieldLabel>
           <div className="flex flex-wrap gap-2">
             {TEAM_SIZE_OPTIONS.map(opt => (
               <button
