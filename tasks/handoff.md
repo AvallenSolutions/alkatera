@@ -1,15 +1,31 @@
 # Handoff: redesign — studio design system + sustainability report programme
-Updated: 2026-07-18 14:00 | Branch: redesign | Worktree: /Users/timej/Documents/GitHub/alkatera/.claude/worktrees/redesign | Dev port: 8896 (preview_start name "redesign"); a second config "redesign-verify" exists for sessions locked out of the first (harness may shift its port)
+Updated: 2026-07-18 14:50 | Branch: redesign | Worktree: /Users/timej/Documents/GitHub/alkatera/.claude/worktrees/redesign | Dev port: 8896 (preview_start name "redesign"); a second config "redesign-verify" exists for sessions locked out of the first (harness may shift its port)
 
 ## Goal
 The alkatera redesign ("house of rooms" studio design language) lives on branch `redesign`,
 auto-deployed on push to Vercel staging. Current programme: rebuild the DOCUMENT GENERATORS
 in the studio design and upgrade sustainability-report customisation (plan:
 `tasks/sustainability-report-redesign-plan.md`, phases A–E, Tim-approved order A→B→C→E→D).
-**A+B+E+C are done; next is Phase D (brand kit, imagery, section control, true preview).**
+**ALL FIVE PHASES (A+B+C+D+E) ARE DONE — the report programme is complete.** Next work is
+staging click-throughs, the provenance-gate decision, and the design-scout leftovers.
 Redesign NEVER merges to main until go-live.
 
 ## Done (verified)
+- **Phase D SHIPPED (5c601edd), verified live on local.** Brand kit tab on the report hub
+  (logo + colours + foreword author + reusable image library; merge-writes ONLY the
+  branding/imageLibrary keys of shared report_defaults; logo mirrors organizations.logo_url).
+  Named imagery slots (cover/divider1/divider2/people) replace heroImages indices with a
+  render-time legacy fallback; theme = single look authority (leadership page + foreword
+  drafting ungated from tier: Customers + Supply-chain gain both; Investors/Compliance stay
+  imagery-free). Running-order chevrons materialise config.sectionOrder (renderer + review +
+  preview all prefer it; renumbering stays sequential); per-section scopes (products pcfIds,
+  trends year range) typed in config jsonb, precedence scope > reportYears > fallback; NO
+  migration. Truthful preview: the orphaned /api/reports/preview real-render route revived
+  (route-auth + no-store + products scope + a pinned no-AI invariant) behind a collapsed
+  panel with a sandboxed srcDoc iframe, manual refresh and a "Preview is behind" chip.
+  Verified: kit saves/seeds, cover from library, custom order in preview AND shipped share
+  doc, leadership page with kit author, legacy share byte-stable. 127 vitest, tsc clean.
+  NOTE: local demo library entry (rosa-the-dog URL) seeded in LOCAL DB only.
 - **Phase C SHIPPED (0465fad0), verified live on local (fallback narratives, no GEMINI key).**
   Draft-then-edit: create parks the report as 'draft' (migration 20260718150000, applied
   LOCAL + STAGING, not prod), narratives draft synchronously into data_snapshot
