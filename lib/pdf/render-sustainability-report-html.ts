@@ -324,6 +324,9 @@ interface ReportConfig {
   sections: string[];
   isMultiYear?: boolean;
   reportYears?: number[];
+  /** Theme id (lib/pdf/templates/themes.ts); falls back to Classic. */
+  template?: string;
+  orientation?: 'portrait' | 'landscape';
   branding: {
     logo: string | null;
     primaryColor: string;
@@ -2234,7 +2237,7 @@ export function renderSustainabilityReportHtml(
   const tier = getStorytellingTier(config.audience);
 
   // Resolve the active theme based on config.template and config.orientation
-  const theme = resolveTheme((config as any).template, (config as any).orientation);
+  const theme = resolveTheme(config.template, config.orientation);
   const ds = getDensityStyles(theme);
 
   // Compute values used for section dividers
