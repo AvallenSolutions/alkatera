@@ -28,7 +28,7 @@ export function RosaIntro({ message, className }: Props) {
       <div className="h-9 w-9 rounded-full bg-secondary flex items-center justify-center shrink-0 overflow-hidden">
         {/* Rosa is a dog; fall back to a paw glyph if the asset is missing. */}
         <Image
-          src="/images/rosa-avatar.png"
+          src="/images/rosa-the-dog.jpg"
           alt="Rosa"
           width={36}
           height={36}
