@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { renderSustainabilityReportHtml } from '@/lib/pdf/render-sustainability-report-html';
 import { buildReportConfig } from '@/lib/reports/generate-sustainability-pdf';
 import { generateAllSectionNarratives } from '@/lib/claude/section-narrative-assistant';
+import { resolveReportStyle } from '@/lib/pdf/templates/report-styles';
 import { generateExecutiveSummaryNarrative } from '@/lib/claude/executive-summary-assistant';
 
 /**
@@ -188,6 +189,7 @@ export async function POST(
         previousYear: year - 1,
         standards: config.standards,
         audience: config.audience,
+        tone: resolveReportStyle(config.style, config.audience).tone,
         sections: config.sections,
         reportData,
         materiality: materialityCtx,
@@ -201,6 +203,7 @@ export async function POST(
         previousYear: year - 1,
         standards: config.standards,
         audience: config.audience,
+        tone: resolveReportStyle(config.style, config.audience).tone,
         sectionNarratives,
         emissions: {
           scope1: reportData.emissions?.scope1 || 0,

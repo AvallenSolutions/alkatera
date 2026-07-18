@@ -61,6 +61,8 @@ export interface SectionNarrativeContext {
   standards: string[];
   /** Audience type key, e.g. 'investors' | 'customers' | 'regulators' */
   audience: string;
+  /** Style tone-of-voice instruction (lib/pdf/templates/report-styles.ts). */
+  tone?: string;
   sectionId: string;
   sectionLabel: string;
   /** The assembled section data — passed as-is, Claude picks what is relevant */
@@ -214,7 +216,7 @@ Sector: ${ctx.sector || 'Not specified'}
 Reporting year: ${ctx.reportingYear}
 ${ctx.previousYear ? `Previous year for comparison: ${ctx.previousYear}` : ''}
 Applicable standards: ${standardsText}
-Primary audience: ${ctx.audience} — they care about: ${audienceFocus}
+Primary audience: ${ctx.audience} — they care about: ${audienceFocus}${ctx.tone ? `\nTone of voice for this report: ${ctx.tone}` : ''}
 
 Section data:
 ${JSON.stringify(ctx.sectionData, null, 2)}`;
@@ -336,6 +338,7 @@ export interface MaterialityAssessmentSummary {
 }
 
 export async function generateAllSectionNarratives(params: {
+  tone?: string;
   organisationName: string;
   sector?: string;
   reportingYear: number;
@@ -351,7 +354,7 @@ export async function generateAllSectionNarratives(params: {
   const {
     organisationName, sector, reportingYear, previousYear,
     standards, audience, sections, reportData, dataQuality, materiality,
-    reportFramingStatement,
+    reportFramingStatement, tone,
   } = params;
 
   const SECTION_LABELS: Record<string, string> = {
@@ -452,6 +455,7 @@ export async function generateAllSectionNarratives(params: {
         previousYear,
         standards,
         audience,
+        tone,
         sectionId,
         sectionLabel: SECTION_LABELS[sectionId],
         sectionData,

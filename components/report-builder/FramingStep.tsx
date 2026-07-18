@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, TrendingUp, Scale, Users, Truck, FlaskConical, Building2, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ReportConfig } from '@/types/report-builder';
-import { AUDIENCE_TYPES } from '@/types/report-builder';
+import { REPORT_STYLE_CHOICES } from '@/types/report-builder';
 
 interface FramingStepProps {
   config: ReportConfig;
@@ -60,6 +60,8 @@ const AUDIENCE_META: Record<string, {
 
 export function FramingStep({ config, onChange, smartDefaultsApplied }: FramingStepProps) {
   const selectedMeta = AUDIENCE_META[config.audience];
+  const selectedStyle = REPORT_STYLE_CHOICES.find(c => c.value === config.style)
+    ?? REPORT_STYLE_CHOICES.find(c => c.audience === config.audience && c.value !== 'marketing');
 
   return (
     <div className="space-y-8 max-w-2xl">
@@ -86,16 +88,23 @@ export function FramingStep({ config, onChange, smartDefaultsApplied }: FramingS
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {AUDIENCE_TYPES.map((audience) => {
-            const meta = AUDIENCE_META[audience.value];
+          {REPORT_STYLE_CHOICES.map((styleChoice) => {
+            const meta = AUDIENCE_META[styleChoice.audience];
             const Icon = meta?.icon || Building2;
-            const isSelected = config.audience === audience.value;
+            const isSelected = (config.style ?? '') === styleChoice.value
+              || (!config.style && config.audience === styleChoice.audience && styleChoice.value !== 'marketing');
 
             return (
               <button
-                key={audience.value}
+                key={styleChoice.value}
                 type="button"
-                onClick={() => onChange({ audience: audience.value as ReportConfig['audience'] })}
+                onClick={() => onChange({
+                  style: styleChoice.value,
+                  audience: styleChoice.audience as ReportConfig['audience'],
+                  template: styleChoice.template as ReportConfig['template'],
+                  sections: styleChoice.sections,
+                  standards: styleChoice.standards,
+                })}
                 className={cn(
                   'relative text-left p-4 rounded-[6px] border-2 transition-all hover:border-stone-300',
                   isSelected
@@ -110,10 +119,10 @@ export function FramingStep({ config, onChange, smartDefaultsApplied }: FramingS
                 )}
                 <Icon className={cn('w-5 h-5 mb-2', isSelected ? 'text-[#F2F1EA]' : 'text-stone-400')} />
                 <div className={cn('text-sm font-semibold', isSelected ? 'text-white' : 'text-stone-800')}>
-                  {audience.label}
+                  {styleChoice.label}
                 </div>
                 <div className={cn('text-xs mt-0.5', isSelected ? 'text-stone-300' : 'text-stone-500')}>
-                  {audience.description}
+                  {styleChoice.description}
                 </div>
               </button>
             );
@@ -121,12 +130,12 @@ export function FramingStep({ config, onChange, smartDefaultsApplied }: FramingS
         </div>
 
         {/* Audience cues */}
-        {selectedMeta && (
+        {selectedStyle && (
           <div className="rounded-lg bg-stone-50 border border-stone-200 p-3 space-y-1.5">
             <p className="text-xs font-mono uppercase tracking-wider text-stone-400">
-              What this audience cares about
+              What this style delivers
             </p>
-            {selectedMeta.cues.map(cue => (
+            {selectedStyle.cues.map(cue => (
               <div key={cue} className="flex items-start gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-[#2B46C0] mt-1.5 flex-shrink-0" />
                 <p className="text-xs text-stone-600">{cue}</p>
@@ -170,13 +179,13 @@ export function FramingStep({ config, onChange, smartDefaultsApplied }: FramingS
       </div>
 
       {/* Suggested sections preview */}
-      {selectedMeta && (
+      {selectedStyle && (
         <div className="space-y-2">
           <p className="text-xs font-mono uppercase tracking-wider text-stone-400">
-            Suggested sections for this audience
+            Sections this style starts with (editable in Select Content)
           </p>
           <div className="flex flex-wrap gap-1.5">
-            {selectedMeta.suggestedSections.map(s => (
+            {selectedStyle.sections.map(s => (
               <Badge key={s} variant="secondary" className="text-xs font-normal">
                 {s.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
               </Badge>

@@ -37,6 +37,8 @@ export interface ExecutiveSummaryContext {
   previousYear?: number;
   standards: string[];
   audience: string;
+  /** Style tone-of-voice instruction (lib/pdf/templates/report-styles.ts). */
+  tone?: string;
   /** All section narratives already generated */
   sectionNarratives: ReportNarratives;
   /** Live emissions data for factual grounding */
@@ -137,7 +139,7 @@ function buildUserPrompt(ctx: ExecutiveSummaryContext): string {
 Organisation: ${ctx.organisationName}
 Sector: ${ctx.sector || 'Not specified'}
 Reporting year: ${ctx.reportingYear}
-Primary audience: ${ctx.audience}
+Primary audience: ${ctx.audience}${ctx.tone ? `\nTone of voice for this report: ${ctx.tone}` : ''}
 Applicable standards: ${ctx.standards.length > 0 ? ctx.standards.join(', ') : 'None specified'}
 
 Emissions summary:

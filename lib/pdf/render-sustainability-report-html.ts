@@ -23,6 +23,7 @@
  */
 
 import { resolveTheme, getThemeFontImport, type ReportTheme } from '@/lib/pdf/templates/themes';
+import { resolveReportStyle } from '@/lib/pdf/templates/report-styles';
 import {
   INK, CREAM, PAPER, HAIR, DIM, GOOD, ATTN, STALE, MONO, SG, INTER,
   onBand, wordmark, toneChip,
@@ -328,7 +329,9 @@ interface ReportConfig {
   sections: string[];
   isMultiYear?: boolean;
   reportYears?: number[];
-  /** Theme id (lib/pdf/templates/themes.ts); falls back to Classic. */
+  /** Audience-led style preset (lib/pdf/templates/report-styles.ts). */
+  style?: string;
+  /** Theme id (lib/pdf/templates/themes.ts); falls back to the style's theme. */
   template?: string;
   orientation?: 'portrait' | 'landscape';
   branding: {
@@ -2175,11 +2178,14 @@ export function renderSustainabilityReportHtml(
 ): string {
   const screenMode = options.screenMode === true;
   const sections = new Set(config.sections);
-  const tier = getStorytellingTier(config.audience);
 
-  // Resolve the active theme based on config.template and config.orientation
-  const theme = resolveTheme(config.template, config.orientation);
+  // The audience-led style binds look, narrative order, imagery and tier.
+  // An explicitly chosen template still overrides the style's theme.
+  const style = resolveReportStyle(config.style, config.audience);
+  const theme = resolveTheme(config.template || style.themeId, config.orientation);
   const ds = getDensityStyles(theme);
+  const tier = style.tier;
+  const showImagery = style.imagery !== 'none';
 
   // Compute values used for section dividers
   const totalEmissions = data.emissions?.total ?? 0;
@@ -2194,71 +2200,91 @@ export function renderSustainabilityReportHtml(
     ? ` — a ${parseFloat(yoyChange) < 0 ? Math.abs(parseFloat(yoyChange)).toFixed(1) + '% reduction' : parseFloat(yoyChange).toFixed(1) + '% increase'} year-on-year`
     : '';
 
-  const pages = [
-    // Cover — with optional hero photo
-    renderCoverPage(config, data, theme),
+  // ---- Content pages, keyed by section id ---------------------------------
+  // Assembled in the STYLE's narrative order below; sections without data or
+  // deselected by the user simply drop out. Exec summary, emissions, targets
+  // and methodology always render (every style orders them).
+  const sectionPages = new Map<string, string>();
+  sectionPages.set('executive-summary', renderExecSummaryPage(config, data, theme));
+  sectionPages.set('scope-1-2-3', renderEmissionsPage(config, data, theme));
+  if (sections.has('key-findings') && data.keyFindings && data.keyFindings.length > 0) {
+    sectionPages.set('key-findings', renderKeyFindingsPage(config, data, theme));
+  }
+  if (sections.has('trends') && data.emissionsTrends && data.emissionsTrends.length >= 2) {
+    sectionPages.set('trends', renderTrendsPage(config, data, theme));
+  }
+  if ((sections.has('product-footprints') || sections.has('products')) && data.dataAvailability.hasProducts) {
+    sectionPages.set('product-footprints', renderProductsPage(config, data, theme));
+  }
+  if (data.dataAvailability.hasVineyards && data.vineyards && data.vineyards.length > 0) {
+    sectionPages.set('vineyards', renderVineyardsPage(config, data, theme));
+  }
+  if ((sections.has('people-culture') || sections.has('people')) && data.dataAvailability.hasPeopleCulture) {
+    sectionPages.set('people-culture', renderPeopleCulturePage(config, data, theme));
+  }
+  if (sections.has('governance') && data.dataAvailability.hasGovernance) {
+    sectionPages.set('governance', renderGovernancePage(config, data, theme));
+  }
+  if ((sections.has('community-impact') || sections.has('community')) && data.dataAvailability.hasCommunityImpact) {
+    sectionPages.set('community-impact', renderCommunityImpactPage(config, data, theme));
+  }
+  if (sections.has('supply-chain') && data.dataAvailability.hasSuppliers) {
+    sectionPages.set('supply-chain', renderSupplyChainPage(config, data, theme));
+  }
+  sectionPages.set('targets', renderTargetsPage(config, data, theme));
+  if (sections.has('transition-roadmap') && data.transitionPlan && data.transitionPlan.milestones.length > 0) {
+    sectionPages.set('transition-roadmap', renderTransitionRoadmapPage(config, data, theme));
+  }
+  if (sections.has('risks-and-opportunities') && data.transitionPlan?.risks_and_opportunities?.length) {
+    sectionPages.set('risks-and-opportunities', renderRisksOpportunitiesPage(config, data, theme));
+  }
+  sectionPages.set('methodology', renderMethodologyPage(config, data, theme));
 
-    // Leadership message — storytelling full audiences only, gated by theme
+  // Order by the style's narrative arc; anything unlisted follows in the
+  // order it was built. Vineyards always ride directly behind products.
+  const orderedIds = [
+    ...style.sectionOrder.filter(id => sectionPages.has(id)),
+    ...Array.from(sectionPages.keys()).filter(id => !style.sectionOrder.includes(id)),
+  ];
+  const vIdx = orderedIds.indexOf('vineyards');
+  const pIdx = orderedIds.indexOf('product-footprints');
+  if (vIdx !== -1 && pIdx !== -1 && vIdx !== pIdx + 1) {
+    orderedIds.splice(vIdx, 1);
+    orderedIds.splice(orderedIds.indexOf('product-footprints') + 1, 0, 'vineyards');
+  }
+
+  // Chapter dividers precede the carbon and commitments chapters for
+  // storytelling tiers, when the theme and imagery policy allow them.
+  const showDividers = (theme.showSectionDividers !== false) && showImagery && (tier === 'full' || tier === 'balanced');
+  const dividerBefore = new Map<string, string>();
+  if (showDividers && totalEmissions > 0) {
+    dividerBefore.set('scope-1-2-3', renderSectionDividerPage(
+      config,
+      emissionsDividerStat,
+      `tCO\u2082e total emissions in ${config.reportYear}`,
+      `Our carbon footprint is measured across all three GHG Protocol scopes${emissionsDividerYoY}. The following section presents the complete picture.`,
+      'Our Carbon Footprint',
+      theme,
+    ));
+  }
+  if (showDividers && reductionTarget) {
+    dividerBefore.set('targets', renderSectionDividerPage(
+      config,
+      `-${reductionTarget}%`,
+      'absolute emission reduction target',
+      `Our transition plan sets out the milestones, investments, and actions required to reach this goal. Progress is independently verified and reported annually.`,
+      'Our Commitments',
+      theme,
+    ));
+  }
+
+  const orderedContent = orderedIds.flatMap(id => [dividerBefore.get(id) ?? '', sectionPages.get(id) ?? '']);
+
+  const pages = [
+    renderCoverPage(config, data, theme),
     (theme.showLeadershipPage !== false) && tier === 'full'
       ? renderLeadershipPage(config, theme) : '',
-
-    // Executive summary
-    renderExecSummaryPage(config, data, theme),
-
-    // Section divider: Emissions — storytelling audiences, gated by theme
-    (theme.showSectionDividers !== false) && (tier === 'full' || tier === 'balanced') && totalEmissions > 0
-      ? renderSectionDividerPage(
-          config,
-          emissionsDividerStat,
-          `tCO\u2082e total emissions in ${config.reportYear}`,
-          `Our carbon footprint is measured across all three GHG Protocol scopes${emissionsDividerYoY}. The following section presents the complete picture.`,
-          'Our Carbon Footprint',
-          theme,
-        )
-      : '',
-
-    // Emissions sections
-    renderEmissionsPage(config, data, theme),
-    sections.has('key-findings') && data.keyFindings && data.keyFindings.length > 0
-      ? renderKeyFindingsPage(config, data, theme) : '',
-    sections.has('trends') && data.emissionsTrends && data.emissionsTrends.length >= 2
-      ? renderTrendsPage(config, data, theme) : '',
-    (sections.has('product-footprints') || sections.has('products')) && data.dataAvailability.hasProducts
-      ? renderProductsPage(config, data, theme) : '',
-    data.dataAvailability.hasVineyards && data.vineyards && data.vineyards.length > 0
-      ? renderVineyardsPage(config, data, theme) : '',
-
-    // People & governance sections
-    (sections.has('people-culture') || sections.has('people')) && data.dataAvailability.hasPeopleCulture
-      ? renderPeopleCulturePage(config, data, theme) : '',
-    sections.has('governance') && data.dataAvailability.hasGovernance
-      ? renderGovernancePage(config, data, theme) : '',
-    (sections.has('community-impact') || sections.has('community')) && data.dataAvailability.hasCommunityImpact
-      ? renderCommunityImpactPage(config, data, theme) : '',
-    sections.has('supply-chain') && data.dataAvailability.hasSuppliers
-      ? renderSupplyChainPage(config, data, theme) : '',
-
-    // Section divider: Commitments — storytelling audiences, gated by theme
-    (theme.showSectionDividers !== false) && (tier === 'full' || tier === 'balanced') && reductionTarget
-      ? renderSectionDividerPage(
-          config,
-          `-${reductionTarget}%`,
-          'absolute emission reduction target',
-          `Our transition plan sets out the milestones, investments, and actions required to reach this goal. Progress is independently verified and reported annually.`,
-          'Our Commitments',
-          theme,
-        )
-      : '',
-
-    // Strategy sections
-    renderTargetsPage(config, data, theme),
-    sections.has('transition-roadmap') && data.transitionPlan && data.transitionPlan.milestones.length > 0
-      ? renderTransitionRoadmapPage(config, data, theme) : '',
-    sections.has('risks-and-opportunities') && data.transitionPlan?.risks_and_opportunities?.length
-      ? renderRisksOpportunitiesPage(config, data, theme) : '',
-
-    // Technical sections
-    renderMethodologyPage(config, data, theme),
+    ...orderedContent,
     data.csrdGatingWarning ? renderCsrdGatingWarningPage(config, theme) : '',
     renderEsrsDisclosureIndexPage(config, data, theme),
     renderClosingPage(config, data, theme),

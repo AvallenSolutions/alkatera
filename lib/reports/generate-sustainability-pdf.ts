@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { renderSustainabilityReportHtml } from '@/lib/pdf/render-sustainability-report-html';
 import { convertHtmlToPdf } from '@/lib/pdf/pdfshift-client';
 import { generateAllSectionNarratives } from '@/lib/claude/section-narrative-assistant';
+import { resolveReportStyle } from '@/lib/pdf/templates/report-styles';
 import { generateExecutiveSummaryNarrative } from '@/lib/claude/executive-summary-assistant';
 
 /**
@@ -42,6 +43,8 @@ export interface ReportConfigShape {
   isMultiYear: boolean;
   reportYears: number[];
   reportFramingStatement?: string;
+  /** Audience-led style preset id (lib/pdf/templates/report-styles.ts). */
+  style?: string;
   /** Theme id from the wizard's style picker (lib/pdf/templates/themes.ts). */
   template?: string;
   orientation?: 'portrait' | 'landscape';
@@ -70,6 +73,7 @@ export function buildReportConfig(report: Record<string, any>): ReportConfigShap
     isMultiYear: report.is_multi_year || false,
     reportYears: report.report_years || [],
     reportFramingStatement: report.report_framing_statement || undefined,
+    style: jsonConfig.style || undefined,
     template: jsonConfig.template || undefined,
     orientation: jsonConfig.orientation === 'landscape' ? 'landscape' : jsonConfig.orientation === 'portrait' ? 'portrait' : undefined,
     branding: {
@@ -317,6 +321,7 @@ export async function buildReportData(reportId: string): Promise<{
       previousYear: year - 1,
       standards: config.standards,
       audience: config.audience,
+      tone: resolveReportStyle(config.style, config.audience).tone,
       sections: config.sections,
       reportData,
       dataQuality,
@@ -331,6 +336,7 @@ export async function buildReportData(reportId: string): Promise<{
       previousYear: year - 1,
       standards: config.standards,
       audience: config.audience,
+      tone: resolveReportStyle(config.style, config.audience).tone,
       sectionNarratives,
       emissions: {
         scope1: reportData.emissions?.scope1 || 0,
