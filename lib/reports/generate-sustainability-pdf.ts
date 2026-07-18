@@ -42,10 +42,23 @@ export interface ReportConfigShape {
   isMultiYear: boolean;
   reportYears: number[];
   reportFramingStatement?: string;
-  branding: { logo: string | null; primaryColor: string; secondaryColor: string };
+  /** Theme id from the wizard's style picker (lib/pdf/templates/themes.ts). */
+  template?: string;
+  orientation?: 'portrait' | 'landscape';
+  branding: {
+    logo: string | null;
+    primaryColor: string;
+    secondaryColor: string;
+    heroImages?: string[];
+    leadership?: { name?: string; title?: string; message?: string; photo?: string };
+  };
 }
 
 export function buildReportConfig(report: Record<string, any>): ReportConfigShape {
+  // The wizard persists its full client config (incl. template/orientation,
+  // hero images and the leadership block) into the `config` jsonb column;
+  // the flat columns hold the queryable subset. Read both.
+  const jsonConfig = (report.config ?? {}) as Record<string, any>;
   return {
     reportName: report.report_name,
     reportYear: report.report_year,
@@ -57,10 +70,14 @@ export function buildReportConfig(report: Record<string, any>): ReportConfigShap
     isMultiYear: report.is_multi_year || false,
     reportYears: report.report_years || [],
     reportFramingStatement: report.report_framing_statement || undefined,
+    template: jsonConfig.template || undefined,
+    orientation: jsonConfig.orientation === 'landscape' ? 'landscape' : jsonConfig.orientation === 'portrait' ? 'portrait' : undefined,
     branding: {
       logo: report.logo_url || null,
       primaryColor: report.primary_color || '#205E40',
       secondaryColor: report.secondary_color || '#047857',
+      heroImages: Array.isArray(jsonConfig.branding?.heroImages) ? jsonConfig.branding.heroImages : undefined,
+      leadership: jsonConfig.branding?.leadership || undefined,
     },
   };
 }
@@ -110,11 +127,6 @@ export async function buildReportData(reportId: string): Promise<{
       hasFacilities: false,
     },
   };
-
-  const snapshot = report.config_snapshot as any;
-  if (snapshot?.reportData) {
-    Object.assign(reportData, snapshot.reportData);
-  }
 
   const year = config.reportYear;
   const orgId = report.organization_id;

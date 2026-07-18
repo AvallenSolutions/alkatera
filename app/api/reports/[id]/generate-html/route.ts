@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { renderSustainabilityReportHtml } from '@/lib/pdf/render-sustainability-report-html';
+import { buildReportConfig } from '@/lib/reports/generate-sustainability-pdf';
 import { generateAllSectionNarratives } from '@/lib/claude/section-narrative-assistant';
 import { generateExecutiveSummaryNarrative } from '@/lib/claude/executive-summary-assistant';
 
@@ -59,23 +60,9 @@ export async function POST(
       .eq('id', report.organization_id)
       .single();
 
-    const config = {
-      reportName: report.report_name,
-      reportYear: report.report_year,
-      reportingPeriodStart: report.reporting_period_start,
-      reportingPeriodEnd: report.reporting_period_end,
-      audience: report.audience || 'investors',
-      standards: report.standards || [],
-      sections: report.sections || [],
-      isMultiYear: report.is_multi_year || false,
-      reportYears: report.report_years || [],
-      reportFramingStatement: report.report_framing_statement || undefined,
-      branding: {
-        logo: report.logo_url || null,
-        primaryColor: report.primary_color || '#205E40',
-        secondaryColor: report.secondary_color || '#2B46C0',
-      },
-    };
+    // Shared with the PDF pipeline so theme/orientation, hero images and the
+    // leadership block behave identically in both output formats.
+    const config = buildReportConfig(report);
 
     const reportData: Record<string, any> = {
       organization: {
@@ -95,11 +82,6 @@ export async function POST(
         hasFacilities: false,
       },
     };
-
-    const snapshot = report.config_snapshot as any;
-    if (snapshot?.reportData) {
-      Object.assign(reportData, snapshot.reportData);
-    }
 
     const year = config.reportYear;
     const orgId = report.organization_id;

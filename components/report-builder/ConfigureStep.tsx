@@ -185,7 +185,7 @@ export function ConfigureStep({ config, onChange }: ConfigureStepProps) {
         </Select>
         <p className="text-sm text-muted-foreground">
           {config.outputFormat === 'html'
-            ? 'A responsive web page that opens in your browser, easy to share via link or embed.'
+            ? 'A responsive web page that opens in your browser. Save it or print it from there.'
             : 'A branded PDF document with charts and tables, ideal for sharing and publishing.'}
         </p>
       </div>
