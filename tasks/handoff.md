@@ -1,5 +1,5 @@
 # Handoff: redesign — studio design system + sustainability report programme
-Updated: 2026-07-18 14:50 | Branch: redesign | Worktree: /Users/timej/Documents/GitHub/alkatera/.claude/worktrees/redesign | Dev port: 8896 (preview_start name "redesign"); a second config "redesign-verify" exists for sessions locked out of the first (harness may shift its port)
+Updated: 2026-07-18 16:15 | Branch: redesign | Worktree: /Users/timej/Documents/GitHub/alkatera/.claude/worktrees/redesign | Dev port: 8896 (preview_start name "redesign"); a second config "redesign-verify" exists for sessions locked out of the first (harness may shift its port)
 
 ## Goal
 The alkatera redesign ("house of rooms" studio design language) lives on branch `redesign`,
@@ -11,6 +11,25 @@ staging click-throughs, the provenance-gate decision, and the design-scout lefto
 Redesign NEVER merges to main until go-live.
 
 ## Done (verified)
+- **Confirmed-data gate fixed + widened (37777b31), verified live.** The gate only sat on the
+  two PDF routes, so HTML ship, PUBLIC share links, investor summary, regulatory index and the
+  ISO 14064 worksheet all bypassed it. Fixing the METRIC came first because widening a broken
+  lock would have locked real customers out:
+  (a) areas with NO records are excluded from the weighting and the rest renormalised, instead
+      of scoring 0% — this capped a no-facilities org at 65% against an 80% threshold FOREVER,
+      with no blocker shown for the area responsible (the v1 comment predicted it);
+  (b) archived products no longer inflate the catalogue denominator (archived_at, NOT is_draft);
+  (c) PARAMETRIC packaging counts as confirmed (derived factors leave matched_source_name null
+      by design, so the old test pinned packaging near zero for the model we are moving to).
+  LCA publishing is now scoped to THAT product's materials (checkProductProvenanceGate), not
+  catalogue LCA coverage. Drafting + preview stay ungated. useProvenanceGate surfaces the
+  blockers in the funnel BEFORE drafting, and turns any gated route's 403 into the studio
+  dialog. Demo org moved 17% -> 29% and is still blocked, but for fixable reasons with a 100%
+  ceiling. 187 vitest, tsc clean, no migration.
+  ⚠️ OPEN QUESTION for Tim: "products confirmed" still means "has a completed LCA" (coverage),
+  not "the data behind it is confirmed". That is the right shape for the LCA gate now, but for
+  the whole-company report the honest question is arguably "is the data behind THIS report's
+  numbers confirmed". Worth revisiting before go-live.
 - **Phase D SHIPPED (5c601edd), verified live on local.** Brand kit tab on the report hub
   (logo + colours + foreword author + reusable image library; merge-writes ONLY the
   branding/imageLibrary keys of shared report_defaults; logo mirrors organizations.logo_url).
