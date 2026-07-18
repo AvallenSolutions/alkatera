@@ -1,99 +1,89 @@
 # Handoff: redesign — studio design system + sustainability report programme
-Updated: 2026-07-18 12:30 | Branch: redesign | Worktree: /Users/timej/Documents/GitHub/alkatera/.claude/worktrees/redesign | Dev port: 8891 (preview_start name "redesign")
+Updated: 2026-07-18 13:15 | Branch: redesign | Worktree: /Users/timej/Documents/GitHub/alkatera/.claude/worktrees/redesign | Dev port: 8896 (preview_start name "redesign"); a second config "redesign-verify" exists for sessions locked out of the first (harness may shift its port)
 
 ## Goal
 The alkatera redesign ("house of rooms" studio design language) lives on branch `redesign`,
 auto-deployed on push to Vercel staging. Current programme: rebuild the DOCUMENT GENERATORS
 in the studio design and upgrade sustainability-report customisation (plan:
 `tasks/sustainability-report-redesign-plan.md`, phases A–E, Tim-approved order A→B→C→E→D).
-A+B are done; **next is Phase E: one studio funnel + real share links**. Redesign NEVER
+**A+B+E are done; next is Phase C (draft-then-edit narratives), then D.** Redesign NEVER
 merges to main until go-live.
 
 ## Done (verified)
-- **LCA PDF template in studio design** (0ef5f515): faithful implementation of Tim's Claude
-  Design project d03d39b6 (`LCA Report Template.dc.html`); 26-page fixture PDF inspected
-  page-by-page via headless Chromium (the PDFShift engine).
-- **Shared studio PDF kit** `lib/pdf/studio-kit.ts` (99481453): all primitives incl.
-  `onBand()` (luminance → ink/cream text on any brand colour). LCA re-render byte-identical.
-- **Report Phase A** (99481453+fe49b65a): theme/heroImages/leadership were persisted but
-  NEVER read back (placebo picker; forewords/photos never reached PDFs) — fixed + typed;
-  dead `config_snapshot` reads removed; SlideSpeak fully retired; generate-html shares
-  buildReportConfig.
-- **Report Phase B** (4b3a2454, e16e69db, 3710089a, 263a9d55): themes studio-native
-  (Annual/Working/Board/Technical/Editorial, ids unchanged); full colour/font sweep; cover,
-  foreword, dividers, score panels, closing = brand poster blocks (NO dark pages); dynamic
-  section numbers (`__SECTION_NUM__`, appendix '!'/'A' kept); SDG tiles on-brand; zero pills.
-- **Five audience-led styles** (8f631439): `lib/pdf/templates/report-styles.ts` — Marketing /
-  Customers / Compliance / Investors&Board / Supply-Chain. Style binds theme + legacy
-  audience + tier + imagery + ToV + narrative section ORDER + default sections. Renderer
-  assembles in the style's arc; FramingStep's primary choice is the 5 styles. Verified:
-  investors = landscape brief w/ targets p2, sequential numbering; compliance/marketing OK.
-- Earlier today (all verified, see git log): scrape background fix chain (74640aea, 55c9cdec,
-  9af65370), beverage illustrations (5ca73b92), studio FieldLabel (7c7a28f8), PulseCard
-  studio refactor (c5606339).
-- Verification harnesses in session scratchpad (recreate if gone — pattern is simple):
-  `render-fixture.ts` (LCA) + `render-sust-fixture.ts` (report; arg = style id or theme id)
-  → run `cd WORKTREE && npx tsx <script> <style> out.html`, then headless-chrome
-  `--print-to-pdf`, then Read the PDF pages.
+- **Phase E SHIPPED (78bd38f4), verified live on local.**
+  - **One studio funnel** at /reports/builder: confirm-not-ask page (arrival idiom). Style
+    picker (5 styles) → framing statement (the one open question) → confirmed fact-list
+    (name/period/sections/standards/format/brand) with quiet Edit swaps. Defaults = org
+    report_defaults + live data detection (`hooks/useReportDataAvailability.ts`); a style's
+    sections filter to what the data supports; the catalogue shows honest Data ready /
+    No data yet chips. QuickGenerateDialog + the 4-step wizard + 11 dead components DELETED
+    (19 files, ~7k LOC gone); landing page has one Create-a-report CTA + in-flight polling.
+    `lib/pdf/templates/report-styles.ts` is now the single style registry (added
+    defaultStandards + cues; REPORT_STYLE_CHOICES deleted from types).
+    Verified: style switch re-derives sections/standards live, HTML generation completes
+    (narratives fail gracefully without keys), 80 scoped vitest, tsc clean.
+  - **Real share links**: `report_shares` table + private `report-shares` bucket
+    (migration 20260718120000) · POST/DELETE `/api/reports/[id]/share` renders the
+    screen-mode doc once (`lib/reports/build-screen-report.ts`, extracted from and shared
+    with generate-html), stores it, mints a 128-bit token · public `/report/[token]` route
+    serves the stored bytes (noindex, no-store, robots disallow) · Share/Copy/Revoke on the
+    report card. Verified: anonymous 200 on a fresh link, revoke → 404 + stored object
+    deleted, bad token 404.
+  - **saveDefaults now MERGES** organizations.report_defaults (was clobbering hospitality's
+    band-threshold/marketplace keys) and persists the chosen style.
+  - **Root fetch-cache fix**: `getServiceRoleClient` (lib/supabase/api-client.ts) + both
+    report routes now pass a no-store fetch override. Found live: a revoked share kept
+    serving because Next's patched fetch cached the PostgREST select + storage download.
+    Same latent bug exists on MAIN's api-client — spawned as a task chip.
+- Phases A+B, LCA template, studio kit, five styles: see git log (99481453, 4b3a2454,
+  8f631439, 263a9d55) and the plan file. Screen-mode renderer tests were stale after the
+  five-styles change (investors → landscape executive theme, cream background) — updated
+  in 78bd38f4 after confirming the behaviour was deliberate.
 
 ## Done (unverified)
-- **ToV threading into AI writers** (8f631439): tone param wired into section-narrative +
-  exec-summary assistants from both build paths; code compiles, fails gracefully, but NO
-  live AI run possible until Anthropic quota resets (~1 Aug). Fixture narratives are static.
-- FramingStep style-picker UI: typechecks, never browser-clicked.
-- Report generation on staging (real PDFShift run) never exercised post-redesign.
+- ToV threading into AI writers (8f631439): no live AI run until Anthropic quota resets ~1 Aug.
+- Share flow on STAGING: code deployed on push, but the migration is NOT yet applied to
+  staging (MCP write was permission-blocked; SQL handed to Tim in chat). Until it runs,
+  Share link on staging 500s; funnel itself works.
+- Real PDFShift PDF generation post-redesign still not exercised (needs staging).
 
 ## In flight
-Nothing mid-edit. Worktree clean EXCEPT `lib/pulse/__tests__/widget-tier.test.ts` — that is
-a SEPARATE task-chip session's work (task_9f49442d); do not touch or commit it.
+Nothing mid-edit. Worktree clean EXCEPT `lib/pulse/__tests__/widget-tier.test.ts`
+(separate task-chip session, task_9f49442d — do not touch) and untracked supabase/.temp.
 
 ## Next
-1. **Phase E — one funnel + share links** (the big one):
-   a. Collapse QuickGenerateDialog + 4-step wizard (`reports/builder`) into ONE studio-native
-      flow in the arrival confirm-not-ask idiom: style picker first (5 styles), smart
-      defaults prefilled from data + org `report_defaults`, framing statement as the one
-      open question, progressive disclosure for the rest. Rebuild the 19 pre-studio
-      `components/report-builder/**` files on the studio kit (FieldLabel/Panel/FactList/
-      StateChip/PillButton/MonoTabs) as part of this — not a separate restyle pass.
-   b. Share links: `report_shares` table (token, report_id, expires_at, revoked_at) +
-      public route `app/(public)/report/[token]` serving the screenMode document +
-      share/revoke actions on the report card. Migration → post SQL in chat (/migration).
-2. screenMode (interactive HTML) restyle to the studio web document; Board/Editorial full
-   page audits; risk/opportunity tinted panels purist cleanup; light-brand onBand test.
-3. **Phase C** — draft-then-edit narratives: generate into a store BEFORE render, review/edit
+1. **Tim: run the report_shares migration on staging** (vwhdyqvlgjqmlzmsvaes SQL editor —
+   block posted in chat 2026-07-18). NOT prod.
+2. **Phase C — draft-then-edit narratives**: generate into a store BEFORE render, review/edit
    step, per-section regenerate with tone hint, CEO-foreword drafting. Build any time;
-   live-test after 1 Aug.
-4. **Phase D** — org brand kit (extend `organizations.report_defaults`), imagery library,
-   ungate foreword/photos from storytelling audiences, section reorder UI, truthful preview.
-5. Design-scout leftovers (scout details in git history of this file): /uploads rebuild (L),
-   shadcn Tabs→MonoTabs on /settings + /reports/sustainability (S), delete dead pulse
-   widgets FinancialFootprintWidget/MaccChartWidget (~740 LOC, zero refs).
+   live-test after 1 Aug (Anthropic quota).
+3. **Phase D** — org brand kit, imagery library, ungate foreword/photos, section reorder,
+   truthful preview.
+4. Smaller: screenMode restyle polish audits (Board/Editorial), share-link expiry UI
+   (expires_at column exists, no picker yet), a11y aria-labels on the style cards
+   (accessible names come only from inner text), design-scout leftovers (/uploads rebuild,
+   Tabs→MonoTabs on /settings, dead pulse widgets deletion).
 
 ## Gotchas and decisions
-- ⚠️ **CWD DISCIPLINE**: shell cwd resets between Bash calls; several commands this session
-  accidentally hit the MAIN repo (its report renderer was contaminated + restored via
-  checkout). ALWAYS `cd` the worktree or use absolute paths in EVERY file-touching command.
-- Push to redesign auto-deploys staging. British English, no em dashes, plain language,
-  brand is alka**tera** lowercase.
-- Studio canon: no dark pages (poster blocks carry contrast); customer brand colour takes
-  the saturated-band slot with `onBand()` contrast; working tones = mono caps, NEVER pills;
-  radius 6; Space Grotesk speaks / Inter explains / JetBrains Mono annotates.
-- Fixed A4 page divs are DELIBERATE (Chromium spike: canvas bg doesn't paint margins, fixed
-  footers land unpredictably). Don't "improve" to CSS flow.
-- `generated_reports.audience` CHECK constraint predates styles → style id lives in `config`
-  jsonb; legacy audience maps via `resolveReportStyle()` fallback.
-- Vercel Deployment Protection is ON for staging: only Tim's browser can drive the app;
-  Claude verifies via staging Supabase MCP (project vwhdyqvlgjqmlzmsvaes) + `vercel` CLI
-  logs. Staging login tim@alkatera.com / alkatera-staging-2026.
-- Staging is deliberately NO-Inngest: never set INNGEST_* env there (a stray key silently
-  reroutes background dispatch into the void — burned us twice; memory saved).
-- URL-import scrape: fully verified except the final Claude leg — Anthropic key hit its
-  monthly cap, resets 1 Aug. No code change needed.
-- Full `vitest` hangs — always scope (`npx vitest run lib/pdf` etc). lib/pdf 64/64 green.
+- ⚠️ CWD DISCIPLINE: shell cwd resets between Bash calls; always cd this worktree.
+- Browser-pane synthetic clicks did NOT register on React buttons this session (element
+  positions verified correct); `element.click()` via javascript_tool works and proves the
+  handlers. Real user clicks are fine. Also: the app scrolls `<main>`, not the window —
+  scroll via JS or scroll_to.
+- The `report-shares` bucket mime allowlist matches EXACTLY: upload contentType must be
+  plain `text/html` (no charset suffix), the public route adds the charset when serving.
+- Shares are served THROUGH the server from the PRIVATE bucket so revocation truly cuts
+  access (report-assets is public and images/pdf-only — do not move shares there).
+- Studio canon: no dark pages, working tones = mono caps never pills, radius 6, Space
+  Grotesk speaks / Inter explains / JetBrains Mono annotates. British English, no em
+  dashes in copy, alka**tera** lowercase.
+- Push to redesign auto-deploys staging. Staging is deliberately NO-Inngest; never set
+  INNGEST_* there. Vercel Deployment Protection blocks Claude's browser on staging;
+  verify via staging Supabase MCP + `vercel` CLI logs.
+- Full `vitest` hangs — always scope. Local Supabase has the migration + bucket applied.
 
 ## Pending Tim actions
-- **~1 Aug (Anthropic quota reset):** reload staging arrival-confirm → scrape should
-  complete; generate a styled report → narratives should carry each style's ToV.
-- **Any time:** on staging, generate a report and click Download to exercise the new
-  template through real PDFShift (works without AI narratives).
-- Prod: 10+ redesign migrations pending (never merged); staging Stripe test keys optional.
+- **report_shares migration on STAGING** (SQL block in chat, 2026-07-18). Do NOT run in prod.
+- ~1 Aug (Anthropic quota): staging scrape retest; styled-report narratives; Phase C live test.
+- Any time on staging (after migration): generate a report → Share link → open in a private
+  window → Revoke → confirm the link dies.
