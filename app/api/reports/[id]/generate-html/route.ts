@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { buildScreenReportHtml } from '@/lib/reports/build-screen-report';
+import { enforceExportAllowed } from '@/middleware/subscription-check';
+import { enforceProvenanceGate } from '@/lib/provenance/gate';
 
 /**
  * Generate Sustainability Report HTML (screen mode)
@@ -57,6 +59,14 @@ export async function POST(
     if (reportError || !report) {
       return NextResponse.json({ error: 'Report not found' }, { status: 404 });
     }
+
+    // Shipping a report is a paid feature, and the interactive document is
+    // just as external as the PDF: it gets the same two gates.
+    const exportBlocked = await enforceExportAllowed(report.organization_id);
+    if (exportBlocked) return exportBlocked;
+
+    const provenanceBlocked = await enforceProvenanceGate(supabase, report.organization_id, 'overall');
+    if (provenanceBlocked) return provenanceBlocked;
 
     // In-flight signal. Also releases the Phase C draft lock (draft-only
     // narrative writes carry .eq('status','draft')) the moment shipping

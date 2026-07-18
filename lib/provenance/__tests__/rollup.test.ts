@@ -43,19 +43,23 @@ describe('confirmedShareFromIngredients (pure scorer)', () => {
   });
 
   it('weights products, utilities and packaging per PROVENANCE_AREA_WEIGHTS', () => {
-    // Only products fully confirmed, everything else at 0 — confirmedPct
-    // should land exactly on the products weight.
+    // Products fully confirmed, the other two applicable but unconfirmed —
+    // confirmedPct should land exactly on the products weight.
     const { confirmedPct } = confirmedShareFromIngredients({
-      ...EMPTY,
       productsTotal: 4,
       productsConfirmed: 4,
+      utilitiesTotal: 10,
+      utilitiesConfirmed: 0,
+      packagingTotal: 6,
+      packagingConfirmed: 0,
     });
     expect(confirmedPct).toBe(PROVENANCE_AREA_WEIGHTS.products);
   });
 
-  it('an area with no records reads as 0% confirmed, not excluded from weighting', () => {
+  it('excludes areas with no records from the weighting instead of scoring them 0', () => {
     // Products and utilities fully confirmed; packaging has no rows at all
-    // (e.g. a hospitality-only org). Packaging still drags the total down.
+    // (e.g. a hospitality-only org). Absent data is "not applicable", not
+    // "unconfirmed", so this org reads 100% rather than being capped at 85%.
     const { confirmedPct, byArea } = confirmedShareFromIngredients({
       productsTotal: 5,
       productsConfirmed: 5,
@@ -65,7 +69,33 @@ describe('confirmedShareFromIngredients (pure scorer)', () => {
       packagingConfirmed: 0,
     });
     expect(byArea.packaging).toBe(0);
-    expect(confirmedPct).toBe(PROVENANCE_AREA_WEIGHTS.products + PROVENANCE_AREA_WEIGHTS.utilities);
+    expect(confirmedPct).toBe(100);
+  });
+
+  it('lets an org with only one applicable area reach 100%', () => {
+    // A contract distiller with no facilities and no packaging rows: under
+    // the v1 scoring this capped at 50% and could never clear the 80% gate.
+    const { confirmedPct } = confirmedShareFromIngredients({
+      ...EMPTY,
+      productsTotal: 3,
+      productsConfirmed: 3,
+    });
+    expect(confirmedPct).toBe(100);
+  });
+
+  it('renormalises partial confirmation across the applicable areas only', () => {
+    // Products half confirmed, utilities absent, packaging fully confirmed.
+    // Weights renormalise over products(50) + packaging(15) = 65.
+    const { confirmedPct } = confirmedShareFromIngredients({
+      productsTotal: 10,
+      productsConfirmed: 5,
+      utilitiesTotal: 0,
+      utilitiesConfirmed: 0,
+      packagingTotal: 4,
+      packagingConfirmed: 4,
+    });
+    const expected = Math.round(((0.5 * 50 + 1 * 15) / 65) * 100);
+    expect(confirmedPct).toBe(expected);
   });
 
   it('clamps a confirmed count above total rather than exceeding 100%', () => {
@@ -121,6 +151,7 @@ function createMockDb(responses: Record<string, MockResponse[]>) {
       eq: vi.fn().mockReturnThis(),
       gte: vi.fn().mockReturnThis(),
       in: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
       not: vi.fn().mockReturnThis(),
       neq: vi.fn().mockReturnThis(),
       then: (resolve: (value: MockResponse) => unknown) => Promise.resolve(response).then(resolve),
@@ -146,7 +177,8 @@ describe('gatherProvenanceIngredients', () => {
       ],
       product_materials: [
         { count: 30, error: null }, // total packaging rows
-        { count: 9, error: null }, // confirmed (matched_source_name set, not proxy)
+        { count: 9, error: null }, // matched library factor, not a proxy
+        { count: 5, error: null }, // parametric (derived, matched_source_name null)
       ],
     });
 
@@ -158,8 +190,41 @@ describe('gatherProvenanceIngredients', () => {
       utilitiesTotal: 30, // 20 + 10
       utilitiesConfirmed: 12, // 8 + 4
       packagingTotal: 30,
-      packagingConfirmed: 9,
+      packagingConfirmed: 14, // 9 matched + 5 parametric
     });
+  });
+
+  it('counts parametric packaging as confirmed and never exceeds the total', async () => {
+    const db = createMockDb({
+      products: [{ data: [{ id: 'p1' }], error: null }],
+      facilities: [{ data: [], error: null }],
+      product_carbon_footprints: [{ count: 1, error: null }],
+      facility_activity_entries: [{ count: 0, error: null }, { count: 0, error: null }],
+      product_materials: [
+        { count: 4, error: null }, // total
+        { count: 3, error: null }, // matched
+        { count: 3, error: null }, // parametric — overlapping counts must clamp
+      ],
+    });
+
+    const ingredients = await gatherProvenanceIngredients(db, 'org-parametric');
+    expect(ingredients.packagingConfirmed).toBe(4);
+    expect(ingredients.packagingConfirmed).toBeLessThanOrEqual(ingredients.packagingTotal);
+  });
+
+  it('excludes archived products from the catalogue denominator', async () => {
+    const db = createMockDb({
+      products: [{ data: [{ id: 'p1' }, { id: 'p2' }], error: null }],
+      facilities: [{ data: [], error: null }],
+      product_carbon_footprints: [{ count: 2, error: null }],
+      facility_activity_entries: [{ count: 0, error: null }, { count: 0, error: null }],
+      product_materials: [{ count: 0, error: null }, { count: 0, error: null }, { count: 0, error: null }],
+    });
+
+    await gatherProvenanceIngredients(db, 'org-archived');
+    // The products id query filters on archived_at IS NULL.
+    const productsBuilder = db.from.mock.results.find((_, i) => db.from.mock.calls[i][0] === 'products')?.value;
+    expect(productsBuilder.is).toHaveBeenCalledWith('archived_at', null);
   });
 
   it('skips the facility- and product-scoped queries for a brand new org with neither', async () => {
@@ -219,6 +284,9 @@ describe('computeConfirmedShare (org wrapper)', () => {
 
     const rollup = await computeConfirmedShare(db, 'org-1');
     expect(rollup.byArea.products).toBe(100);
-    expect(rollup.confirmedPct).toBe(PROVENANCE_AREA_WEIGHTS.products);
+    // Products is the only applicable area (no facilities, no packaging
+    // rows), so a fully confirmed catalogue reads 100%, not the products
+    // weight. Under the v1 scoring this org was capped at 50% forever.
+    expect(rollup.confirmedPct).toBe(100);
   });
 });

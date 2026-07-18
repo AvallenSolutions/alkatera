@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { renderInvestorSummaryHtml } from '@/lib/pdf/render-investor-summary-html';
 import { convertHtmlToPdf } from '@/lib/pdf/pdfshift-client';
+import { enforceProvenanceGate } from '@/lib/provenance/gate';
 
 /**
  * Generate Investor Summary PDF
@@ -48,6 +49,10 @@ export async function POST(
     if (reportError || !report) {
       return NextResponse.json({ error: 'Report not found' }, { status: 404 });
     }
+
+    // Leaves the building: needs enough confirmed data behind it (Pillar 2).
+    const provenanceBlocked = await enforceProvenanceGate(supabase, report.organization_id, 'overall');
+    if (provenanceBlocked) return provenanceBlocked;
 
     const orgId = report.organization_id;
     const year = report.report_year;

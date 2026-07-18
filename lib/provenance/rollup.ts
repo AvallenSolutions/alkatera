@@ -82,34 +82,53 @@ export const PROVENANCE_AREA_WEIGHTS: Record<ProvenanceArea, number> = {
   packaging: 15,
 };
 
-/** confirmed/total clamped to 0..1; an area with no records at all reads as 0% confirmed, not "not applicable". */
+/** confirmed/total clamped to 0..1. Callers must check `total > 0` first: an area with no records has no share, which is different from 0%. */
 function share(confirmed: number, total: number): number {
   if (total <= 0) return 0;
   return Math.min(1, Math.max(0, confirmed) / total);
 }
 
 /**
- * Pure scorer: ingredients in, rollup out. An org with nothing in a given
- * area (e.g. a hospitality-only org with no packaged products) scores that
- * area at 0%, which drags down `confirmedPct` by up to that area's weight
- * even though the area may not really apply to them — a known v1
- * simplification called out here for whoever revisits this in Phase D.
+ * Pure scorer: ingredients in, rollup out.
+ *
+ * Areas with NO records are excluded from the weighting and the remaining
+ * weights are renormalised, rather than scoring 0% and silently dragging
+ * the total down. The v1 behaviour (score absent areas as 0) made the whole
+ * gate unreachable for real orgs: a contract distiller with no facilities
+ * lost all 35 utility points permanently, capping them at 65% against an
+ * 80% threshold, with no way to ever pass and no blocker shown for the area
+ * responsible (blockers only list areas that HAVE records). Absent data is
+ * "not applicable here", not "unconfirmed".
+ *
+ * An org with no records in any area scores 0: there is nothing to stand
+ * behind yet, and the artefact gates should say so.
  */
 export function confirmedShareFromIngredients(i: ProvenanceRollupIngredients): ProvenanceRollup {
-  const products = share(i.productsConfirmed, i.productsTotal);
-  const utilities = share(i.utilitiesConfirmed, i.utilitiesTotal);
-  const packaging = share(i.packagingConfirmed, i.packagingTotal);
+  const totals: Record<ProvenanceArea, number> = {
+    products: i.productsTotal,
+    utilities: i.utilitiesTotal,
+    packaging: i.packagingTotal,
+  };
+  const shares: Record<ProvenanceArea, number> = {
+    products: share(i.productsConfirmed, i.productsTotal),
+    utilities: share(i.utilitiesConfirmed, i.utilitiesTotal),
+    packaging: share(i.packagingConfirmed, i.packagingTotal),
+  };
 
-  const weights = PROVENANCE_AREA_WEIGHTS;
-  const totalWeight = weights.products + weights.utilities + weights.packaging;
-  const weightedSum = products * weights.products + utilities * weights.utilities + packaging * weights.packaging;
+  const areas: ProvenanceArea[] = ['products', 'utilities', 'packaging'];
+  const applicable = areas.filter(area => totals[area] > 0);
+  const totalWeight = applicable.reduce((sum, area) => sum + PROVENANCE_AREA_WEIGHTS[area], 0);
+  const weightedSum = applicable.reduce(
+    (sum, area) => sum + shares[area] * PROVENANCE_AREA_WEIGHTS[area],
+    0
+  );
 
   return {
     confirmedPct: totalWeight > 0 ? Math.round((weightedSum / totalWeight) * 100) : 0,
     byArea: {
-      products: Math.round(products * 100),
-      utilities: Math.round(utilities * 100),
-      packaging: Math.round(packaging * 100),
+      products: Math.round(shares.products * 100),
+      utilities: Math.round(shares.utilities * 100),
+      packaging: Math.round(shares.packaging * 100),
     },
   };
 }
@@ -142,8 +161,10 @@ export async function gatherProvenanceIngredients(
     return error ? 0 : (n ?? 0);
   };
 
-  const ids = async (table: string): Promise<string[]> => {
-    const { data, error } = await db.from(table).select('id').eq('organization_id', organizationId);
+  const ids = async (table: string, refine?: (q: any) => any): Promise<string[]> => {
+    let q = db.from(table).select('id').eq('organization_id', organizationId);
+    if (refine) q = refine(q);
+    const { data, error } = await q;
     if (error || !data) return [];
     return (data as Array<{ id: string | number }>).map((r) => String(r.id));
   };
@@ -152,7 +173,11 @@ export async function gatherProvenanceIngredients(
 
   const [productIds, facilityIds, productsConfirmed, utilitiesActivityTotal, utilitiesActivityConfirmed] =
     await Promise.all([
-      ids('products'),
+      // Archived products are not part of "your catalogue" for this purpose:
+      // counting them would let old SKUs permanently suppress the score.
+      // `archived_at` is the real archive flag (is_draft is overloaded and
+      // most products are created as drafts, so it must NOT be filtered on).
+      ids('products', (q) => q.is('archived_at', null)),
       ids('facilities'),
       count('product_carbon_footprints', (q) =>
         q.eq('organization_id', organizationId).eq('status', 'completed').not('product_id', 'is', null),
@@ -178,7 +203,14 @@ export async function gatherProvenanceIngredients(
         ])
       : [0, 0];
 
-  const [packagingTotal, packagingConfirmed] =
+  // Packaging counts as confirmed when it carries a real, non-proxy factor.
+  // Two shapes qualify: a matched library factor (`matched_source_name` set,
+  // not a proxy) and a PARAMETRIC factor derived from the packaging endpoint
+  // model, which deliberately leaves `matched_source_name` null because
+  // nothing was searched or matched — it is computed from pinned endpoints.
+  // Missing the parametric shape pinned the packaging pillar near zero for
+  // every org on the model the platform is moving to.
+  const [packagingTotal, packagingMatched, packagingParametric] =
     productIds.length > 0
       ? await Promise.all([
           count('product_materials', (q) => q.in('product_id', productIds).eq('material_type', 'packaging')),
@@ -189,8 +221,16 @@ export async function gatherProvenanceIngredients(
               .not('matched_source_name', 'is', null)
               .neq('ef_source_type', 'proxy'),
           ),
+          count('product_materials', (q) =>
+            q
+              .in('product_id', productIds)
+              .eq('material_type', 'packaging')
+              .eq('data_source', 'parametric')
+              .is('matched_source_name', null),
+          ),
         ])
-      : [0, 0];
+      : [0, 0, 0];
+  const packagingConfirmed = Math.min(packagingTotal, packagingMatched + packagingParametric);
 
   return {
     productsTotal: productIds.length,

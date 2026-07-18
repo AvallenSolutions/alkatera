@@ -6,6 +6,7 @@ import {
   type Iso14064LineItem,
 } from '@/lib/pdf/render-iso14064-worksheet-html';
 import { convertHtmlToPdf } from '@/lib/pdf/pdfshift-client';
+import { enforceProvenanceGate } from '@/lib/provenance/gate';
 
 /**
  * Generate the ISO 14064-1:2018 Auditor / Verification Worksheet PDF.
@@ -61,6 +62,10 @@ export async function POST(
     if (reportError || !report) {
       return NextResponse.json({ error: 'Report not found' }, { status: 404 });
     }
+
+    // Leaves the building: needs enough confirmed data behind it (Pillar 2).
+    const provenanceBlocked = await enforceProvenanceGate(supabase, report.organization_id, 'overall');
+    if (provenanceBlocked) return provenanceBlocked;
 
     const orgId = report.organization_id;
     const year = report.report_year;

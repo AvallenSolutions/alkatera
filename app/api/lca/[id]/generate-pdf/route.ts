@@ -25,7 +25,7 @@ import { convertHtmlToPdf } from '@/lib/pdf/pdfshift-client';
 import { generateNarratives, type LcaContext } from '@/lib/claude/lca-assistant';
 import { enforceExportAllowed } from '@/middleware/subscription-check';
 import { computeLcaStaleness } from '@/lib/lca/staleness';
-import { enforceProvenanceGate } from '@/lib/provenance/gate';
+import { enforceProductProvenanceGate } from '@/lib/provenance/gate';
 
 // ============================================================================
 // TYPES
@@ -114,9 +114,15 @@ export async function POST(
     const exportBlocked = await enforceExportAllowed(pcf.organization_id);
     if (exportBlocked) return exportBlocked;
 
-    // External artefact: needs enough confirmed product data first (Pillar 2).
-    const provenanceBlocked = await enforceProvenanceGate(supabase, pcf.organization_id, 'products');
-    if (provenanceBlocked) return provenanceBlocked;
+    // External artefact: the materials behind THIS product must be confirmed
+    // (Pillar 2). Deliberately per-product, not the org-wide products area:
+    // that measured catalogue LCA coverage, so a well-evidenced LCA was
+    // blocked by unrelated products and adding a product could retroactively
+    // block a published one.
+    if (pcf.product_id) {
+      const provenanceBlocked = await enforceProductProvenanceGate(supabase, String(pcf.product_id));
+      if (provenanceBlocked) return provenanceBlocked;
+    }
 
     // Fetch materials
     const { data: materials } = await supabase

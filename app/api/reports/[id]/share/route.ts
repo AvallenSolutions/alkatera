@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { buildScreenReportHtml } from '@/lib/reports/build-screen-report';
 import { generateShareToken, isShareActive, type ReportShareRow } from '@/lib/reports/report-shares';
 import { getSupabaseAdminClient } from '@/lib/supabase/api-client';
+import { enforceProvenanceGate } from '@/lib/provenance/gate';
 
 /**
  * Report share links.
@@ -64,6 +65,12 @@ export async function POST(
     if (reportError || !report) {
       return NextResponse.json({ error: 'Report not found' }, { status: 404 });
     }
+
+    // A public link is the MOST external artefact here: it needs the same
+    // confirmed-data backing as the PDF. Gated at creation only, so links
+    // already out in the world keep working (revocation is the kill switch).
+    const provenanceBlocked = await enforceProvenanceGate(supabase, report.organization_id, 'overall');
+    if (provenanceBlocked) return provenanceBlocked;
 
     // Reuse an existing active link rather than minting a second one.
     const { data: existing } = await (supabase as any)

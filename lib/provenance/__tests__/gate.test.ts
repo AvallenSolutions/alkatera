@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { checkProvenanceGate, CONFIRMED_SHARE_EXPORT_THRESHOLD } from '../gate';
+import { checkProvenanceGate, checkProductProvenanceGate, CONFIRMED_SHARE_EXPORT_THRESHOLD } from '../gate';
 
 // Same chainable mock-db shape as rollup.test.ts (kept independent rather
 // than imported, since it's a small test fixture and the two files should
@@ -22,6 +22,7 @@ function createMockDb(responses: Record<string, MockResponse[]>) {
       eq: vi.fn().mockReturnThis(),
       gte: vi.fn().mockReturnThis(),
       in: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
       not: vi.fn().mockReturnThis(),
       neq: vi.fn().mockReturnThis(),
       then: (resolve: (value: MockResponse) => unknown) => Promise.resolve(response).then(resolve),
@@ -81,11 +82,82 @@ describe('checkProvenanceGate', () => {
       product_carbon_footprints: [{ count: 0, error: null }], // products 0%
       facility_activity_entries: [{ count: 10, error: null }, { count: 0, error: null }], // utilities 0%
       utility_data_entries: [{ count: 0, error: null }, { count: 0, error: null }],
-      product_materials: [{ count: 5, error: null }, { count: 0, error: null }], // packaging 0%
+      product_materials: [
+        { count: 5, error: null }, // total
+        { count: 0, error: null }, // matched
+        { count: 0, error: null }, // parametric
+      ], // packaging 0%
     });
     const result = await checkProvenanceGate(db, 'org-1', 'overall');
     expect(result.allowed).toBe(false);
     const areas = result.blockers.map((b) => b.area).sort();
     expect(areas).toEqual(['packaging', 'products', 'utilities']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Per-product gate: publishing ONE LCA asks about THAT product's materials,
+// never the catalogue's LCA coverage.
+// ---------------------------------------------------------------------------
+
+describe('checkProductProvenanceGate', () => {
+  const materials = (total: number, matched: number, parametric: number) =>
+    createMockDb({
+      product_materials: [
+        { count: total, error: null },
+        { count: matched, error: null },
+        { count: parametric, error: null },
+      ],
+    });
+
+  it('allows a product whose materials carry real factors', async () => {
+    const result = await checkProductProvenanceGate(materials(10, 9, 0), 'prod-1');
+    expect(result.allowed).toBe(true);
+    expect(result.confirmedPct).toBe(90);
+    expect(result.blockers).toEqual([]);
+  });
+
+  it('counts parametric factors as confirmed', async () => {
+    // 4 matched + 5 parametric of 10: proxies alone would read 40% and block.
+    const result = await checkProductProvenanceGate(materials(10, 4, 5), 'prod-1');
+    expect(result.confirmedPct).toBe(90);
+    expect(result.allowed).toBe(true);
+  });
+
+  it('blocks a proxy-heavy product and deep-links to it', async () => {
+    const result = await checkProductProvenanceGate(materials(10, 2, 0), 'prod-42');
+    expect(result.allowed).toBe(false);
+    expect(result.confirmedPct).toBe(20);
+    expect(result.blockers[0]).toMatchObject({
+      unconfirmedCount: 8,
+      deepLink: '/products/prod-42',
+    });
+  });
+
+  it('never exceeds the total when the two confirmed shapes overlap', async () => {
+    const result = await checkProductProvenanceGate(materials(4, 3, 3), 'prod-1');
+    expect(result.confirmedPct).toBe(100);
+  });
+
+  it('allows a product with no material rows (nothing to confirm)', async () => {
+    const result = await checkProductProvenanceGate(materials(0, 0, 0), 'prod-empty');
+    expect(result.allowed).toBe(true);
+    expect(result.blockers).toEqual([]);
+  });
+
+  it('is independent of how many OTHER products have an LCA', async () => {
+    // The org-wide products area would read 1/50 = 2% and block; this
+    // product's own materials are fully confirmed, so it publishes.
+    const db = createMockDb({
+      products: [{ data: Array.from({ length: 50 }, (_, i) => ({ id: `p${i}` })), error: null }],
+      product_carbon_footprints: [{ count: 1, error: null }],
+      product_materials: [
+        { count: 6, error: null },
+        { count: 6, error: null },
+        { count: 0, error: null },
+      ],
+    });
+    const result = await checkProductProvenanceGate(db, 'p0');
+    expect(result.allowed).toBe(true);
   });
 });

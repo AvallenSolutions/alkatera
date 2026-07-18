@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { renderRegulatoryIndexHtml } from '@/lib/pdf/render-regulatory-index-html';
 import { convertHtmlToPdf } from '@/lib/pdf/pdfshift-client';
+import { enforceProvenanceGate } from '@/lib/provenance/gate';
 
 /**
  * Generate Regulatory Framework Index PDF
@@ -50,6 +51,10 @@ export async function POST(
     if (reportError || !report) {
       return NextResponse.json({ error: 'Report not found' }, { status: 404 });
     }
+
+    // Leaves the building: needs enough confirmed data behind it (Pillar 2).
+    const provenanceBlocked = await enforceProvenanceGate(supabase, report.organization_id, 'overall');
+    if (provenanceBlocked) return provenanceBlocked;
 
     const { data: org } = await supabase
       .from('organizations')

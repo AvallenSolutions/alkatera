@@ -15,6 +15,9 @@ import { useOrganization } from '@/lib/organizationContext'
 import { PageLoader } from '@/components/ui/page-loader'
 import { VerificationCard } from '@/components/partners/VerificationCard'
 import { BrandKitEditor } from '@/components/report-builder/BrandKitEditor'
+import { ProvenanceGateDialog } from '@/components/studio/provenance-gate-dialog'
+import { parseProvenanceRefusal } from '@/hooks/useProvenanceGate'
+import type { ProvenanceBlocker } from '@/lib/provenance/gate'
 import { useToast } from '@/hooks/use-toast'
 import { AUDIENCE_LABELS } from '@/types/report-builder'
 import { toast as sonnerToast } from 'sonner'
@@ -74,6 +77,8 @@ function SustainabilityReportsHub() {
   // Active share links by report id (report_shares rows with no revocation)
   const [shareTokens, setShareTokens] = useState<Record<string, string>>({})
   const [shareBusyId, setShareBusyId] = useState<string | null>(null)
+  // Blockers returned by a gated route, shown in the studio dialog
+  const [gateBlockers, setGateBlockers] = useState<ProvenanceBlocker[] | null>(null)
 
   // ── Readiness + tab data (fetched together on mount) ─────────────────────────
   const [hasEmissions, setHasEmissions] = useState(false)
@@ -208,7 +213,16 @@ function SustainabilityReportsHub() {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       })
-      if (!response.ok) throw new Error('Share failed')
+      if (!response.ok) {
+        // A public link needs confirmed data behind it: name what to confirm.
+        const body = await response.json().catch(() => null)
+        const blockers = parseProvenanceRefusal(body)
+        if (blockers) {
+          setGateBlockers(blockers)
+          return
+        }
+        throw new Error('Share failed')
+      }
       const { token: shareToken } = await response.json()
       setShareTokens(prev => ({ ...prev, [reportId]: shareToken }))
       await copyShareUrl(shareToken)
@@ -255,7 +269,15 @@ function SustainabilityReportsHub() {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       })
-      if (!response.ok) throw new Error('Export failed')
+      if (!response.ok) {
+        const body = await response.json().catch(() => null)
+        const blockers = parseProvenanceRefusal(body)
+        if (blockers) {
+          setGateBlockers(blockers)
+          return
+        }
+        throw new Error('Export failed')
+      }
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -804,6 +826,13 @@ function SustainabilityReportsHub() {
           <BrandKitEditor />
         </TabsContent>
       </Tabs>
+
+      <ProvenanceGateDialog
+        open={gateBlockers !== null}
+        onClose={() => setGateBlockers(null)}
+        subject="This report"
+        blockers={gateBlockers ?? []}
+      />
     </div>
   )
 }

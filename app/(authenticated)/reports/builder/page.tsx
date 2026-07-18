@@ -16,6 +16,8 @@ import {
   useReportDataAvailability,
   sectionHasData,
 } from '@/hooks/useReportDataAvailability';
+import { useProvenanceGate } from '@/hooks/useProvenanceGate';
+import { ProvenanceGateDialog } from '@/components/studio/provenance-gate-dialog';
 import { useOrganization } from '@/lib/organizationContext';
 import { useToast } from '@/hooks/use-toast';
 import { PageLoader } from '@/components/ui/page-loader';
@@ -145,6 +147,10 @@ function ReportFunnelInner() {
 
   const availability = useReportDataAvailability(currentOrganization?.id, config.reportYear);
   const progress = useReportProgress(generatingReportId);
+  // Courtesy pre-check: say what needs confirming before the user spends
+  // effort on a report the ship routes would refuse to produce.
+  const gate = useProvenanceGate(currentOrganization?.id);
+  const [gateDialogOpen, setGateDialogOpen] = useState(false);
 
   const style = REPORT_STYLES[(config.style as ReportStyleId) ?? 'investors'];
 
@@ -311,6 +317,12 @@ function ReportFunnelInner() {
 
   const handleShip = async () => {
     if (!draftReportId) return;
+    // The ship routes enforce this server-side; catching it here means the
+    // user sees what to confirm instead of a bare failure.
+    if (!gate.allowed) {
+      setGateDialogOpen(true);
+      return;
+    }
     try {
       await shipReport(draftReportId, config);
       setGeneratingReportId(draftReportId);
@@ -318,6 +330,30 @@ function ReportFunnelInner() {
       toast({ title: 'Shipping failed', description: err instanceof Error ? err.message : 'Try again.', variant: 'destructive' });
     }
   };
+
+  const gateNotice = !gate.loading && !gate.allowed ? (
+    <Panel className="flex flex-wrap items-baseline justify-between gap-3">
+      <span className="flex items-baseline gap-3">
+        <StateChip tone="attention">Needs confirming</StateChip>
+        <span className="text-xs text-muted-foreground">
+          {gate.confirmedPct}% of your data is confirmed. Reports can be drafted now, but sharing or
+          downloading one needs {gate.threshold}%.
+        </span>
+      </span>
+      <PillButton variant="outline" size="sm" onClick={() => setGateDialogOpen(true)}>
+        See what to confirm
+      </PillButton>
+    </Panel>
+  ) : null;
+
+  const gateDialog = (
+    <ProvenanceGateDialog
+      open={gateDialogOpen}
+      onClose={() => setGateDialogOpen(false)}
+      subject="Your report"
+      blockers={gate.blockers}
+    />
+  );
 
   if (!initialised) return <PageLoader message="Reading your data..." />;
 
@@ -369,6 +405,7 @@ function ReportFunnelInner() {
             block, or change the voice. Nothing ships until you say so.
           </p>
         </div>
+        {gateNotice}
         <NarrativeReview
           organizationId={currentOrganization?.id || null}
           config={config}
@@ -379,6 +416,7 @@ function ReportFunnelInner() {
           onToneChange={handleToneChange}
           onShip={handleShip}
         />
+        {gateDialog}
       </div>
     );
   }
@@ -395,6 +433,9 @@ function ReportFunnelInner() {
           Pick the reader, confirm the details, generate. Everything is prefilled from your data.
         </p>
       </div>
+
+      {/* ── Confirmed-data notice (courtesy; the ship routes enforce it) ────── */}
+      {gateNotice}
 
       {/* ── The reader ──────────────────────────────────────────────────────── */}
       <div className="space-y-3">
@@ -641,6 +682,8 @@ function ReportFunnelInner() {
           {creating ? 'Starting.' : 'Draft the report'}
         </PillButton>
       </div>
+
+      {gateDialog}
     </div>
   );
 }
