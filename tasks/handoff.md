@@ -1,15 +1,36 @@
 # Handoff: redesign — studio design system + sustainability report programme
-Updated: 2026-07-18 13:15 | Branch: redesign | Worktree: /Users/timej/Documents/GitHub/alkatera/.claude/worktrees/redesign | Dev port: 8896 (preview_start name "redesign"); a second config "redesign-verify" exists for sessions locked out of the first (harness may shift its port)
+Updated: 2026-07-18 14:00 | Branch: redesign | Worktree: /Users/timej/Documents/GitHub/alkatera/.claude/worktrees/redesign | Dev port: 8896 (preview_start name "redesign"); a second config "redesign-verify" exists for sessions locked out of the first (harness may shift its port)
 
 ## Goal
 The alkatera redesign ("house of rooms" studio design language) lives on branch `redesign`,
 auto-deployed on push to Vercel staging. Current programme: rebuild the DOCUMENT GENERATORS
 in the studio design and upgrade sustainability-report customisation (plan:
 `tasks/sustainability-report-redesign-plan.md`, phases A–E, Tim-approved order A→B→C→E→D).
-**A+B+E are done; next is Phase C (draft-then-edit narratives), then D.** Redesign NEVER
-merges to main until go-live.
+**A+B+E+C are done; next is Phase D (brand kit, imagery, section control, true preview).**
+Redesign NEVER merges to main until go-live.
 
 ## Done (verified)
+- **Phase C SHIPPED (0465fad0), verified live on local (fallback narratives, no GEMINI key).**
+  Draft-then-edit: create parks the report as 'draft' (migration 20260718150000, applied
+  LOCAL + STAGING, not prod), narratives draft synchronously into data_snapshot
+  (narratives + keyFindings + narrative_meta + full inputs + drift digest), funnel gains a
+  review branch ("Read it before it ships."): inline edit (server flips aiGenerated:false),
+  per-block regenerate with tone hint, voice override (confident/measured/technical, always
+  force — assistant caches ignore tone), CEO-foreword draft (foreword-assistant.ts,
+  Marketing style only, prints only after explicit accept). Ship consumes the store in both
+  build paths; unreviewed blocks carry a mono "AI-assisted draft" note in the document
+  (INCLUDING re-rendered pre-Phase-C reports — deliberate honesty). Drafts park with a
+  Draft chip + Review draft resume (?draft={id}), no polling, no staleness. Shared assembly
+  (assemble-report-data.ts) deduped both paths and finally populates emissionsTrends +
+  targets + key-findings-in-HTML. Routes: POST/PATCH /api/reports/[id]/narratives,
+  POST .../narratives/regenerate (Bearer+RLS+no-store via route-auth.ts,
+  enforceExportAllowed on draft POST, .eq(status,'draft') ship-race lock). 114 vitest, tsc
+  clean; full walk verified incl. shipped share doc carrying the edited text verbatim.
+  - **Fixed in passing (PROD-RELEVANT): products!inner from product_carbon_footprints is
+    ambiguous (products.latest_lca_id_fkey) and 300s silently** — emptied report product
+    sections, landing lcaCount, LCA narrative/suggestion routes, Sankey + timeline. All 7
+    sites now pin products!product_lcas_product_id_fkey. Main has the same bug: task chip
+    spawned (task_d8c430d5).
 - **Phase E SHIPPED (78bd38f4), verified live on local.**
   - **One studio funnel** at /reports/builder: confirm-not-ask page (arrival idiom). Style
     picker (5 styles) → framing statement (the one open question) → confirmed fact-list
@@ -52,10 +73,7 @@ Nothing mid-edit. Worktree clean EXCEPT `lib/pulse/__tests__/widget-tier.test.ts
 (separate task-chip session, task_9f49442d — do not touch) and untracked supabase/.temp.
 
 ## Next
-1. **Phase C — draft-then-edit narratives**: generate into a store BEFORE render, review/edit
-   step, per-section regenerate with tone hint, CEO-foreword drafting. Build any time;
-   live-test after 1 Aug (Anthropic quota).
-2. **Phase D** — org brand kit, imagery library, ungate foreword/photos, section reorder,
+1. **Phase D** — org brand kit, imagery library, ungate foreword/photos, section reorder,
    truthful preview.
 3. Smaller: screenMode restyle polish audits (Board/Editorial), share-link expiry UI
    (expires_at column exists, no picker yet), a11y aria-labels on the style cards
@@ -81,6 +99,7 @@ Nothing mid-edit. Worktree clean EXCEPT `lib/pulse/__tests__/widget-tier.test.ts
 - Full `vitest` hangs — always scope. Local Supabase has the migration + bucket applied.
 
 ## Pending Tim actions
-- ~1 Aug (Anthropic quota): staging scrape retest; styled-report narratives; Phase C live test.
+- ~1 Aug (Anthropic quota): staging scrape retest. (Report narratives are GEMINI, not
+  Anthropic — they are live-testable on staging NOW.)
 - Any time on staging (after migration): generate a report → Share link → open in a private
   window → Revoke → confirm the link dies.
