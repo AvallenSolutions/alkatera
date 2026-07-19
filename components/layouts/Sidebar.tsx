@@ -999,6 +999,7 @@ export function Sidebar({ className }: SidebarProps) {
                     { href: '/admin/emissions-trace/', icon: Eye, label: 'Emissions Trace' },
                     { href: '/admin/reconciliation/', icon: Scale, label: 'Reconciliation' },
                     { href: '/admin/ingest-learning/', icon: Brain, label: 'Ingest Learning' },
+                    { href: '/admin/rosa-learning/', icon: Dog, label: 'Rosa Learning' },
                   ].map(({ href, icon: AdminIcon, label }) => (
                     isCollapsed ? (
                       <Tooltip key={href}>
