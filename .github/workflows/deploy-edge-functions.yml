@@ -35,7 +35,6 @@ jobs:
           supabase functions deploy add-facility-activity-entry --no-verify-jwt
           supabase functions deploy add-facility-activity-data --no-verify-jwt
           supabase functions deploy create-calculation-log --no-verify-jwt
-          supabase functions deploy gaia-query --no-verify-jwt
           supabase functions deploy ingest-activity-data --no-verify-jwt
           supabase functions deploy ingest-water-data --no-verify-jwt
           supabase functions deploy invoke-corporate-calculations --no-verify-jwt
