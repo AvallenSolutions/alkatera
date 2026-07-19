@@ -1,4 +1,4 @@
--- 20260717120000_restore_global_staging_factor_visibility.sql
+-- 20260719130000_restore_global_staging_factor_visibility.sql
 --
 -- Why: 20260624120000_advisor_rls_comprehensive.sql looped over org-scoped
 -- tables, dropped every permissive policy whose qual mentioned
@@ -12,7 +12,7 @@
 -- non-service-role query now sees ZERO global factor-library rows: /admin/factors,
 -- /api/admin/emission-factors, ingredient/packaging searches that fall back to
 -- the global library, and the packaging gap-filler factors pinned by fixed UUID
--- in 20260717100000_packaging_factor_endpoints.sql.
+-- in 20260719100000_packaging_factor_endpoints.sql.
 --
 -- Fix: additive permissive SELECT policy for global rows. Permissive policies
 -- OR together, so org-scoped visibility via staging_emission_factors_select is

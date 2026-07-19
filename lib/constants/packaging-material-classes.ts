@@ -48,7 +48,7 @@ export interface MaterialClassDef {
   eolKey: CatalogueMaterial['eolKey'];
   /**
    * For kind='gap_filler': the curated global staging_emission_factors row.
-   * Seeded with a fixed UUID by migration 20260717100000 so it can be pinned
+   * Seeded with a fixed UUID by migration 20260719100000 so it can be pinned
    * by ID in every environment.
    */
   gapFillerFactorId?: string;
