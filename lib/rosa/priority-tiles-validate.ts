@@ -6,6 +6,7 @@
  * much is dropped, the API route falls back to deterministic tiles.
  */
 
+import { scrubEmDashes } from '@/lib/copy-style'
 import {
   TILE_HREF_PREFIXES,
   TILE_ICON_VOCAB,
@@ -150,9 +151,6 @@ export function validateCuratedTiles(
       continue
     }
 
-    // Defensively scrub em dashes in copy: Tim's preference + locked rule.
-    const scrub = (s: string) => s.replace(/—/g, ', ').replace(/\s+,/g, ',').replace(/\s{2,}/g, ' ')
-
     const iconRaw = typeof t.icon === 'string' ? t.icon : 'Sparkles'
     const icon: TileIcon = (ICON_SET.has(iconRaw) ? iconRaw : 'Sparkles') as TileIcon
 
@@ -182,11 +180,11 @@ export function validateCuratedTiles(
     out.push({
       id: tileId(opts.organizationId, opts.userId, t),
       kind: clamp(t.kind ?? 'tile', 32) || 'tile',
-      value: scrub(value),
+      value: scrubEmDashes(value),
       unit,
-      title: scrub(title),
-      hint: scrub(hint),
-      recommendation: scrub(recommendation),
+      title: scrubEmDashes(title),
+      hint: scrubEmDashes(hint),
+      recommendation: scrubEmDashes(recommendation),
       icon,
       href,
       tone,

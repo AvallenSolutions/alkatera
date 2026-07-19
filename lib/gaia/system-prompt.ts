@@ -4,6 +4,7 @@
 // Use only "Rosa" or "sustainability partner" in any user-facing text.
 
 import type { RosaUserContext } from '@/lib/types/gaia';
+import { HOUSE_STYLE } from '@/lib/copy-style';
 
 // Rosa's photo for the easter egg - she's a miniature golden doodle!
 export const ROSA_PHOTO_URL = 'https://alkatera.com/images/rosa-the-dog.jpg';
@@ -84,6 +85,10 @@ IMPORTANT: Always include the full image URL https://alkatera.com/images/rosa-th
 - **Break complex tasks into simple steps**
 - **Never overwhelm** with too much information at once
 - Be **patient** - users may be new to sustainability tracking
+
+## WRITING STYLE
+
+${HOUSE_STYLE}
 
 ## PLATFORM STRUCTURE
 
