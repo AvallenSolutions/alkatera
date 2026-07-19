@@ -11,7 +11,7 @@ Rosa has **8 separate persona definitions**. The two most complete are dead code
 | # | Source | Lines | Runtime | Actually runs? |
 |---|--------|-------|---------|----------------|
 | 1 | `lib/gaia/system-prompt.ts` `ROSA_SYSTEM_PROMPT` | ~315 | Node | **No.** Only consumer is `lib/gaia/context-builder.ts` `buildRosaContext`, which has zero callers. |
-| 2 | `supabase/functions/gaia-query/index.ts` | ~1,684 | Deno | **No.** Only callers are `sendRosaQuery`/`Stream` in `lib/gaia/index.ts`, themselves uncalled. Still CI-deployed every push. |
+| 2 | `supabase/functions/gaia-query/index.ts` | ~1,684 | Deno | **No, and now DELETED** (commit `d85a2792`). Was called only by `sendRosaQuery`/`Stream`, themselves uncalled. |
 | 3 | `app/api/rosa/chat/route.ts` `buildSystemPrompt()` | ~63 | Node | **Yes.** Drawer, `/rosa/` hub, AskRosaWidget, `/admin/rosa`. The shortest of the three. |
 | 4 | `lib/rosa/priority-tiles-prompt.ts` | ~110 | Node | Yes |
 | 5 | `lib/rosa/progress-tracker-prompt.ts` | ~35 | Node | Yes |
@@ -51,7 +51,7 @@ Eval harness (`scripts/rosa-eval.ts` mirroring `scripts/ingest-eval.ts`), and sw
 
 ## Follow-ups surfaced while building
 
-- **The gaia-query edge function is still deployed.** Orphaned, ~1,684 lines, its own divergent persona, its own Anthropic key path, redeployed by CI on every push. Deleting deployed infrastructure needs Tim's explicit go-ahead.
+- **gaia-query REMOVED from the repo** (commit `d85a2792`): function source, CI deploy step, and the two orphaned client wrappers. Verified unused first (no repo reference, no other function/trigger/cron, no prod invocations logged, and every assistant message this month carries a tool trail so came from the tool-based route). ⚠️ **STILL DEPLOYED on the Supabase project** — removing it from CI stops it being updated, not served. Tim needs to delete it in the Supabase dashboard: Edge Functions > gaia-query > Delete.
 - **Nothing aggregates the signals yet.** `gaia_feedback`, `rosa_telemetry` and the corrections now accumulate, but `lib/gaia/feedback-learning.ts` (566 lines, a complete feedback → pattern → knowledge-gap loop) is still unreached. Wiring it up is the natural next step now that there is finally data for it to read.
 - **Corrections could crowd out real facts.** `formatMemoryBlock` renders at most 10 entries per scope and `listMemories` caps at 30. A user who thumbs-downs often would push genuine org facts out of the prompt with `correction_*` entries. Needs either a separate cap for corrections or a periodic distil step.
 - **The correction key is noise in the prompt.** It renders as `- correction_2701466e: We report to VSME, not CSRD.` The uuid fragment means nothing to the model and costs tokens.
