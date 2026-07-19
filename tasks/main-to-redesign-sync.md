@@ -20,7 +20,25 @@ routes, the ISO 14044 data-quality gate, and everything done on 2026-07-19 (syst
 normalisation, the house-style module, the Rosa persona consolidation, the Rosa feedback loop and
 learning surface, the four repaired test suites).
 
-## The blocker: three migrations share version numbers across the branches
+## The blocker: version collisions  ✅ MAIN'S SIDE FIXED (commit `8550d30d`)
+
+main's four colliding migrations were renumbered to `20260719100000`-`130000`
+(after redesign's latest, `20260718150000`), and `trial_tier_limits` moved to
+`20260622120001` to match what redesign had already done. main now has zero
+duplicate versions and no version that means a different migration on redesign.
+
+Ordering is unchanged: nothing on main sits between `20260716110000` and the
+renamed block, so they hold the same position in the sequence. All five are
+byte-identical renames. Nothing needs re-applying: production records
+migrations under its own apply-time timestamps and by name, never by repo
+filename.
+
+**One collision remains, on the redesign side and not fixable from main:**
+`20260714200000` is shared by `product_materials_ef_metadata` and
+`chemical_library_user_submissions`. Renumber the latter on `redesign` before
+merging.
+
+### The original problem, for context
 
 | Version | On `main` | On `redesign` |
 |---|---|---|
@@ -40,10 +58,15 @@ Both branches allocated the same timestamps independently. Consequences:
 3. **`main` also collides with itself.** `20260717120000` is used by BOTH
    `pcf_unique_active_per_year` and `restore_global_staging_factor_visibility`.
 
-**Fix before any merge:** renumber, do not rename. Give main's three packaging migrations fresh
-later timestamps, and resolve main's internal duplicate. Then reconcile
-`supabase_migrations.schema_migrations` on staging by hand so the renumbered ones are seen as
-pending.
+**Mechanism, for the record:** `supabase_migrations.schema_migrations` has `version` as its
+PRIMARY KEY, so two migrations sharing a version can never both be recorded. The second is
+invisible to the tracker forever, and a later push reads that version as applied and skips
+whatever did not get in.
+
+**Staging still needs nothing done by hand.** Because main's packaging migrations now carry
+versions staging has never seen (`20260719*`), they will apply cleanly on the next push rather
+than being skipped as already-applied. That was the point of moving main's side rather than
+redesign's.
 
 ## What prod actually looks like (checked, not assumed)
 
