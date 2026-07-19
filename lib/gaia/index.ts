@@ -32,23 +32,14 @@ import type {
 // Re-export types
 export * from '@/lib/types/gaia';
 
-// Re-export from system-prompt
+// Chat suggestion content. The persona that used to live alongside these now
+// lives in lib/rosa/persona.ts; the GAIA_* aliases went with it, having only
+// ever been re-exported here and consumed by nobody.
 export {
-  ROSA_PERSONA,
-  ROSA_SYSTEM_PROMPT,
   ROSA_SUGGESTED_QUESTIONS,
-  ROSA_CONTEXT_TEMPLATE,
   ROSA_FOLLOWUP_QUESTIONS,
   ROSA_PHOTO_URL,
-  // Backwards compatibility
-  GAIA_PERSONA,
-  GAIA_SYSTEM_PROMPT,
-  GAIA_SUGGESTED_QUESTIONS,
-  GAIA_CONTEXT_TEMPLATE,
-  GAIA_FOLLOWUP_QUESTIONS,
   getContextualFollowUps,
-  buildContextualPrompt,
-  generateContextualSuggestions,
 } from './system-prompt';
 
 // Re-export from action-handlers
@@ -108,18 +99,10 @@ export {
   formatFeedbackAnalyticsForPrompt,
 } from './feedback-learning';
 
-// Re-export context builder with enhanced context support
-export {
-  buildRosaContext,
-  buildRosaContextWithKnowledge,
-  buildGaiaContext,
-  detectQueryIntent,
-  suggestChartType,
-  fetchExternalKnowledge,
-  type RosaPromptContext,
-  type RosaEnhancedContext,
-  type GaiaPromptContext,
-} from './context-builder';
+// context-builder.ts is gone. It assembled a prompt from ROSA_SYSTEM_PROMPT
+// for a pre-tool architecture, and had no callers: Rosa gets her context from
+// tools now, plus the memory and page-context blocks that /api/rosa/chat
+// injects. See lib/rosa/persona.ts.
 
 // Re-export from sustainability-knowledge (Curated Knowledge Base)
 export {
