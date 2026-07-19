@@ -13,6 +13,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { existsSync, readdirSync, readFileSync } from 'fs';
+import { join } from 'path';
 import { NO_EM_DASH_RULE, HOUSE_STYLE } from '../copy-style';
 import { ROSA_SYSTEM_PROMPT } from '@/lib/gaia/system-prompt';
 
@@ -29,6 +31,42 @@ describe('Rosa system prompt', () => {
     // The house-style block deliberately omits this Rosa-specific rule, so
     // check the persona did not lose it when the block was introduced.
     expect(ROSA_SYSTEM_PROMPT).toContain('NEVER describe yourself as an "AI"');
+  });
+});
+
+describe('no prompt tells Rosa she is an AI', () => {
+  // Three live Pulse prompts opened with "You are Rosa, alkatera's
+  // sustainability AI", which trains the exact self-description the identity
+  // rule bans, in the very first sentence. Grepping the tree is the only way
+  // to catch this: the prompts are inline consts inside route files that
+  // cannot be imported here without pulling in server-only dependencies.
+  const PROMPT_DIRS = ['lib', 'app/api'];
+  const BANNED = /(?:sustainability|alkatera'?s?)\s+AI\b|You are an AI/i;
+
+  function walk(dir: string, out: string[] = []): string[] {
+    const root = join(process.cwd(), dir);
+    if (!existsSync(root)) return out;
+    for (const entry of readdirSync(root, { withFileTypes: true })) {
+      const rel = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === 'node_modules' || entry.name === '__tests__') continue;
+        walk(rel, out);
+      } else if (/\.tsx?$/.test(entry.name)) {
+        out.push(rel);
+      }
+    }
+    return out;
+  }
+
+  it('has no "sustainability AI" phrasing in any prompt source', () => {
+    const offenders: string[] = [];
+    for (const file of walk(PROMPT_DIRS[0]).concat(walk(PROMPT_DIRS[1]))) {
+      // copy-style.ts documents the anti-pattern in a comment, by design.
+      if (file.endsWith('copy-style.ts')) continue;
+      const text = readFileSync(join(process.cwd(), file), 'utf8');
+      if (BANNED.test(text)) offenders.push(file);
+    }
+    expect(offenders).toEqual([]);
   });
 });
 

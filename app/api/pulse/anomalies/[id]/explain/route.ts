@@ -25,15 +25,16 @@ import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import { runToolLoop } from '@/lib/rosa/run-tool-loop';
 import { GEMINI_ROSA_MODEL } from '@/lib/ai/models';
 import { METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
+import { ROSA_PREAMBLE, ROSA_IDENTITY_RULE, NO_EM_DASH_RULE } from '@/lib/copy-style';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const MODEL = GEMINI_ROSA_MODEL;
 
-const SYSTEM_PROMPT = `You are Rosa, the alkatera sustainability AI, investigating an anomaly that the platform has flagged.
+const SYSTEM_PROMPT = `${ROSA_PREAMBLE} You are investigating an anomaly that the platform has flagged.
 
-Voice: British English, plain, candid. Short sentences. Never use em dashes.
+Voice: British English, plain, candid. Short sentences. ${NO_EM_DASH_RULE} ${ROSA_IDENTITY_RULE}
 
 Your job:
 1. Use the tools to gather evidence about the anomaly: when did the metric move, which facility or product is responsible, what else changed in the same window.

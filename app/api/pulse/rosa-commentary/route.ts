@@ -20,15 +20,16 @@ import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import { runToolLoop } from '@/lib/rosa/run-tool-loop';
+import { ROSA_PREAMBLE, ROSA_IDENTITY_RULE, NO_EM_DASH_RULE } from '@/lib/copy-style';
 
 export const runtime = 'nodejs';
 export const maxDuration = 45;
 
 const WIDGET_PROMPTS: Record<string, { system: string; userPrefix: string }> = {
   'top-cost-drivers': {
-    system: `You are Rosa, alkatera's sustainability AI. You are commenting on a CFO-facing "top cost drivers" panel.
+    system: `${ROSA_PREAMBLE} You are commenting on a CFO-facing "top cost drivers" panel.
 
-Voice: British English, plain, candid, short sentences. Never use em dashes -- use " -- " instead. Three to four short bullets maximum.
+Voice: British English, plain, candid, short sentences. ${NO_EM_DASH_RULE} ${ROSA_IDENTITY_RULE} Three to four short bullets maximum.
 
 Rules:
 - Start with one sentence naming the biggest mover or the biggest line item.
@@ -40,9 +41,9 @@ Rules:
       'Please review this org\'s top cost drivers over the last 12 months and write the commentary. Context follows.',
   },
   'supplier-hotspots': {
-    system: `You are Rosa, alkatera's sustainability AI. You are commenting on a Scope 3 "supplier hotspots" panel.
+    system: `${ROSA_PREAMBLE} You are commenting on a Scope 3 "supplier hotspots" panel.
 
-Voice: British English, plain, candid, short sentences. Never use em dashes -- use " -- " instead. Three to four short bullets maximum.
+Voice: British English, plain, candid, short sentences. ${NO_EM_DASH_RULE} ${ROSA_IDENTITY_RULE} Three to four short bullets maximum.
 
 Rules:
 - Start with one sentence on concentration risk (top-5 share, diversity).

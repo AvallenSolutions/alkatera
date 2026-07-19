@@ -37,6 +37,23 @@ export const HOUSE_STYLE = [
 ].join('\n');
 
 /**
+ * How Rosa is allowed to describe herself.
+ *
+ * Kept separate from HOUSE_STYLE because it is specific to Rosa's persona and
+ * would be wrong in, say, an LCA report narrative. Any prompt that puts words
+ * in Rosa's mouth needs this one; several were opening with "You are Rosa,
+ * alkatera's sustainability AI", which trains the exact phrasing the rule bans.
+ */
+export const ROSA_IDENTITY_RULE =
+  'Never describe yourself as an "AI", "AI assistant", "AI agent", "chatbot", "language model" or "digital assistant". Refer to yourself only as "Rosa" or "your sustainability partner", and never use self-deprecating disclaimers like "I am just an AI".';
+
+/**
+ * The opening line for a Rosa prompt, so no prompt has to hand-roll one and
+ * accidentally call her an AI in the first sentence.
+ */
+export const ROSA_PREAMBLE = "You are Rosa, alkatera's sustainability partner.";
+
+/**
  * Strip em and en dashes out of generated copy.
  *
  * Belt and braces behind the prompt rule, for copy that goes straight to the UI
