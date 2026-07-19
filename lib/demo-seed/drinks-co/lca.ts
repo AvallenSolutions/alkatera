@@ -1,4 +1,5 @@
 import { PRODUCTS, REFERENCE_YEAR, type SeedCtx } from './shared';
+import { ALLOCATIONS } from './entities';
 
 /**
  * Seed COMPLETED product carbon footprints directly (the browser-only calculator
@@ -289,8 +290,97 @@ async function seedOneLca(ctx: SeedCtx, productId: number): Promise<number> {
   const { error: matErr } = await svc.from('product_carbon_footprint_materials').insert(matRows);
   if (matErr) throw new Error(`PCF materials ${productId}: ${matErr.message}`);
 
+  await seedProductionSites(ctx, pcfId, productId, proc);
+
   await svc.from('products').update({ has_active_lca: true, latest_lca_id: pcfId, system_boundary: 'cradle_to_gate' }).eq('id', productId);
   return total;
+}
+
+/**
+ * Write the PCF's production-site rows and mirror them into
+ * aggregated_impacts.facility_detail.
+ *
+ * The seeder has always carried rich per-product allocations in
+ * entities.ts ALLOCATIONS (including a third-party co-packer modelled with an
+ * archetype proxy), but lca.ts wrote `facility_detail: []` and never inserted a
+ * site row. So on a fully-seeded org the product Facilities tab, the LCA
+ * report's production-sites section, the allocation Sankey and
+ * /company/production-allocation were all blank, which reads as a broken
+ * feature rather than an empty demo.
+ *
+ * Processing emissions are the facility-attributable part of the footprint, so
+ * they are what gets split across sites by share of production.
+ */
+async function seedProductionSites(
+  ctx: SeedCtx,
+  pcfId: string,
+  productId: number,
+  processingPerUnit: number,
+): Promise<void> {
+  const { svc, orgId } = ctx;
+  const allocations = ALLOCATIONS[productId];
+  if (!allocations || allocations.length === 0) return;
+
+  const totalVolume = allocations.reduce((s, a) => s + a.productionVolume, 0) || 1;
+
+  const siteRows = allocations.map((a) => {
+    const share = a.productionVolume / totalVolume;
+    // The facility's own intensity: this product's share of the site, spread
+    // over everything that site makes.
+    const facilityShare = a.facilityTotalProduction > 0
+      ? a.productionVolume / a.facilityTotalProduction
+      : 1;
+    const perUnit = round(processingPerUnit * share, 6);
+    return {
+      product_carbon_footprint_id: pcfId,
+      facility_id: a.facilityId,
+      organization_id: orgId,
+      production_volume: a.productionVolume,
+      share_of_production: round(share, 4),
+      facility_intensity: round(processingPerUnit, 6),
+      attributable_emissions_per_unit: perUnit,
+      allocated_emissions_kg_co2e: round(perUnit * a.productionVolume, 2),
+      emission_intensity_kg_co2e_per_unit: perUnit,
+      // 'Verified' for sites we meter, 'Modelled' where we ran an archetype
+      // proxy because a third party would not share metered energy.
+      data_source: a.dataCollectionMode === 'archetype_proxy' ? 'Modelled' : 'Verified',
+      reporting_period_start: `${REFERENCE_YEAR}-01-01`,
+      reporting_period_end: `${REFERENCE_YEAR}-12-31`,
+    };
+  });
+
+  const { error } = await svc.from('product_carbon_footprint_production_sites').insert(siteRows);
+  if (error) {
+    ctx.warnings.push(`production sites ${productId}: ${error.message}`);
+    return;
+  }
+
+  // Mirror into aggregated_impacts.facility_detail, matching the shape
+  // lib/product-lca-aggregator.ts emits so the report transformer and
+  // lib/products/portfolio.ts sumFacilityVolume() read it the same way.
+  const facilityDetail = allocations.map((a) => {
+    const share = a.productionVolume / totalVolume;
+    return {
+      facility_name: a.facilityName,
+      country_code: 'GB',
+      is_contract_manufacturer: a.operationalControl === 'third_party',
+      data_source: a.dataCollectionMode === 'archetype_proxy' ? 'archetype_proxy' : 'facility_allocation',
+      attribution_ratio: round(a.facilityTotalProduction > 0 ? a.productionVolume / a.facilityTotalProduction : 1, 4),
+      production_volume: a.productionVolume,
+      per_unit_total: round(processingPerUnit * share, 6),
+    };
+  });
+
+  const { data: current } = await svc
+    .from('product_carbon_footprints')
+    .select('aggregated_impacts')
+    .eq('id', pcfId)
+    .single();
+  const impacts = ((current as any)?.aggregated_impacts ?? {}) as Record<string, unknown>;
+  await svc
+    .from('product_carbon_footprints')
+    .update({ aggregated_impacts: { ...impacts, facility_detail: facilityDetail } })
+    .eq('id', pcfId);
 }
 
 /** Seed completed LCAs for all single products + derive the multipack total. */

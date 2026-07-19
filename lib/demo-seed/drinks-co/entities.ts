@@ -346,7 +346,7 @@ async function ensureMultipack(ctx: SeedCtx): Promise<void> {
   ctx.report.multipack = 'Floral Haze IPA 24-can case wired as multipack (24 × can)';
 }
 
-interface Allocation {
+export interface Allocation {
   facilityId: string;
   facilityName: string;
   operationalControl: 'owned' | 'third_party';
@@ -357,8 +357,17 @@ interface Allocation {
   proxyJustification?: string;
 }
 
-/** Per-product facility allocations that drive the LCA recalc. */
-const ALLOCATIONS: Record<number, Allocation[]> = {
+/**
+ * Per-product facility allocations.
+ *
+ * Exported because lca.ts needs them: they are the source for the PCF's
+ * production-site rows and its aggregated_impacts.facility_detail, which drive
+ * the product Facilities tab, the LCA report's production-sites section, the
+ * allocation Sankey and /company/production-allocation. Before this was
+ * exported the seed wrote facility_detail: [] and no site rows at all, so every
+ * one of those surfaces was blank on a fully-seeded org.
+ */
+export const ALLOCATIONS: Record<number, Allocation[]> = {
   [PRODUCTS.bacchus]: [{ facilityId: FACILITIES.winery, facilityName: 'Cotswolds Estate Winery', operationalControl: 'owned', productionVolume: 28000, facilityTotalProduction: 60000 }],
   [PRODUCTS.highlandMalt]: [
     { facilityId: FACILITIES.distillery, facilityName: 'Highland Malt Distillery', operationalControl: 'owned', productionVolume: 42000, facilityTotalProduction: 180000 },
@@ -372,62 +381,18 @@ const ALLOCATIONS: Record<number, Allocation[]> = {
   [PRODUCTS.ipaCan]: [{ facilityId: FACILITIES.brewery, facilityName: 'West Country Brewery', operationalControl: 'owned', productionVolume: 480000, facilityTotalProduction: 1200000 }],
 };
 
-/**
- * Seed one draft PCF per product carrying facility allocations in draft_data, so
- * the existing recalc tool finds valid allocations and produces a real LCA
- * instead of skipping. Also sets products.last_wizard_settings (in finalise).
+/*
+ * ensureRecalcReadiness() used to live here. It wrote one draft PCF per product
+ * carrying facility allocations in draft_data, so the recalc tool would find
+ * them and compute a real LCA.
+ *
+ * It was dead work: seedCompletedLcas() runs immediately afterwards and its
+ * clearProductPcfs() deletes EVERY PCF for the product with no status filter,
+ * so those drafts never survived long enough to be read. The seed now writes
+ * completed PCFs directly, and the allocations it was preparing are consumed by
+ * lca.ts seedProductionSites() instead, which is what populates the Facilities
+ * tab and the report's production-sites section.
  */
-async function ensureRecalcReadiness(ctx: SeedCtx): Promise<void> {
-  const { svc, orgId } = ctx;
-
-  // Resolve archetype ids by slug for any proxy allocations.
-  const { data: archetypes } = await svc.from('facility_archetypes').select('id, slug');
-  const archetypeBySlug = new Map((archetypes ?? []).map((a: any) => [a.slug, a.id]));
-
-  const ids = Object.keys(ALLOCATIONS).map(Number);
-  const { data: products } = await svc
-    .from('products')
-    .select('id, name, unit_size_value, unit_size_unit')
-    .in('id', ids);
-  const byId = new Map((products ?? []).map((p: any) => [p.id, p]));
-
-  // Clear our prior seed drafts, then insert fresh ones.
-  await svc.from('product_carbon_footprints').delete().eq('organization_id', orgId).eq('status', 'draft').in('product_id', ids);
-
-  const rows = ids.map((id) => {
-    const p = byId.get(id);
-    const allocs = ALLOCATIONS[id].map((a) => ({
-      facilityId: a.facilityId,
-      facilityName: a.facilityName,
-      operationalControl: a.operationalControl,
-      reportingPeriodStart: `${REFERENCE_YEAR}-01-01`,
-      reportingPeriodEnd: `${REFERENCE_YEAR}-12-31`,
-      productionVolume: a.productionVolume,
-      productionVolumeUnit: 'bottles',
-      facilityTotalProduction: a.facilityTotalProduction,
-      facilityTotalProductionUnit: 'bottles',
-      dataCollectionMode: a.dataCollectionMode ?? 'primary',
-      archetypeId: a.archetypeSlug ? archetypeBySlug.get(a.archetypeSlug) ?? null : null,
-      proxyJustification: a.proxyJustification ?? null,
-    }));
-    const size = p?.unit_size_value ? `${p.unit_size_value} ${p.unit_size_unit || ''}`.trim() : '1 unit';
-    return {
-      organization_id: orgId,
-      product_id: id,
-      product_name: p?.name ?? `Product ${id}`,
-      functional_unit: `1 × ${size} of ${p?.name ?? 'product'}`,
-      reference_year: REFERENCE_YEAR,
-      status: 'draft',
-      is_draft: true,
-      system_boundary: 'cradle-to-gate',
-      draft_data: { facilityAllocations: allocs, seedTag: 'drinks-co-demo' },
-    };
-  });
-
-  const { error } = await svc.from('product_carbon_footprints').insert(rows);
-  if (error) throw new Error(`recalc-ready PCFs: ${error.message}`);
-  ctx.report.recalcReady = `${rows.length} products made recalc-ready (seed draft PCFs)`;
-}
 
 /** Run all entity-level seeding in dependency order. */
 export async function seedEntities(ctx: SeedCtx): Promise<void> {
@@ -438,5 +403,4 @@ export async function seedEntities(ctx: SeedCtx): Promise<void> {
   await ensureMaturation(ctx);
   await finaliseProducts(ctx);
   await ensureMultipack(ctx);
-  await ensureRecalcReadiness(ctx);
 }

@@ -4,9 +4,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  * Shared context, helpers and constants for the alkatera Drinks Co demo seed.
  *
  * The seed is service-role and idempotent: re-running it converges on the same
- * dataset rather than duplicating rows. The calculator itself is browser-only,
- * so this module only writes the rows that make each product "recalc-ready" —
- * Tim runs the real LCA recalc from the admin tool afterwards.
+ * dataset rather than duplicating rows.
+ *
+ * The calculator is browser-only, so a service-role seeder cannot invoke it.
+ * lca.ts therefore writes COMPLETED PCFs directly with hand-modelled impacts,
+ * and every product shows a footprint immediately. Do not run the recalc tool
+ * afterwards: it would find no draft allocations to work from and skip every
+ * product. This comment used to say the opposite.
  */
 
 export const DRINKS_CO_ORG_ID = 'b0a00000-0000-4000-8000-000000000001';

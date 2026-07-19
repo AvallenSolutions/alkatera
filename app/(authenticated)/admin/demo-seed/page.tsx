@@ -174,8 +174,10 @@ export default function DemoSeedPage() {
             products (wine with viticulture, Calvados with an orchard, whisky maturation, a
             multipack), ~24 months of facility energy/water/waste + production, reconciled Pulse
             trends, targets + action plan, B Corp progress, social data and a full supplier + Xero
-            set. Idempotent. After seeding, run <strong>Recalculate LCAs</strong> with this org
-            active to compute the real footprints.
+            set. Idempotent. Completed LCAs are seeded directly, so every product shows a
+            footprint straight away. Do <strong>not</strong> run Recalculate LCAs afterwards: the
+            seeded footprints are the demo numbers, and a recalc would skip every product anyway
+            because the seed owns the PCFs.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-3">
