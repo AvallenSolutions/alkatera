@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import type { RosaTurn } from '@/lib/rosa/useRosaConversation'
 import { RosaThinking, RosaStreamingCursor } from './RosaThinking'
 import { ActionProposalCard } from '@/components/gaia/ActionProposalCard'
+import { RosaAnswerFeedback } from './RosaAnswerFeedback'
 
 // Lazy-load the chart renderer (Recharts ~200KB) so the drawer's first
 // open doesn't pull it in. Only fetched when Rosa actually returns a
@@ -146,6 +147,13 @@ function Turn({ turn }: { turn: RosaTurn }) {
               />
             ))}
           </div>
+        )}
+
+        {/* Rating. Only once the turn has finished and been persisted: the
+            feedback row keys on gaia_messages.id, which arrives with the
+            stream's done event. Errored turns get nothing to rate. */}
+        {turn.messageId && !turn.streaming && !turn.errored && (
+          <RosaAnswerFeedback messageId={turn.messageId} />
         )}
       </div>
     </div>

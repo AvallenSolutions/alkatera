@@ -11,6 +11,12 @@ export interface RosaTurn {
   content: string
   /** True while streaming; flips to false on done/error. */
   streaming?: boolean
+  /**
+   * The persisted gaia_messages.id, set from the stream's done event. Absent
+   * while streaming and on turns that errored before being saved. Feedback
+   * needs it, so the rating controls only render once it arrives.
+   */
+  messageId?: string
   /** True if the turn errored mid-stream. */
   errored?: boolean
   /**
@@ -277,6 +283,17 @@ export function useRosaConversation(): UseRosaConversationResult {
             }
           } else if (event.type === 'done') {
             if (event.conversation_id) setConversationId(event.conversation_id)
+            // Carry the persisted gaia_messages.id onto the turn so the UI can
+            // offer feedback on it. Without this the drawer has no way to name
+            // which answer a thumbs-down refers to.
+            if (event.message_id) {
+              const persistedId = event.message_id
+              setTurns(prev =>
+                prev.map(t =>
+                  t.id === assistantTurn.id ? { ...t, messageId: persistedId } : t,
+                ),
+              )
+            }
           } else if (event.type === 'error') {
             throw new Error(event.error || 'Rosa hit an error.')
           }
