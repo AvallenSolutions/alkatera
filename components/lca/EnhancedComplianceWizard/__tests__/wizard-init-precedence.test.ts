@@ -191,6 +191,62 @@ describe('buildInitialFormData — per-product prefill', () => {
     const clean = pickLcaSettings(result);
     expect(clean).not.toHaveProperty('functionalUnit');
   });
+
+  // --------------------------------------------------------------------------
+  // Boundary format normalisation
+  //
+  // systemBoundary is compared with strict equality all over the wizard
+  // (boundaryNeedsUsePhase/EndOfLife/Distribution, getStepIdsForBoundary, the
+  // BoundaryStep radio values). Those comparisons only ever match the
+  // lowercase-hyphenated form. The DB, though, stores the underscored enum on
+  // products.system_boundary, and product_carbon_footprints.system_boundary is
+  // a free-text column that has historically held both forms (see the defensive
+  // `boundary.includes("_")` normalisation in app/(authenticated)/products/page.tsx).
+  //
+  // An unnormalised value therefore does NOT just fail to tick the radio: it
+  // silently collapses a cradle-to-grave study back to the 10 base steps, so
+  // distribution / use-phase / end-of-life never appear.
+  // --------------------------------------------------------------------------
+  it('normalises an underscored DB-enum boundary from the settings blob', () => {
+    const result = buildInitialFormData({
+      last_wizard_settings: {
+        ...FULL_PRODUCT_SETTINGS,
+        systemBoundary: 'cradle_to_grave',
+      } as unknown as LcaWizardSettings,
+    });
+
+    expect(result.systemBoundary).toBe('cradle-to-grave');
+  });
+
+  it('normalises a capitalised boundary from the settings blob', () => {
+    const result = buildInitialFormData({
+      last_wizard_settings: {
+        ...FULL_PRODUCT_SETTINGS,
+        systemBoundary: 'Cradle-to-Grave',
+      } as unknown as LcaWizardSettings,
+    });
+
+    expect(result.systemBoundary).toBe('cradle-to-grave');
+  });
+
+  it('leaves an already-normalised boundary untouched', () => {
+    const result = buildInitialFormData({
+      last_wizard_settings: FULL_PRODUCT_SETTINGS,
+    });
+
+    expect(result.systemBoundary).toBe('cradle-to-grave');
+  });
+
+  it('falls back to the default when the blob carries an empty boundary', () => {
+    const result = buildInitialFormData({
+      last_wizard_settings: {
+        ...FULL_PRODUCT_SETTINGS,
+        systemBoundary: '',
+      } as unknown as LcaWizardSettings,
+    });
+
+    expect(result.systemBoundary).toBe('cradle-to-gate');
+  });
 });
 
 // ============================================================================

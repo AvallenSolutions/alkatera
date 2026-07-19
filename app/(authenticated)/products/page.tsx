@@ -18,7 +18,7 @@ import { Plus, Package, AlertCircle, Trash2, MoreVertical, Search, Leaf, ArrowRi
 import { supabase } from "@/lib/supabaseClient";
 import { duplicateProduct } from "@/lib/products";
 import { useRouter } from "next/navigation";
-import { boundaryFromDbEnum, getBoundaryLabel, SYSTEM_BOUNDARIES } from "@/lib/system-boundaries";
+import { normaliseBoundary, getBoundaryLabel, SYSTEM_BOUNDARIES } from "@/lib/system-boundaries";
 import { useOrganization } from "@/lib/organizationContext";
 import { useSubscription } from "@/hooks/useSubscription";
 import {
@@ -302,8 +302,9 @@ export default function ProductsPage() {
   };
 
   const getBoundaryBadge = (boundary: string) => {
-    // Normalise both DB enum format (underscores) and PCF format (hyphens)
-    const normalised = boundary.includes("_") ? boundaryFromDbEnum(boundary) : boundary;
+    // Normalise both DB enum format (underscores) and PCF format (hyphens),
+    // plus the capitalised values older rows carry.
+    const normalised = normaliseBoundary(boundary);
     const label = getBoundaryLabel(normalised);
     const isFullLifecycle = normalised === "cradle-to-consumer" || normalised === "cradle-to-grave";
     return (
