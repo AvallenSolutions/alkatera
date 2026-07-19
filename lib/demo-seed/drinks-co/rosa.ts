@@ -1,6 +1,5 @@
 import {
   OWNER_USER_ID,
-  monthStart,
   replaceRows,
   type SeedCtx,
 } from './shared';
@@ -43,14 +42,20 @@ export async function seedRosa(ctx: SeedCtx): Promise<void> {
 async function seedConversations(ctx: SeedCtx): Promise<void> {
   const { svc, orgId } = ctx;
 
+  // Spread across the last ~6 weeks, in DAYS not months.
+  //
+  // These were originally 1, 2 and 3 months back, which meant the learning
+  // dashboard's default 30-day window showed "nobody has rated an answer yet"
+  // on a freshly-seeded org, and the oldest thread fell outside 90 days
+  // entirely. Anything seeded for a demo has to land inside the default view.
   const threads: Array<{
     title: string;
-    monthsAgo: number;
+    daysAgo: number;
     turns: Array<{ q: string; a: string; rating?: 'positive' | 'negative'; note?: string }>;
   }> = [
     {
       title: 'Where our footprint actually sits',
-      monthsAgo: 3,
+      daysAgo: 40,
       turns: [
         {
           q: 'What is driving our product footprint the most?',
@@ -66,7 +71,7 @@ async function seedConversations(ctx: SeedCtx): Promise<void> {
     },
     {
       title: 'Reporting scope',
-      monthsAgo: 2,
+      daysAgo: 18,
       turns: [
         {
           q: 'What is scope 3 and which categories apply to us?',
@@ -83,7 +88,7 @@ async function seedConversations(ctx: SeedCtx): Promise<void> {
     },
     {
       title: 'Getting the B Corp submission moving',
-      monthsAgo: 1,
+      daysAgo: 5,
       turns: [
         {
           q: 'How do I add evidence for a B Corp requirement?',
@@ -109,7 +114,7 @@ async function seedConversations(ctx: SeedCtx): Promise<void> {
   let feedbackCount = 0;
 
   for (const thread of threads) {
-    const created = monthStart(thread.monthsAgo);
+    const created = new Date(Date.now() - thread.daysAgo * 24 * 3600 * 1000).toISOString();
     const { data: conv, error: convErr } = await svc
       .from('gaia_conversations')
       .insert({

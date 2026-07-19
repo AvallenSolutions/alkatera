@@ -109,6 +109,13 @@ export async function POST(request: NextRequest) {
     const orgSize: RPDOrganisationSize = settings.obligation_size === 'large' ? 'L' : 'S'
     const feeYearDef = FEE_YEARS.find(f => f.id === fee_year)
     const isModulated = feeYearDef?.is_modulated ?? false
+    // The calendar year the fee year starts in, e.g. '2025-26' -> 2025. Needed
+    // as a NUMBER by isDRSExcluded, whose `< 2027` guard silently does nothing
+    // when handed the '2025-26' string. Falls back to parsing the id so a fee
+    // year missing from FEE_YEARS still yields a usable number.
+    const feeYearStart =
+      (feeYearDef ? Number(feeYearDef.start.slice(0, 4)) : Number(String(fee_year).slice(0, 4))) ||
+      undefined
 
     // Fetch fee rates
     const { data: feeRates } = await supabase
@@ -220,7 +227,15 @@ export async function POST(request: NextRequest) {
         else if (unit === 'cl') unitSizeML = size * 10
       }
 
-      const drsExcluded = (settings.drs_applies ?? true) && isDRSExcluded(isDrinksContainer, unitSizeML, materialType, fee_year)
+      // isDRSExcluded takes a NUMERIC calendar year and guards on `< 2027`.
+      // fee_year is a string like '2025-26', and Number('2025-26') is NaN, so
+      // `'2025-26' < 2027` is false and the "DRS does not start until 2027"
+      // guard was silently skipped. DRS-excluded items are charged 0 by
+      // fee-calculator, so drinks containers were being zero-rated across the
+      // whole of 2025/26.
+      const drsExcluded =
+        (settings.drs_applies ?? true) &&
+        isDRSExcluded(isDrinksContainer, unitSizeML, materialType, feeYearStart)
 
       // Handle drinks container component rules. Prefer the modern child
       // table (packaging_material_components); fall back to the legacy
