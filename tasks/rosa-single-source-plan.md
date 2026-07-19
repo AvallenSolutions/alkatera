@@ -52,7 +52,14 @@ Eval harness (`scripts/rosa-eval.ts` mirroring `scripts/ingest-eval.ts`), and sw
 ## Follow-ups surfaced while building
 
 - **gaia-query REMOVED from the repo** (commit `d85a2792`): function source, CI deploy step, and the two orphaned client wrappers. Verified unused first (no repo reference, no other function/trigger/cron, no prod invocations logged, and every assistant message this month carries a tool trail so came from the tool-based route). ⚠️ **STILL DEPLOYED on the Supabase project** — removing it from CI stops it being updated, not served. Tim needs to delete it in the Supabase dashboard: Edge Functions > gaia-query > Delete.
-- **Nothing aggregates the signals yet.** `gaia_feedback`, `rosa_telemetry` and the corrections now accumulate, but `lib/gaia/feedback-learning.ts` (566 lines, a complete feedback → pattern → knowledge-gap loop) is still unreached. Wiring it up is the natural next step now that there is finally data for it to read.
+- ~~Nothing aggregates the signals~~ **DONE** (commit `582de1c5`): `/admin/rosa-learning` + `GET /api/admin/rosa-learning`, mirroring `/admin/ingest-learning`. Reads all three signals. Fixed two real bugs in the analyser while wiring it: every categoriser ran on Rosa's ANSWER not the user's question (so everything bucketed to 'general'), and the suggested-knowledge title embedded a customer's verbatim question into the SHARED `gaia_knowledge_base`.
 - **Corrections could crowd out real facts.** `formatMemoryBlock` renders at most 10 entries per scope and `listMemories` caps at 30. A user who thumbs-downs often would push genuine org facts out of the prompt with `correction_*` entries. Needs either a separate cap for corrections or a periodic distil step.
 - **The correction key is noise in the prompt.** It renders as `- correction_2701466e: We report to VSME, not CSRD.` The uuid fragment means nothing to the model and costs tokens.
 - **No eval harness still.** Nothing can prove a persona change improves anything, which is what gates the global half of the learning loop.
+
+## Still open after the learning surface shipped
+
+- **`generateKnowledgeFromPatterns` is still not called by anything.** It now produces a safe, customer-text-free draft, but nothing invokes it. Deliberate: the drafts are `[TODO]` work items, and the admin can author a real entry through the existing knowledge UI. Wire it to a button only if the draft queue turns out to be worth having.
+- **Rosa still cannot be evaluated.** No golden set, no `scripts/rosa-eval.ts`. The learning surface tells Tim where she is weak; nothing proves a persona change actually helped. This is what gates the global half of the loop.
+- **Corrections could still crowd out real org facts.** `formatMemoryBlock` renders 10 per scope; a heavy thumbs-down user pushes genuine facts out with `correction_*` entries.
+- **Categorisation is 11 hand-written regexes** (`QUESTION_CATEGORIES`). Fine at current volume, will need revisiting when there is real traffic.
