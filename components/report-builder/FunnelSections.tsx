@@ -13,6 +13,7 @@ import {
   sectionHasData,
   type ReportDataAvailability,
 } from '@/hooks/useReportDataAvailability';
+import { isCompletenessSection, type SectionCompleteness } from '@/lib/reports/section-completeness';
 
 interface FunnelSectionsProps {
   config: ReportConfig;
@@ -59,6 +60,43 @@ export function FunnelSections({
 }: FunnelSectionsProps) {
   const { hasFeature } = useSubscription();
   const [pcfOptions, setPcfOptions] = useState<Array<{ id: string; name: string }>>([]);
+
+  // Per-measure completeness for the social/value-chain sections, from the
+  // same oracle the document itself reads (/api/reports/completeness), so
+  // "3 of 9 measures recorded" here can never disagree with the rendered
+  // pages. The coarse availability chip stays as-is for preselection.
+  const [completeness, setCompleteness] = useState<Record<string, SectionCompleteness>>({});
+  const [gapsOpen, setGapsOpen] = useState<Record<string, boolean>>({});
+  const selectedCompletenessSections = config.sections.filter(isCompletenessSection);
+  const completenessKey = `${organizationId}|${config.reportYear}|${selectedCompletenessSections.sort().join(',')}`;
+
+  useEffect(() => {
+    if (!organizationId || selectedCompletenessSections.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const supabase = getSupabaseBrowserClient();
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (!token) return;
+        const params = new URLSearchParams({
+          year: String(config.reportYear),
+          sections: selectedCompletenessSections.join(','),
+          organization_id: organizationId,
+        });
+        const response = await fetch(`/api/reports/completeness?${params}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok || cancelled) return;
+        const body = await response.json();
+        if (!cancelled && body?.sections) setCompleteness(body.sections);
+      } catch {
+        // Quietly keep the coarse chip; the gap rows just do not appear.
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [completenessKey]);
 
   const isFeatureLocked = (sectionId: string): boolean => {
     const section = AVAILABLE_SECTIONS.find(s => s.id === sectionId);
@@ -268,6 +306,53 @@ export function FunnelSections({
                         <span className="mt-0.5 block text-xs text-muted-foreground">{section.description}</span>
                       </span>
                     </label>
+
+                    {/* Per-measure completeness (the same oracle the document reads) */}
+                    {isSelected && !disabled && completeness[section.id] && (() => {
+                      const c = completeness[section.id];
+                      const missing = c.blocks.filter(b => !b.present);
+                      const open = gapsOpen[section.id] ?? false;
+                      const shown = open ? missing.slice(0, 5) : [];
+                      return (
+                        <div className="ml-7 mt-1.5">
+                          <button
+                            type="button"
+                            onClick={() => missing.length > 0 && setGapsOpen(prev => ({ ...prev, [section.id]: !open }))}
+                            className={cn(
+                              'font-mono text-[9.5px] font-bold uppercase tracking-[0.16em]',
+                              missing.length > 0
+                                ? 'text-muted-foreground transition-colors hover:text-foreground'
+                                : 'cursor-default text-studio-dim'
+                            )}
+                          >
+                            {c.presentCount} of {c.totalCount} measures recorded
+                            {missing.length > 0 && <span className="ml-1.5">{open ? '· hide' : '· show missing'}</span>}
+                          </button>
+                          {open && (
+                            <div className="mt-1.5 border-l border-studio-hairline pl-3">
+                              {shown.map(block => (
+                                <div key={block.id} className="flex items-baseline gap-2 py-1">
+                                  <StateChip tone="attention">Missing</StateChip>
+                                  <a
+                                    href={block.deepLink}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-xs text-foreground underline-offset-2 hover:underline"
+                                  >
+                                    {block.label}
+                                  </a>
+                                </div>
+                              ))}
+                              {missing.length > 5 && (
+                                <p className="py-1 font-mono text-[9.5px] uppercase tracking-[0.14em] text-studio-dim">
+                                  and {missing.length - 5} more
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Products scope */}
                     {section.id === 'product-footprints' && isSelected && pcfOptions.length > 0 && (

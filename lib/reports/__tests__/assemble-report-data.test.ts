@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  assembleReportData,
   buildReportConfig,
   deriveEmissionsTrends,
   normaliseTargets,
@@ -155,5 +156,88 @@ describe('normaliseTargets', () => {
     expect(normaliseTargets(null, null)).toEqual([]);
     expect(normaliseTargets([], [])).toEqual([]);
     expect(normaliseTargets([null as any], [undefined as any])).toEqual([]);
+  });
+});
+
+describe('assembleReportData section gating', () => {
+  // A chainable client that records every table touched and resolves every
+  // query empty. What matters here is WHICH tables get queried, not what
+  // they return: an unselected section must issue no queries at all.
+  function makeCountingClient() {
+    const tables: string[] = [];
+    const makeQuery = () => {
+      const q: any = {};
+      for (const m of ['select', 'eq', 'neq', 'in', 'is', 'not', 'order', 'limit', 'gte', 'lte', 'filter', 'or']) {
+        q[m] = () => q;
+      }
+      q.maybeSingle = async () => ({ data: null, error: null });
+      q.single = async () => ({ data: null, error: null });
+      q.then = (resolve: any) => Promise.resolve({ data: [], error: null }).then(resolve);
+      return q;
+    };
+    const client = { from: (table: string) => { tables.push(table); return makeQuery(); } } as any;
+    return { client, tables };
+  }
+
+  const reportRow = (sections: string[]) => ({
+    organization_id: 'org-1',
+    report_name: 'Gating Test',
+    report_year: 2026,
+    reporting_period_start: '2026-01-01',
+    reporting_period_end: '2026-12-31',
+    audience: 'customers',
+    standards: [],
+    sections,
+    is_multi_year: false,
+    report_years: [2026],
+    config: {},
+  });
+
+  const SOCIAL_TABLES = /^(people_|governance_|community_|organization_suppliers|supplier_data_submissions|facilities$|facility_)/;
+
+  it('issues no social/value-chain queries when those sections are unselected', async () => {
+    const { client, tables } = makeCountingClient();
+    await assembleReportData(client, reportRow(['executive-summary', 'scope-1-2-3']), { skipKeyFindings: true });
+    expect(tables.filter(t => SOCIAL_TABLES.test(t))).toEqual([]);
+  });
+
+  it('fetches people tables when people-culture is selected, and attaches the completeness oracle', async () => {
+    const { client, tables } = makeCountingClient();
+    const { reportData } = await assembleReportData(
+      client,
+      reportRow(['executive-summary', 'people-culture']),
+      { skipKeyFindings: true },
+    );
+    expect(tables.some(t => t.startsWith('people_'))).toBe(true);
+    expect(tables.some(t => t.startsWith('governance_'))).toBe(false);
+    expect(reportData.peopleCulture).toBeDefined();
+    expect(reportData.dataAvailability.hasPeopleCulture).toBe(false); // empty org: reporting flag stays honest
+    expect(reportData.sectionCompleteness['people-culture'].totalCount).toBe(13);
+    expect(reportData.sectionCompleteness['people-culture'].presentCount).toBe(0);
+  });
+
+  it('targets without governance runs the mission-only fast path, not the full gather', async () => {
+    const { client, tables } = makeCountingClient();
+    await assembleReportData(client, reportRow(['executive-summary', 'targets']), { skipKeyFindings: true });
+    expect(tables).toContain('governance_mission');
+    expect(tables).not.toContain('governance_board_members');
+  });
+
+  it('governance selected runs the full gather', async () => {
+    const { client, tables } = makeCountingClient();
+    await assembleReportData(client, reportRow(['executive-summary', 'governance']), { skipKeyFindings: true });
+    expect(tables).toContain('governance_board_members');
+    expect(tables).toContain('governance_policies');
+  });
+
+  it('facilities selected fetches facilities and attaches its completeness', async () => {
+    const { client, tables } = makeCountingClient();
+    const { reportData } = await assembleReportData(
+      client,
+      reportRow(['executive-summary', 'facilities']),
+      { skipKeyFindings: true },
+    );
+    expect(tables.some(t => t === 'facilities' || t.startsWith('facility_'))).toBe(true);
+    expect(reportData.sectionCompleteness['facilities'].totalCount).toBe(4);
   });
 });
