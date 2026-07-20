@@ -85,16 +85,25 @@ export async function analyzeFeedbackPatterns(
   const negativeCount = feedback.filter(f => f.rating === 'negative').length;
   const positiveRate = totalFeedback > 0 ? (positiveCount / totalFeedback) * 100 : 0;
 
-  // Analyze patterns in negative feedback
-  const negativeFeedback = feedback.filter(f => f.rating === 'negative');
-  const positiveFeedback = feedback.filter(f => f.rating === 'positive');
+  // Resolve the USER QUESTION behind each rated answer, once, up front.
+  //
+  // gaia_feedback.message_id points at the assistant message, so
+  // message.content is Rosa's answer. Every categoriser here matches
+  // question-shaped regexes ("how do i", "what is", "where can"), which an
+  // answer almost never matches, so categorising the answer put practically
+  // everything in 'general' and made the category breakdown useless.
+  // analyzeNegativePatterns was the only one that walked back to the question,
+  // and it did so with one query per feedback row.
+  const withQuestion = await attachUserQuestions(supabase, feedback);
 
-  // Get conversation context for negative feedback
-  const negativePatterns = await analyzeNegativePatterns(supabase, negativeFeedback);
+  const negativeFeedback = withQuestion.filter(f => f.rating === 'negative');
+  const positiveFeedback = withQuestion.filter(f => f.rating === 'positive');
+
+  const negativePatterns = analyzeNegativePatterns(negativeFeedback);
   const positivePatterns = analyzePositivePatterns(positiveFeedback);
 
   // Categorize feedback
-  const categoryBreakdown = calculateCategoryBreakdown(feedback);
+  const categoryBreakdown = calculateCategoryBreakdown(withQuestion);
 
   // Generate improvement suggestions
   const improvementSuggestions = generateImprovementSuggestions(
@@ -121,66 +130,105 @@ export async function analyzeFeedbackPatterns(
   };
 }
 
+/** A rated answer plus the question that prompted it. */
+interface RatedAnswer {
+  id: string;
+  rating: 'positive' | 'negative';
+  feedback_text: string | null;
+  created_at: string;
+  message: { id: string; content: string; role: string; conversation: { id: string } };
+  /** The user message immediately before the rated answer. '' if not found. */
+  question: string;
+}
+
 /**
- * Analyze patterns in negative feedback
+ * Look up the user question behind every rated answer in one query.
+ *
+ * Matches on message ID, not content equality. The previous version compared
+ * `m.content === item.message.content`, which picks the FIRST identical answer
+ * in a conversation, so a repeated answer ("I don't have that data yet") got
+ * attributed to the wrong question.
  */
-async function analyzeNegativePatterns(
+async function attachUserQuestions(
   supabase: SupabaseClient,
-  negativeFeedback: Array<{
+  feedback: Array<{
     id: string;
     rating: 'positive' | 'negative';
     feedback_text: string | null;
     created_at: string;
-    message: {
-      id: string;
-      content: string;
-      role: string;
-      conversation: { id: string };
-    };
+    message: { id: string; content: string; role: string; conversation: { id: string } };
   }>
-): Promise<RosaFeedbackPattern[]> {
+): Promise<RatedAnswer[]> {
+  const conversationIds = Array.from(
+    new Set(feedback.map(f => f.message?.conversation?.id).filter(Boolean)),
+  );
+  if (conversationIds.length === 0) {
+    return feedback.map(f => ({ ...f, question: '' }));
+  }
+
+  const { data } = await supabase
+    .from('gaia_messages')
+    .select('id, content, role, conversation_id, created_at')
+    .in('conversation_id', conversationIds)
+    .order('created_at', { ascending: true });
+
+  const byConversation = new Map<string, Array<{ id: string; content: string; role: string }>>();
+  for (const m of (data ?? []) as Array<{
+    id: string;
+    content: string;
+    role: string;
+    conversation_id: string;
+  }>) {
+    const list = byConversation.get(m.conversation_id) ?? [];
+    list.push({ id: m.id, content: m.content, role: m.role });
+    byConversation.set(m.conversation_id, list);
+  }
+
+  return feedback.map(f => {
+    const list = byConversation.get(f.message?.conversation?.id) ?? [];
+    const idx = list.findIndex(m => m.id === f.message?.id);
+    // Walk back to the nearest user message rather than assuming the answer is
+    // always preceded by exactly one: tool rounds and system turns can sit
+    // between them.
+    let question = '';
+    for (let i = idx - 1; i >= 0; i--) {
+      if (list[i].role === 'user') {
+        question = list[i].content;
+        break;
+      }
+    }
+    return { ...f, question };
+  });
+}
+
+/**
+ * Analyze patterns in negative feedback
+ */
+function analyzeNegativePatterns(negativeFeedback: RatedAnswer[]): RosaFeedbackPattern[] {
   const patterns = new Map<string, RosaFeedbackPattern>();
 
   for (const item of negativeFeedback) {
-    // Get the user question that preceded this response
-    const { data: messages } = await supabase
-      .from('gaia_messages')
-      .select('content, role')
-      .eq('conversation_id', item.message.conversation.id)
-      .order('created_at', { ascending: true });
+    if (!item.question) continue;
+    const category = categorizeQuestion(item.question);
+    const patternKey = extractPatternKey(item.question);
 
-    const messageList = messages as Array<{ content: string; role: string }> | null;
-
-    if (!messageList) continue;
-
-    // Find the user message that preceded the rated assistant message
-    const assistantIndex = messageList.findIndex(m =>
-      m.content === item.message.content && m.role === 'assistant'
-    );
-
-    if (assistantIndex > 0) {
-      const userQuestion = messageList[assistantIndex - 1]?.content || '';
-      const category = categorizeQuestion(userQuestion);
-      const patternKey = extractPatternKey(userQuestion);
-
-      const existing = patterns.get(patternKey);
-      if (existing) {
-        existing.negativeCount++;
-        existing.lastOccurrence = item.created_at;
-        existing.successRate = existing.positiveCount / (existing.positiveCount + existing.negativeCount);
-      } else {
-        patterns.set(patternKey, {
-          id: crypto.randomUUID(),
-          pattern: patternKey,
-          category,
-          negativeCount: 1,
-          positiveCount: 0,
-          successRate: 0,
-          lastOccurrence: item.created_at,
-          status: 'pending_review',
-          suggestedKnowledgeEntry: generateSuggestedKnowledgeEntry(userQuestion, category),
-        });
-      }
+    const existing = patterns.get(patternKey);
+    if (existing) {
+      existing.negativeCount++;
+      existing.lastOccurrence = item.created_at;
+      existing.successRate = existing.positiveCount / (existing.positiveCount + existing.negativeCount);
+    } else {
+      patterns.set(patternKey, {
+        id: crypto.randomUUID(),
+        pattern: patternKey,
+        category,
+        negativeCount: 1,
+        positiveCount: 0,
+        successRate: 0,
+        lastOccurrence: item.created_at,
+        status: 'pending_review',
+        suggestedKnowledgeEntry: generateSuggestedKnowledgeEntry(item.question, category),
+      });
     }
   }
 
@@ -191,23 +239,11 @@ async function analyzeNegativePatterns(
 /**
  * Analyze patterns in positive feedback
  */
-function analyzePositivePatterns(
-  positiveFeedback: Array<{
-    id: string;
-    rating: 'positive' | 'negative';
-    feedback_text: string | null;
-    created_at: string;
-    message: {
-      id: string;
-      content: string;
-      role: string;
-    };
-  }>
-): RosaFeedbackPattern[] {
+function analyzePositivePatterns(positiveFeedback: RatedAnswer[]): RosaFeedbackPattern[] {
   const patterns = new Map<string, RosaFeedbackPattern>();
 
   for (const item of positiveFeedback) {
-    const category = categorizeQuestion(item.message.content);
+    const category = categorizeQuestion(item.question);
     const patternKey = `positive_${category}`;
 
     const existing = patterns.get(patternKey);
@@ -276,10 +312,24 @@ function generateSuggestedKnowledgeEntry(
       ? 'definition'
       : 'example_qa';
 
+  // The title used to be `Answer for: ${question}`, i.e. one customer's
+  // verbatim question. gaia_knowledge_base is SHARED across every org (it is
+  // what search_knowledge_bank reads and what the wiki syncs into), so that
+  // put "why is our Highland site's scope 1 so high" one careless activation
+  // away from being served to a different customer. Inactive rows are not
+  // served, but the row still sits in the shared table.
+  //
+  // The draft is a work item, not knowledge: its body has always been a TODO
+  // placeholder for a human to fill in. So the title only needs to say which
+  // topic needs writing about, and carries no customer text at all. The raw
+  // question stays in the analytics response, which is platform-admin only.
   return {
     entryType,
-    title: `Answer for: ${question.substring(0, 100)}`,
-    content: `[TODO: Add a clear answer to this question]`,
+    title: `Rosa answers "${category}" questions badly: needs a knowledge entry`,
+    content:
+      '[Draft created from negative feedback. Write the answer here, then activate it. ' +
+      'Do not paste a customer question or any org-specific detail into this entry: ' +
+      'every organisation reads this knowledge base.]',
   };
 }
 
@@ -287,15 +337,12 @@ function generateSuggestedKnowledgeEntry(
  * Calculate breakdown by category
  */
 function calculateCategoryBreakdown(
-  feedback: Array<{
-    rating: 'positive' | 'negative';
-    message: { content: string };
-  }>
+  feedback: RatedAnswer[]
 ): RosaFeedbackAnalytics['categoryBreakdown'] {
   const categories = new Map<string, { positive: number; total: number }>();
 
   for (const item of feedback) {
-    const category = categorizeQuestion(item.message.content);
+    const category = categorizeQuestion(item.question);
     const existing = categories.get(category) || { positive: 0, total: 0 };
     existing.total++;
     if (item.rating === 'positive') {
@@ -380,17 +427,12 @@ function generateImprovementSuggestions(
  * Identify knowledge gaps from negative feedback
  */
 function identifyKnowledgeGaps(
-  negativeFeedback: Array<{
-    id: string;
-    rating: 'positive' | 'negative';
-    feedback_text: string | null;
-    message: { content: string };
-  }>
+  negativeFeedback: RatedAnswer[]
 ): RosaFeedbackAnalytics['knowledgeGaps'] {
   const topicCounts = new Map<string, { count: number; feedbackTexts: string[] }>();
 
   for (const item of negativeFeedback) {
-    const category = categorizeQuestion(item.message.content);
+    const category = categorizeQuestion(item.question);
 
     const existing = topicCounts.get(category) || { count: 0, feedbackTexts: [] };
     existing.count++;

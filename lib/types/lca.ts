@@ -132,7 +132,7 @@ export interface PackagingMaterialComponent {
 
 export type LabelPrintingType = 'digital' | 'offset' | 'flexographic' | 'gravure' | 'screen' | 'letterpress' | 'other';
 
-export type DataSource = 'openlca' | 'supplier' | 'primary' | 'staging' | 'ecoinvent' | 'defra' | 'viticulture_primary' | 'arable_primary' | 'orchard_primary';
+export type DataSource = 'openlca' | 'supplier' | 'primary' | 'staging' | 'ecoinvent' | 'defra' | 'viticulture_primary' | 'arable_primary' | 'orchard_primary' | 'parametric';
 
 export type ImpactSourceType = 'primary_verified' | 'secondary_modelled' | 'hybrid_proxy';
 

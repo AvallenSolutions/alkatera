@@ -1,6 +1,7 @@
 import 'server-only';
 import { fetchPage } from '@/lib/distributor/scraping/http';
 import { runJsonPrompt } from '@/lib/ai/gemini';
+import { NO_EM_DASH_RULE } from '@/lib/copy-style';
 
 /**
  * Focused, FAST brand enrichment for an outbound footprint report.
@@ -122,7 +123,7 @@ ${source}
 Return ONLY a JSON object of this exact shape:
 {
   "category": "the most specific accurate drinks category as the brand describes it, e.g. Calvados, London Dry Gin, Single Malt Whisky, Spiced Rum, Lager, Red Wine, Cider, Vodka, Tequila. null if genuinely unclear.",
-  "country_of_origin": "country where the drink is produced — full name or ISO-2 code (e.g. France or FR). null if unclear.",
+  "country_of_origin": "country where the drink is produced: full name or ISO-2 code (e.g. France or FR). null if unclear.",
   "products": [
     { "name": "full product name as sold, e.g. Avallen Calvados", "container_size_ml": 700 }
   ]
@@ -132,7 +133,8 @@ Rules:
 - container_size_ml in millilitres: 70cl = 700, 75cl = 750, 50cl = 500, 1L = 1000, 4.5L = 4500, 5cl miniature = 50. Use null only if no size is stated anywhere.
 - List EVERY distinct product and size variant you can find. A 700ml and a 4.5L of the same drink are TWO separate entries.
 - Only real drinks this brand sells. Exclude gift cards, glassware, merchandise, subscriptions, bundles of mixed brands.
-- British English. Output JSON only — no markdown, no commentary.`;
+- British English. Output JSON only: no markdown, no commentary.
+- ${NO_EM_DASH_RULE}`;
 }
 
 export function sanitise(parsed: Record<string, unknown>, pagesRead: number): ReportEnrichment {

@@ -4,6 +4,13 @@ import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
+// Next.js patches global fetch and, on this route pattern (no next/headers
+// call to auto-trigger dynamic mode), would otherwise cache these outbound
+// Supabase requests across invocations — a GET with an identical URL every
+// time would keep returning the first response it ever saw. no-store on
+// every call is what makes this route actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' });
+
 // Both fields optional here; the enum validation + "at least one"
 // requirement stay in the handler to preserve their specific messages.
 const SubscriptionPatchSchema = z
@@ -39,7 +46,7 @@ export async function PATCH(
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
+      global: { headers: { Authorization: `Bearer ${token}` }, fetch: noStoreFetch },
     });
 
     const { data: userData, error: authError } = await supabase.auth.getUser();
@@ -91,7 +98,7 @@ export async function PATCH(
     }
 
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    const adminClient = createClient(supabaseUrl, serviceRoleKey, { global: { fetch: noStoreFetch } });
 
     const { data: existing, error: fetchError } = await adminClient
       .from('organizations')

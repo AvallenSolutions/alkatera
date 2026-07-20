@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { syncAlkateraCustomer } from '@/lib/sender'
 
+// Next.js patches global fetch and, on this route pattern (no next/headers
+// call to auto-trigger dynamic mode), would otherwise cache these outbound
+// Supabase requests across invocations — a GET with an identical URL every
+// time would keep returning the first response it ever saw. no-store on
+// every call is what makes this route actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' })
+
 const allowedOrigin = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.alkatera.com'
 
 const corsHeaders = {
@@ -79,6 +86,7 @@ export async function POST(request: NextRequest) {
 
     const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
+      global: { fetch: noStoreFetch },
     })
 
     // Verify caller is the same user as user_id (prevent registering on behalf of others)

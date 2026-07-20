@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { calculateCompleteness } from '@/lib/distributor/scoring/completeness-calculator';
+import { FIELD_DEFINITIONS } from '@/lib/distributor/scraping/field-definitions';
 
 describe('calculateCompleteness', () => {
   it('returns 0 for a brand with no data', () => {
@@ -10,47 +11,16 @@ describe('calculateCompleteness', () => {
   });
 
   it('reaches 100 when every known field is populated', () => {
-    const result = calculateCompleteness([
-      'bcorp_certified',
-      'carbon_trust_certified',
-      'iso_14001_certified',
-      'iso_50001_certified',
-      'fairtrade_certified',
-      'rainforest_alliance_certified',
-      'organic_certified',
-      'organic_percentage',
-      'carbon_intensity_kgco2e_per_litre',
-      'scope_1_tco2e',
-      'scope_2_tco2e',
-      'scope_3_tco2e',
-      'net_zero_target_year',
-      'sbt_status',
-      'interim_reduction_percentage',
-      'interim_target_year',
-      'target_baseline_year',
-      'sbti_validated',
-      'water_usage_litres_per_litre',
-      'water_stress_region',
-      'water_recycled_percentage',
-      'recycled_packaging_percentage',
-      'packaging_primary_material',
-      'sustainability_report_url',
-      'sustainability_report_year',
-      'parent_company',
-      'hq_country',
-      'founding_year',
-      'company_registration_number',
-      'contact_email',
-      'company_description',
-      'iwca_member',
-      'porto_protocol_signatory',
-      'epd_published',
-      'carbon_negative_claim',
-      'carbon_neutral_operations',
-      'renewable_energy_percentage',
-      'cdr_partnership',
-    ]);
+    // Derived from FIELD_DEFINITIONS rather than hand-listed. A hardcoded
+    // list silently stops meaning "every known field" the moment someone
+    // adds a definition, which is exactly how this test came to assert 100
+    // against a 38-of-40 list and fail at 95.92.
+    const everyField = FIELD_DEFINITIONS.map(f => f.key);
+    const result = calculateCompleteness(everyField);
+
     expect(result.overall).toBe(100);
+    expect(result.fields_populated).toBe(FIELD_DEFINITIONS.length);
+    expect(result.missing_required).toEqual([]);
   });
 
   it('weights high-impact fields more than default-weight fields', () => {

@@ -13,6 +13,7 @@
 // lib/constants/packaging-weight-ranges.ts.
 
 import type { PackagingDefaults } from './packaging-defaults';
+import type { PackagingMaterialClass } from './packaging-material-classes';
 
 export interface WeightBand {
   /** Band applies up to and including this size (ml). Last band may be Infinity. */
@@ -28,7 +29,15 @@ export interface CatalogueMaterial {
   label: string;
   /** End-of-life factor key understood by getMaterialFactorKey/MATERIAL_TYPE_MAP */
   eolKey: 'glass' | 'aluminium' | 'pet' | 'hdpe' | 'paper' | 'steel' | 'cork' | 'other';
-  /** Deterministic emission factor search (run against /api/ingredients/search) */
+  /** Parametric material class (lib/constants/packaging-material-classes.ts). */
+  materialClass: PackagingMaterialClass;
+  /** Default variant where the class has more than one (e.g. glass colour). */
+  defaultVariant?: string;
+  /**
+   * @deprecated Packaging factors are derived parametrically from
+   * packaging_factor_endpoints; this search string is no longer used for
+   * parametric classes and remains only for legacy rows.
+   */
   efSearchQuery: string;
   /** Circularity defaults applied to the row */
   defaults: PackagingDefaults;
@@ -76,6 +85,8 @@ export const CONTAINER_FORMATS: ContainerFormat[] = [
         key: 'glass',
         label: 'Glass',
         eolKey: 'glass',
+        materialClass: 'glass',
+        defaultVariant: 'flint',
         efSearchQuery: 'glass bottle',
         defaults: { recycled_content_percentage: 40, recyclability_percent: 100, end_of_life_pathway: 'recycling' },
         weightBands: [
@@ -90,6 +101,7 @@ export const CONTAINER_FORMATS: ContainerFormat[] = [
         key: 'pet',
         label: 'Plastic (PET)',
         eolKey: 'pet',
+        materialClass: 'pet',
         efSearchQuery: 'PET bottle',
         defaults: { recycled_content_percentage: 30, recyclability_percent: 90, end_of_life_pathway: 'recycling' },
         weightBands: [
@@ -101,6 +113,7 @@ export const CONTAINER_FORMATS: ContainerFormat[] = [
         key: 'hdpe',
         label: 'Plastic (HDPE)',
         eolKey: 'hdpe',
+        materialClass: 'hdpe',
         efSearchQuery: 'HDPE bottle',
         defaults: { recycled_content_percentage: 25, recyclability_percent: 90, end_of_life_pathway: 'recycling' },
         weightBands: [
@@ -126,6 +139,7 @@ export const CONTAINER_FORMATS: ContainerFormat[] = [
         key: 'aluminium',
         label: 'Aluminium',
         eolKey: 'aluminium',
+        materialClass: 'aluminium',
         efSearchQuery: 'aluminium can',
         defaults: { recycled_content_percentage: 70, recyclability_percent: 95, end_of_life_pathway: 'recycling' },
         weightBands: [
@@ -138,6 +152,7 @@ export const CONTAINER_FORMATS: ContainerFormat[] = [
         key: 'steel',
         label: 'Steel',
         eolKey: 'steel',
+        materialClass: 'steel',
         efSearchQuery: 'steel can',
         defaults: { recycled_content_percentage: 60, recyclability_percent: 90, end_of_life_pathway: 'recycling' },
         weightBands: [
@@ -162,6 +177,7 @@ export const CONTAINER_FORMATS: ContainerFormat[] = [
         key: 'steel',
         label: 'Stainless steel',
         eolKey: 'steel',
+        materialClass: 'steel',
         efSearchQuery: 'stainless steel keg',
         defaults: { reuse_trips: 150, recyclability_percent: 95, end_of_life_pathway: 'reuse' },
         weightBands: [
@@ -173,6 +189,7 @@ export const CONTAINER_FORMATS: ContainerFormat[] = [
         key: 'pet',
         label: 'Plastic (one-way keg)',
         eolKey: 'pet',
+        materialClass: 'pet',
         efSearchQuery: 'PET keg',
         defaults: { recycled_content_percentage: 0, recyclability_percent: 80, end_of_life_pathway: 'recycling' },
         weightBands: [
@@ -196,6 +213,8 @@ export const CONTAINER_FORMATS: ContainerFormat[] = [
         key: 'paperboard',
         label: 'Paperboard (Tetra Pak)',
         eolKey: 'paper',
+        // Liquid cartons are board+PE+alu composites, not plain paperboard.
+        materialClass: 'liquid_carton',
         efSearchQuery: 'beverage carton',
         defaults: { recycled_content_percentage: 25, recyclability_percent: 50, end_of_life_pathway: 'recycling' },
         weightBands: [
@@ -220,6 +239,7 @@ export const CONTAINER_FORMATS: ContainerFormat[] = [
         key: 'plastic_laminate',
         label: 'Plastic laminate',
         eolKey: 'pet',
+        materialClass: 'plastic_laminate',
         efSearchQuery: 'stand-up pouch',
         defaults: { recycled_content_percentage: 0, recyclability_percent: 20, end_of_life_pathway: 'incineration' },
         weightBands: [
@@ -243,6 +263,7 @@ export const CONTAINER_FORMATS: ContainerFormat[] = [
         key: 'bib_composite',
         label: 'Plastic bag + cardboard box',
         eolKey: 'paper',
+        materialClass: 'bib_composite',
         efSearchQuery: 'bag-in-box',
         defaults: { recycled_content_percentage: 30, recyclability_percent: 40, end_of_life_pathway: 'landfill' },
         weightBands: [
@@ -264,6 +285,12 @@ export interface AccessoryOption {
   /** Formats this option makes sense for; empty = all */
   formats: string[];
   eolKey: CatalogueMaterial['eolKey'];
+  /**
+   * Parametric material class. Omitted only where no sensible mono-material
+   * endpoint exists (printed-direct ink), which keeps the legacy path.
+   */
+  materialClass?: PackagingMaterialClass;
+  /** @deprecated see CatalogueMaterial.efSearchQuery */
   efSearchQuery: string;
   typicalWeightG: { medianG: number; minG: number; maxG: number };
   defaults: PackagingDefaults;
@@ -277,6 +304,7 @@ export const CLOSURE_OPTIONS: AccessoryOption[] = [
     label: 'Crown cap',
     formats: ['bottle'],
     eolKey: 'steel',
+    materialClass: 'steel',
     materialKey: 'steel',
     efSearchQuery: 'crown cap',
     typicalWeightG: { medianG: 2.2, minG: 1.5, maxG: 4 },
@@ -287,6 +315,7 @@ export const CLOSURE_OPTIONS: AccessoryOption[] = [
     label: 'Aluminium screw cap',
     formats: ['bottle'],
     eolKey: 'aluminium',
+    materialClass: 'aluminium',
     materialKey: 'aluminium',
     efSearchQuery: 'aluminium screw cap',
     typicalWeightG: { medianG: 5, minG: 3, maxG: 10 },
@@ -297,6 +326,7 @@ export const CLOSURE_OPTIONS: AccessoryOption[] = [
     label: 'Plastic screw cap',
     formats: ['bottle', 'carton', 'pouch', 'bag_in_box'],
     eolKey: 'pet',
+    materialClass: 'pp',
     materialKey: 'pet',
     efSearchQuery: 'plastic screw cap',
     typicalWeightG: { medianG: 3, minG: 1, maxG: 8 },
@@ -307,6 +337,7 @@ export const CLOSURE_OPTIONS: AccessoryOption[] = [
     label: 'Cork stopper',
     formats: ['bottle'],
     eolKey: 'cork',
+    materialClass: 'cork',
     materialKey: 'cork',
     efSearchQuery: 'cork stopper',
     typicalWeightG: { medianG: 5, minG: 3, maxG: 10 },
@@ -320,6 +351,7 @@ export const LABEL_OPTIONS: AccessoryOption[] = [
     label: 'Paper label',
     formats: [],
     eolKey: 'paper',
+    materialClass: 'kraft',
     materialKey: 'paper',
     efSearchQuery: 'paper label',
     typicalWeightG: { medianG: 1.5, minG: 0.3, maxG: 6 },
@@ -330,6 +362,7 @@ export const LABEL_OPTIONS: AccessoryOption[] = [
     label: 'Plastic label or sleeve',
     formats: [],
     eolKey: 'pet',
+    materialClass: 'pp',
     materialKey: 'pet',
     efSearchQuery: 'plastic film label',
     typicalWeightG: { medianG: 1, minG: 0.3, maxG: 5 },
@@ -360,6 +393,7 @@ export const MULTIPACK_OPTIONS: AccessoryOption[] = [
     label: 'Cardboard multipack wrap',
     formats: [],
     eolKey: 'paper',
+    materialClass: 'paperboard',
     materialKey: 'paperboard',
     efSearchQuery: 'folding carton',
     typicalWeightG: { medianG: 40, minG: 15, maxG: 150 },
@@ -373,6 +407,7 @@ export const MULTIPACK_OPTIONS: AccessoryOption[] = [
     label: 'Cardboard case or box (flat)',
     formats: [],
     eolKey: 'paper',
+    materialClass: 'paperboard',
     materialKey: 'paperboard',
     efSearchQuery: 'carton board box',
     typicalWeightG: { medianG: 250, minG: 50, maxG: 1000 },
@@ -383,6 +418,7 @@ export const MULTIPACK_OPTIONS: AccessoryOption[] = [
     label: 'Corrugated shipping box',
     formats: [],
     eolKey: 'paper',
+    materialClass: 'corrugated',
     materialKey: 'paperboard',
     efSearchQuery: 'corrugated board box',
     typicalWeightG: { medianG: 300, minG: 80, maxG: 1500 },
@@ -393,6 +429,7 @@ export const MULTIPACK_OPTIONS: AccessoryOption[] = [
     label: 'Plastic shrink wrap',
     formats: [],
     eolKey: 'pet',
+    materialClass: 'ldpe_film',
     materialKey: 'pet',
     efSearchQuery: 'shrink wrap',
     typicalWeightG: { medianG: 20, minG: 5, maxG: 80 },

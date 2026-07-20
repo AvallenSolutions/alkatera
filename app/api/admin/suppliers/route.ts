@@ -10,6 +10,13 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
+// Next.js patches global fetch and, on this route pattern (no next/headers
+// call to auto-trigger dynamic mode), would otherwise cache these outbound
+// Supabase requests across invocations — a GET with an identical URL every
+// time would keep returning the first response it ever saw. no-store on
+// every call is what makes this route actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' });
+
 /**
  * POST /api/admin/suppliers
  *
@@ -31,6 +38,7 @@ export async function POST(request: NextRequest) {
     const token = authHeader.replace('Bearer ', '');
     const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { persistSession: false },
+      global: { fetch: noStoreFetch },
     });
 
     // Verify the caller is authenticated
@@ -43,7 +51,7 @@ export async function POST(request: NextRequest) {
     // so the admin check must be explicit. Use a token-scoped client so the
     // is_alkatera_admin() RPC resolves auth.uid().
     const userScoped = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
+      global: { headers: { Authorization: `Bearer ${token}` }, fetch: noStoreFetch },
       auth: { persistSession: false },
     });
     const { data: isAdmin } = await userScoped.rpc('is_alkatera_admin');

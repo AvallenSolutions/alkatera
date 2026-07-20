@@ -444,7 +444,7 @@ describe('Product LCA Aggregator', () => {
       expect(Math.abs(eol)).toBeLessThan(0.1);
     });
 
-    it('EoL with high recycling produces net negative (avoided burden credit)', async () => {
+    it('EoL with high recycling produces net negative ONLY under explicit avoided-burden opt-in', async () => {
       setupFromMock([ALU_CAN]);
       const { aggregateProductImpacts } = await import('../product-lca-aggregator');
       const result = await aggregateProductImpacts(
@@ -453,12 +453,30 @@ describe('Product LCA Aggregator', () => {
         [],
         'cradle-to-grave',
         USE_PHASE_CONFIG,
-        EOL_CONFIG,
+        // Avoided-burden is no longer the default (cut-off is); it remains
+        // selectable for legacy rows via an explicit allocationMethod.
+        { ...EOL_CONFIG, allocationMethod: 'avoided-burden' } as any,
       );
 
       const eol = result.impacts.breakdown.by_lifecycle_stage.end_of_life;
       // Aluminium with 75% recycling → net negative credit
       expect(eol).toBeLessThan(0);
+    });
+
+    it('EoL defaults to cut-off: no recycling credit, non-negative stage', async () => {
+      setupFromMock([ALU_CAN]);
+      const { aggregateProductImpacts } = await import('../product-lca-aggregator');
+      const result = await aggregateProductImpacts(
+        mockSupabaseClient as any,
+        'pcf-001',
+        [],
+        'cradle-to-grave',
+        USE_PHASE_CONFIG,
+        EOL_CONFIG, // no allocationMethod → cut-off default
+      );
+
+      const eol = result.impacts.breakdown.by_lifecycle_stage.end_of_life;
+      expect(eol).toBeGreaterThanOrEqual(0);
     });
 
     it('[Maturation] rows are excluded from EoL even though they are synthetic', async () => {
@@ -750,7 +768,9 @@ describe('Product LCA Aggregator', () => {
         [],
         'cradle-to-grave',
         USE_PHASE_CONFIG,
-        EOL_CONFIG, // no allocationMethod → defaults to avoided-burden
+        // The double-credit only arises under an explicit avoided-burden
+        // opt-in now that cut-off is the default.
+        { ...EOL_CONFIG, allocationMethod: 'avoided-burden' } as any,
       );
 
       const w = result.warnings?.find((x: string) => x.includes('count the same benefit twice'));

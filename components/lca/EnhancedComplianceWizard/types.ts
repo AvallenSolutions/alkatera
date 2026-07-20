@@ -27,10 +27,14 @@ export type MaterialValidationStatus = 'resolved' | 'assigned' | 'missing' | 'va
  * The DB constraint `data_source_integrity` guarantees:
  *   (data_source = 'openlca'  AND data_source_id IS NOT NULL)
  * | (data_source = 'supplier' AND supplier_product_id IS NOT NULL)
+ * | (data_source = 'parametric' AND packaging_material_class IS NOT NULL)
  * | (data_source IS NULL)
  */
 export function materialHasAssignedFactor(mat: ProductMaterial): boolean {
   if (mat.data_source === 'supplier' && mat.supplier_product_id) return true;
+  // Parametric packaging: the material class IS the factor assignment — the
+  // calculator derives the number from the endpoint library, no id to pick.
+  if ((mat as any).packaging_material_class) return true;
   if (mat.data_source && mat.data_source_id) return true;
   return false;
 }

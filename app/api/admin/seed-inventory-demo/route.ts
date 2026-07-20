@@ -23,6 +23,13 @@ const SeedBodySchema = z.object({
  * Idempotent — re-running it only inserts missing rows.
  */
 
+// Next.js patches global fetch and, on this route pattern (no next/headers
+// call to auto-trigger dynamic mode), would otherwise cache these outbound
+// Supabase requests across invocations — a GET with an identical URL every
+// time would keep returning the first response it ever saw. no-store on
+// every call is what makes this route actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' })
+
 async function assertAdmin(
   request: NextRequest,
 ): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
@@ -31,7 +38,7 @@ async function assertAdmin(
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   const userClient = createClient(url, anon, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
+    global: { headers: { Authorization: `Bearer ${token}` }, fetch: noStoreFetch },
   })
   const { data: userData } = await userClient.auth.getUser()
   if (!userData?.user) return { ok: false, status: 401, error: 'Unauthorised' }
@@ -43,7 +50,7 @@ async function assertAdmin(
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY)!
-  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: noStoreFetch } })
 }
 
 async function ensureXeroConnection(svc: SupabaseClient, orgId: string) {

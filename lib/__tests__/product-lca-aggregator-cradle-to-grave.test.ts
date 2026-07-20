@@ -273,8 +273,11 @@ describe('Cradle-to-Grave LCA Aggregator', () => {
     // Use phase should be positive (refrigeration for 7 days)
     expect(stages!.use_phase).toBeGreaterThan(0);
 
-    // End-of-life with aluminium recycling credit should be negative (net avoided burden)
-    expect(stages!.end_of_life).toBeLessThan(0);
+    // End-of-life defaults to CUT-OFF allocation (no recycling credit): the
+    // recycled-content benefit is claimed once, on the input side, so EoL is
+    // gross disposal emissions only and must be non-negative. Avoided-burden
+    // is now an explicit opt-in via eolConfig.allocationMethod.
+    expect(stages!.end_of_life).toBeGreaterThan(0);
 
     // Total is reported separately and doesn't need to exactly equal stage sum
     // because transport is added to stage buckets but totalClimate counts only

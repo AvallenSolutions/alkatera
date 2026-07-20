@@ -16,6 +16,7 @@ import {
   boundaryNeedsEndOfLife,
   boundaryToDbEnum,
   boundaryFromDbEnum,
+  normaliseBoundary,
   calculateLossMultiplier,
   getDefaultConsumerWaste,
   getDefaultLossConfig,
@@ -342,6 +343,52 @@ describe('boundaryFromDbEnum', () => {
     ];
     for (const b of boundaries) {
       expect(boundaryFromDbEnum(boundaryToDbEnum(b))).toBe(b);
+    }
+  });
+});
+
+describe('normaliseBoundary', () => {
+  it('passes canonical values through untouched', () => {
+    expect(normaliseBoundary('cradle-to-gate')).toBe('cradle-to-gate');
+    expect(normaliseBoundary('cradle-to-shelf')).toBe('cradle-to-shelf');
+    expect(normaliseBoundary('cradle-to-consumer')).toBe('cradle-to-consumer');
+    expect(normaliseBoundary('cradle-to-grave')).toBe('cradle-to-grave');
+  });
+
+  it('converts the underscored DB enum form', () => {
+    expect(normaliseBoundary('cradle_to_gate')).toBe('cradle-to-gate');
+    expect(normaliseBoundary('cradle_to_grave')).toBe('cradle-to-grave');
+  });
+
+  it('lowercases capitalised values', () => {
+    expect(normaliseBoundary('Cradle-to-Grave')).toBe('cradle-to-grave');
+    expect(normaliseBoundary('CRADLE_TO_SHELF')).toBe('cradle-to-shelf');
+  });
+
+  it('trims surrounding whitespace', () => {
+    expect(normaliseBoundary('  cradle-to-grave  ')).toBe('cradle-to-grave');
+  });
+
+  it('falls back to the default for empty, null and undefined', () => {
+    expect(normaliseBoundary('')).toBe('cradle-to-gate');
+    expect(normaliseBoundary(null)).toBe('cradle-to-gate');
+    expect(normaliseBoundary(undefined)).toBe('cradle-to-gate');
+  });
+
+  it('falls back rather than propagating an unrecognised value', () => {
+    // A value no predicate can match would silently disable the wider
+    // lifecycle stages, so it must never survive normalisation.
+    expect(normaliseBoundary('gate-to-gate')).toBe('cradle-to-gate');
+    expect(normaliseBoundary('nonsense')).toBe('cradle-to-gate');
+  });
+
+  it('honours an explicit fallback', () => {
+    expect(normaliseBoundary('nonsense', 'cradle-to-grave')).toBe('cradle-to-grave');
+  });
+
+  it('normalises whatever boundaryToDbEnum produces, for every boundary', () => {
+    for (const b of SYSTEM_BOUNDARIES) {
+      expect(normaliseBoundary(boundaryToDbEnum(b.value))).toBe(b.value);
     }
   });
 });

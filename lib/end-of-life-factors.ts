@@ -333,6 +333,12 @@ const MATERIAL_TYPE_MAP: Record<string, string> = {
   paperboard: 'paper',
   plastic_laminate: 'pet',
   bib_composite: 'paper',
+  // Parametric material classes (lib/constants/packaging-material-classes.ts)
+  pp: 'hdpe',
+  ldpe_film: 'hdpe',
+  kraft: 'paper',
+  corrugated: 'paper',
+  liquid_carton: 'paper',
   // Steel
   steel_can: 'steel',
   steel: 'steel',

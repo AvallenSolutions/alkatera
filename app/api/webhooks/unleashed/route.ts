@@ -3,6 +3,13 @@ import { createClient } from '@supabase/supabase-js'
 import { decryptConfig } from '@/lib/crypto/config-encryption'
 import { verifyUnleashedWebhook, type UnleashedWebhookPayload } from '@/lib/integrations/unleashed/webhooks'
 
+// Next.js patches global fetch and, on this route pattern (no next/headers
+// call to auto-trigger dynamic mode), would otherwise cache these outbound
+// Supabase requests across invocations — a GET with an identical URL every
+// time would keep returning the first response it ever saw. no-store on
+// every call is what makes this route actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' })
+
 // POST /api/webhooks/unleashed?organizationId=…
 //
 // Unleashed posts events here. We verify the HMAC signature against the
@@ -26,6 +33,7 @@ export async function POST(request: NextRequest) {
   const serviceClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { global: { fetch: noStoreFetch } },
   )
 
   const { data: conn } = await serviceClient

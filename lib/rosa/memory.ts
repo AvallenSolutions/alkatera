@@ -58,18 +58,50 @@ export async function saveMemory(
   const v = (value ?? '').trim().slice(0, MAX_VALUE_LEN);
   if (!k || !v) return { ok: false, error: 'key and value are required' };
 
-  const row = {
-    organization_id: organizationId,
-    user_id: scope === 'user' ? userId : null,
-    scope,
-    key: k,
-    value: v,
-    updated_at: new Date().toISOString(),
-  };
+  // Deliberately NOT an upsert. rosa_memory's uniqueness is an expression
+  // index, unique(organization_id, COALESCE(user_id, '000…'), scope, key), and
+  // Postgres cannot match an expression index in ON CONFLICT. The previous
+  // `.upsert(row, { onConflict: 'organization_id,user_id,scope,key' })` failed
+  // every time with "no unique or exclusion constraint matching the ON CONFLICT
+  // specification", for both scopes. That is the path Rosa's own save_memory
+  // tool uses, so nothing she chose to remember was ever stored.
+  //
+  // app/api/rosa/memory/route.ts had a working hand-rolled version; this is it,
+  // moved here so there is one implementation rather than a correct copy and a
+  // broken one.
+  const matchUserId = scope === 'user' ? userId : null;
+
+  let lookup = supabase
+    .from('rosa_memory')
+    .select('id')
+    .eq('organization_id', organizationId)
+    .eq('scope', scope)
+    .eq('key', k);
+  lookup = matchUserId === null ? lookup.is('user_id', null) : lookup.eq('user_id', matchUserId);
+
+  const { data: existing, error: selectErr } = await lookup.maybeSingle();
+  if (selectErr) return { ok: false, error: selectErr.message };
+
+  if (existing) {
+    const { data, error } = await supabase
+      .from('rosa_memory')
+      .update({ value: v, updated_at: new Date().toISOString() })
+      .eq('id', (existing as any).id)
+      .select('id')
+      .single();
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, id: (data as any).id };
+  }
 
   const { data, error } = await supabase
     .from('rosa_memory')
-    .upsert(row, { onConflict: 'organization_id,user_id,scope,key' })
+    .insert({
+      organization_id: organizationId,
+      user_id: matchUserId,
+      scope,
+      key: k,
+      value: v,
+    })
     .select('id')
     .single();
   if (error) return { ok: false, error: error.message };

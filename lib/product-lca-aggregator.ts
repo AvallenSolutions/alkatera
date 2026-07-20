@@ -22,6 +22,7 @@ import {
   assessMaterialDataQuality,
   assessAggregateDataQuality,
   propagateUncertainty,
+  runMonteCarloSimulation,
   type MaterialDataQuality,
 } from './data-quality-assessment';
 import { generateInterpretation } from './lca-interpretation';
@@ -206,7 +207,7 @@ export async function aggregateProductImpacts(
   // 3. Get the product_id and boundary from the PCF
   const { data: lcaData } = await supabase
     .from('product_carbon_footprints')
-    .select('product_id, organization_id, system_boundary')
+    .select('product_id, organization_id, system_boundary, reference_year')
     .eq('id', productCarbonFootprintId)
     .single();
 
@@ -640,6 +641,7 @@ export async function aggregateProductImpacts(
     recyclingPct: number; landfillPct: number; incinerationPct: number;
     compostingPct: number; adPct: number;
     grossEmissions: number; avoidedEmissions: number; netEmissions: number;
+    allocationMethod: string;
   }> = [];
 
   if (isStageIncluded(effectiveBoundary, 'end_of_life')) {
@@ -651,7 +653,15 @@ export async function aggregateProductImpacts(
     // a defensible reason), but we flag it plainly. Collected per material,
     // warned once after the loop.
     const doubleCreditMaterials: Array<{ name: string; recycledPct: number }> = [];
-    const eolAllocationMethod = eolConfig?.allocationMethod ?? 'avoided-burden';
+    // Cut-off is the default allocation (GHG Protocol / PAS 2050 recycled-
+    // content convention): the recycling benefit is claimed once, on the
+    // input side, by whoever uses recycled material. Avoided-burden remains
+    // an explicit opt-in for legacy (non-parametric) rows only — parametric
+    // rows already carry their recycled benefit in the endpoint interpolation,
+    // so crediting them again at EoL would double-count and could net a
+    // bottle carbon-negative.
+    const requestedEolAllocation = eolConfig?.allocationMethod ?? 'cut-off';
+    let warnedParametricAvoidedBurden = false;
 
     for (const material of materials as Material[]) {
       const materialType = (material.material_type || '').toLowerCase();
@@ -785,8 +795,25 @@ export async function aggregateProductImpacts(
         };
       }
 
+      // Parametric rows (pinned endpoint) are FORCED to cut-off; an
+      // avoided-burden request is acknowledged with a warning, not honoured.
+      const rowIsParametric = Boolean((material as any).packaging_endpoint_id);
+      const rowAllocationMethod = rowIsParametric ? 'cut-off' : requestedEolAllocation;
+      if (
+        rowIsParametric &&
+        eolConfig?.allocationMethod === 'avoided-burden' &&
+        !warnedParametricAvoidedBurden
+      ) {
+        warnedParametricAvoidedBurden = true;
+        calculationWarnings.push(
+          'The avoided-burden end-of-life credit was not applied to packaging modelled with the parametric ' +
+          'factor library: its recycling benefit is already counted in the recycled-content input, and crediting ' +
+          'it again at end-of-life would count the same benefit twice.'
+        );
+      }
+
       const eolResult = calculateMaterialEoL(quantity, factorKey, eolRegion, pathwayOverrides, {
-        allocationMethod: eolConfig?.allocationMethod,
+        allocationMethod: rowAllocationMethod,
         transportKm: eolConfig?.transportKm,
       });
 
@@ -839,6 +866,7 @@ export async function aggregateProductImpacts(
         grossEmissions: eolResult.gross,
         avoidedEmissions: eolResult.avoided,
         netEmissions: eolResult.net,
+        allocationMethod: rowAllocationMethod,
       });
 
       console.log(`[aggregateProductImpacts] EoL ${material.material_name} (${factorKey}): net=${eolResult.net.toFixed(6)}, avoided=${eolResult.avoided.toFixed(6)}, gross=${eolResult.gross.toFixed(6)}`);
@@ -847,7 +875,7 @@ export async function aggregateProductImpacts(
       // an actual avoided-burden credit at EoL (avoided < 0 means a credit
       // was applied) for the same material.
       const materialRecycledPct = Number((material as any).recycled_content_percentage || 0);
-      if (materialRecycledPct > 0 && eolAllocationMethod === 'avoided-burden' && eolResult.avoided < 0) {
+      if (!rowIsParametric && materialRecycledPct > 0 && rowAllocationMethod === 'avoided-burden' && eolResult.avoided < 0) {
         doubleCreditMaterials.push({
           name: material.material_name || 'Packaging',
           recycledPct: materialRecycledPct,
@@ -1102,6 +1130,7 @@ export async function aggregateProductImpacts(
 
   const aggregateQuality = assessAggregateDataQuality(materialAssessments);
   const propagatedUncertaintyPct = propagateUncertainty(materialAssessments, totalCarbonFootprint);
+  const monteCarlo = runMonteCarloSimulation(materialAssessments);
 
   // 95% confidence interval for total footprint (lognormal distribution)
   const uncertaintyFraction = propagatedUncertaintyPct / 100;
@@ -1337,7 +1366,16 @@ export async function aggregateProductImpacts(
     eol_methodology: eolMaterialBreakdown.length > 0 ? {
       region: eolConfig?.region || 'eu',
       region_label: REGION_LABELS[eolConfig?.region || 'eu'] || 'European Union',
-      avoided_burden_method: 'Ecoinvent 3.12 recycling credits (avoided burden)',
+      // Per-row allocation: cut-off is the default (and forced for parametric
+      // packaging); avoided-burden appears only when a legacy row opted in.
+      allocation_method: eolMaterialBreakdown.every(m => m.allocationMethod === 'cut-off')
+        ? 'cut-off'
+        : eolMaterialBreakdown.every(m => m.allocationMethod === 'avoided-burden')
+          ? 'avoided-burden'
+          : 'mixed',
+      avoided_burden_method: eolMaterialBreakdown.some(m => m.allocationMethod === 'avoided-burden')
+        ? 'Ecoinvent 3.12 recycling credits (avoided burden)'
+        : 'Cut-off (no end-of-life recycling credit; recycled-content benefit counted on the input side)',
       data_source: 'DEFRA 2024, Ecoinvent 3.12, EU Packaging Directive, EPA 2024',
       data_year: EOL_DATA_YEAR,
       total_gross_emissions: eolMaterialBreakdown.reduce((s, m) => s + m.grossEmissions, 0),
@@ -1372,6 +1410,20 @@ export async function aggregateProductImpacts(
         parameters: sensitivityResults,
         conclusion: sensitivityConclusion,
       },
+      monte_carlo: monteCarlo
+        ? {
+            iterations: monteCarlo.iterations,
+            seed: monteCarlo.seed,
+            mean: monteCarlo.mean,
+            median: monteCarlo.median,
+            p2_5: monteCarlo.p2_5,
+            p97_5: monteCarlo.p97_5,
+            std_dev: monteCarlo.stdDev,
+            coefficient_of_variation_pct: monteCarlo.coefficientOfVariationPct,
+            relative_95_interval_pct: monteCarlo.relative95IntervalPct,
+            assumptions: monteCarlo.assumptions,
+          }
+        : null,
     },
 
     // MAJOR 1: LULUC CO₂e justification note (ISO 14067 §6.4.9.4)
@@ -1534,7 +1586,43 @@ export async function aggregateProductImpacts(
 
   console.log(`[aggregateProductImpacts] RESULT: ${totalCarbonFootprint.toFixed(4)} kg CO2e per ${productData?.functional_unit || 'unit'}`);
 
-  // 12. Update the PCF record
+  // 12. Supersede the previous active PCF, THEN mark this one completed.
+  // Supersede runs FIRST: the partial unique index
+  // uniq_active_pcf_per_product_year allows only one completed PCF per
+  // (product_id, reference_year), so completing before superseding would
+  // violate it whenever a previous active record exists. Scoped to THIS
+  // reference year — the old product-only filter superseded every other
+  // year's active PCF too, silently erasing multi-year history.
+  // Old records become 'superseded' — the migration that dropped the redundant
+  // valid_status CHECK made the value usable. The previous workaround demoted
+  // them to 'draft', which the wizard's resume query then picked up as the
+  // most recent in-progress draft (supersede bumps updated_at), presenting a
+  // historical record as "resume where you left off" and eventually promoting
+  // it back to completed. Version history became a shell game.
+  if (lcaData?.product_id) {
+    let supersedeQuery = supabase
+      .from('product_carbon_footprints')
+      .update({ status: 'superseded', updated_at: new Date().toISOString() })
+      .eq('product_id', lcaData.product_id)
+      .eq('status', 'completed')
+      .neq('id', productCarbonFootprintId);
+    if (lcaData.reference_year != null) {
+      supersedeQuery = supersedeQuery.eq('reference_year', lcaData.reference_year);
+    }
+    const { error: supersedeError } = await supersedeQuery;
+
+    if (supersedeError) {
+      // Not fatal on its own, but the completion below may now hit the
+      // unique index; the completion error path reports that clearly.
+      console.warn('[aggregateProductImpacts] Failed to supersede old PCFs:', supersedeError);
+    } else {
+      console.log(
+        `[aggregateProductImpacts] Superseded old completed PCFs for product ${lcaData.product_id}` +
+        (lcaData.reference_year != null ? ` (reference year ${lcaData.reference_year})` : ''),
+      );
+    }
+  }
+
   // Note: aggregated_impacts.climate_change_gwp100 is the single source of truth for carbon footprint
   // total_ghg_emissions column is deprecated and will be removed in a future migration
   const { error: updateError } = await supabase
@@ -1556,32 +1644,6 @@ export async function aggregateProductImpacts(
   if (updateError) {
     console.error('[aggregateProductImpacts] Failed to update LCA:', updateError);
     return { success: false, total_carbon_footprint: 0, impacts: {}, materials_count: 0, production_sites_count: 0, error: `Failed to update LCA: ${updateError.message}` };
-  }
-
-  // 12b. Supersede old completed PCFs for the same product.
-  // Each calculation creates a new PCF record. Without this cleanup, multiple
-  // completed records exist and pages relying on ORDER BY can pick different ones,
-  // causing discrepancies (e.g. product page shows 1.95 while passport shows 1.43).
-  // Old records become 'superseded' — the migration that dropped the redundant
-  // valid_status CHECK made the value usable. The previous workaround demoted
-  // them to 'draft', which the wizard's resume query then picked up as the
-  // most recent in-progress draft (supersede bumps updated_at), presenting a
-  // historical record as "resume where you left off" and eventually promoting
-  // it back to completed. Version history became a shell game.
-  if (lcaData?.product_id) {
-    const { error: supersedeError } = await supabase
-      .from('product_carbon_footprints')
-      .update({ status: 'superseded', updated_at: new Date().toISOString() })
-      .eq('product_id', lcaData.product_id)
-      .eq('status', 'completed')
-      .neq('id', productCarbonFootprintId);
-
-    if (supersedeError) {
-      // Non-fatal — the new PCF is still correctly completed
-      console.warn('[aggregateProductImpacts] Failed to supersede old PCFs:', supersedeError);
-    } else {
-      console.log(`[aggregateProductImpacts] Superseded old completed PCFs for product ${lcaData.product_id}`);
-    }
   }
 
   // 13. Update the product with latest LCA reference

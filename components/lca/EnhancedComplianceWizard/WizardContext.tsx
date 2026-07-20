@@ -25,7 +25,7 @@ import type {
   MaterialWithValidation,
 } from './types';
 import { INITIAL_PRE_CALC_STATE, materialHasAssignedFactor } from './types';
-import { boundaryNeedsUsePhase, boundaryNeedsEndOfLife, boundaryNeedsDistribution, boundaryToDbEnum, DEFAULT_PRODUCT_LOSS_CONFIG } from '@/lib/system-boundaries';
+import { boundaryNeedsUsePhase, boundaryNeedsEndOfLife, boundaryNeedsDistribution, boundaryToDbEnum, normaliseBoundary, DEFAULT_PRODUCT_LOSS_CONFIG } from '@/lib/system-boundaries';
 import type { ProductLossConfig } from '@/lib/system-boundaries';
 import type { UsePhaseConfig } from '@/lib/use-phase-factors';
 import type { EoLConfig } from '@/lib/end-of-life-factors';
@@ -240,6 +240,10 @@ export function buildInitialFormData(
   return {
     ...INITIAL_FORM_DATA,
     ...source,
+    // The blob is written from formData (canonical form), but older rows and
+    // the demo seed have carried the underscored DB enum. An unmatched value
+    // hides the distribution / use-phase / end-of-life steps entirely.
+    systemBoundary: normaliseBoundary(source.systemBoundary),
   } as WizardFormData;
 }
 
@@ -851,7 +855,7 @@ export function WizardProvider({
           isComparativeAssertion: pcf.is_comparative_assertion || false,
           functionalUnit:
             pcf.functional_unit || '',
-          systemBoundary: (pcf.system_boundary || 'cradle-to-gate').toLowerCase(),
+          systemBoundary: normaliseBoundary(pcf.system_boundary),
           cutoffCriteria:
             pcf.cutoff_criteria || STANDARD_ISO_TEXT.cutoffCriteria,
           assumptions: (pcf.assumptions_limitations || [])
@@ -1282,8 +1286,6 @@ export function WizardProvider({
       // is completed and the boundary changed, demote it to draft — the
       // stored numbers can no longer be presented under the new label, and
       // recalculating restores completed status.
-      const normaliseBoundary = (b: string | null | undefined) =>
-        (b || '').toLowerCase().replace(/_/g, '-');
       const { data: currentPcfRow } = await supabase
         .from('product_carbon_footprints')
         .select('status, system_boundary')

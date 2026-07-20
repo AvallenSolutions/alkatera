@@ -39,6 +39,14 @@ export const maxDuration = 300;
 
 const MAX_ROWS = 5000;
 
+// Next.js patches global fetch and, on this route pattern (the token auth
+// path never touches next/headers, so nothing auto-triggers dynamic mode),
+// would otherwise cache these outbound Supabase requests across invocations
+// — the "existing brands/products" reads would keep returning the first
+// response they ever saw and break idempotency. no-store on every call is
+// what makes this route actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' });
+
 // Rows are keyed directly by directory field names; unknown keys are
 // ignored downstream by the processors, so each row is a permissive
 // record. Values get coerced to strings via stringifyValues().
@@ -141,6 +149,7 @@ async function resolveServiceClient(request: Request): Promise<SupabaseClient | 
   if (!supabaseUrl || !serviceKey) return null;
   const service = createClient(supabaseUrl, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
+    global: { fetch: noStoreFetch },
   });
 
   // Token path (unattended automation).

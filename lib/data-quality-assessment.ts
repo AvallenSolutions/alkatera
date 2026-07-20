@@ -546,6 +546,140 @@ export function propagateUncertainty(
   return Math.round(Math.sqrt(sumVariance) * 100);
 }
 
+
+// ============================================================================
+// MONTE CARLO UNCERTAINTY SIMULATION (ISO 14044 §4.5.3)
+// ============================================================================
+
+export interface MonteCarloResult {
+  iterations: number;
+  seed: number;
+  mean: number;
+  median: number;
+  p2_5: number;
+  p97_5: number;
+  stdDev: number;
+  coefficientOfVariationPct: number;
+  /** Half-width of the 95% interval about the median, as a percentage. */
+  relative95IntervalPct: number;
+  assumptions: string[];
+}
+
+/** Deterministic PRNG (mulberry32) so identical inputs always yield the same interval. */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Standard normal draw via Box-Muller from a supplied uniform generator. */
+function standardNormal(rng: () => number): number {
+  let u1 = 0;
+  while (u1 === 0) u1 = rng(); // avoid log(0)
+  const u2 = rng();
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+}
+
+/** Stable FNV-1a hash of a string into a uint32 seed. */
+function hashSeed(input: string): number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+/**
+ * Monte Carlo propagation of emission-factor uncertainty for the total footprint.
+ *
+ * Each material's impact is sampled independently from a lognormal distribution
+ * whose median is the point-estimate impact and whose log-space sigma is the
+ * pedigree-derived geometric standard deviation (sigma_g = uncertainty.totalUncertainty).
+ * This is consistent with the per-material 95% CI multipliers exp(+/-1.96 * sigma_g)
+ * defined in calculateUncertainty().
+ *
+ * v1 limitations (surfaced in the report):
+ *  - Emission factors are treated as UNCORRELATED across materials. Where several
+ *    inputs draw on the same upstream process this understates the tail.
+ *  - Only emission-factor uncertainty is sampled; activity-data (mass/volume)
+ *    uncertainty is not yet included.
+ *
+ * The seed defaults to a stable hash of the material set, so identical inputs
+ * always reproduce the same interval (audit trail). Pass an explicit seed to override.
+ */
+export function runMonteCarloSimulation(
+  materials: MaterialDataQuality[],
+  options: { iterations?: number; seed?: number } = {}
+): MonteCarloResult | null {
+  const iterations = options.iterations ?? 10000;
+  const active = materials.filter(
+    (m) => Number.isFinite(m.impactValue) && m.impactValue > 0
+  );
+  if (active.length === 0) return null;
+
+  const seed =
+    options.seed ??
+    hashSeed(
+      active
+        .map((m) => `${m.materialName}:${m.impactValue}:${m.uncertainty.totalUncertainty}`)
+        .join('|')
+    );
+  const rng = mulberry32(seed);
+
+  const totals = new Float64Array(iterations);
+  for (let i = 0; i < iterations; i++) {
+    let sum = 0;
+    for (const m of active) {
+      const sigmaLog = Math.max(0, m.uncertainty.totalUncertainty);
+      const z = standardNormal(rng);
+      sum += m.impactValue * Math.exp(sigmaLog * z);
+    }
+    totals[i] = sum;
+  }
+
+  const sorted = Array.from(totals).sort((a, b) => a - b);
+  const mean = sorted.reduce((s, v) => s + v, 0) / iterations;
+  const variance =
+    sorted.reduce((s, v) => s + (v - mean) * (v - mean), 0) / iterations;
+  const stdDev = Math.sqrt(variance);
+  const percentile = (p: number): number => {
+    const idx = Math.min(
+      sorted.length - 1,
+      Math.max(0, Math.round((p / 100) * (sorted.length - 1)))
+    );
+    return sorted[idx];
+  };
+  const median = percentile(50);
+  const p2_5 = percentile(2.5);
+  const p97_5 = percentile(97.5);
+  const round4 = (x: number) => Math.round(x * 10000) / 10000;
+
+  return {
+    iterations,
+    seed,
+    mean: round4(mean),
+    median: round4(median),
+    p2_5: round4(p2_5),
+    p97_5: round4(p97_5),
+    stdDev: round4(stdDev),
+    coefficientOfVariationPct: mean > 0 ? Math.round((stdDev / mean) * 100) : 0,
+    relative95IntervalPct:
+      median > 0 ? Math.round(((p97_5 - p2_5) / 2 / median) * 100) : 0,
+    assumptions: [
+      'Each material emission factor is sampled independently from a lognormal distribution.',
+      'Median is the point-estimate impact; log-space sigma is the pedigree-derived geometric standard deviation.',
+      'Emission factors are assumed uncorrelated across materials; shared upstream processes are not modelled, which may understate the tail.',
+      'Only emission-factor uncertainty is sampled; activity-data uncertainty is not yet included.',
+    ],
+  };
+}
+
 /**
  * Aggregate data quality assessment for entire PCF
  */

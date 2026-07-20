@@ -151,6 +151,36 @@ export function boundaryFromDbEnum(dbValue: string): SystemBoundary {
   return dbValue.replace(/_/g, '-') as SystemBoundary;
 }
 
+export const DEFAULT_SYSTEM_BOUNDARY: SystemBoundary = 'cradle-to-gate';
+
+/**
+ * Coerce any stored boundary value into the canonical lowercase-hyphenated
+ * form the rest of the platform compares against.
+ *
+ * Every boundary predicate here (`boundaryNeedsUsePhase`, `isStageIncluded`,
+ * the wizard's `getStepIdsForBoundary`, the BoundaryStep radio values) uses
+ * strict equality, so a value in any other shape does not merely fail to
+ * display: it silently degrades a wider study to cradle-to-gate behaviour.
+ *
+ * Three shapes reach us in practice:
+ *   - `cradle_to_grave`  — the products.system_boundary DB enum
+ *   - `Cradle-to-Grave`  — older capitalised rows and imports
+ *   - `cradle-to-grave`  — the canonical form, passed through untouched
+ *
+ * `product_carbon_footprints.system_boundary` is free text, so nothing at the
+ * database level keeps those apart. Anything unrecognised falls back to the
+ * default rather than propagating a value no predicate will ever match.
+ */
+export function normaliseBoundary(
+  value: string | null | undefined,
+  fallback: SystemBoundary = DEFAULT_SYSTEM_BOUNDARY,
+): SystemBoundary {
+  const canonical = (value || '').trim().toLowerCase().replace(/_/g, '-');
+  return SYSTEM_BOUNDARIES.some(b => b.value === canonical)
+    ? (canonical as SystemBoundary)
+    : fallback;
+}
+
 /**
  * Product loss rates at downstream lifecycle stages.
  * Applied as an upstream emission multiplier: lost units' burden
