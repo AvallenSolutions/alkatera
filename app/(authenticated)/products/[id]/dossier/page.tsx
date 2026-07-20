@@ -44,8 +44,11 @@ interface ActiveRun {
 
 interface GateResult {
   allowed: boolean;
+  reason?: 'provenance' | 'tier';
+  message?: string;
   confirmedPct: number;
   threshold: number;
+  requiredTier?: string;
 }
 
 export default function DossierPage() {
@@ -201,7 +204,9 @@ export default function DossierPage() {
         </span>
       </div>
 
-      {/* The one saturated block on this surface: what it would take to publish. */}
+      {/* What it would take to share this. A refusal always says which of the
+          two reasons it is: work to do, or a plan to change. They are very
+          different conversations and merging them wastes the reader's time. */}
       {gate && (
         <div className="mt-6">
           <Panel>
@@ -213,11 +218,20 @@ export default function DossierPage() {
                 <p className="mt-2 max-w-prose text-sm text-studio-dim">
                   {gate.allowed
                     ? 'Enough of this footprint rests on confirmed data to stand behind it in a report.'
-                    : `Reports and exports need ${gate.threshold}% of a footprint confirmed. This one is at ${gate.confirmedPct}%.`}
+                    : gate.message}
                 </p>
+                {gate.reason === 'tier' && (
+                  <div className="mt-4">
+                    <PillButton variant="room" size="sm" href="/wiring/billing">
+                      See the plans
+                    </PillButton>
+                  </div>
+                )}
               </div>
               <StateChip tone={gate.allowed ? 'good' : 'attention'}>
-                {gate.confirmedPct}% / {gate.threshold}%
+                {gate.reason === 'tier'
+                  ? `${String(gate.requiredTier ?? '').toUpperCase()} PLAN`
+                  : `${gate.confirmedPct}% / ${gate.threshold}%`}
               </StateChip>
             </div>
           </Panel>

@@ -129,7 +129,12 @@ export default function ProductDashboardPage() {
   const latestLca = lcaReports[0];
   const footprint = latestLca?.aggregated_impacts?.climate_change_gwp100;
 
-  const handleCalculate = () => {
+  // The dossier is where a footprint is read and corrected. The wizard still
+  // exists for the rare expert who wants every ISO field, reached through
+  // "Open the full record" on the dossier itself, but it is no longer the
+  // front door: walking ten to fourteen steps should not be the price of
+  // seeing your own number.
+  const handleOpenFootprint = () => {
     if (!isHealthy) {
       toast.error(
         product?.is_multipack
@@ -138,7 +143,7 @@ export default function ProductDashboardPage() {
       );
       return;
     }
-    router.push(`/products/${productId}/compliance-wizard`);
+    router.push(`/products/${productId}/dossier`);
   };
 
   const handleArchive = async () => {
@@ -235,7 +240,10 @@ export default function ProductDashboardPage() {
     );
   }
 
-  const ctaLabel = footprint != null ? "Update LCA" : "Create LCA";
+  // "Open" rather than "Create": with Phase 4 a product with a recipe already
+  // has an estimated footprint, so there is nothing to create, only something
+  // to look at and correct.
+  const ctaLabel = footprint != null ? "Open the footprint" : "Start the footprint";
 
   return (
     <div className="container mx-auto max-w-6xl px-6 py-8">
@@ -304,7 +312,7 @@ export default function ProductDashboardPage() {
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <span data-guide="product-calculate-btn">
-            <PillButton variant="room" onClick={handleCalculate}>
+            <PillButton variant="room" onClick={handleOpenFootprint}>
               {ctaLabel}
             </PillButton>
           </span>

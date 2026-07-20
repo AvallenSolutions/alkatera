@@ -100,7 +100,7 @@ export const lcaRecalcRun = inngest.createFunction(
 
       const { data: run } = await supabase
         .from('lca_calculation_runs')
-        .select('id, product_id, organization_id, requested_by')
+        .select('id, product_id, organization_id, requested_by, trigger')
         .eq('id', runId)
         .maybeSingle();
       if (!run) throw new Error(`Run ${runId} not found`);
@@ -124,11 +124,12 @@ export const lcaRecalcRun = inngest.createFunction(
 
       const { data: pcfs } = await supabase
         .from('product_carbon_footprints')
-        .select('draft_data')
+        .select('id, status, draft_data')
         .eq('product_id', run.product_id)
         .eq('organization_id', run.organization_id)
         .order('updated_at', { ascending: false })
         .limit(5);
+      const pcfsForPromotion = pcfs;
 
       let allocations: any[] = [];
       for (const pcf of (pcfs ?? []) as Array<{ draft_data: any }>) {
@@ -138,12 +139,33 @@ export const lcaRecalcRun = inngest.createFunction(
           break;
         }
       }
-      if (allocations.length === 0) {
+      // A product's very first estimate legitimately has no facility data yet:
+      // nobody has linked a site, and refusing here would leave the cellar
+      // showing a blank where the whole point is to show something honest.
+      // Materials-only is the correct starting picture, and the dossier says so
+      // plainly ("no site is linked yet, so making it counts as zero, that is
+      // almost certainly too low").
+      //
+      // For any other trigger the guard stands: recalculating an established
+      // footprint without the facility data it previously had would silently
+      // shrink the number with nobody able to see why.
+      const firstEstimate = run.trigger === 'first_recipe';
+      if (allocations.length === 0 && !firstEstimate) {
         throw new Error(
           'No facility allocations found. Recalculating without them would understate ' +
             'processing emissions, so this product must be re-run through the LCA first.',
         );
       }
+
+      // Promote an existing estimate or draft in place rather than inserting a
+      // second row beside it. Without this, a product born with an estimated
+      // footprint would end up with two records, and the newer one would lose
+      // the boundary_source='defaulted' marker that makes the boundary ask
+      // fire, so the assumption would quietly become indistinguishable from a
+      // decision somebody made.
+      const promotable = (pcfsForPromotion ?? []).find((p: any) =>
+        ['estimate', 'draft', 'failed'].includes(p.status),
+      );
 
       await patchRun(supabase, runId, {
         status: 'running',
@@ -156,6 +178,7 @@ export const lcaRecalcRun = inngest.createFunction(
         productName: product.name as string,
         unit: (product.unit as string) || 'unit',
         requestedBy: run.requested_by as string | null,
+        draftPcfId: (promotable as any)?.id ?? null,
         settings,
         allocations,
       };
@@ -176,6 +199,7 @@ export const lcaRecalcRun = inngest.createFunction(
         eolConfig: plan.settings.eolConfig,
         distributionConfig: plan.settings.distributionConfig,
         productLossConfig: plan.settings.productLossConfig,
+        draftPcfId: plan.draftPcfId ?? undefined,
         userId: plan.requestedBy ?? undefined,
         context: {
           supabase,

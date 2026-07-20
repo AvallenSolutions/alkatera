@@ -14,10 +14,17 @@ import { createClient } from '@supabase/supabase-js';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import { buildDossier } from '@/lib/lca/dossier';
-import { checkProductProvenanceGate } from '@/lib/provenance/gate';
+import { checkLcaExportGate } from '@/lib/lca/export-gate';
+import { TIER_NAMES, type TierName } from '@/lib/subscription/feature-catalog';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+/** Anything unrecognised (trial, cancelled, null) reads as the lowest tier. */
+function normaliseTier(raw: unknown): TierName {
+  const value = String(raw ?? '').toLowerCase();
+  return (TIER_NAMES as string[]).includes(value) ? (value as TierName) : 'seed';
+}
 
 export async function GET(request: NextRequest) {
   const { client, user, error: authError } = await getSupabaseAPIClient();
@@ -88,9 +95,22 @@ export async function GET(request: NextRequest) {
     facilityCount: facilityCount ?? 0,
   });
 
-  // Whether this could be exported today. The dossier shows the answer up
-  // front rather than letting someone reach the download and be refused.
-  const gate = await checkProductProvenanceGate(client as any, productId);
+  // Whether this could be shared today, and if not which of the two reasons
+  // it is. Shown up front rather than letting someone reach the download and
+  // be refused there.
+  const { data: org } = await client
+    .from('organizations')
+    .select('subscription_tier')
+    .eq('id', organizationId)
+    .maybeSingle();
+  const currentTier = normaliseTier((org as any)?.subscription_tier);
+
+  const gate = await checkLcaExportGate(
+    client as any,
+    productId,
+    (pcf as any)?.system_boundary ?? null,
+    currentTier,
+  );
 
   // Any calculation currently in flight, so the page can say "working on it"
   // instead of showing a stale number with no explanation.

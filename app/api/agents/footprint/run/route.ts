@@ -5,6 +5,7 @@ import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access'
 import { titleAndSummaryForExceptionPayload } from '@/lib/agents/exception-format'
 import { safeCompare } from '@/lib/utils/safe-compare'
 import { sweepAsks } from '@/lib/asks/generate'
+import { sweepFirstFootprints } from '@/lib/lca/first-footprint'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -40,6 +41,8 @@ interface RunSummary {
   asksCreated: number
   /** Open asks whose underlying gap no longer applies, auto-closed this run. */
   asksAutoResolved: number
+  /** Products that had a recipe but no footprint, given an estimated one. */
+  firstFootprintsCreated: number
   errors: string[]
 }
 
@@ -259,19 +262,27 @@ async function sweepOrgSupplierImportJobs(
 async function sweepOrg(
   admin: ReturnType<typeof getSupabaseAdminClient>,
   organizationId: string,
+  baseUrl: string | null = null,
 ): Promise<RunSummary> {
   const errors: string[] = []
   // The ask sweep runs independently of the three job-table sweeps above —
   // it reads live data state (products, materials, activity entries),
   // not a job queue — but shares the same errors array and the same
   // "never fail the whole run over one source" degrade-to-empty contract.
-  const [ingest, productImport, supplierImport, askSweep] = await Promise.all([
+  const [ingest, productImport, supplierImport, askSweep, firstFootprints] = await Promise.all([
     sweepOrgIngestJobs(admin, organizationId, errors),
     sweepOrgProductImportJobs(admin, organizationId, errors),
     sweepOrgSupplierImportJobs(admin, organizationId, errors),
     sweepAsks(admin, organizationId).catch((err: any) => {
       errors.push(`ask sweep: ${err?.message || 'unknown error'}`)
       return { candidatesGenerated: 0, created: 0, autoResolved: 0, errors: [] }
+    }),
+    // Products that arrived through any intake route and have a recipe but no
+    // footprint at all. Catching them here means no intake path has to
+    // remember to ask for one.
+    sweepFirstFootprints(admin, organizationId, baseUrl).catch((err: any) => {
+      errors.push(`first-footprint sweep: ${err?.message || 'unknown error'}`)
+      return { considered: 0, created: 0, dispatched: 0 }
     }),
   ])
   errors.push(...askSweep.errors)
@@ -283,6 +294,7 @@ async function sweepOrg(
     supplierImportJobsSwept: supplierImport.swept,
     asksCreated: askSweep.created,
     asksAutoResolved: askSweep.autoResolved,
+    firstFootprintsCreated: firstFootprints.created,
     errors,
   }
 }
@@ -303,7 +315,7 @@ export async function PUT(request: NextRequest) {
   if (denied) return denied
 
   const admin = getSupabaseAdminClient()
-  const summary = await sweepOrg(admin, organizationId)
+  const summary = await sweepOrg(admin, organizationId, request.nextUrl.origin)
   return NextResponse.json(summary)
 }
 
@@ -330,7 +342,7 @@ export async function POST(request: NextRequest) {
 
   const summaries: RunSummary[] = []
   for (const org of orgs || []) {
-    const s = await sweepOrg(admin, org.id)
+    const s = await sweepOrg(admin, org.id, request.nextUrl.origin)
     summaries.push(s)
   }
 
