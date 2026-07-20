@@ -3,6 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 import { generateRisksAndOpportunities } from '@/lib/claude/transition-risks-assistant';
 import type { ReductionTarget, TransitionMilestone, RiskOpportunity } from '@/lib/transition-plan/types';
 
+// Next.js patches global fetch and, on this route pattern (no next/headers
+// call to auto-trigger dynamic mode), would otherwise cache these outbound
+// Supabase requests across invocations — a GET with an identical URL every
+// time would keep returning the first response it ever saw. no-store on
+// every call is what makes this route actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' });
+
 /**
  * Transition Plan API
  *
@@ -24,7 +31,7 @@ async function getAuthenticatedClient(request: NextRequest) {
   const client = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { global: { headers: { Authorization: `Bearer ${token}` } } },
+    { global: { headers: { Authorization: `Bearer ${token}` }, fetch: noStoreFetch } },
   );
   const { data: { user } } = await client.auth.getUser();
   return { client, user };

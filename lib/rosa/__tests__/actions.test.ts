@@ -162,15 +162,39 @@ describe('executeAction', () => {
 });
 
 describe('action proposer tools', () => {
-  it('exposes the core action tool names', async () => {
+  // This used to pin the exact array, which meant every new action tool broke
+  // the test and told us nothing. It sat red long enough that the list drifted
+  // from 3 names to 13. Assert the invariants that actually matter instead, so
+  // the test survives new tools but still catches a broken one.
+
+  it('follow the propose_* naming convention', async () => {
     const { ACTION_TOOL_NAMES } = await import('../tools');
-    expect(ACTION_TOOL_NAMES).toEqual(
-      expect.arrayContaining([
-        'propose_log_utility_entry',
-        'propose_set_target',
-        'propose_add_supplier',
-        'propose_support_ticket',
-      ])
-    );
+    expect(ACTION_TOOL_NAMES.length).toBeGreaterThan(0);
+    for (const name of ACTION_TOOL_NAMES) {
+      expect(name).toMatch(/^propose_[a-z0-9_]+$/);
+    }
+  });
+
+  it('have no duplicates', async () => {
+    const { ACTION_TOOL_NAMES } = await import('../tools');
+    expect(new Set(ACTION_TOOL_NAMES).size).toBe(ACTION_TOOL_NAMES.length);
+  });
+
+  it('are every one of them exposed to the model in ROSA_TOOLS', async () => {
+    // A name in ACTION_TOOL_NAMES that has no ToolDefinition is a dead end:
+    // the action layer knows about it but the model can never call it.
+    const { ACTION_TOOL_NAMES, ROSA_TOOLS } = await import('../tools');
+    const defined = new Set(ROSA_TOOLS.map(t => t.name));
+    const missing = ACTION_TOOL_NAMES.filter(n => !defined.has(n));
+    expect(missing).toEqual([]);
+  });
+
+  it('still include the three original proposers', async () => {
+    // Cheap guard against an accidental mass deletion.
+    const { ACTION_TOOL_NAMES } = await import('../tools');
+    expect(ACTION_TOOL_NAMES).toContain('propose_log_utility_entry');
+    expect(ACTION_TOOL_NAMES).toContain('propose_set_target');
+    expect(ACTION_TOOL_NAMES).toContain('propose_add_supplier');
+    expect(ACTION_TOOL_NAMES).toContain('propose_support_ticket');
   });
 });

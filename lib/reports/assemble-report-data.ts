@@ -1,5 +1,12 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { gatherPeopleCulture } from './sections/people-culture';
+import { gatherGovernance } from './sections/governance';
+import { gatherCommunityImpact } from './sections/community-impact';
+import { gatherSupplyChain } from './sections/supply-chain';
+import { gatherFacilities } from './sections/facilities';
+import { EMPTY_GOVERNANCE } from './sections/types';
+import { computeAllSectionCompleteness } from './section-completeness';
 
 /**
  * Shared data assembly for the sustainability report.
@@ -357,6 +364,83 @@ export async function assembleReportData(
     reportData.materialityComplete = hasMaterialityComplete;
   }
 
+  // ---------------------------------------------------------------------------
+  // Social and value-chain sections (people, governance, community, suppliers,
+  // facilities). Fetched ONLY when selected — an unselected section issues no
+  // queries — and concurrently. dataAvailability.hasX is REPORTING ONLY: the
+  // renderer gates on selection and skeletons the gaps, so a failed fetch
+  // degrades to an honest page, never a silently missing one.
+  // ---------------------------------------------------------------------------
+  const wantsPeople = config.sections.includes('people-culture') || config.sections.includes('people');
+  const wantsGovernanceSection = config.sections.includes('governance');
+  const wantsCommunity = config.sections.includes('community-impact') || config.sections.includes('community');
+  const wantsSupplyChain = config.sections.includes('supply-chain');
+  const wantsFacilities = config.sections.includes('facilities');
+
+  const soften = async <T>(label: string, run: () => Promise<T>): Promise<T | undefined> => {
+    try {
+      return await run();
+    } catch (err) {
+      console.error(`[assemble-report-data] ${label} fetch failed (non-fatal):`, err);
+      return undefined;
+    }
+  };
+
+  const [peopleCulture, governance, communityImpact, suppliers, sectionFacilities] = await Promise.all([
+    wantsPeople ? soften('people-culture', () => gatherPeopleCulture(supabase, orgId, year)) : undefined,
+    wantsGovernanceSection ? soften('governance', () => gatherGovernance(supabase, orgId, year)) : undefined,
+    wantsCommunity ? soften('community-impact', () => gatherCommunityImpact(supabase, orgId, year)) : undefined,
+    wantsSupplyChain ? soften('supply-chain', () => gatherSupplyChain(supabase, orgId, year)) : undefined,
+    wantsFacilities ? soften('facilities', () => gatherFacilities(supabase, orgId, year)) : undefined,
+  ]);
+
+  if (peopleCulture) {
+    reportData.peopleCulture = peopleCulture;
+    reportData.dataAvailability.hasPeopleCulture = peopleCulture.dataCompleteness > 0;
+  }
+  if (governance) {
+    reportData.governance = governance;
+    reportData.dataAvailability.hasGovernance =
+      governance.boardMembers.length > 0 || governance.policies.length > 0 || !!governance.missionStatement;
+  }
+  if (communityImpact) {
+    reportData.communityImpact = communityImpact;
+    reportData.dataAvailability.hasCommunityImpact = communityImpact.dataCompleteness > 0;
+  }
+  if (suppliers) {
+    reportData.suppliers = suppliers;
+    reportData.dataAvailability.hasSuppliers = suppliers.length > 0;
+  }
+  if (sectionFacilities) {
+    reportData.facilities = sectionFacilities;
+    reportData.dataAvailability.hasFacilities = sectionFacilities.length > 0;
+  }
+
+  // The Targets page reads governance climate commitments. When governance
+  // itself is not selected, a mission-only query keeps Targets truthful
+  // without paying for the full governance gather.
+  if (!wantsGovernanceSection && config.sections.includes('targets')) {
+    const mission = await soften('governance-mission (targets)', async () => {
+      const { data } = await supabase
+        .from('governance_mission')
+        .select('mission_statement, vision_statement, purpose_statement, is_benefit_corporation, sdg_commitments, climate_commitments')
+        .eq('organization_id', orgId)
+        .maybeSingle();
+      return data;
+    });
+    if (mission) {
+      reportData.governance = {
+        ...EMPTY_GOVERNANCE,
+        missionStatement: mission.mission_statement ?? null,
+        visionStatement: mission.vision_statement ?? null,
+        purposeStatement: mission.purpose_statement ?? null,
+        isBenefitCorp: !!mission.is_benefit_corporation,
+        sdgCommitments: Array.isArray(mission.sdg_commitments) ? mission.sdg_commitments : [],
+        climateCommitments: Array.isArray(mission.climate_commitments) ? mission.climate_commitments : [],
+      };
+    }
+  }
+
   // Transition plan (Roadmap + R&O sections, and the targets narrative)
   const wantsTargets = config.sections.includes('targets');
   if (config.sections.includes('transition-roadmap') || config.sections.includes('risks-and-opportunities') || wantsTargets) {
@@ -448,6 +532,10 @@ export async function assembleReportData(
       console.error('[assemble-report-data] Key findings generation failed (non-fatal):', err);
     }
   }
+
+  // The single completeness oracle, attached so the renderer and the builder
+  // read the same verdicts (lib/reports/section-completeness.ts).
+  reportData.sectionCompleteness = computeAllSectionCompleteness(config.sections, reportData);
 
   return { config, reportData };
 }

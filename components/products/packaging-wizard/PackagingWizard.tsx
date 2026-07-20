@@ -46,6 +46,7 @@ import {
 } from "@/lib/constants/packaging-catalogue";
 import { autoMatchEmissionFactor } from "@/lib/products/ef-auto-match";
 import { makePackagingRow, applyPackagingDefaults } from "@/lib/products/packaging-row-builder";
+import { getMaterialClass } from "@/lib/constants/packaging-material-classes";
 
 const FORMAT_ICONS: Record<string, typeof Package> = {
   bottle: Wine,
@@ -166,6 +167,8 @@ export function PackagingWizard({
       container_material: material.key,
       container_size_ml: sizeMl,
       weight_source: weightTouched ? 'measured' : 'typical',
+      packaging_material_class: material.materialClass,
+      packaging_material_variant: material.defaultVariant ?? null,
     }), material.defaults));
 
     if (closure) {
@@ -179,6 +182,7 @@ export function PackagingWizard({
         container_format: format.key,
         container_material: closure.materialKey,
         weight_source: closureWeightG !== '' ? 'measured' : 'typical',
+        packaging_material_class: closure.materialClass ?? null,
       }), closure.defaults));
     }
 
@@ -193,6 +197,7 @@ export function PackagingWizard({
         container_format: format.key,
         container_material: labelOption.materialKey,
         weight_source: labelWeightG !== '' ? 'measured' : 'typical',
+        packaging_material_class: labelOption.materialClass ?? null,
       }), labelOption.defaults));
     }
 
@@ -207,6 +212,7 @@ export function PackagingWizard({
         units_per_group: unitsPerPack,
         container_material: multipack.materialKey,
         weight_source: multipackWeightG !== '' ? 'measured' : 'typical',
+        packaging_material_class: multipack.materialClass ?? null,
       }), multipack.defaults));
     }
 
@@ -218,31 +224,48 @@ export function PackagingWizard({
     if (rows.length === 0) return;
     setIsCompleting(true);
     try {
-      // Auto-match an emission factor for each row from its deterministic
-      // catalogue search. Failures leave the row unmatched (user picks later).
-      const efSources = [
-        { query: material!.efSearchQuery, category: 'container' },
-        closure ? { query: closure.efSearchQuery, category: 'closure' } : null,
-        labelOption ? { query: labelOption.efSearchQuery, category: 'label' } : null,
-        multipack ? { query: multipack.efSearchQuery, category: 'secondary' } : null,
-      ].filter((s): s is { query: string; category: string } => s !== null);
-
-      const matches = await Promise.all(
-        efSources.map((s) =>
-          autoMatchEmissionFactor({
-            query: s.query,
-            organizationId,
-            packagingCategory: s.category,
-          })
-        )
-      );
-
-      const matchedRows = rows.map((row, i) => {
-        const match = matches[i];
+      // Parametric-first: rows with a material class need NO factor search —
+      // the calculator derives the factor from the endpoint library
+      // (parametric) or the pinned curated composite factor (gap-filler).
+      // Only classless rows (printed-direct ink) fall back to the legacy
+      // deterministic catalogue search.
+      const matchedRows = await Promise.all(rows.map(async (row) => {
+        const classDef = getMaterialClass(row.packaging_material_class);
+        if (classDef?.kind === 'parametric') {
+          return {
+            ...row,
+            match_status: 'verified' as const,
+            data_source: 'parametric' as const,
+            data_source_id: undefined,
+            ef_source: 'Parametric (ecoinvent endpoints)',
+            ef_source_type: 'secondary',
+          };
+        }
+        if (classDef?.kind === 'gap_filler' && classDef.gapFillerFactorId) {
+          return {
+            ...row,
+            match_status: 'verified' as const,
+            data_source: 'openlca' as const,
+            data_source_id: classDef.gapFillerFactorId,
+            ef_source: 'Curated composite factor',
+            ef_source_type: 'secondary',
+          };
+        }
+        // Legacy fallback for classless rows
+        const spec =
+          row.packaging_category === 'container' ? material!.efSearchQuery :
+          row.packaging_category === 'closure' ? closure?.efSearchQuery :
+          row.packaging_category === 'label' ? labelOption?.efSearchQuery :
+          multipack?.efSearchQuery;
+        if (!spec) return { ...row, match_status: 'needs_review' as const };
+        const match = await autoMatchEmissionFactor({
+          query: spec,
+          organizationId,
+          packagingCategory: row.packaging_category || 'container',
+        });
         if (!match) return { ...row, match_status: 'needs_review' as const };
         return {
           ...row,
-          // Curated catalogue mapping with a deterministic search: verified
           match_status: 'verified' as const,
           matched_source_name: match.matched_source_name,
           data_source: match.data_source,
@@ -255,14 +278,14 @@ export function PackagingWizard({
           ef_data_quality_grade: match.ef_data_quality_grade,
           ef_uncertainty_percent: match.ef_uncertainty_percent,
         };
-      });
+      }));
 
       const unmatched = matchedRows.filter((r) => !r.data_source).length;
       onComplete(matchedRows);
       handleOpenChange(false);
       toast.success(
         unmatched === 0
-          ? `${matchedRows.length} packaging item${matchedRows.length > 1 ? 's' : ''} added with emission factors matched`
+          ? `${matchedRows.length} packaging item${matchedRows.length > 1 ? 's' : ''} added with emission factors set`
           : `${matchedRows.length} packaging item${matchedRows.length > 1 ? 's' : ''} added. ${unmatched} still need${unmatched === 1 ? 's' : ''} an emission factor.`
       );
     } finally {

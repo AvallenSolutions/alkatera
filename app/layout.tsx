@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Inter, JetBrains_Mono, Playfair_Display } from 'next/font/google';
 import { spaceGrotesk } from '@/components/studio/fonts';
 import { AuthProvider } from '@/components/providers/AuthProvider';
+import { SessionExpiryGuard } from '@/components/providers/SessionExpiryGuard';
 import { QueryProvider } from '@/components/providers/QueryProvider';
 import { OrganizationProvider } from '@/lib/organizationContext';
 import { Toaster } from '@/components/ui/toaster';
@@ -178,6 +179,7 @@ export default function RootLayout({
           >
             <QueryProvider>
               <AuthProvider>
+                <SessionExpiryGuard />
                 <OrganizationProvider>
                   {children}
                   <Toaster />

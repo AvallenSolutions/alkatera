@@ -1,4 +1,5 @@
 import { runTextPrompt } from '@/lib/ai/gemini'
+import { NO_EM_DASH_RULE } from '@/lib/copy-style'
 /**
  * Impact Valuation Narrative Generator
  *
@@ -82,7 +83,7 @@ function setCache(key: string, result: ImpactValuationNarratives): void {
 // PROMPTS
 // ============================================================================
 
-const BOARD_SUMMARY_SYSTEM = `You are a sustainability finance analyst writing for a company board pack. Write in clear, confident British English. Be factual and concise. Never invent data. Use only the figures provided.
+const BOARD_SUMMARY_SYSTEM = `You are a sustainability finance analyst writing for a company board pack. Write in clear, confident British English. ${NO_EM_DASH_RULE} Be factual and concise. Never invent data. Use only the figures provided.
 
 IMPORTANT GUARDRAILS:
 - These figures are modelled estimates based on proxy values, not audited financial data.
@@ -92,10 +93,10 @@ IMPORTANT GUARDRAILS:
 
 function buildBoardSummaryUserPrompt(ctx: ImpactValuationNarrativeContext): string {
   const coveragePct = Math.round(ctx.dataCoverage * 100);
-  return `Write a 150-word board summary for ${ctx.organisationName}'s ${ctx.reportingYear} Impact Valuation. Total monetised sustainability impact: £${ctx.grandTotal.toLocaleString('en-GB')} across four capitals — Natural (£${ctx.naturalTotal.toLocaleString('en-GB')}), Human (£${ctx.humanTotal.toLocaleString('en-GB')}), Social (£${ctx.socialTotal.toLocaleString('en-GB')}), Governance (£${ctx.governanceTotal.toLocaleString('en-GB')}). Data confidence: ${ctx.confidenceLevel} (${coveragePct}% coverage). Largest contributing capital: ${ctx.topCapital} (£${ctx.topCapitalValue.toLocaleString('en-GB')}). Explain what impact valuation means, highlight the headline figure, name the top capital, and note the confidence level. End with one sentence on strategic relevance.`;
+  return `Write a 150-word board summary for ${ctx.organisationName}'s ${ctx.reportingYear} Impact Valuation. Total monetised sustainability impact: £${ctx.grandTotal.toLocaleString('en-GB')} across four capitals: Natural (£${ctx.naturalTotal.toLocaleString('en-GB')}), Human (£${ctx.humanTotal.toLocaleString('en-GB')}), Social (£${ctx.socialTotal.toLocaleString('en-GB')}), Governance (£${ctx.governanceTotal.toLocaleString('en-GB')}). Data confidence: ${ctx.confidenceLevel} (${coveragePct}% coverage). Largest contributing capital: ${ctx.topCapital} (£${ctx.topCapitalValue.toLocaleString('en-GB')}). Explain what impact valuation means, highlight the headline figure, name the top capital, and note the confidence level. End with one sentence on strategic relevance.`;
 }
 
-const RETAIL_TENDER_SYSTEM = `You are a sustainability copywriter writing for retail buyer questionnaires and tender documents. Write in confident, third-person British English. Be punchy and commercial. Never invent data. Use only the figures provided.
+const RETAIL_TENDER_SYSTEM = `You are a sustainability copywriter writing for retail buyer questionnaires and tender documents. Write in confident, third-person British English. ${NO_EM_DASH_RULE} Be punchy and commercial. Never invent data. Use only the figures provided.
 
 IMPORTANT GUARDRAILS:
 - These figures are modelled estimates based on proxy values, not audited financial data.
@@ -147,11 +148,11 @@ export async function generateImpactValuationNarratives(
 
     const boardSummary = boardSummaryText?.trim()
       ? boardSummaryText
-      : 'Board summary unavailable — please retry.';
+      : 'Board summary unavailable, please retry.';
 
     const retailTenderInsert = retailTenderText?.trim()
       ? retailTenderText
-      : 'Retail tender insert unavailable — please retry.';
+      : 'Retail tender insert unavailable, please retry.';
 
     const result: ImpactValuationNarratives = {
       boardSummary,
@@ -166,8 +167,8 @@ export async function generateImpactValuationNarratives(
 
     // Graceful fallback
     return {
-      boardSummary: 'Board summary unavailable — please retry.',
-      retailTenderInsert: 'Retail tender insert unavailable — please retry.',
+      boardSummary: 'Board summary unavailable, please retry.',
+      retailTenderInsert: 'Retail tender insert unavailable, please retry.',
       cached: false,
     };
   }

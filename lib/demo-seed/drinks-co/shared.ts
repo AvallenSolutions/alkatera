@@ -4,14 +4,22 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  * Shared context, helpers and constants for the alkatera Drinks Co demo seed.
  *
  * The seed is service-role and idempotent: re-running it converges on the same
- * dataset rather than duplicating rows. The calculator itself is browser-only,
- * so this module only writes the rows that make each product "recalc-ready" —
- * Tim runs the real LCA recalc from the admin tool afterwards.
+ * dataset rather than duplicating rows.
+ *
+ * The calculator is browser-only, so a service-role seeder cannot invoke it.
+ * lca.ts therefore writes COMPLETED PCFs directly with hand-modelled impacts,
+ * and every product shows a footprint immediately. Do not run the recalc tool
+ * afterwards: it would find no draft allocations to work from and skip every
+ * product. This comment used to say the opposite.
  */
 
 export const DRINKS_CO_ORG_ID = 'b0a00000-0000-4000-8000-000000000001';
 
-/** The org owner (hello@alkatera.com) — used for NOT NULL uploaded_by/created_by FKs. */
+/**
+ * The org owner on PRODUCTION (hello@alkatera.com). Only foundation.ts should
+ * read this constant: it checks whether this auth user exists and falls back to
+ * a local admin/first user otherwise. Everything else must use ctx.ownerUserId.
+ */
 export const OWNER_USER_ID = '27ea31a3-949c-4107-bcd1-e1b1eff818d1';
 
 /** The six real facilities (stable seeded UUIDs). */
@@ -73,6 +81,13 @@ export const REFERENCE_YEAR = 2025;
 export interface SeedCtx {
   svc: SupabaseClient;
   orgId: string;
+  /**
+   * The auth user every created_by/uploaded_by/user_id row is attributed to.
+   * Resolved at runtime by foundation.ts (prod's owner when it exists, else a
+   * local admin/first user), so the seed works on environments where the prod
+   * owner account does not exist.
+   */
+  ownerUserId: string;
   /** Section -> human-readable count summary, surfaced in the API response. */
   report: Record<string, string>;
   /** Non-fatal warnings (e.g. a junk facility that couldn't be removed). */
@@ -80,7 +95,7 @@ export interface SeedCtx {
 }
 
 export function makeCtx(svc: SupabaseClient): SeedCtx {
-  return { svc, orgId: DRINKS_CO_ORG_ID, report: {}, warnings: [] };
+  return { svc, orgId: DRINKS_CO_ORG_ID, ownerUserId: OWNER_USER_ID, report: {}, warnings: [] };
 }
 
 /** ISO date (YYYY-MM-DD) for the first of the month, n months before now. */

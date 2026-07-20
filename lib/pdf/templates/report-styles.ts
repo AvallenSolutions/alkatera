@@ -67,7 +67,7 @@ export const REPORT_STYLES: Record<ReportStyleId, ReportStyle> = {
     sectionOrder: [
       'executive-summary', 'key-findings', 'community-impact', 'people-culture',
       'product-footprints', 'scope-1-2-3', 'trends', 'targets', 'transition-roadmap',
-      'supply-chain', 'governance', 'methodology',
+      'supply-chain', 'facilities', 'governance', 'methodology',
     ],
     defaultSections: [...CORE, 'key-findings', 'community-impact', 'people-culture', 'product-footprints', 'targets'],
     defaultStandards: ['ghg-protocol'],
@@ -88,8 +88,8 @@ export const REPORT_STYLES: Record<ReportStyleId, ReportStyle> = {
     tone: 'Plain, honest and product-first. Talk about the products by name, per-unit numbers over corporate totals, and what changed this year. Never overclaim; say what is not yet measured.',
     sectionOrder: [
       'executive-summary', 'product-footprints', 'key-findings', 'scope-1-2-3',
-      'trends', 'supply-chain', 'targets', 'people-culture', 'community-impact',
-      'governance', 'methodology',
+      'trends', 'supply-chain', 'facilities', 'targets', 'people-culture',
+      'community-impact', 'governance', 'methodology',
     ],
     defaultSections: [...CORE, 'product-footprints', 'key-findings', 'trends', 'targets'],
     defaultStandards: ['iso-14067'],
@@ -110,9 +110,9 @@ export const REPORT_STYLES: Record<ReportStyleId, ReportStyle> = {
     tone: 'Precise and standards-referenced. Cite clauses, state boundaries and methods, quantify uncertainty. No marketing language; every claim traceable to the data.',
     sectionOrder: [
       'executive-summary', 'scope-1-2-3', 'trends', 'key-findings',
-      'product-footprints', 'supply-chain', 'people-culture', 'governance',
-      'community-impact', 'targets', 'transition-roadmap', 'risks-and-opportunities',
-      'methodology', 'regulatory',
+      'product-footprints', 'supply-chain', 'facilities', 'people-culture',
+      'governance', 'community-impact', 'targets', 'transition-roadmap',
+      'risks-and-opportunities', 'methodology', 'regulatory',
     ],
     defaultSections: [
       ...CORE, 'trends', 'key-findings', 'product-footprints', 'supply-chain',
@@ -138,7 +138,7 @@ export const REPORT_STYLES: Record<ReportStyleId, ReportStyle> = {
     sectionOrder: [
       'executive-summary', 'targets', 'risks-and-opportunities', 'trends',
       'transition-roadmap', 'scope-1-2-3', 'key-findings', 'governance',
-      'product-footprints', 'supply-chain', 'methodology',
+      'product-footprints', 'supply-chain', 'facilities', 'methodology',
     ],
     defaultSections: [...CORE, 'targets', 'risks-and-opportunities', 'trends', 'transition-roadmap', 'key-findings', 'governance'],
     defaultStandards: ['csrd', 'tcfd'],
@@ -158,9 +158,9 @@ export const REPORT_STYLES: Record<ReportStyleId, ReportStyle> = {
     imagery: 'standard',
     tone: 'Collaborative and mutual. Write as partners with shared goals: acknowledge suppliers by category, frame reductions as joint achievements, and be explicit about what is asked of partners next and what support is offered in return.',
     sectionOrder: [
-      'executive-summary', 'supply-chain', 'key-findings', 'scope-1-2-3',
-      'targets', 'transition-roadmap', 'product-footprints', 'trends',
-      'governance', 'methodology',
+      'executive-summary', 'supply-chain', 'facilities', 'key-findings',
+      'scope-1-2-3', 'targets', 'transition-roadmap', 'product-footprints',
+      'trends', 'governance', 'methodology',
     ],
     defaultSections: [...CORE, 'supply-chain', 'key-findings', 'targets', 'transition-roadmap'],
     defaultStandards: ['ghg-protocol'],

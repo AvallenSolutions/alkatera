@@ -3,6 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 import { safeCompare } from '@/lib/utils/safe-compare';
 import { runInsightsSweep } from '@/lib/pulse/cron-jobs';
 
+// Next.js patches global fetch and, on this route pattern (no next/headers
+// call to auto-trigger dynamic mode), would otherwise cache these outbound
+// Supabase requests across invocations — a GET with an identical URL every
+// time would keep returning the first response it ever saw. no-store on
+// every call is what makes this route actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' });
+
 /**
  * Cron: Pulse — generate daily AI insights
  *
@@ -36,6 +43,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient(supabaseUrl, supabaseKey, {
       auth: { autoRefreshToken: false, persistSession: false },
+      global: { fetch: noStoreFetch },
     });
 
     // Distinguish "API key not configured" from "Gemini call failed for org X".

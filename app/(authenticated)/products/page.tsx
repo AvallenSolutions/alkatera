@@ -20,7 +20,7 @@ import { Trash2, MoreVertical, Search, Copy, Loader2, Sparkles } from "lucide-re
 import { supabase } from "@/lib/supabaseClient";
 import { duplicateProduct } from "@/lib/products";
 import { useRouter } from "next/navigation";
-import { boundaryFromDbEnum, getBoundaryLabel } from "@/lib/system-boundaries";
+import { normaliseBoundary, getBoundaryLabel } from "@/lib/system-boundaries";
 import { useOrganization } from "@/lib/organizationContext";
 import { useSubscription } from "@/hooks/useSubscription";
 import {
@@ -321,9 +321,9 @@ export default function ProductsPage() {
   };
 
   const boundaryLabel = (boundary: string) => {
-    // Normalise both DB enum format (underscores) and PCF format (hyphens)
-    const normalised = boundary.includes("_") ? boundaryFromDbEnum(boundary) : boundary;
-    return getBoundaryLabel(normalised);
+    // Normalise both DB enum format (underscores) and PCF format (hyphens),
+    // plus the capitalised values older rows carry.
+    return getBoundaryLabel(normaliseBoundary(boundary));
   };
 
   /** Format a per-unit footprint figure for the card number. */

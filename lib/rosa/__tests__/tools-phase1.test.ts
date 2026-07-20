@@ -50,8 +50,23 @@ function buildMockClient(responses: Record<string, any> = {}) {
         const r = responses[`${table}:single`];
         return r ?? { data: null, error: null };
       }),
+      is: vi.fn().mockImplementation(function (this: any, col: string, val: any) {
+        this._filters.push(['is', col, val]);
+        return this;
+      }),
+      insert: vi.fn().mockImplementation(function (this: any, row: any) {
+        this._inserted = row;
+        calls.push({ table, op: 'insert', row });
+        return this;
+      }),
+      update: vi.fn().mockImplementation(function (this: any, row: any) {
+        this._updated = row;
+        calls.push({ table, op: 'update', row });
+        return this;
+      }),
       upsert: vi.fn().mockImplementation(function (this: any, row: any) {
         this._upserted = row;
+        calls.push({ table, op: 'upsert', row });
         return this;
       }),
       then: undefined,
@@ -214,8 +229,10 @@ describe('save_memory', () => {
     expect(res.is_error).toBe(true);
   });
 
-  it('upserts into rosa_memory with scope', async () => {
+  it('inserts into rosa_memory when the key is new', async () => {
     const { client, calls } = buildMockClient({
+      // No existing row for this key.
+      'rosa_memory:maybeSingle': { data: null, error: null },
       'rosa_memory:single': { data: { id: 'm1' }, error: null },
     });
     const res = await executeTool(makeCtx(client), 'save_memory', {
@@ -224,7 +241,41 @@ describe('save_memory', () => {
       value: 'short',
     });
     expect(res.is_error).toBe(false);
-    expect(calls.some(c => c.table === 'rosa_memory')).toBe(true);
+    expect(calls.some(c => c.table === 'rosa_memory' && c.op === 'insert')).toBe(true);
+  });
+
+  it('updates in place when the key already exists', async () => {
+    const { client, calls } = buildMockClient({
+      'rosa_memory:maybeSingle': { data: { id: 'm1' }, error: null },
+      'rosa_memory:single': { data: { id: 'm1' }, error: null },
+    });
+    const res = await executeTool(makeCtx(client), 'save_memory', {
+      scope: 'user',
+      key: 'response_style',
+      value: 'shorter',
+    });
+    expect(res.is_error).toBe(false);
+    expect(calls.some(c => c.table === 'rosa_memory' && c.op === 'update')).toBe(true);
+    expect(calls.some(c => c.table === 'rosa_memory' && c.op === 'insert')).toBe(false);
+  });
+
+  it('never uses ON CONFLICT, which the expression index cannot match', async () => {
+    // rosa_memory's uniqueness is unique(organization_id, COALESCE(user_id,
+    // '000…'), scope, key). Postgres cannot match an expression index in ON
+    // CONFLICT, so the old `.upsert(..., { onConflict: '…user_id…' })` failed
+    // every single call and nothing Rosa chose to remember was ever saved.
+    // Verified against a real database before the fix. If an upsert reappears
+    // here, save_memory is silently broken again.
+    const { client, calls } = buildMockClient({
+      'rosa_memory:maybeSingle': { data: null, error: null },
+      'rosa_memory:single': { data: { id: 'm1' }, error: null },
+    });
+    await executeTool(makeCtx(client), 'save_memory', {
+      scope: 'org',
+      key: 'reporting_framework',
+      value: 'VSME',
+    });
+    expect(calls.some(c => c.table === 'rosa_memory' && c.op === 'upsert')).toBe(false);
   });
 });
 

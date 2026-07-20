@@ -220,11 +220,46 @@ async function seedSnapshots(ctx: SeedCtx): Promise<void> {
     products_assessed: 9,
   });
 
-  // Drop any stale AI insight (e.g. an old "no data recorded yet" headline that
-  // now contradicts the seeded data); a fresh, accurate one regenerates later.
-  await svc.from('dashboard_insights').delete().eq('organization_id', orgId);
+  // Replace any stale insight (e.g. an old "no data recorded yet" headline that
+  // now contradicts the seeded data) with one that matches what we just wrote.
+  //
+  // This used to be a bare delete, on the reasoning that a fresh one would
+  // regenerate. It does not regenerate on its own: it needs an LLM run, so the
+  // first card on the Pulse overview sat blank on an otherwise fully-populated
+  // org. `model` names the seed rather than a real model, so nobody mistakes
+  // this for genuine analysis.
+  // metricRows interleaves four metric keys per month and runs oldest first, so
+  // filter to the one series before taking its endpoints.
+  const totals = metricRows.filter((r: any) => r.metric_key === 'total_co2e');
+  const firstTotal = Number((totals[0] as any)?.value ?? 0);
+  const lastTotal = Number((totals[totals.length - 1] as any)?.value ?? 0);
+  const changePct = firstTotal > 0 ? Math.round(((lastTotal - firstTotal) / firstTotal) * 100) : 0;
+  const direction = changePct <= 0 ? 'down' : 'up';
 
-  ctx.report.snapshots = `${metricRows.length} metric + ${esgRows.length} ESG + ${vitalityRows.length} vitality snapshots`;
+  await svc.from('dashboard_insights').delete().eq('organization_id', orgId);
+  const { error: insightErr } = await svc.from('dashboard_insights').insert({
+    organization_id: orgId,
+    period: 'monthly',
+    headline: `Emissions are ${direction} ${Math.abs(changePct)}% across the last two years, with packaging still the largest driver.`,
+    narrative_md: [
+      `Total emissions have moved ${direction} by ${Math.abs(changePct)}% since the start of the reporting window, driven mostly by the electricity contract change at the distillery and steadily lighter glass.`,
+      '',
+      '**Where it still sits:** packaging remains the biggest single contributor across the product range. Glass is the reason, and the aluminium can line is measurably below the range average.',
+      '',
+      '**Worth a look:** the winery is the only owned site whose intensity has not improved this year. Its production volume fell faster than its energy use, so the per-litre figure went the wrong way.',
+    ].join('\n'),
+    supporting_metrics: {
+      total_co2e_first: firstTotal,
+      total_co2e_latest: lastTotal,
+      change_pct: changePct,
+      products_assessed: 9,
+    },
+    confidence: 0.8,
+    model: 'alkatera-demo-seed',
+  });
+  if (insightErr) ctx.warnings.push(`dashboard insight: ${insightErr.message}`);
+
+  ctx.report.snapshots = `${metricRows.length} metric + ${esgRows.length} ESG + ${vitalityRows.length} vitality snapshots + 1 Pulse insight`;
 }
 
 export async function seedOperations(ctx: SeedCtx): Promise<void> {

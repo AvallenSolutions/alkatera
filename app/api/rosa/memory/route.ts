@@ -2,63 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { getSupabaseServerClient } from '@/lib/supabase/server-client'
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
-import { deleteMemory, listMemories } from '@/lib/rosa/memory'
+import { deleteMemory, listMemories, saveMemory } from '@/lib/rosa/memory'
 
 const MAX_VALUE_LEN = 1000
-
-/**
- * Upsert a rosa_memory row without using ON CONFLICT — the table's uniqueness
- * is enforced by an expression index (COALESCE on user_id), which Postgres
- * can't match for ON CONFLICT. So we do it explicitly: select, then
- * update-or-insert.
- */
-async function upsertMemory(
-  service: SupabaseClient,
-  organizationId: string,
-  userId: string,
-  scope: 'user' | 'org',
-  key: string,
-  value: string,
-): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
-  const v = value.trim().slice(0, MAX_VALUE_LEN)
-  if (!v) return { ok: false, error: 'value is required' }
-
-  const matchUserId = scope === 'user' ? userId : null
-  let lookup = service
-    .from('rosa_memory')
-    .select('id')
-    .eq('organization_id', organizationId)
-    .eq('scope', scope)
-    .eq('key', key)
-  lookup = matchUserId === null ? lookup.is('user_id', null) : lookup.eq('user_id', matchUserId)
-  const { data: existing, error: selectErr } = await lookup.maybeSingle()
-  if (selectErr) return { ok: false, error: selectErr.message }
-
-  if (existing) {
-    const { data, error } = await service
-      .from('rosa_memory')
-      .update({ value: v, updated_at: new Date().toISOString() })
-      .eq('id', (existing as any).id)
-      .select('id')
-      .single()
-    if (error) return { ok: false, error: error.message }
-    return { ok: true, id: (data as any).id }
-  }
-
-  const { data, error } = await service
-    .from('rosa_memory')
-    .insert({
-      organization_id: organizationId,
-      user_id: matchUserId,
-      scope,
-      key,
-      value: v,
-    })
-    .select('id')
-    .single()
-  if (error) return { ok: false, error: error.message }
-  return { ok: true, id: (data as any).id }
-}
 
 export const runtime = 'nodejs'
 
@@ -135,7 +81,7 @@ export async function POST(req: NextRequest) {
   const ctx = await resolveContext()
   if ('error' in ctx) return ctx.error
 
-  const result = await upsertMemory(ctx.service, ctx.organizationId, ctx.userId, scope, key, value)
+  const result = await saveMemory(ctx.service, ctx.organizationId, ctx.userId, scope, key, value)
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 500 })
   }

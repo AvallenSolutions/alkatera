@@ -29,6 +29,7 @@ import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import { executeTool, ROSA_TOOLS, ACTION_TOOL_NAMES, type ToolContext } from '@/lib/rosa/tools';
 import { buildMemoryBlock } from '@/lib/rosa/memory';
+import { buildRosaPageContextBlock } from '@/lib/rosa/persona';
 import { loadAttachment } from '@/lib/rosa/document-extraction';
 import { rateLimit } from '@/lib/rate-limit';
 import { logRosaTelemetry } from '@/lib/rosa/budget';
@@ -155,18 +156,13 @@ export async function POST(request: NextRequest) {
   const memoryBlock = await buildMemoryBlock(serviceSupabase, organizationId, user.id);
   const baseSystemPrompt = buildRosaSystemPrompt(memoryBlock);
 
-  // Layer page context onto the system prompt so Rosa can answer questions
-  // about what the user is currently looking at. Sliced and prioritised by
-  // the client; we just pretty-print here. Empty array → no change.
-  const pageContextBlock = pageContext.length > 0
-    ? '\n\n---\n## Where the user is right now\n' +
-      pageContext
-        .slice()
-        .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0))
-        .map(slice => `### ${slice.label}\n${JSON.stringify(slice.data, null, 2)}`)
-        .join('\n\n') +
-      '\n\nWhen the user asks page-specific questions ("which option here?", "help me with this", "what should I pick?"), reference the structured context above. If a question isn\'t about the page, treat the context as background only.\n---'
-    : '';
+  // Page context describes what the user is looking at. It is client-supplied
+  // and carries org records, so it goes through the fenced, capped builder
+  // (lib/rosa/persona.ts) rather than straight into the prompt.
+  const pageContextSection = (() => {
+    const block = buildRosaPageContextBlock(pageContext);
+    return block ? `\n\n---\n${block}\n---` : '';
+  })();
 
   // Worked examples (Pillar 4 step 3 "Feed back"): curated question/answer
   // pairs selected by keyword overlap with this turn's message, the
@@ -178,7 +174,7 @@ export async function POST(request: NextRequest) {
     : null;
   const exemplarSection = exemplarBlock ? `\n\n---\n## Worked examples\n${exemplarBlock}\n---` : '';
 
-  const systemPrompt = baseSystemPrompt + pageContextBlock + exemplarSection;
+  const systemPrompt = baseSystemPrompt + pageContextSection + exemplarSection;
 
   // Load any attachments up front so we can abort cleanly if one is missing.
   const loadedAttachments = [] as Array<Awaited<ReturnType<typeof loadAttachment>>>;

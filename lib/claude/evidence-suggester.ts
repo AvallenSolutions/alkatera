@@ -1,5 +1,6 @@
 import 'server-only'
 import Anthropic from '@anthropic-ai/sdk'
+import { NO_EM_DASH_RULE } from '@/lib/copy-style'
 
 // Claude-assisted requirement suggester for the Evidence Library.
 //
@@ -30,15 +31,17 @@ You will be given:
 1. A compliance evidence document (PDF or image).
 2. A list of candidate framework requirements from B Corp, VSME, ESRS, CDP, SBTi and others.
 
-Your job: identify which of the candidate requirements the document plausibly helps evidence. Be selective. A single good match is more useful than ten weak ones. Only suggest requirements where the document clearly touches the subject of the requirement — not requirements that merely share a theme.
+Your job: identify which of the candidate requirements the document plausibly helps evidence. Be selective. A single good match is more useful than ten weak ones. Only suggest requirements where the document clearly touches the subject of the requirement, not requirements that merely share a theme.
 
 For each match, return:
 - requirement_id: the UUID from the candidate list (exact)
 - framework_code + requirement_code: echoed back for sanity
-- confidence: 0.0–1.0. Use ≥0.8 only when the document directly states or proves what the requirement asks for. 0.5–0.8 when it is partial or indirect evidence. Below 0.3 should not be suggested.
+- confidence: 0.0-1.0. Use ≥0.8 only when the document directly states or proves what the requirement asks for. 0.5-0.8 when it is partial or indirect evidence. Below 0.3 should not be suggested.
 - reasoning: one short sentence explaining the match, citing the document content specifically.
 
-Cap the response at 20 matches.`
+Cap the response at 20 matches.
+
+${NO_EM_DASH_RULE}`
 
 export async function suggestRequirements(opts: {
   fileBase64: string
@@ -59,7 +62,7 @@ export async function suggestRequirements(opts: {
 
   const candidateLines = candidates
     .map((c) =>
-      `- [${c.id}] ${c.framework_code} ${c.requirement_code}: ${c.requirement_name}${c.description ? ' — ' + c.description.slice(0, 200) : ''}`,
+      `- [${c.id}] ${c.framework_code} ${c.requirement_code}: ${c.requirement_name}${c.description ? ' - ' + c.description.slice(0, 200) : ''}`,
     )
     .join('\n')
 
@@ -83,7 +86,7 @@ export async function suggestRequirements(opts: {
                   requirement_id: { type: 'string', description: 'UUID from the candidate list.' },
                   framework_code: { type: 'string' },
                   requirement_code: { type: 'string' },
-                  confidence: { type: 'number', description: '0.0–1.0' },
+                  confidence: { type: 'number', description: '0.0-1.0' },
                   reasoning: { type: 'string', description: 'One short sentence citing the doc.' },
                 },
                 required: ['requirement_id', 'framework_code', 'requirement_code', 'confidence', 'reasoning'],
@@ -104,7 +107,7 @@ export async function suggestRequirements(opts: {
             type: 'text',
             text:
               `Evidence document title: "${documentTitle}"\n\n` +
-              `Candidate requirements (format: [uuid] FRAMEWORK CODE: name — description):\n` +
+              `Candidate requirements (format: [uuid] FRAMEWORK CODE: name - description):\n` +
               candidateLines +
               `\n\nReturn ranked matches by calling the suggest_matching_requirements tool.`,
           },

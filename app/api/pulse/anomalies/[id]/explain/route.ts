@@ -25,15 +25,14 @@ import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import { runToolLoop } from '@/lib/rosa/run-tool-loop';
 import { GEMINI_ROSA_MODEL } from '@/lib/ai/models';
 import { METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
+import { buildRosaMicroPersona } from '@/lib/rosa/persona';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const MODEL = GEMINI_ROSA_MODEL;
 
-const SYSTEM_PROMPT = `You are Rosa, the alkatera sustainability AI, investigating an anomaly that the platform has flagged.
-
-Voice: British English, plain, candid. Short sentences. Never use em dashes.
+const SYSTEM_PROMPT = `${buildRosaMicroPersona('You are investigating an anomaly that the platform has flagged.')}
 
 Your job:
 1. Use the tools to gather evidence about the anomaly: when did the metric move, which facility or product is responsible, what else changed in the same window.

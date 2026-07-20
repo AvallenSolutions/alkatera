@@ -32,23 +32,14 @@ import type {
 // Re-export types
 export * from '@/lib/types/gaia';
 
-// Re-export from system-prompt
+// Chat suggestion content. The persona that used to live alongside these now
+// lives in lib/rosa/persona.ts; the GAIA_* aliases went with it, having only
+// ever been re-exported here and consumed by nobody.
 export {
-  ROSA_PERSONA,
-  ROSA_SYSTEM_PROMPT,
   ROSA_SUGGESTED_QUESTIONS,
-  ROSA_CONTEXT_TEMPLATE,
   ROSA_FOLLOWUP_QUESTIONS,
   ROSA_PHOTO_URL,
-  // Backwards compatibility
-  GAIA_PERSONA,
-  GAIA_SYSTEM_PROMPT,
-  GAIA_SUGGESTED_QUESTIONS,
-  GAIA_CONTEXT_TEMPLATE,
-  GAIA_FOLLOWUP_QUESTIONS,
   getContextualFollowUps,
-  buildContextualPrompt,
-  generateContextualSuggestions,
 } from './system-prompt';
 
 // Re-export from action-handlers
@@ -108,18 +99,10 @@ export {
   formatFeedbackAnalyticsForPrompt,
 } from './feedback-learning';
 
-// Re-export context builder with enhanced context support
-export {
-  buildRosaContext,
-  buildRosaContextWithKnowledge,
-  buildGaiaContext,
-  detectQueryIntent,
-  suggestChartType,
-  fetchExternalKnowledge,
-  type RosaPromptContext,
-  type RosaEnhancedContext,
-  type GaiaPromptContext,
-} from './context-builder';
+// context-builder.ts is gone. It assembled a prompt from ROSA_SYSTEM_PROMPT
+// for a pre-tool architecture, and had no callers: Rosa gets her context from
+// tools now, plus the memory and page-context blocks that /api/rosa/chat
+// injects. See lib/rosa/persona.ts.
 
 // Re-export from sustainability-knowledge (Curated Knowledge Base)
 export {
@@ -444,26 +427,14 @@ export async function addMessage(
 // ============================================================================
 
 /**
- * Send a query to Rosa
- */
-export async function sendRosaQuery(
-  request: RosaQueryRequest
-): Promise<RosaQueryResponse> {
-  // Note: Edge function is still named gaia-query for database compatibility
-  const { data, error } = await supabase.functions.invoke('gaia-query', {
-    body: request,
-  });
-
-  if (error) throw error;
-  return data;
-}
-
-// Backwards compatibility
-/** @deprecated Use sendRosaQuery instead */
-export const sendGaiaQuery = sendRosaQuery;
-
-/**
- * Stream chunk type for Rosa streaming responses
+ * The gaia-query edge function is gone, and with it sendRosaQuery and
+ * sendRosaQueryStream, which were its only callers and had none of their own.
+ * It was a pre-tool architecture that stuffed org data into the prompt; Rosa
+ * gets her context from tools now. Everything streams through
+ * sendRosaQueryStreamV2 below, which hits the Next.js /api/rosa/chat route.
+ *
+ * The event shape outlived it: sendRosaQueryStreamV2 emits the same one, so
+ * GaiaChat did not have to change when the transport did.
  */
 export interface RosaStreamEvent {
   type: 'start' | 'text' | 'chart' | 'sources' | 'done' | 'error' | 'tool_use' | 'tool_result' | 'action_proposal';
@@ -488,91 +459,6 @@ export interface RosaStreamEvent {
 // Backwards compatibility
 /** @deprecated Use RosaStreamEvent instead */
 export type GaiaStreamEvent = RosaStreamEvent;
-
-/**
- * Send a streaming query to Rosa
- * Returns an async generator that yields stream events
- */
-export async function* sendRosaQueryStream(
-  request: RosaQueryRequest
-): AsyncGenerator<RosaStreamEvent> {
-  const { data: sessionData } = await supabase.auth.getSession();
-  const accessToken = sessionData?.session?.access_token;
-
-  if (!accessToken) {
-    throw new Error('Not authenticated');
-  }
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!supabaseUrl) {
-    throw new Error('Supabase URL not configured');
-  }
-
-  // Note: Edge function is still named gaia-query for database compatibility
-  const response = await fetch(`${supabaseUrl}/functions/v1/gaia-query`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({ ...request, stream: true }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || `Request failed: ${response.status}`);
-  }
-
-  const reader = response.body?.getReader();
-  if (!reader) {
-    throw new Error('No response body');
-  }
-
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      // Process complete SSE events
-      const lines = buffer.split('\n\n');
-      buffer = lines.pop() || '';
-
-      for (const eventBlock of lines) {
-        if (eventBlock.startsWith('data: ')) {
-          const jsonStr = eventBlock.slice(6);
-          try {
-            const event: RosaStreamEvent = JSON.parse(jsonStr);
-            yield event;
-          } catch {
-            // Skip invalid JSON
-          }
-        }
-      }
-    }
-
-    // Process any remaining buffer
-    if (buffer.startsWith('data: ')) {
-      const jsonStr = buffer.slice(6);
-      try {
-        const event: RosaStreamEvent = JSON.parse(jsonStr);
-        yield event;
-      } catch {
-        // Skip invalid JSON
-      }
-    }
-  } finally {
-    reader.releaseLock();
-  }
-}
-
-// Backwards compatibility
-/** @deprecated Use sendRosaQueryStream instead */
-export const sendGaiaQueryStream = sendRosaQueryStream;
 
 /**
  * Phase-2 streamer that hits the Next.js /api/rosa/chat route (named-event SSE).

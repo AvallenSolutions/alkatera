@@ -4,6 +4,13 @@ import { safeCompare } from '@/lib/utils/safe-compare';
 import { queueBrandsForScraping } from '@/lib/distributor/scraping/agent-dispatcher';
 import { inngest } from '@/lib/inngest/client';
 
+// Next.js patches global fetch and, on this route pattern (no next/headers
+// call to auto-trigger dynamic mode), would otherwise cache these outbound
+// Supabase requests across invocations — a GET with an identical URL every
+// time would keep returning the first response it ever saw. no-store on
+// every call is what makes this route actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' });
+
 /**
  * Cron: distributor scraping queue processor
  *
@@ -53,6 +60,7 @@ export async function POST(request: NextRequest) {
   }
   const supabase = createClient(supabaseUrl, supabaseKey, {
     auth: { autoRefreshToken: false, persistSession: false },
+    global: { fetch: noStoreFetch },
   }) as SupabaseClient;
 
   // 1. Stale-running recovery. The scrape now runs in a background

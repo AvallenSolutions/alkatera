@@ -485,6 +485,14 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setUserRole(null)
         setIsLoading(false)
       }
+    } else if (!user) {
+      // Cold boot with no session: currentUserId and the ref are BOTH null,
+      // so userChanged is false and neither branch above runs — but the
+      // provider still owes AppLayout a resolved loading state. Without this,
+      // an unauthenticated visit to any authenticated URL shows the shell
+      // skeleton forever instead of redirecting to /login (found on staging,
+      // where a deep link was the first thing ever opened logged-out).
+      setIsLoading(false)
     } else if (isSupplierMeta && userRole !== 'supplier') {
       // Metadata updated (e.g. after invite acceptance) but user ID unchanged
       console.log('🔄 OrganizationContext: Supplier metadata detected, re-fetching...')

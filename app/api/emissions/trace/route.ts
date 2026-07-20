@@ -18,6 +18,13 @@ import { getOrgFyStartMonth } from '@/lib/log-data/org-fiscal-year'
 import { getYearRangeForOrg, getLabelYearForDate } from '@/lib/log-data/period-utils'
 import { overlapFraction } from '@/lib/calculations/utility-factors'
 
+// Next.js patches global fetch and, on this route pattern (no next/headers
+// call to auto-trigger dynamic mode), would otherwise cache these outbound
+// Supabase requests across invocations — a GET with an identical URL every
+// time would keep returning the first response it ever saw. no-store on
+// every call is what makes this route actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' })
+
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
@@ -30,7 +37,7 @@ export async function GET(request: NextRequest) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     const userClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
+      global: { headers: { Authorization: `Bearer ${token}` }, fetch: noStoreFetch },
     })
 
     const { data: userData, error: authError } = await userClient.auth.getUser()
@@ -47,7 +54,7 @@ export async function GET(request: NextRequest) {
     if (!orgId) return NextResponse.json({ error: 'Missing organizationId' }, { status: 400 })
 
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-    const supabase = createClient(supabaseUrl, serviceKey)
+    const supabase = createClient(supabaseUrl, serviceKey, { global: { fetch: noStoreFetch } })
 
     // Resolve the org's financial-year window. `year` is the reporting label year;
     // for a calendar-year org this is exactly Jan-Dec, so behaviour is unchanged.

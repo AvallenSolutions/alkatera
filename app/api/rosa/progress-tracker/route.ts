@@ -15,6 +15,7 @@ import { FunctionCallingMode } from '@google/generative-ai'
 import { getSupabaseServerClient } from '@/lib/supabase/server-client'
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
 import { rateLimit } from '@/lib/rate-limit'
+import { scrubEmDashes } from '@/lib/copy-style'
 import {
   getGeminiClient,
   toGeminiFunctionDeclarations,
@@ -117,12 +118,10 @@ function validateRead(raw: unknown, series: TrackerTimeseries): ReadPayload {
     if (series.data_quality.coverage_weeks >= 3) return 'medium'
     return 'low'
   })()
-  // Scrub em dashes — locked rule.
-  const scrub = (str: string) => str.replace(/—/g, ', ').replace(/\s{2,}/g, ' ')
   return {
-    headline: scrub(headline),
-    detail: scrub(detail),
-    next_move: next_move ? scrub(next_move) : null,
+    headline: scrubEmDashes(headline),
+    detail: scrubEmDashes(detail),
+    next_move: next_move ? scrubEmDashes(next_move) : null,
     next_move_href,
     confidence,
   }

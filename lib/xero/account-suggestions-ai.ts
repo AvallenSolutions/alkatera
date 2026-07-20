@@ -1,5 +1,6 @@
 import 'server-only'
 import { runTextPrompt } from '@/lib/ai/gemini'
+import { NO_EM_DASH_RULE } from '@/lib/copy-style'
 
 /**
  * AI-powered account mapping suggestions.
@@ -81,6 +82,8 @@ For each account, respond with:
 - category: string | "exclude" | null (if genuinely unsure)
 - confidence: number (0.0 to 1.0)
 - reasoning: string (brief, one sentence)
+
+${NO_EM_DASH_RULE}
 
 Return ONLY a JSON array, no markdown fences.`
 

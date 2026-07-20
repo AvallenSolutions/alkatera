@@ -1,4 +1,5 @@
 import { runTextPrompt } from '@/lib/ai/gemini';
+import { NO_EM_DASH_RULE } from '@/lib/copy-style';
 
 // Gemini 3.5 Flash bills internal "thinking" tokens against the same
 // maxOutputTokens budget as the actual response, and @google/generative-ai
@@ -50,13 +51,14 @@ Source text (concatenated from the brand's own website pages):
 ${trimmed.slice(0, 16000)}
 """
 
-Write a 2–3 paragraph overview of this brand, with these rules:
+Write a 2-3 paragraph overview of this brand, with these rules:
 - Start with what they make and where (one or two sentences).
 - The remaining paragraph(s) MUST focus on their sustainability story: certifications, practices, commitments, partnerships, environmental philosophy.
 - Only state facts you can support from the source text above. Do not invent figures, dates, or claims.
 - Never include numeric values (carbon footprints, percentages, years). Those are tracked separately as structured fields.
 - Plain prose. No markdown, no bullet points, no headings.
-- 100–250 words total.
+- ${NO_EM_DASH_RULE}
+- 100-250 words total.
 - If the source text doesn't have enough material for a credible overview (e.g. it's only nav/footer scraps), respond with exactly the single word INSUFFICIENT_DATA and nothing else.`;
 
   try {

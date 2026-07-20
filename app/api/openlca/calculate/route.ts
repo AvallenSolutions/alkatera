@@ -5,6 +5,13 @@ import { ProviderLinking, type ImpactResult } from '@/lib/openlca/schema';
 import { classifyOpenLcaError } from '@/lib/openlca/classify-error';
 import { isServiceCall } from '@/lib/lca/service-auth';
 
+// Next.js patches global fetch and, on this route pattern (no next/headers
+// call to auto-trigger dynamic mode), would otherwise cache these outbound
+// Supabase requests across invocations — a GET with an identical URL every
+// time would keep returning the first response it ever saw. no-store on
+// every call is what makes this route actually live.
+const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cache: 'no-store' });
+
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120; // OpenLCA calculations can take 60-90s
 
@@ -114,12 +121,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
     }
 
+    // Both clients take noStoreFetch: a raw createClient on this route pattern
+    // otherwise serves whatever the first invocation happened to read, which
+    // would hand the waterfall a stale cache lookup and a stale answer.
     const supabase = serviceCall
       ? createClient(supabaseUrl, serviceKey!, {
           auth: { autoRefreshToken: false, persistSession: false },
+          global: { fetch: noStoreFetch },
         })
       : createClient(supabaseUrl, supabaseAnonKey, {
-          global: { headers: { Authorization: `Bearer ${token}` } },
+          global: { headers: { Authorization: `Bearer ${token}` }, fetch: noStoreFetch },
         });
 
     if (!serviceCall) {

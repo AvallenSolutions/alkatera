@@ -1,9 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
+import type { EmailOtpType } from "@supabase/supabase-js"
 import { supabase } from "@/lib/supabaseClient"
-import { AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-react"
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2 } from "lucide-react"
 
 export function UpdatePasswordForm() {
   const router = useRouter()
@@ -14,6 +16,54 @@ export function UpdatePasswordForm() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
+  // Recovery-link preparation. A valid recovery session must exist before we
+  // can call updateUser(). It gets established one of two ways:
+  //   1. via /auth/confirm, which verifies the token and redirects here with a
+  //      session already set (no token_hash in the URL), or
+  //   2. directly on this page, when a link points straight at
+  //      /update-password?token_hash=… (Supabase's native template / a
+  //      dashboard-generated recovery link). In that case we must exchange the
+  //      token for a session ourselves — otherwise updateUser() fails with the
+  //      opaque "Auth session missing!".
+  const [preparing, setPreparing] = useState(true)
+  const [linkInvalid, setLinkInvalid] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const params = new URLSearchParams(window.location.search)
+        const tokenHash = params.get("token_hash")
+        const type = (params.get("type") || "recovery") as EmailOtpType
+
+        if (tokenHash) {
+          // Native / dashboard link landed straight on this page — establish the
+          // recovery session by verifying the token here.
+          const { error: verifyError } = await supabase.auth.verifyOtp({
+            type,
+            token_hash: tokenHash,
+          })
+          if (verifyError) {
+            console.error("Recovery token verification failed:", verifyError.message)
+            if (!cancelled) setLinkInvalid(true)
+          }
+        } else {
+          // Came via /auth/confirm (or a refreshed tab) — a session should
+          // already be present. If not, the link context is missing/expired.
+          const { data } = await supabase.auth.getSession()
+          if (!data.session && !cancelled) setLinkInvalid(true)
+        }
+      } catch (err) {
+        console.error("Recovery preparation error:", err)
+        if (!cancelled) setLinkInvalid(true)
+      } finally {
+        if (!cancelled) setPreparing(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const validatePassword = (password: string) => {
     if (password.length < 10) {
@@ -73,6 +123,35 @@ export function UpdatePasswordForm() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (preparing) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-6 text-white/70">
+        <Loader2 className="h-6 w-6 animate-spin text-[#ccff00]" />
+        <p className="text-sm">Verifying your reset link...</p>
+      </div>
+    )
+  }
+
+  if (linkInvalid) {
+    return (
+      <div className="space-y-4 w-full">
+        <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+          <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-300">
+            This password reset link is invalid or has expired. Please request a
+            new one.
+          </p>
+        </div>
+        <Link
+          href="/password-reset"
+          className="block w-full text-center py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:opacity-90 transition-all"
+        >
+          Request a new reset link
+        </Link>
+      </div>
+    )
   }
 
   return (

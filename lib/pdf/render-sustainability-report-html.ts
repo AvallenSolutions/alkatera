@@ -26,14 +26,17 @@ import { resolveTheme, getThemeFontImport, type ReportTheme } from '@/lib/pdf/te
 import { resolveReportStyle } from '@/lib/pdf/templates/report-styles';
 import {
   INK, CREAM, PAPER, HAIR, DIM, GOOD, ATTN, STALE, MONO, SG, INTER,
-  onBand, wordmark, toneChip,
+  onBand, wordmark, toneChip, notMeasuredTile, notMeasuredBlock,
 } from '@/lib/pdf/studio-kit';
-import type {
-  FacilityInfo,
-  SupplierData,
-  PeopleCultureData,
-  GovernanceData,
-  CommunityImpactData,
+import {
+  EMPTY_PEOPLE_CULTURE,
+  EMPTY_GOVERNANCE,
+  EMPTY_COMMUNITY_IMPACT,
+  type FacilityInfo,
+  type SupplierData,
+  type PeopleCultureData,
+  type GovernanceData,
+  type CommunityImpactData,
 } from '@/lib/reports/sections/types';
 
 // ============================================================================
@@ -539,32 +542,13 @@ function renderExecutiveSummaryNarrativeBlock(narrative: ExecutiveSummaryNarrati
 // NOT-YET-MEASURED SKELETONS
 // ============================================================================
 
-/**
- * A metric tile whose value has not been recorded yet.
- *
- * Keeps the card shell so neighbouring tiles never reflow, and says plainly
- * that the number is missing rather than printing "N/A" (which reads as "not
- * applicable to this business", a different and false claim) or 0 (which
- * claims something was measured and came to nothing). The value line is
- * deliberately small and quiet: a gap must never out-shout a real number.
- */
-function notMeasuredMetric(label: string, hint: string): string {
-  return `
-        <div class="metric-card" style="text-align: center;">
-          <div class="metric-label">${escapeHtml(label)}</div>
-          <div style="font-size: 14px; font-weight: 500; color: ${DIM}; line-height: 1.3; margin: 4px 0 2px;">Not yet measured</div>
-          <div class="metric-unit" style="opacity: .65;">${escapeHtml(hint)}</div>
-        </div>`;
-}
+// The tile and block skeletons live in studio-kit (notMeasuredTile /
+// notMeasuredBlock) so every studio document says "not yet measured" the same
+// way. The helpers below are the table-shaped variants this renderer needs.
 
-/** A full-width block (table, prose or card grid) with nothing recorded yet. */
-function notMeasuredBlock(title: string, hint: string): string {
-  return `
-      <div style="background: ${CREAM}; border: 1px solid ${HAIR}; border-radius: 6px; padding: 16px;">
-        <div style="font-family: ${MONO}; font-size: 9px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: ${DIM};">${escapeHtml(title)}</div>
-        <div style="font-size: 12px; color: ${INK}; margin-top: 8px;">Not yet recorded.</div>
-        <div style="font-size: 11px; color: ${DIM}; margin-top: 4px;">${escapeHtml(hint)}</div>
-      </div>`;
+/** An honest table cell for a single unmeasured value. Mono, DIM, never 'N/A' or 0. */
+function notMeasuredCell(): string {
+  return `<span style="font-family: ${MONO}; font-size: 9px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: ${DIM};">Not yet measured</span>`;
 }
 
 /** A table body row standing in for "no rows recorded yet". */
@@ -580,17 +564,25 @@ function nothingRecordedYet(year: number): string {
       </p>`;
 }
 
-// Maps section IDs to materiality topic IDs (mirrors section-narrative-assistant.ts)
-const SECTION_TO_TOPIC: Record<string, string> = {
+// Maps section IDs to materiality topic IDs. Exported so a test can assert
+// every value exists in lib/materiality/topic-library.ts: four of these were
+// phantom ids for months (product-footprints, governance-accountability,
+// community-engagement, supply-chain-standards), which silently guaranteed
+// the materiality callout could never appear on those pages.
+export const SECTION_TO_TOPIC: Record<string, string> = {
   'scope-1-2-3': 'climate-mitigation',
   'emissions-breakdown': 'climate-mitigation',
   'key-findings': 'climate-mitigation',
   'trends': 'climate-mitigation',
-  'products': 'product-footprints',
+  'products': 'product-lifecycle',
+  'product-footprints': 'product-lifecycle',
   'people': 'employee-wellbeing',
-  'governance': 'governance-accountability',
-  'community': 'community-engagement',
-  'supply-chain': 'supply-chain-standards',
+  'people-culture': 'employee-wellbeing',
+  'governance': 'sustainability-governance',
+  'community': 'community-impact',
+  'community-impact': 'community-impact',
+  'supply-chain': 'supply-chain-transparency',
+  'facilities': 'energy-management',
 };
 
 /**
@@ -1276,8 +1268,18 @@ function renderVineyardsPage(config: ReportConfig, data: ReportData, theme?: Rep
 
 function renderPeopleCulturePage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
   const brandColor = getBrandColor(config);
-  if (!data.peopleCulture) return '';
-  const pc = data.peopleCulture;
+  // Never return '': a selected section always renders, as a skeleton if need
+  // be. The spread-merge also fills keys legacy callers omit (undefined would
+  // otherwise print or crash where the contract promises null).
+  const pc: PeopleCultureData = { ...EMPTY_PEOPLE_CULTURE, ...data.peopleCulture };
+
+  const hasAnyMeasure = [
+    pc.totalEmployees, pc.femalePercentage, pc.newHires, pc.departures,
+    pc.turnoverRate, pc.livingWageCompliance, pc.trainingHoursPerEmployee,
+    pc.genderPayGapMean, pc.ceoWorkerPayRatio, pc.engagementScore,
+    pc.deiActionsTotal,
+  ].some(v => v !== null) || pc.benefits.length > 0;
+  const nothingRecorded = pc.dataCompleteness === 0 && !hasAnyMeasure;
 
   const pillars = [
     { label: 'Fair Work', score: pc.fairWorkScore, color: '#047857' },
@@ -1300,6 +1302,7 @@ function renderPeopleCulturePage(config: ReportConfig, data: ReportData, theme?:
       <div style="height: 150px; border-radius: 6px; overflow: hidden; margin-bottom: 24px;">
         <img src="${escapeHtml(config.branding.images.people)}" alt="" style="width: 100%; height: 100%; object-fit: cover;" />
       </div>` : ''}
+      ${nothingRecorded ? nothingRecordedYet(config.reportYear) : ''}
 
       <div style="display: flex; gap: 24px; margin-bottom: 28px;">
         <div style="flex: 1; background: ${brandColor}; border-radius: 6px; padding: 28px; color: ${onBand(brandColor).fg};">
@@ -1321,26 +1324,30 @@ function renderPeopleCulturePage(config: ReportConfig, data: ReportData, theme?:
       </div>
 
       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px;">
+        ${pc.totalEmployees !== null ? `
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Employees</div>
           <div class="metric-value" style="font-size: 24px;">${pc.totalEmployees}</div>
           <div class="metric-unit">total headcount</div>
-        </div>
+        </div>` : notMeasuredTile('Employees', 'Add under People, Diversity & inclusion')}
+        ${pc.femalePercentage !== null ? `
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Female %</div>
-          <div class="metric-value" style="font-size: 24px;">${pc.femalePercentage !== null ? pc.femalePercentage.toFixed(0) + '%' : 'N/A'}</div>
+          <div class="metric-value" style="font-size: 24px;">${pc.femalePercentage.toFixed(0)}%</div>
           <div class="metric-unit">of workforce</div>
-        </div>
+        </div>` : notMeasuredTile('Female %', 'Add under People, Diversity & inclusion')}
+        ${pc.newHires !== null ? `
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">New Hires</div>
           <div class="metric-value" style="font-size: 24px;">${pc.newHires}</div>
-          <div class="metric-unit">${pc.departures} departures</div>
-        </div>
+          <div class="metric-unit">${pc.departures !== null ? `${pc.departures} departures` : 'departures not yet measured'}</div>
+        </div>` : notMeasuredTile('New Hires', 'Add under People, Diversity & inclusion')}
+        ${pc.turnoverRate !== null ? `
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Turnover</div>
-          <div class="metric-value" style="font-size: 24px;">${pc.turnoverRate !== null ? pc.turnoverRate.toFixed(1) + '%' : 'N/A'}</div>
+          <div class="metric-value" style="font-size: 24px;">${pc.turnoverRate.toFixed(1)}%</div>
           <div class="metric-unit">annual rate</div>
-        </div>
+        </div>` : notMeasuredTile('Turnover', 'Add under People, Diversity & inclusion')}
       </div>
 
       <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
@@ -1349,19 +1356,37 @@ function renderPeopleCulturePage(config: ReportConfig, data: ReportData, theme?:
           <div class="metric-label">Living Wage</div>
           <div class="metric-value" style="font-size: 24px; color: ${pc.livingWageCompliance >= 90 ? '#047857' : '#BF4B2A'};">${pc.livingWageCompliance.toFixed(0)}%</div>
           <div class="metric-unit">compliance</div>
-        </div>` : ''}
+        </div>` : notMeasuredTile('Living Wage', 'Add under People, Fair work')}
         ${pc.trainingHoursPerEmployee !== null ? `
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Training</div>
           <div class="metric-value" style="font-size: 24px;">${pc.trainingHoursPerEmployee.toFixed(1)}</div>
           <div class="metric-unit">hours per employee</div>
-        </div>` : ''}
+        </div>` : notMeasuredTile('Training', 'Add under People, Training')}
         ${pc.genderPayGapMean !== null ? `
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Gender Pay Gap</div>
           <div class="metric-value" style="font-size: 24px; color: ${pc.genderPayGapMean <= 5 ? '#047857' : '#BF4B2A'};">${pc.genderPayGapMean.toFixed(1)}%</div>
           <div class="metric-unit">mean gap</div>
-        </div>` : ''}
+        </div>` : notMeasuredTile('Gender Pay Gap', 'Add under People, Fair work')}
+        ${pc.ceoWorkerPayRatio !== null ? `
+        <div class="metric-card" style="text-align: center;">
+          <div class="metric-label">CEO Pay Ratio</div>
+          <div class="metric-value" style="font-size: 24px;">${pc.ceoWorkerPayRatio.toFixed(1)}:1</div>
+          <div class="metric-unit">CEO to median worker</div>
+        </div>` : notMeasuredTile('CEO Pay Ratio', 'Add under People, Fair work')}
+        ${pc.engagementScore !== null ? `
+        <div class="metric-card" style="text-align: center;">
+          <div class="metric-label">Engagement</div>
+          <div class="metric-value" style="font-size: 24px;">${pc.engagementScore.toFixed(0)}%</div>
+          <div class="metric-unit">employee engagement</div>
+        </div>` : notMeasuredTile('Engagement', 'Add under People, Wellbeing')}
+        ${pc.deiActionsTotal !== null ? `
+        <div class="metric-card" style="text-align: center;">
+          <div class="metric-label">DEI Actions</div>
+          <div class="metric-value" style="font-size: 24px;">${pc.deiActionsCompleted ?? 0} of ${pc.deiActionsTotal}</div>
+          <div class="metric-unit">actions completed</div>
+        </div>` : notMeasuredTile('DEI Actions', 'Add under People, Diversity & inclusion')}
       </div>
 
       ${renderPageFooter(config, 5, false, undefined, theme)}
@@ -1369,20 +1394,32 @@ function renderPeopleCulturePage(config: ReportConfig, data: ReportData, theme?:
 }
 
 function renderGovernancePage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
-  if (!data.governance) return '';
-  const gov = data.governance;
+  // Never return '': a selected section always renders, as a skeleton if need
+  // be. The spread-merge also fills keys legacy callers omit.
+  const gov: GovernanceData = {
+    ...EMPTY_GOVERNANCE,
+    ...data.governance,
+    boardDiversityMetrics: {
+      ...EMPTY_GOVERNANCE.boardDiversityMetrics,
+      ...data.governance?.boardDiversityMetrics,
+    },
+    boardMembers: data.governance?.boardMembers ?? [],
+    policies: data.governance?.policies ?? [],
+  };
 
-  const boardRows = gov.boardMembers.slice(0, 10).map(m => `
+  const nothingRecorded = gov.boardMembers.length === 0 && gov.policies.length === 0 && !gov.missionStatement;
+
+  const boardRows = gov.boardMembers.length > 0 ? gov.boardMembers.slice(0, 10).map(m => `
     <tr>
       <td style="font-weight: 500;">${escapeHtml(m.name)}</td>
       <td>${escapeHtml(m.role)}</td>
-      <td>${m.gender ? escapeHtml(m.gender) : 'N/A'}</td>
-      <td>${m.isIndependent === null ? 'N/A' : m.isIndependent ? 'Yes' : 'No'}</td>
-      <td style="text-align: right;">${m.attendanceRate !== null ? m.attendanceRate.toFixed(0) + '%' : 'N/A'}</td>
+      <td>${m.gender ? escapeHtml(m.gender) : notMeasuredCell()}</td>
+      <td>${m.isIndependent === null ? notMeasuredCell() : m.isIndependent ? 'Yes' : 'No'}</td>
+      <td style="text-align: right;">${m.attendanceRate !== null ? m.attendanceRate.toFixed(0) + '%' : notMeasuredCell()}</td>
     </tr>
-  `).join('');
+  `).join('') : notMeasuredRow(5, 'Add board members under Governance, Board.');
 
-  const policyRows = gov.policies.slice(0, 8).map(p => {
+  const policyRows = gov.policies.length > 0 ? gov.policies.slice(0, 8).map(p => {
     const statusColor = p.status === 'active' ? '#047857' : p.status === 'draft' ? '#B45309' : '#BE123C';
     return `
     <tr>
@@ -1391,7 +1428,7 @@ function renderGovernancePage(config: ReportConfig, data: ReportData, theme?: Re
       <td><span style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: ${statusColor};">${escapeHtml(p.status)}</span></td>
       <td>${p.isPublic ? '&#10003; Public' : 'Internal'}</td>
     </tr>`;
-  }).join('');
+  }).join('') : notMeasuredRow(4, 'Add policies under Governance, Policies.');
 
   const governanceNarrative = data.narratives?.sections?.['governance'];
 
@@ -1401,31 +1438,33 @@ function renderGovernancePage(config: ReportConfig, data: ReportData, theme?: Re
 
       ${renderMaterialityCallout(config, 'governance', data)}
       ${(theme?.showNarratives !== false) && governanceNarrative ? renderNarrativeBlock(governanceNarrative) : ''}
+      ${nothingRecorded ? nothingRecordedYet(config.reportYear) : ''}
 
       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px;">
+        ${gov.boardDiversityMetrics.totalMembers > 0 ? `
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Board Size</div>
           <div class="metric-value" style="font-size: 24px;">${gov.boardDiversityMetrics.totalMembers}</div>
           <div class="metric-unit">members</div>
-        </div>
+        </div>` : notMeasuredTile('Board Size', 'Add under Governance, Board')}
         ${gov.boardDiversityMetrics.femalePercentage !== null ? `
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Female %</div>
           <div class="metric-value" style="font-size: 24px; color: #2B46C0;">${gov.boardDiversityMetrics.femalePercentage.toFixed(0)}%</div>
           <div class="metric-unit">board diversity</div>
-        </div>` : notMeasuredMetric('Female %', 'add in governance > board')}
+        </div>` : notMeasuredTile('Female %', 'Add under Governance, Board')}
         ${gov.boardDiversityMetrics.independentPercentage !== null ? `
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Independent %</div>
           <div class="metric-value" style="font-size: 24px;">${gov.boardDiversityMetrics.independentPercentage.toFixed(0)}%</div>
           <div class="metric-unit">of directors</div>
-        </div>` : notMeasuredMetric('Independent %', 'add in governance > board')}
+        </div>` : notMeasuredTile('Independent %', 'Add under Governance, Board')}
         ${gov.policyCompleteness !== null ? `
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Policy Score</div>
           <div class="metric-value" style="font-size: 24px; color: ${gov.policyCompleteness >= 75 ? '#047857' : '#BF4B2A'};">${gov.policyCompleteness.toFixed(0)}%</div>
           <div class="metric-unit">completeness</div>
-        </div>` : notMeasuredMetric('Policy Score', 'add in governance > policies')}
+        </div>` : notMeasuredTile('Policy Score', 'Add under Governance, Policies')}
       </div>
 
       <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px;">Board Composition</div>
@@ -1448,7 +1487,7 @@ function renderGovernancePage(config: ReportConfig, data: ReportData, theme?: Re
       <div style="background: #F2F1EA; border: 1px solid #D9D6CB; border-radius: 6px; padding: 16px;">
         <div style="font-size: 11px; font-weight: 600; color: #1A1B1D; margin-bottom: 6px;">Mission Statement</div>
         <p style="font-size: 12px; color: #1A1B1D; line-height: 1.6; font-style: italic;">${escapeHtml(gov.missionStatement)}</p>
-      </div>` : ''}
+      </div>` : notMeasuredBlock('Mission Statement', 'Add under Governance, Overview')}
 
       ${renderPageFooter(config, 6, false, undefined, theme)}
     </div>`;
@@ -1456,8 +1495,14 @@ function renderGovernancePage(config: ReportConfig, data: ReportData, theme?: Re
 
 function renderCommunityImpactPage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
   const brandColor = getBrandColor(config);
-  if (!data.communityImpact) return '';
-  const ci = data.communityImpact;
+  // Never return '': a selected section always renders, as a skeleton if need
+  // be. The spread-merge also fills keys legacy callers omit.
+  const ci: CommunityImpactData = {
+    ...EMPTY_COMMUNITY_IMPACT,
+    ...data.communityImpact,
+    impactStories: data.communityImpact?.impactStories ?? [],
+  };
+  const nothingRecorded = ci.dataCompleteness === 0;
 
   const pillarScores = [
     { label: 'Giving', score: ci.givingScore, color: '#047857' },
@@ -1474,6 +1519,7 @@ function renderCommunityImpactPage(config: ReportConfig, data: ReportData, theme
 
       ${renderMaterialityCallout(config, 'community', data)}
       ${(theme?.showNarratives !== false) && communityNarrative ? renderNarrativeBlock(communityNarrative) : ''}
+      ${nothingRecorded ? nothingRecordedYet(config.reportYear) : ''}
 
       <div style="display: flex; gap: 24px; margin-bottom: 24px;">
         <div style="flex: 1; background: ${brandColor}; border-radius: 6px; padding: 28px; color: ${onBand(brandColor).fg};">
@@ -1499,24 +1545,26 @@ function renderCommunityImpactPage(config: ReportConfig, data: ReportData, theme
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Donations</div>
           <div class="metric-value" style="font-size: 20px;">${formatGBP(ci.totalDonations)}</div>
-          <div class="metric-unit">${ci.donationCount ?? 0} contributions</div>
-        </div>` : notMeasuredMetric('Donations', 'add in community > giving')}
+          <div class="metric-unit">${ci.donationCount !== null ? `${ci.donationCount} contributions` : 'charitable giving'}</div>
+        </div>` : notMeasuredTile('Donations', 'Add under Community, Charitable giving')}
         ${ci.totalVolunteerHours !== null ? `
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Volunteer Hours</div>
           <div class="metric-value" style="font-size: 20px;">${formatNumber(ci.totalVolunteerHours, 0)}</div>
-          <div class="metric-unit">${ci.volunteerActivities ?? 0} activities</div>
-        </div>` : notMeasuredMetric('Volunteer Hours', 'add in community > volunteering')}
+          <div class="metric-unit">${ci.volunteerActivities !== null ? `${ci.volunteerActivities} activities` : 'volunteering'}</div>
+        </div>` : notMeasuredTile('Volunteer Hours', 'Add under Community, Volunteering')}
+        ${ci.localEmploymentRate !== null ? `
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Local Employment</div>
-          <div class="metric-value" style="font-size: 20px;">${ci.localEmploymentRate !== null ? ci.localEmploymentRate.toFixed(0) + '%' : 'N/A'}</div>
+          <div class="metric-value" style="font-size: 20px;">${ci.localEmploymentRate.toFixed(0)}%</div>
           <div class="metric-unit">local hires</div>
-        </div>
+        </div>` : notMeasuredTile('Local Employment', 'Add under Community, Local impact')}
+        ${ci.localSourcingRate !== null ? `
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Local Sourcing</div>
-          <div class="metric-value" style="font-size: 20px;">${ci.localSourcingRate !== null ? ci.localSourcingRate.toFixed(0) + '%' : 'N/A'}</div>
+          <div class="metric-value" style="font-size: 20px;">${ci.localSourcingRate.toFixed(0)}%</div>
           <div class="metric-unit">local suppliers</div>
-        </div>
+        </div>` : notMeasuredTile('Local Sourcing', 'Add under Community, Local impact')}
       </div>
 
       ${ci.impactStories.length > 0 ? (() => {
@@ -1541,25 +1589,27 @@ function renderCommunityImpactPage(config: ReportConfig, data: ReportData, theme
           </div>`;
         }).join('')}
       </div>`;
-      })() : ''}
+      })() : notMeasuredBlock('Impact Stories', 'Add under Community, Stories')}
 
       ${renderPageFooter(config, 7, false, undefined, theme)}
     </div>`;
 }
 
 function renderSupplyChainPage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
-  if (!data.suppliers || data.suppliers.length === 0) return '';
+  // Never return '': a selected section always renders, as a skeleton if need be.
+  const suppliers = data.suppliers ?? [];
+  const nothingRecorded = suppliers.length === 0;
 
   // Group suppliers by category
   const categories: Record<string, { count: number; suppliers: SupplierData[] }> = {};
-  for (const s of data.suppliers) {
+  for (const s of suppliers) {
     const cat = s.category || 'Uncategorised';
     if (!categories[cat]) categories[cat] = { count: 0, suppliers: [] };
     categories[cat].count++;
     categories[cat].suppliers.push(s);
   }
 
-  const categoryRows = Object.entries(categories)
+  const categoryRows = suppliers.length > 0 ? Object.entries(categories)
     .sort((a, b) => b[1].count - a[1].count)
     .slice(0, 12)
     .map(([cat, info]) => `
@@ -1568,7 +1618,7 @@ function renderSupplyChainPage(config: ReportConfig, data: ReportData, theme?: R
         <td style="text-align: center; font-weight: 600;">${info.count}</td>
         <td style="font-size: 11px; color: #6F6F68;">${info.suppliers.slice(0, 3).map(s => escapeHtml(s.name)).join(', ')}${info.count > 3 ? ` +${info.count - 3} more` : ''}</td>
       </tr>
-    `).join('');
+    `).join('') : notMeasuredRow(3, 'Add suppliers under Suppliers.');
 
   const supplyChainNarrative = data.narratives?.sections?.['supply-chain'];
 
@@ -1578,11 +1628,13 @@ function renderSupplyChainPage(config: ReportConfig, data: ReportData, theme?: R
 
       ${renderMaterialityCallout(config, 'supply-chain', data)}
       ${(theme?.showNarratives !== false) && supplyChainNarrative ? renderNarrativeBlock(supplyChainNarrative) : ''}
+      ${nothingRecorded ? nothingRecordedYet(config.reportYear) : ''}
 
       <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
+        ${suppliers.length > 0 ? `
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Total Suppliers</div>
-          <div class="metric-value" style="font-size: 32px;">${data.suppliers.length}</div>
+          <div class="metric-value" style="font-size: 32px;">${suppliers.length}</div>
           <div class="metric-unit">in supply chain</div>
         </div>
         <div class="metric-card" style="text-align: center;">
@@ -1592,9 +1644,12 @@ function renderSupplyChainPage(config: ReportConfig, data: ReportData, theme?: R
         </div>
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Data Coverage</div>
-          <div class="metric-value" style="font-size: 32px;">${data.suppliers.filter(s => Object.keys(s.emissionsData || {}).length > 0).length}</div>
+          <div class="metric-value" style="font-size: 32px;">${suppliers.filter(s => Object.keys(s.emissionsData || {}).length > 0).length}</div>
           <div class="metric-unit">with emissions data</div>
-        </div>
+        </div>` : `
+        ${notMeasuredTile('Total Suppliers', 'Add under Suppliers')}
+        ${notMeasuredTile('Categories', 'Add under Suppliers')}
+        ${notMeasuredTile('Data Coverage', 'Add under Suppliers')}`}
       </div>
 
       <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px;">Supplier Categories</div>
@@ -1606,6 +1661,89 @@ function renderSupplyChainPage(config: ReportConfig, data: ReportData, theme?: R
       </table>
 
       ${renderPageFooter(config, 8, false, undefined, theme)}
+    </div>`;
+}
+
+function renderFacilitiesPage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
+  // Never return '': a selected section always renders, as a skeleton if need be.
+  const facilities = data.facilities ?? [];
+  const nothingRecorded = facilities.length === 0;
+
+  const measured = facilities.filter(f => f.totalEmissions !== null);
+  // FacilityInfo.totalEmissions is ALREADY tonnes at this layer (the fetcher
+  // converts from the source column's kg).
+  const totalSiteEmissions = measured.reduce((sum, f) => sum + (f.totalEmissions ?? 0), 0);
+
+  const facilityRows = facilities.length > 0 ? facilities.slice(0, 14).map(f => {
+    const intensityKg = f.totalEmissions !== null && f.unitsProduced !== null && f.unitsProduced > 0
+      ? (f.totalEmissions * 1000) / f.unitsProduced
+      : null;
+    return `
+    <tr>
+      <td style="font-weight: 500;">${escapeHtml(f.name)}</td>
+      <td style="font-size: 11px; color: #6F6F68;">${escapeHtml(f.type)}</td>
+      <td style="font-size: 11px; color: #6F6F68;">${escapeHtml(f.location)}</td>
+      <td style="text-align: right;">${f.totalEmissions !== null ? formatNumber(f.totalEmissions, 1) : notMeasuredCell()}</td>
+      <td style="text-align: right;">${f.unitsProduced !== null ? formatNumber(f.unitsProduced, 0) : notMeasuredCell()}</td>
+      <td style="text-align: right;">${intensityKg !== null ? formatNumber(intensityKg, 3) : notMeasuredCell()}</td>
+    </tr>`;
+  }).join('') : notMeasuredRow(6, 'Add facilities under Company, Facilities.');
+
+  const facilitiesNarrative = data.narratives?.sections?.['facilities'];
+
+  return `
+    <div class="page light-page">
+      ${renderSectionHeader('__SECTION_NUM__', 'Facilities', false, false, getBrandColor(config), theme)}
+
+      ${renderMaterialityCallout(config, 'facilities', data)}
+      ${(theme?.showNarratives !== false) && facilitiesNarrative ? renderNarrativeBlock(facilitiesNarrative) : ''}
+      ${nothingRecorded ? nothingRecordedYet(config.reportYear) : ''}
+
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px;">
+        ${facilities.length > 0 ? `
+        <div class="metric-card" style="text-align: center;">
+          <div class="metric-label">Sites</div>
+          <div class="metric-value" style="font-size: 32px;">${facilities.length}</div>
+          <div class="metric-unit">operational sites</div>
+        </div>
+        <div class="metric-card" style="text-align: center;">
+          <div class="metric-label">Sites Measured</div>
+          <div class="metric-value" style="font-size: 32px; color: ${measured.length === facilities.length ? '#047857' : '#B45309'};">${measured.length}</div>
+          <div class="metric-unit">with emissions data</div>
+        </div>
+        ${measured.length > 0 ? `
+        <div class="metric-card" style="text-align: center;">
+          <div class="metric-label">Site Emissions</div>
+          <div class="metric-value" style="font-size: 24px;">${formatNumber(totalSiteEmissions, 1)}</div>
+          <div class="metric-unit">tCO&#8322;e scopes 1 &amp; 2</div>
+        </div>` : notMeasuredTile('Site Emissions', 'Add under Company, Facilities')}` : `
+        ${notMeasuredTile('Sites', 'Add under Company, Facilities')}
+        ${notMeasuredTile('Sites Measured', 'Add under Company, Facilities')}
+        ${notMeasuredTile('Site Emissions', 'Add under Company, Facilities')}`}
+      </div>
+
+      <div style="font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: #6F6F68; margin-bottom: 16px;">${measured.length} of ${facilities.length} sites measured</div>
+
+      <table class="data-table" style="font-size: 11px;">
+        <thead>
+          <tr>
+            <th>Site</th>
+            <th>Type</th>
+            <th>Location</th>
+            <th style="text-align: right;">tCO&#8322;e</th>
+            <th style="text-align: right;">Units Produced</th>
+            <th style="text-align: right;">kg CO&#8322;e/unit</th>
+          </tr>
+        </thead>
+        <tbody>${facilityRows}</tbody>
+      </table>
+
+      <div style="font-size: 10px; color: #6F6F68; margin-top: 12px; line-height: 1.5;">
+        Site emissions cover scopes 1 and 2 only, so they do not sum to the whole-company
+        headline figure, which also includes scope 3.
+      </div>
+
+      ${renderPageFooter(config, 9, false, undefined, theme)}
     </div>`;
 }
 
@@ -1631,7 +1769,7 @@ function renderTargetsPage(config: ReportConfig, data: ReportData, theme?: Repor
             <div style="font-size: 14px; color: #D9D6CB; line-height: 1.6;">${escapeHtml(c)}</div>
           </div>
         `).join('') : `
-          <p style="font-size: 14px; color: #6F6F68;">No climate commitments have been recorded yet. Consider setting Science Based Targets or committing to a net-zero pathway.</p>
+          <p style="font-size: 13px; color: ${onBand(brandColor).meta};">Not yet recorded. Climate commitments added under Governance will appear here.</p>
         `}
       </div>
 
@@ -1666,10 +1804,10 @@ function renderTargetsPage(config: ReportConfig, data: ReportData, theme?: Repor
               const latest = data.emissionsTrends[data.emissionsTrends.length - 1];
               const yoy = latest.yoyChange ? parseFloat(latest.yoyChange) : NaN;
               const color = isNaN(yoy) ? '#6F6F68' : yoy < 0 ? '#047857' : '#BE123C';
-              const label = isNaN(yoy) ? 'N/A' : yoy < 0 ? 'Decreasing' : 'Increasing';
-              return `<div style="font-size: 20px; font-weight: 700; color: ${color};">${label}</div>
+              const label = isNaN(yoy) ? 'Not yet known' : yoy < 0 ? 'Decreasing' : 'Increasing';
+              return `<div style="font-size: ${isNaN(yoy) ? 14 : 20}px; font-weight: 700; color: ${color};">${label}</div>
                 <div style="font-size: 12px; color: #6F6F68;">${isNaN(yoy) ? '' : Math.abs(yoy).toFixed(1) + '% YoY'}</div>`;
-            })() : `<div style="font-size: 20px; font-weight: 700; color: #6F6F68;">N/A</div><div style="font-size: 12px; color: #6F6F68;">Insufficient data</div>`}
+            })() : `<div style="font-size: 14px; font-weight: 600; color: #6F6F68; margin-top: 4px;">Not yet known</div><div style="font-size: 12px; color: #6F6F68;">Needs a second year of data</div>`}
           </div>
         </div>
       </div>
@@ -2192,9 +2330,10 @@ export function renderSustainabilityReportHtml(
     : '';
 
   // ---- Content pages, keyed by section id ---------------------------------
-  // Assembled in the STYLE's narrative order below; sections without data or
-  // deselected by the user simply drop out. Exec summary, emissions, targets
-  // and methodology always render (every style orders them).
+  // Assembled in the STYLE's narrative order below; deselected sections drop
+  // out, but a SELECTED section always renders (skeleton when its data is
+  // missing). Exec summary, emissions, targets and methodology always render
+  // (every style orders them).
   const sectionPages = new Map<string, string>();
   sectionPages.set('executive-summary', renderExecSummaryPage(config, data, theme));
   sectionPages.set('scope-1-2-3', renderEmissionsPage(config, data, theme));
@@ -2210,17 +2349,25 @@ export function renderSustainabilityReportHtml(
   if (data.dataAvailability.hasVineyards && data.vineyards && data.vineyards.length > 0) {
     sectionPages.set('vineyards', renderVineyardsPage(config, data, theme));
   }
-  if ((sections.has('people-culture') || sections.has('people')) && data.dataAvailability.hasPeopleCulture) {
+  // The social and value-chain sections gate on SECTION SELECTION ALONE.
+  // dataAvailability.hasX is reporting metadata, never a render gate: the
+  // flag was set 1,800 lines from where it was read, and forgetting to set it
+  // silently dropped whole selected pages for months. A selected section with
+  // no data renders as an honest "not yet measured" skeleton instead.
+  if (sections.has('people-culture') || sections.has('people')) {
     sectionPages.set('people-culture', renderPeopleCulturePage(config, data, theme));
   }
-  if (sections.has('governance') && data.dataAvailability.hasGovernance) {
+  if (sections.has('governance')) {
     sectionPages.set('governance', renderGovernancePage(config, data, theme));
   }
-  if ((sections.has('community-impact') || sections.has('community')) && data.dataAvailability.hasCommunityImpact) {
+  if (sections.has('community-impact') || sections.has('community')) {
     sectionPages.set('community-impact', renderCommunityImpactPage(config, data, theme));
   }
-  if (sections.has('supply-chain') && data.dataAvailability.hasSuppliers) {
+  if (sections.has('supply-chain')) {
     sectionPages.set('supply-chain', renderSupplyChainPage(config, data, theme));
+  }
+  if (sections.has('facilities')) {
+    sectionPages.set('facilities', renderFacilitiesPage(config, data, theme));
   }
   sectionPages.set('targets', renderTargetsPage(config, data, theme));
   if (sections.has('transition-roadmap') && data.transitionPlan && data.transitionPlan.milestones.length > 0) {

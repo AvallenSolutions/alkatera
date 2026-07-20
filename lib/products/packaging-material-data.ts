@@ -105,16 +105,26 @@ export function buildPackagingMaterialData(form: PackagingFormData, productId: s
     printing_process: form.printing_process || null,
   };
 
+  // Parametric material identity. When a class is set (and no supplier is
+  // linked), the calculator derives the factor from the endpoint library —
+  // data_source 'parametric' satisfies the data_source_integrity CHECK via
+  // packaging_material_class.
+  materialData.packaging_material_class = form.packaging_material_class || null;
+  materialData.packaging_material_variant = form.packaging_material_variant || null;
+
   // Only include data_source if it's a valid value with required fields
-  if (form.data_source === 'openlca' && form.data_source_id) {
+  if (form.data_source === 'supplier' && form.supplier_product_id) {
+    materialData.data_source = 'supplier';
+    materialData.supplier_product_id = form.supplier_product_id;
+  } else if (form.data_source === 'parametric' && form.packaging_material_class) {
+    materialData.data_source = 'parametric';
+    materialData.data_source_id = null;
+  } else if (form.data_source === 'openlca' && form.data_source_id) {
     materialData.data_source = 'openlca';
     materialData.data_source_id = form.data_source_id;
     if (form.openlca_database) {
       materialData.openlca_database = form.openlca_database;
     }
-  } else if (form.data_source === 'supplier' && form.supplier_product_id) {
-    materialData.data_source = 'supplier';
-    materialData.supplier_product_id = form.supplier_product_id;
   }
 
   // Cache the emission factor value so the resolver always has a local

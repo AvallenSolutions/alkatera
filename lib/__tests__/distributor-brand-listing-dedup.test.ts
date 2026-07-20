@@ -2,34 +2,48 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { processSkuList } from '@/lib/distributor/sku-list-processor';
 
 /**
- * Phase 4 acceptance: when the directory matcher resolves a new SKU
- * upload to a directory entry the distributor already lists, we must
- * UPDATE the existing brand_profiles row rather than INSERT a fresh
- * duplicate. The migration adds unique(distributor_org_id,
- * brand_directory_id) which would reject a duplicate insert at the DB
- * level, but the application should detect this case first so the
- * upload doesn't fail.
+ * Phase 4 acceptance: when the directory matcher resolves a new SKU upload to
+ * a directory entry the distributor already lists, the upload must not create
+ * a second listing for that brand.
  *
- * These tests stub the supabase client + the directory matcher to
- * exercise both branches: existing-listing-update and new-listing-insert.
+ * The processor used to do a SELECT then a per-brand INSERT or UPDATE, and
+ * these tests asserted on which of the two ran. It now does one bulk
+ * `.upsert(payload, { onConflict: 'distributor_org_id,brand_directory_id' })`,
+ * which is a better implementation (it replaced ~1-2k round-trips on a real
+ * catalogue) but it made the old assertions meaningless: the mock had no
+ * `.in()`, so the tests threw rather than failed, and sat red.
+ *
+ * Rewritten against the bulk-upsert shape. The guarantee under test is
+ * unchanged and is now asserted directly: one row per directory entry, keyed
+ * on the unique constraint, with a curated website never clobbered by a CSV.
  */
 
 const DISTRIBUTOR_ORG_ID = 'distributor-X';
 const SKU_LIST_ID = 'sku-list-1';
 const DIRECTORY_ID_AVALLEN = 'directory-avallen';
 
-let inserts: Array<{ table: string; row: Record<string, unknown> }> = [];
-let updates: Array<{ table: string; rowId: string; patch: Record<string, unknown> }> = [];
-let existingProfiles: Array<{
+interface ProfileRow {
   id: string;
   distributor_org_id: string;
   brand_directory_id: string;
+  name?: string;
+  normalized_name?: string;
   website: string | null;
+}
+
+/** Every upsert the processor issued, in order. */
+let upserts: Array<{
+  table: string;
+  payload: Record<string, unknown>[];
+  options: Record<string, unknown> | undefined;
 }> = [];
+let inserts: Array<{ table: string; row: Record<string, unknown> }> = [];
+/** Stands in for the brand_profiles table, and survives across uploads. */
+let existingProfiles: ProfileRow[] = [];
 
 beforeEach(() => {
+  upserts = [];
   inserts = [];
-  updates = [];
   existingProfiles = [];
 });
 
@@ -64,16 +78,14 @@ function fakeSupabase(): unknown {
       return { data: [], error: null };
     },
     from(table: string) {
-      const builder: Record<string, unknown> = {};
       let filters: Record<string, unknown> = {};
-      let nextSelect: string | null = null;
-      let updatePatch: Record<string, unknown> | null = null;
+      let inFilter: { col: string; values: unknown[] } | null = null;
       let insertPatch: Record<string, unknown> | null = null;
+      let upsertPayload: Record<string, unknown>[] | null = null;
+      let upsertOptions: Record<string, unknown> | undefined;
+
       const fluent: Record<string, unknown> = {
-        select: (cols: string) => {
-          nextSelect = cols;
-          return fluent;
-        },
+        select: () => fluent,
         eq: (col: string, val: unknown) => {
           filters[col] = val;
           return fluent;
@@ -82,93 +94,119 @@ function fakeSupabase(): unknown {
           filters[col] = val;
           return fluent;
         },
+        in: (col: string, values: unknown[]) => {
+          inFilter = { col, values };
+          return fluent;
+        },
         order: () => fluent,
         single: async () => respond(),
         maybeSingle: async () => respond(),
-        update: (patch: Record<string, unknown>) => {
-          updatePatch = patch;
-          return fluent;
-        },
         insert: (row: Record<string, unknown> | Record<string, unknown>[]) => {
           insertPatch = Array.isArray(row) ? row[0] : row;
           return fluent;
         },
-        upsert: (row: Record<string, unknown>) => {
-          // Older code path — should NOT be hit by Phase 4 processor.
-          insertPatch = row;
+        upsert: (
+          rows: Record<string, unknown> | Record<string, unknown>[],
+          options?: Record<string, unknown>,
+        ) => {
+          upsertPayload = Array.isArray(rows) ? rows : [rows];
+          upsertOptions = options;
           return fluent;
         },
+        // The processor awaits the builder directly for the bulk calls
+        // (no .single()), so it has to be thenable.
+        then: (
+          resolve: (v: unknown) => unknown,
+          reject?: (e: unknown) => unknown,
+        ) => respond().then(resolve, reject),
       };
 
-      async function respond() {
-        if (table === 'brand_profiles' && updatePatch) {
-          const id = filters.id as string;
-          updates.push({ table, rowId: id, patch: updatePatch });
-          const existing = existingProfiles.find((p) => p.id === id) ?? null;
-          updatePatch = null;
-          filters = {};
-          nextSelect = null;
-          return {
-            data: existing
-              ? { id: existing.id, website: existing.website }
-              : null,
-            error: existing ? null : { message: 'not_found' },
-          };
+      function reset() {
+        filters = {};
+        inFilter = null;
+        insertPatch = null;
+        upsertPayload = null;
+        upsertOptions = undefined;
+      }
+
+      async function respond(): Promise<{ data: unknown; error: unknown }> {
+        if (table === 'brand_profiles' && upsertPayload) {
+          upserts.push({ table, payload: upsertPayload, options: upsertOptions });
+          const returned: Array<{ id: string; brand_directory_id: string }> = [];
+          for (const row of upsertPayload) {
+            const dirId = row.brand_directory_id as string;
+            const orgId = row.distributor_org_id as string;
+            // Mirror the real unique(distributor_org_id, brand_directory_id):
+            // a conflicting row updates in place instead of adding a second.
+            const existing = existingProfiles.find(
+              (p) => p.distributor_org_id === orgId && p.brand_directory_id === dirId,
+            );
+            if (existing) {
+              Object.assign(existing, row);
+              returned.push({ id: existing.id, brand_directory_id: dirId });
+            } else {
+              const created: ProfileRow = {
+                ...(row as unknown as ProfileRow),
+                id: 'profile-' + (existingProfiles.length + 1),
+              };
+              existingProfiles.push(created);
+              returned.push({ id: created.id, brand_directory_id: dirId });
+            }
+          }
+          reset();
+          return { data: returned, error: null };
         }
-        if (table === 'brand_profiles' && insertPatch) {
-          const row = {
-            id: 'new-profile-' + (inserts.length + 1),
-            website: (insertPatch as { website?: string | null }).website ?? null,
-            distributor_org_id: insertPatch.distributor_org_id as string,
-            brand_directory_id: insertPatch.brand_directory_id as string,
-          };
-          inserts.push({ table, row: insertPatch });
-          existingProfiles.push(row);
-          insertPatch = null;
-          filters = {};
-          nextSelect = null;
-          return { data: { id: row.id, website: row.website }, error: null };
-        }
+
         if (table === 'brand_profiles') {
-          // SELECT path
-          const match = existingProfiles.find(
+          // The bulk existence check: select ... eq(org) in(brand_directory_id).
+          const orgId = filters.distributor_org_id;
+          const wanted = inFilter ? (inFilter as { values: unknown[] }).values : null;
+          const matches = existingProfiles.filter(
             (p) =>
-              p.distributor_org_id === filters.distributor_org_id &&
-              p.brand_directory_id === filters.brand_directory_id,
+              p.distributor_org_id === orgId &&
+              (wanted === null || wanted.includes(p.brand_directory_id)),
           );
-          filters = {};
-          nextSelect = null;
-          return { data: match ?? null, error: null };
+          reset();
+          return {
+            data: matches.map((p) => ({
+              id: p.id,
+              brand_directory_id: p.brand_directory_id,
+              website: p.website,
+            })),
+            error: null,
+          };
         }
+
         if (table === 'brand_skus' && insertPatch) {
           inserts.push({ table, row: insertPatch });
-          insertPatch = null;
+          reset();
           return { data: null, error: null };
         }
+
         if (table === 'brand_directory' && insertPatch) {
-          // The matcher's create-fresh path. Tests below always hit the
-          // "existing match" path so this should never run.
+          // The matcher's create-fresh path. These tests always hit the
+          // "existing match" path, so this should never run.
           throw new Error('test_should_not_create_directory_entry');
         }
+
         if (table === 'product_directory' && insertPatch) {
-          // The product matcher's create-fresh path. This test fixture
-          // doesn't exercise the product directory — every SKU just
-          // gets a fresh canonical product silently so the brand-level
-          // dedup assertions stay focused.
+          // The product matcher's create-fresh path. This fixture doesn't
+          // exercise the product directory: every SKU just gets a fresh
+          // canonical product so the brand-level assertions stay focused.
           const row = {
             id: 'product-new-' + (inserts.length + 1),
             name: (insertPatch as { name: string }).name,
           };
           inserts.push({ table, row: insertPatch });
-          insertPatch = null;
-          filters = {};
-          nextSelect = null;
+          reset();
           return { data: row, error: null };
         }
+
+        reset();
         return { data: null, error: null };
       }
 
-      return Object.assign(builder, fluent);
+      return fluent;
     },
   };
 }
@@ -192,7 +230,7 @@ describe('processSkuList — Phase 4 dedup-on-write', () => {
   // normalised values, both resolve to the canonical Avallen directory
   // entry via the stubbed matcher.
 
-  it('inserts a new brand_profiles listing on first upload', async () => {
+  it('creates a single brand_profiles listing on first upload', async () => {
     const supabase = fakeSupabase() as Parameters<typeof processSkuList>[0]['supabase'];
     const result = await processSkuList({
       supabase,
@@ -203,10 +241,30 @@ describe('processSkuList — Phase 4 dedup-on-write', () => {
     });
     expect(result.errors).toEqual([]);
     expect(result.brand_count).toBe(1);
-    const profileInserts = inserts.filter((i) => i.table === 'brand_profiles');
-    expect(profileInserts).toHaveLength(1);
-    expect(profileInserts[0].row.brand_directory_id).toBe(DIRECTORY_ID_AVALLEN);
-    expect(updates).toEqual([]);
+
+    const profileUpserts = upserts.filter((u) => u.table === 'brand_profiles');
+    expect(profileUpserts).toHaveLength(1);
+    expect(profileUpserts[0].payload).toHaveLength(1);
+    expect(profileUpserts[0].payload[0].brand_directory_id).toBe(DIRECTORY_ID_AVALLEN);
+    expect(existingProfiles).toHaveLength(1);
+  });
+
+  it('keys the upsert on the unique constraint that prevents duplicates', async () => {
+    // Without this onConflict target the upsert degrades to a plain insert
+    // and the DB constraint rejects the second upload instead of merging it.
+    const supabase = fakeSupabase() as Parameters<typeof processSkuList>[0]['supabase'];
+    await processSkuList({
+      supabase,
+      distributorOrgId: DISTRIBUTOR_ORG_ID,
+      skuListId: SKU_LIST_ID,
+      rows: [{ brand: 'Avallen', product: 'Calvados' }],
+      mapping: MAPPING,
+    });
+
+    const profileUpserts = upserts.filter((u) => u.table === 'brand_profiles');
+    expect(profileUpserts[0].options).toMatchObject({
+      onConflict: 'distributor_org_id,brand_directory_id',
+    });
   });
 
   it('updates the existing listing when a second upload resolves to the same directory entry', async () => {
@@ -220,10 +278,10 @@ describe('processSkuList — Phase 4 dedup-on-write', () => {
       mapping: MAPPING,
     });
 
-    // Reset insert/update logs but keep existingProfiles so the
-    // pre-existing listing is visible to the second upload.
+    // Reset the call logs but keep existingProfiles, so the listing the
+    // first upload created is visible to the second one.
     inserts = [];
-    updates = [];
+    upserts = [];
 
     // Second upload — different normalised name ("avallen cognac" vs
     // "avallen"), same canonical brand via fuzzy match.
@@ -236,16 +294,75 @@ describe('processSkuList — Phase 4 dedup-on-write', () => {
     });
     expect(result.errors).toEqual([]);
     expect(result.brand_count).toBe(1);
-    // No fresh brand_profiles INSERT — that would violate the new
-    // unique(distributor_org_id, brand_directory_id) constraint.
-    const profileInserts = inserts.filter((i) => i.table === 'brand_profiles');
-    expect(profileInserts).toHaveLength(0);
-    // Instead, the existing listing was updated with the latest spelling.
-    // Normalised collapses to "avallen" because the descriptor "Cognac"
-    // is stripped — the matcher is right to treat "Avallen Cognac" and
-    // "Avallen" as the same brand.
-    expect(updates).toHaveLength(1);
-    expect(updates[0].patch.name).toBe('Avallen Cognac');
-    expect(updates[0].patch.normalized_name).toBe('avallen');
+
+    // THE point of the test: the second upload must not add a second row
+    // for the same directory entry. One upsert, one row in it, and the
+    // table still holds exactly one listing afterwards.
+    const profileUpserts = upserts.filter((u) => u.table === 'brand_profiles');
+    expect(profileUpserts).toHaveLength(1);
+    expect(profileUpserts[0].payload).toHaveLength(1);
+    expect(profileUpserts[0].payload[0].brand_directory_id).toBe(DIRECTORY_ID_AVALLEN);
+    expect(existingProfiles).toHaveLength(1);
+
+    // The surviving listing carries the latest spelling. Normalised
+    // collapses to "avallen" because the descriptor "Cognac" is stripped,
+    // which is why the matcher treats the two uploads as one brand.
+    expect(profileUpserts[0].payload[0].name).toBe('Avallen Cognac');
+    expect(profileUpserts[0].payload[0].normalized_name).toBe('avallen');
+  });
+
+  it('collapses two spellings in the SAME upload into one payload row', async () => {
+    // The cross-upload case is caught by the DB constraint via onConflict.
+    // Within a single upload there is no constraint to lean on: the payload
+    // is keyed by directory id, and if that keying breaks, one upsert call
+    // carries two rows for the same brand and the DB rejects the batch.
+    //
+    // "Avallen Apple" is deliberate. "Avallen Cognac" would not exercise
+    // this, because normalizeBrandName strips "cognac" as a descriptor so
+    // both spellings land in the same bucket long before the payload is
+    // built. "apple" is not a descriptor, so it survives normalisation and
+    // the two rows only converge at the directory-id keying under test.
+    const supabase = fakeSupabase() as Parameters<typeof processSkuList>[0]['supabase'];
+    const result = await processSkuList({
+      supabase,
+      distributorOrgId: DISTRIBUTOR_ORG_ID,
+      skuListId: SKU_LIST_ID,
+      rows: [
+        { brand: 'Avallen', product: 'Calvados' },
+        { brand: 'Avallen Apple', product: 'Apple Brandy' },
+      ],
+      mapping: MAPPING,
+    });
+    expect(result.errors).toEqual([]);
+
+    const profileUpserts = upserts.filter((u) => u.table === 'brand_profiles');
+    expect(profileUpserts).toHaveLength(1);
+    expect(profileUpserts[0].payload).toHaveLength(1);
+    expect(profileUpserts[0].payload[0].brand_directory_id).toBe(DIRECTORY_ID_AVALLEN);
+    expect(existingProfiles).toHaveLength(1);
+  });
+
+  it('never overwrites a curated website with a value from the CSV', async () => {
+    // This is what the bulk existence check exists for: it reads the
+    // websites already on file so the upsert payload can preserve them.
+    const supabase = fakeSupabase() as Parameters<typeof processSkuList>[0]['supabase'];
+    existingProfiles.push({
+      id: 'profile-curated',
+      distributor_org_id: DISTRIBUTOR_ORG_ID,
+      brand_directory_id: DIRECTORY_ID_AVALLEN,
+      website: 'https://www.avallenspirits.com',
+    });
+
+    await processSkuList({
+      supabase,
+      distributorOrgId: DISTRIBUTOR_ORG_ID,
+      skuListId: SKU_LIST_ID,
+      rows: [{ brand: 'Avallen', product: 'Calvados', site: 'https://spam.example.com' }],
+      mapping: { ...MAPPING, website: 'site' },
+    });
+
+    const profileUpserts = upserts.filter((u) => u.table === 'brand_profiles');
+    expect(profileUpserts[0].payload[0].website).toBe('https://www.avallenspirits.com');
+    expect(existingProfiles).toHaveLength(1);
   });
 });

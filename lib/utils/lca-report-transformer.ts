@@ -726,7 +726,9 @@ export function transformLCADataForReport(
     const gwpSrc: string = m.gwp_data_source || '';
     const nonGwpSrc: string = m.non_gwp_data_source || '';
     let factorDatabase = 'Secondary database';
-    if (m.impact_source === 'primary_verified' || m.data_priority === 1) {
+    if (gwpSrc === 'packaging_parametric') {
+      factorDatabase = 'Parametric (ecoinvent endpoints)';
+    } else if (m.impact_source === 'primary_verified' || m.data_priority === 1) {
       factorDatabase = 'Supplier verified';
     } else if (gwpSrc.toLowerCase().includes('defra')) {
       factorDatabase = nonGwpSrc
@@ -807,6 +809,25 @@ export function transformLCADataForReport(
       transportMode: modeLabel,
       transportDistance: transportDistanceKm > 0 ? transportDistanceKm.toLocaleString('en-GB') : null,
       transportWarning,
+      // Parametric packaging derivation (self-contained snapshot written by
+      // the calculator; renders the working so a reviewer can reproduce it).
+      derivation: m.factor_derivation
+        ? {
+            materialClass: m.factor_derivation.material_class,
+            variant: m.factor_derivation.variant,
+            region: m.factor_derivation.region,
+            recycledPct: Number(m.factor_derivation.recycled_content_pct ?? 0),
+            virginEf: Number(m.factor_derivation.virgin_climate ?? 0),
+            recycledEf: Number(m.factor_derivation.recycled_climate ?? 0),
+            derivedEf: Number(m.factor_derivation.derived_ef_climate ?? 0),
+            dataset: m.factor_derivation.dataset || 'ecoinvent',
+            datasetVersion: m.factor_derivation.dataset_version || '3.12',
+            systemModel: m.factor_derivation.system_model || 'Cutoff',
+            libraryVersion: Number(m.factor_derivation.library_version ?? 1),
+            isProvisional: Boolean(m.factor_derivation.is_provisional),
+            allocationMethod: m.eol_allocation_method || m.factor_derivation.allocation_method || 'cut-off',
+          }
+        : null,
     };
   });
 
@@ -1534,6 +1555,20 @@ export function transformLCADataForReport(
           })),
           conclusion: sa.conclusion || '',
         },
+        monteCarlo: us.monte_carlo
+          ? {
+              iterations: us.monte_carlo.iterations || 0,
+              seed: us.monte_carlo.seed || 0,
+              mean: us.monte_carlo.mean || 0,
+              median: us.monte_carlo.median || 0,
+              p2_5: us.monte_carlo.p2_5 || 0,
+              p97_5: us.monte_carlo.p97_5 || 0,
+              stdDev: us.monte_carlo.std_dev || 0,
+              coefficientOfVariationPct: us.monte_carlo.coefficient_of_variation_pct || 0,
+              relative95IntervalPct: us.monte_carlo.relative_95_interval_pct || 0,
+              assumptions: us.monte_carlo.assumptions || [],
+            }
+          : undefined,
       };
     })(),
 
@@ -1561,21 +1596,28 @@ export function transformLCADataForReport(
         });
 
         // Data quality (§4.2.3.6)
-        const dqStatus: 'conforms' | 'minor_gap' | 'major_gap' =
-          primaryCount === 0 ? 'major_gap'
-          : dqScore >= 70 ? 'conforms'
+        // Judge data quality against the ISO 14044 §4.2.3.6 goal-and-scope
+        // criteria via the pedigree score, not by the mere presence of primary
+        // data. A study built entirely on secondary/proxy factors (ecoinvent,
+        // AGRIBALYSE) is acceptable when the pedigree quality is adequate; it is
+        // capped at a minor gap so the recommendation to add primary data stays
+        // visible without blocking internal / B2B use. Genuinely poor pedigree
+        // (score < 50) remains a major gap on its own merits.
+        let dqStatus: 'conforms' | 'minor_gap' | 'major_gap' =
+          dqScore >= 70 ? 'conforms'
           : dqScore >= 50 ? 'minor_gap'
           : 'major_gap';
+        if (primaryCount === 0 && dqStatus === 'conforms') dqStatus = 'minor_gap';
         findings.push({
           clause: 'ISO 14044 §4.2.3.6 — Data quality requirements',
           status: dqStatus,
           summary: dqStatus === 'conforms'
             ? `Data quality rated ${dqRating.toLowerCase()} (${dqScore}%) with ${primaryShare}% primary coverage.`
             : dqStatus === 'minor_gap'
-              ? `Data quality is acceptable (${dqRating.toLowerCase()}, ${dqScore}%) but primary-data coverage (${primaryShare}%) could be improved for the dominant contributors.`
-              : primaryCount === 0
-                ? 'No primary verified data: all material inputs rely on secondary databases or proxy estimates.'
-                : `Data quality (${dqScore}%) falls below the threshold typical for external communication; proxy share is ${proxyShare}%.`,
+              ? (primaryCount === 0
+                  ? `Data quality is adequate (${dqRating.toLowerCase()}, ${dqScore}%) using secondary database factors (ecoinvent, AGRIBALYSE); adding primary data for the dominant contributors would further strengthen representativeness.`
+                  : `Data quality is acceptable (${dqRating.toLowerCase()}, ${dqScore}%) but primary-data coverage (${primaryShare}%) could be improved for the dominant contributors.`)
+              : `Data quality (${dqScore}%) falls below the pedigree threshold expected even for secondary data; improve database matching (geographic, technological, temporal) or add primary data for the dominant contributors.`,
           detail: `Pedigree matrix assessment covers reliability, completeness, temporal, geographic, and technological representativeness. Current split: ${primaryCount} primary / ${secondaryCount} secondary / ${proxyCount} proxy across ${materials.length} inputs.`,
         });
 
@@ -1624,12 +1666,22 @@ export function transformLCADataForReport(
         }
 
         // Sensitivity & uncertainty (§4.5.3)
-        findings.push({
-          clause: 'ISO 14044 §4.5.3 — Sensitivity and uncertainty',
-          status: 'minor_gap',
-          summary: 'No formal Monte Carlo or scenario sensitivity analysis is included in this report.',
-          detail: 'For comparative assertions released to the public, ISO 14044 §5.3 requires uncertainty analysis. A Monte Carlo run over the top contributors (using pedigree-derived GSDs) is recommended before external use.',
-        });
+        const mcFinding = (impacts as any).uncertainty_sensitivity?.monte_carlo;
+        if (mcFinding && mcFinding.iterations > 0) {
+          findings.push({
+            clause: 'ISO 14044 §4.5.3 — Sensitivity and uncertainty',
+            status: 'conforms',
+            summary: `Monte Carlo uncertainty analysis (${mcFinding.iterations.toLocaleString()} iterations) and a one-at-a-time parameter sensitivity analysis are included. The 95% interval on the total footprint is ${mcFinding.p2_5}–${mcFinding.p97_5} kg CO₂e (±${mcFinding.relative_95_interval_pct}% about the median).`,
+            detail: 'Each material emission factor is sampled independently from a lognormal distribution with median equal to the point estimate and log-space sigma equal to the pedigree-derived geometric standard deviation. Emission factors are treated as uncorrelated across materials, which may understate the tail where inputs share upstream processes; correlated sampling and discrete scenario analysis remain future enhancements. This satisfies the sensitivity and uncertainty requirements of ISO 14044 §4.5.3.',
+          });
+        } else {
+          findings.push({
+            clause: 'ISO 14044 §4.5.3 — Sensitivity and uncertainty',
+            status: 'minor_gap',
+            summary: 'No formal Monte Carlo or scenario sensitivity analysis is included in this report.',
+            detail: 'For comparative assertions released to the public, ISO 14044 §5.3 requires uncertainty analysis. A Monte Carlo run over the top contributors (using pedigree-derived GSDs) is recommended before external use.',
+          });
+        }
 
         // Interpretation (§4.5)
         findings.push({
@@ -1656,7 +1708,7 @@ export function transformLCADataForReport(
           ? `The study of ${lca.product_name} conforms with the structural requirements of ISO 14044:2006 and ISO 14067:2018 and is fit for internal use and B2B communication in its current form. An independent critical review remains recommended before any public comparative assertion.`
           : rating === 'qualified_pass'
             ? `The study of ${lca.product_name} conforms with the core requirements of ISO 14044:2006 and ISO 14067:2018. A small number of minor gaps (typically around primary data coverage, uncertainty analysis, or external review) should be addressed before the report is used for public comparative assertions, but the study is suitable for internal decision-making and B2B reporting.`
-            : `The study of ${lca.product_name} captures the main lifecycle stages but has one or more major gaps (most commonly: absent primary data or an incomplete inventory) that should be resolved before the report is used beyond internal exploratory analysis.`;
+            : `The study of ${lca.product_name} captures the main lifecycle stages but has one or more major gaps (most commonly: low-quality or poorly matched data, or an incomplete inventory) that should be resolved before the report is used beyond internal exploratory analysis.`;
 
         return {
           verdict,

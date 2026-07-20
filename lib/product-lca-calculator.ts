@@ -25,6 +25,14 @@ import { getGridFactor } from './grid-emission-factors';
 import { getAwareFactor } from './calculations/water-risk';
 import { DEFAULT_RECYCLED_CONTENT_CREDIT, RECYCLED_CONTENT_DISPLACEMENT, FACTOR_EMBEDS_RECYCLED_CONTENT } from './constants/packaging-defaults';
 import { getPackagingUnitsPerGroup, SHARED_PACKAGING_CATEGORIES, getMaterialFactorKey } from './end-of-life-factors';
+import { getMaterialClass, isParametricClass, resolveVariant } from './constants/packaging-material-classes';
+import {
+  derivePackagingFactor,
+  fetchActivePackagingEndpoints,
+  buildFactorDerivation,
+  endpointLookupKey,
+  type PackagingFactorEndpoint,
+} from './calculations/packaging-factor';
 import { checkPackagingWeight, checkIngredientAmount } from './constants/packaging-weight-ranges';
 import { overlapFraction } from './calculations/utility-factors';
 import { resolveRefrigerantGwp } from './ghg-constants';
@@ -1623,11 +1631,92 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     // Build list of materials that need live resolution (not pinned)
     const materialsToResolve = materials.filter(m => !getPinnedRow(m));
 
-    if (materialsToResolve.length > 0) {
-      console.log(`[calculateProductCarbonFootprint] Resolving ${materialsToResolve.length} materials in parallel (concurrency: ${OPENLCA_CONCURRENCY})`);
+    // ------------------------------------------------------------------
+    // Parametric packaging: factors are DERIVED, never searched.
+    // A packaging row with a parametric material class resolves as a pure
+    // function of (endpoint library row, recycled content, weight) — the
+    // same inputs always produce the same number. Supplier-declared rows
+    // keep the supplier path (primary data beats the parametric model);
+    // gap-filler composite classes pin their curated staging factor by ID;
+    // legacy rows without a class fall through to the old resolver with a
+    // visible data-quality warning until the Phase 3 backfill maps them.
+    // ------------------------------------------------------------------
+    const isSupplierMaterial = (m: any) =>
+      m.data_source === 'supplier' || Boolean(m.supplier_product_id);
+    const isParametricMaterial = (m: any) =>
+      isPackagingRow(m) && !isSupplierMaterial(m) && isParametricClass(m.packaging_material_class);
+
+    const parametricMaterials = materialsToResolve.filter(isParametricMaterial);
+    const materialsForResolver = materialsToResolve.filter(m => !isParametricMaterial(m));
+    // Endpoint + derivation pinned per material row id, written onto the
+    // PCF material snapshot below (reproducibility across library updates).
+    const parametricEndpointByMaterialId = new Map<string, PackagingFactorEndpoint>();
+
+    if (parametricMaterials.length > 0) {
+      const wanted = parametricMaterials.map((m: any) => ({
+        materialClass: m.packaging_material_class as string,
+        variant: resolveVariant(m.packaging_material_class, m.packaging_material_variant),
+        // Endpoints are curated per region with EU-27 -> GLO fallback inside
+        // the fetch; origin country rarely matches a curated region directly.
+        region: m.origin_country_code || 'EU-27',
+      }));
+      const endpoints = await fetchActivePackagingEndpoints(supabase, wanted);
+      parametricMaterials.forEach((m: any, i) => {
+        const w = wanted[i];
+        const endpoint = endpoints.get(endpointLookupKey(w.materialClass, w.variant, w.region));
+        if (!endpoint) {
+          // Every parametric class is guaranteed a seeded endpoint; a miss is
+          // a factor-library curation bug, not a user-data condition.
+          throw new Error(
+            `No packaging factor endpoint found for material class "${w.materialClass}" (${w.variant}). ` +
+            `The packaging factor library is missing an entry — contact support.`,
+          );
+        }
+        const quantityKg = normalizeToKg(m.quantity, m.unit) / allocationDivisorFor(m);
+        resolvedFactors.set(String(m.id), derivePackagingFactor({
+          endpoint,
+          recycledContentPct: m.recycled_content_percentage,
+          quantityKg,
+        }));
+        parametricEndpointByMaterialId.set(String(m.id), endpoint);
+      });
+      console.log(`[calculateProductCarbonFootprint] Derived ${parametricMaterials.length} parametric packaging factors`);
+    }
+
+    // Gap-filler composite classes (bag-in-box, laminate pouch, liquid
+    // carton): force resolution to the curated staging factor BY ID so the
+    // row can never fuzzy-match, regardless of what was saved on it.
+    for (const m of materialsForResolver as any[]) {
+      if (!isPackagingRow(m) || isSupplierMaterial(m)) continue;
+      const classDef = getMaterialClass(m.packaging_material_class);
+      if (classDef?.kind === 'gap_filler' && classDef.gapFillerFactorId) {
+        m.data_source = 'openlca';
+        m.data_source_id = classDef.gapFillerFactorId;
+      } else if (!classDef) {
+        // Legacy packaging row: still resolves via the old (now
+        // category-scoped and deterministically ordered) path, but flagged.
+        calculatorWarnings.push(
+          `"${m.material_name}" predates packaging material classes, so its emission factor was matched by name. ` +
+          `Edit the item and choose a material class for a fully reproducible factor.`
+        );
+        fallbackEvents.push({
+          material_name: m.material_name,
+          material_id: m.id?.toString() ?? '',
+          attempted_priority: 'parametric packaging',
+          resolved_priority: 3,
+          fallback_reason: 'No packaging material class assigned; factor resolved via legacy name matching.',
+          factor_value_kg_co2e: 0,
+          source_reference: 'Legacy packaging resolution',
+          category: 'data_quality',
+        });
+      }
+    }
+
+    if (materialsForResolver.length > 0) {
+      console.log(`[calculateProductCarbonFootprint] Resolving ${materialsForResolver.length} materials in parallel (concurrency: ${OPENLCA_CONCURRENCY})`);
 
       // Semaphore-based concurrency limiter
-      const queue = materialsToResolve.map(m => async () => {
+      const queue = materialsForResolver.map(m => async () => {
         const quantityKg = normalizeToKg(m.quantity, m.unit) / allocationDivisorFor(m);
         console.log(`[calculateProductCarbonFootprint] Processing material: ${m.material_name} (${quantityKg} kg)`);
         console.log(`[calculateProductCarbonFootprint] Material OpenLCA data:`, {
@@ -1653,6 +1742,41 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         }
       }
       await Promise.allSettled(results);
+
+      // Ingredient factor pinning: when a row with NO pinned factor resolved
+      // through the priority-3 local fallback (name/keyword matching), write
+      // the winning factor's id back onto product_materials so the choice
+      // never drifts on later runs (a new library row changing an unpinned
+      // fuzzy match is exactly how the two-run packaging swing happened).
+      // Packaging (parametric now), supplier and integration-owned rows are
+      // excluded. Non-fatal: a failed write just means re-resolution next run.
+      try {
+        const pinUpdates = materialsForResolver.filter((m: any) => {
+          if (isPackagingRow(m)) return false;
+          if (m.data_source_id) return false;
+          if (m.data_source && m.data_source !== 'openlca') return false;
+          const r = resolvedFactors.get(String(m.id));
+          return Boolean(r && r.data_priority === 3 && r.resolved_factor_id && m.id);
+        });
+        for (const m of pinUpdates as any[]) {
+          const r = resolvedFactors.get(String(m.id))!;
+          const { error: pinError } = await supabase
+            .from('product_materials')
+            .update({
+              data_source: 'openlca',
+              data_source_id: r.resolved_factor_id,
+              matched_source_name: (m as any).matched_source_name || r.source_reference,
+            })
+            .eq('id', m.id);
+          if (pinError) {
+            console.warn(`[calculateProductCarbonFootprint] Factor pin write-back failed for ${m.material_name}:`, pinError.message);
+          } else {
+            console.log(`[calculateProductCarbonFootprint] Pinned factor ${r.resolved_factor_id} onto ${m.material_name}`);
+          }
+        }
+      } catch (pinErr: any) {
+        console.warn('[calculateProductCarbonFootprint] Factor pin write-back failed (non-fatal):', pinErr?.message);
+      }
     }
 
     for (const material of materials) {
@@ -1792,11 +1916,14 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         // per-unit packaging impact is 1/N of the single-trip impact. The
         // quantity column stores the full container weight; we amortise here.
         //
-        // Recycled-content credit: recycled inputs typically carry ~50% of
-        // virgin-material footprint (PAS 2050 cut-off convention). Applied as
-        // a multiplier on the climate impact only — water/land/etc. stay as
-        // reported by the factor since the credit is material-specific and
-        // most published factors are already for virgin inputs.
+        // Recycled-content credit (LEGACY rows only): recycled inputs carry a
+        // material-specific share of the virgin footprint (PAS 2050 cut-off
+        // convention), applied as a post-hoc climate multiplier. Parametric
+        // rows NEVER take this credit — their recycled content is already in
+        // the endpoint interpolation — and supplier rows carry declared
+        // impacts that must not be adjusted.
+        const isParametricResolvedRow = parametricEndpointByMaterialId.has(String(material.id));
+        const isSupplierResolvedRow = isSupplierMaterial(material);
         const rawReuseTrips = (material as any).reuse_trips;
         const reuseTrips = Number.isFinite(Number(rawReuseTrips)) && Number(rawReuseTrips) >= 1
           ? Number(rawReuseTrips)
@@ -1854,7 +1981,13 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           transportEmissions /= reuseTrips;
         }
 
-        if (!isPinned && material.material_type === 'packaging' && recycledMultiplier < 1) {
+        if (
+          !isPinned &&
+          !isParametricResolvedRow &&
+          !isSupplierResolvedRow &&
+          material.material_type === 'packaging' &&
+          recycledMultiplier < 1
+        ) {
           console.log(
             `[calculateProductCarbonFootprint] Applying recycled-content credit: ×${recycledMultiplier.toFixed(3)} (${recycledPct}% recycled) for ${material.material_name}`
           );
@@ -2116,13 +2249,50 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         }
 
         // Build LCA material record with all impact data
-        // Note: data_source must be 'openlca', 'supplier', or NULL per constraint
-        // For staging factors, we use NULL
+        // Note: data_source must be 'openlca', 'supplier', 'parametric', or
+        // NULL per constraint. For staging factors, we use NULL.
         let dataSource = null;
-        if (material.data_source === 'openlca' && material.data_source_id) {
+        if (isParametricResolvedRow) {
+          dataSource = 'parametric';
+        } else if (material.data_source === 'openlca' && material.data_source_id) {
           dataSource = 'openlca';
         } else if (material.data_source === 'supplier' && material.supplier_product_id) {
           dataSource = 'supplier';
+        }
+
+        // Parametric pin: endpoint identity + full derivation, persisted so
+        // the report can show the working and a recalculation after a library
+        // update remains attributable to a specific library version. Pinned
+        // recalcs carry the previous PCF's pin forward verbatim.
+        const parametricEndpoint = parametricEndpointByMaterialId.get(String(material.id)) ?? null;
+        const pinnedSource = isPinned ? (pinnedRow as any) : null;
+        const packagingPin = parametricEndpoint
+          ? {
+              packaging_material_class: parametricEndpoint.material_class,
+              packaging_material_variant: parametricEndpoint.variant,
+              packaging_endpoint_id: parametricEndpoint.id,
+              packaging_library_version: parametricEndpoint.library_version,
+              factor_derivation: buildFactorDerivation(parametricEndpoint, material.recycled_content_percentage),
+            }
+          : {
+              packaging_material_class: pinnedSource?.packaging_material_class ?? (material as any).packaging_material_class ?? null,
+              packaging_material_variant: pinnedSource?.packaging_material_variant ?? (material as any).packaging_material_variant ?? null,
+              packaging_endpoint_id: pinnedSource?.packaging_endpoint_id ?? null,
+              packaging_library_version: pinnedSource?.packaging_library_version ?? null,
+              factor_derivation: pinnedSource?.factor_derivation ?? null,
+            };
+        // End-of-life allocation: parametric rows are always cut-off (the
+        // recycling benefit is already claimed on the input side); other
+        // packaging rows record the requested method, defaulting to cut-off.
+        const eolAllocationMethod = isPackagingRow(material)
+          ? (parametricEndpoint || pinnedSource?.packaging_endpoint_id
+              ? 'cut-off'
+              : (params.eolConfig?.allocationMethod ?? 'cut-off'))
+          : null;
+        // Pinned rows re-assert their previous data_source (a pinned
+        // parametric row is still parametric on the fresh snapshot).
+        if (isPinned && pinnedSource?.data_source === 'parametric' && pinnedSource?.packaging_endpoint_id) {
+          dataSource = 'parametric';
         }
 
         const lcaMaterial = {
@@ -2153,6 +2323,10 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           supplier_product_id: material.supplier_product_id,
           data_source: dataSource,
           data_source_id: material.data_source_id || null,
+
+          // Parametric packaging pin (null for non-parametric rows)
+          ...packagingPin,
+          eol_allocation_method: eolAllocationMethod,
 
           // Transport data
           transport_mode: material.transport_mode || null,
@@ -3850,11 +4024,19 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     let calculationFingerprint = '';
     try {
       calculationFingerprint = await generateCalculationFingerprint({
-        materials: materials.map(m => ({
-          name: m.material_name,
-          quantity_kg: normalizeToKg(m.quantity, m.unit) / allocationDivisorFor(m),
-          data_source_id: m.data_source_id,
-        })),
+        materials: materials.map(m => {
+          // Parametric packaging rows fingerprint their endpoint pin so a
+          // library version bump marks dependent products stale, while
+          // unchanged inputs stay byte-identical.
+          const pin = parametricEndpointByMaterialId.get(String(m.id));
+          return {
+            name: m.material_name,
+            quantity_kg: normalizeToKg(m.quantity, m.unit) / allocationDivisorFor(m),
+            data_source_id: pin
+              ? `${pin.material_class}|${pin.variant}|${pin.id}|v${pin.library_version}|r${m.recycled_content_percentage ?? 0}`
+              : m.data_source_id,
+          };
+        }),
         factorValues: materialResolutions.map((r: any) => ({
           name: r.name,
           impact_climate_per_kg: r.impact_climate_per_kg,

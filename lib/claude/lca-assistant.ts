@@ -1,4 +1,5 @@
 import { runTextPrompt } from '@/lib/ai/gemini'
+import { NO_EM_DASH_RULE } from '@/lib/copy-style'
 /**
  * LCA Assistant
  *
@@ -85,6 +86,7 @@ Guidelines:
 - Keep suggestions concise (2-4 sentences for most fields)
 - If suggesting cut-off criteria, explain in simple terms what's excluded and why
 - For functional units, always include the quantity and the product (e.g., "1 litre of packaged beer")
+- ${NO_EM_DASH_RULE}
 
 Always respond in valid JSON format matching the requested structure.`;
 
@@ -102,6 +104,7 @@ Guidelines:
 - Include appropriate caveats about data quality and scope limitations
 - Structure content with clear topic sentences
 - Use proper LCA terminology but explain complex concepts
+- ${NO_EM_DASH_RULE}
 
 Always respond in valid JSON format matching the requested structure.`;
 
@@ -112,6 +115,7 @@ Your role:
 2. Use everyday analogies and examples
 3. Keep explanations to 2-3 sentences maximum
 4. Avoid introducing new jargon while explaining
+5. ${NO_EM_DASH_RULE}
 
 Always respond in valid JSON format with 'explanation' and optionally 'example' fields.`;
 
