@@ -580,17 +580,25 @@ function nothingRecordedYet(year: number): string {
       </p>`;
 }
 
-// Maps section IDs to materiality topic IDs (mirrors section-narrative-assistant.ts)
-const SECTION_TO_TOPIC: Record<string, string> = {
+// Maps section IDs to materiality topic IDs. Exported so a test can assert
+// every value exists in lib/materiality/topic-library.ts: four of these were
+// phantom ids for months (product-footprints, governance-accountability,
+// community-engagement, supply-chain-standards), which silently guaranteed
+// the materiality callout could never appear on those pages.
+export const SECTION_TO_TOPIC: Record<string, string> = {
   'scope-1-2-3': 'climate-mitigation',
   'emissions-breakdown': 'climate-mitigation',
   'key-findings': 'climate-mitigation',
   'trends': 'climate-mitigation',
-  'products': 'product-footprints',
+  'products': 'product-lifecycle',
+  'product-footprints': 'product-lifecycle',
   'people': 'employee-wellbeing',
-  'governance': 'governance-accountability',
-  'community': 'community-engagement',
-  'supply-chain': 'supply-chain-standards',
+  'people-culture': 'employee-wellbeing',
+  'governance': 'sustainability-governance',
+  'community': 'community-impact',
+  'community-impact': 'community-impact',
+  'supply-chain': 'supply-chain-transparency',
+  'facilities': 'energy-management',
 };
 
 /**
