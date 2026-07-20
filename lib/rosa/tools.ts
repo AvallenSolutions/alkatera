@@ -24,6 +24,7 @@ import { listMemories, saveMemory, type MemoryScope } from './memory';
 import { proposeAction } from './actions';
 import { loadAttachment, extractStructured } from './document-extraction';
 import { buildOrgSignalPack } from './priority-signals';
+import { buildDossier } from '@/lib/lca/dossier';
 import { getBenchmarkForProductType } from '@/lib/industry-benchmarks';
 import { gatherGrowthIngredients, scoreFromIngredients, computeGrowthSignals } from '@/lib/desk/growth-score';
 import { logRosaTelemetry } from './budget';
@@ -267,6 +268,18 @@ export const ROSA_TOOLS: ToolDefinition[] = [
         lca_id: { type: 'string', description: 'The product_carbon_footprints UUID.' },
       },
       required: ['lca_id'],
+    },
+  },
+  {
+    name: 'get_lca_dossier',
+    description:
+      "Returns one product's footprint as a dossier: the headline number, how far the footprint follows the product in plain language, and five sections (what it is made of, making it, getting it to customers, after it is sold, how this was worked out). Each section carries a state (settled, unreviewed, incomplete, out of scope) and a provenance label (estimated, drafted, confirmed). Use this when the user asks what is behind a product's number, why it might be wrong, or what would improve it. Prefer it over get_lca_summary when the question is about trust or gaps rather than the figure itself. Say 'not checked' or 'industry average', never 'estimated proxy' or 'unreviewed default'.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        product_id: { type: 'string', description: 'The products.id of the product.' },
+      },
+      required: ['product_id'],
     },
   },
   // ───────────── Knowledge / coaching tools ─────────────
@@ -796,6 +809,8 @@ export async function executeTool(
         return await toolGetProductFootprint(ctx, input as { product_id: string });
       case 'get_lca_summary':
         return await toolGetLcaSummary(ctx, input as { lca_id: string });
+      case 'get_lca_dossier':
+        return await toolGetLcaDossier(ctx, input as { product_id: string });
       case 'search_knowledge_bank':
         return await toolSearchKnowledgeBank(ctx, input as { query: string; category?: string; limit?: number });
       case 'explain_methodology':
@@ -1625,6 +1640,102 @@ async function toolGetLcaSummary(
     is_error: false,
     content: JSON.stringify(data),
     audit: { tool: 'get_lca_summary', lca_id: input.lca_id, status: (data as any).status },
+  };
+}
+
+/**
+ * The dossier, for Rosa.
+ *
+ * get_lca_summary answers "what is the number". This answers "how much should
+ * you believe it", which is the question a founder is actually asking when
+ * they say their footprint looks wrong. Returns the section states and
+ * provenance rather than the full row detail, so Rosa talks about trust and
+ * gaps instead of reciting figures.
+ */
+async function toolGetLcaDossier(
+  ctx: ToolContext,
+  input: { product_id: string },
+): Promise<ToolResult> {
+  if (!input?.product_id) {
+    return {
+      is_error: true,
+      content: 'product_id is required',
+      audit: { tool: 'get_lca_dossier', error: 'missing_product_id' },
+    };
+  }
+
+  const { data: product } = await ctx.supabase
+    .from('products')
+    .select('id, name')
+    .eq('organization_id', ctx.organizationId)
+    .eq('id', input.product_id)
+    .maybeSingle();
+
+  if (!product) {
+    return {
+      is_error: true,
+      content: 'Product not found',
+      audit: { tool: 'get_lca_dossier', error: 'not_found' },
+    };
+  }
+
+  const { data: pcfs } = await ctx.supabase
+    .from('product_carbon_footprints')
+    .select(
+      'id, status, functional_unit, reference_year, system_boundary, aggregated_impacts, distribution_config, updated_at',
+    )
+    .eq('organization_id', ctx.organizationId)
+    .eq('product_id', input.product_id)
+    .order('updated_at', { ascending: false })
+    .limit(10);
+
+  const pcf =
+    (pcfs ?? []).find((p: any) => p.status === 'completed') ?? (pcfs ?? [])[0] ?? null;
+
+  const { data: materials } = pcf
+    ? await ctx.supabase
+        .from('product_carbon_footprint_materials')
+        .select('id, material_name, material_type, impact_climate, gwp_data_source, matched_source_name, data_source')
+        .eq('product_carbon_footprint_id', (pcf as any).id)
+    : { data: [] as any[] };
+
+  const { count: facilityCount } = await ctx.supabase
+    .from('facility_product_assignments')
+    .select('id', { count: 'exact', head: true })
+    .eq('product_id', input.product_id);
+
+  const dossier = buildDossier({
+    product: { id: (product as any).id, name: (product as any).name },
+    pcf: pcf as any,
+    materials: (materials ?? []) as any,
+    facilityCount: facilityCount ?? 0,
+  });
+
+  // Only what Rosa should reason about: the shape of the trust, not every row.
+  const summary = {
+    product: dossier.productName,
+    headline_kg_co2e: dossier.headlineKgCo2e,
+    how_far_it_follows_the_product: dossier.boundaryLabel,
+    provenance: dossier.provenance,
+    confirmed_pct: dossier.confirmedPct,
+    sections: dossier.sections.map((s) => ({
+      section: s.title,
+      state: s.state,
+      provenance: s.provenance,
+      kg_co2e: s.kgCo2e,
+      share_pct: s.sharePct,
+      what_to_do: s.note ?? null,
+    })),
+  };
+
+  return {
+    is_error: false,
+    content: JSON.stringify(summary),
+    audit: {
+      tool: 'get_lca_dossier',
+      product_id: input.product_id,
+      confirmed_pct: dossier.confirmedPct,
+    },
   };
 }
 

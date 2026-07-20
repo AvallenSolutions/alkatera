@@ -5,6 +5,7 @@ import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access'
 import { dispatchExceptionWrite, isDispatchKind } from '@/lib/intake/dispatch'
 import { isHandoffKind } from '@/lib/intake/deep-links'
 import { applyAskAnswer } from '@/lib/asks/apply'
+import { dispatchRecalcIfNeeded } from '@/lib/lca/dispatch-recalc'
 
 export const runtime = 'nodejs'
 
@@ -121,7 +122,19 @@ export async function PATCH(
       })
       .eq('id', params.id)
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 })
-    return NextResponse.json({ ok: true, applied_to: appliedTo })
+
+    // Some answers change how the footprint is calculated, not just how far a
+    // stored figure is trusted. Leaving the number untouched after one of
+    // those would teach the user their answers do not matter.
+    const recalc = await dispatchRecalcIfNeeded(
+      admin,
+      organizationId,
+      user.id,
+      appliedTo,
+      request.nextUrl.origin,
+    )
+
+    return NextResponse.json({ ok: true, applied_to: appliedTo, recalculating: recalc.dispatched })
   }
 
   if (action === 'reject' || action === 'defer') {

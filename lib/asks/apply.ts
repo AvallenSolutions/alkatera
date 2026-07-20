@@ -87,6 +87,10 @@ async function applyByAskType(
       return applyPlausibilityProductionRun(supabase, organizationId, payload, answer);
     case 'plausibility_packaging_weight':
       return applyPlausibilityPackagingWeight(supabase, organizationId, payload, answer);
+    case 'dossier_boundary':
+      return applyDossierBoundary(supabase, organizationId, payload, answer);
+    case 'dossier_gap_distribution':
+      return applyDossierDistribution(supabase, organizationId, payload, answer);
     case 'growth_signal':
       throw new Error('Growth-band asks resolve by going and adding the record — approve or defer, not answer.');
     default:
@@ -243,4 +247,138 @@ async function applyPlausibilityPackagingWeight(
     .eq('id', target.id);
   if (error) throw new Error(error.message);
   return { table: 'product_materials', id: target.id, field: 'net_weight_g', value, written: true };
+}
+
+// ---------------------------------------------------------------------------
+// Dossier gaps
+//
+// These two differ from every handler above: they change how the footprint is
+// calculated, not just how trusted a stored figure is. So each returns
+// `recalc_product_id`, and the caller dispatches the recalculation once the
+// answer has landed. Answering a question and leaving the number unchanged
+// would be worse than not asking.
+// ---------------------------------------------------------------------------
+
+/** The org owns this footprint, checked through its product. */
+async function assertPcfInOrg(
+  supabase: SupabaseClient,
+  organizationId: string,
+  pcfId: string,
+): Promise<{ product_id: number; system_boundary: string | null; distribution_config: any }> {
+  const { data, error } = await supabase
+    .from('product_carbon_footprints')
+    .select('id, product_id, system_boundary, distribution_config, organization_id')
+    .eq('id', pcfId)
+    .eq('organization_id', organizationId)
+    .maybeSingle();
+  if (error || !data) throw new Error('Footprint not found for this organisation.');
+  return data as any;
+}
+
+/**
+ * Mirror a wizard setting onto the product.
+ *
+ * A recalculation reads its settings from products.last_wizard_settings, so a
+ * change written only to the footprint row would be silently reverted by the
+ * next recalculation. That is the bug this merge exists to prevent.
+ */
+async function mergeWizardSetting(
+  supabase: SupabaseClient,
+  productId: number | string,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  const { data } = await supabase
+    .from('products')
+    .select('last_wizard_settings')
+    .eq('id', productId)
+    .maybeSingle();
+  const merged = { ...((data?.last_wizard_settings as any) ?? {}), ...patch };
+  await supabase.from('products').update({ last_wizard_settings: merged }).eq('id', productId);
+}
+
+async function applyDossierBoundary(
+  supabase: SupabaseClient,
+  organizationId: string,
+  payload: AskPayload,
+  answer: unknown,
+): Promise<AppliedTo> {
+  const target = payload.target;
+  if (!target || target.table !== 'product_carbon_footprints') {
+    throw new Error('Malformed ask target.');
+  }
+  const allowed = (payload.options ?? []).map((o) => o.value);
+  if (typeof answer !== 'string' || !allowed.includes(answer)) {
+    throw new Error('Pick one of the offered options.');
+  }
+
+  const pcf = await assertPcfInOrg(supabase, organizationId, target.id);
+
+  const { error } = await supabase
+    .from('product_carbon_footprints')
+    // boundary_source flips to 'chosen': a person has now decided this, so it
+    // must never raise this question again.
+    .update({ system_boundary: answer, boundary_source: 'chosen' })
+    .eq('id', target.id);
+  if (error) throw new Error(error.message);
+
+  await mergeWizardSetting(supabase, pcf.product_id, { systemBoundary: answer });
+
+  return {
+    table: 'product_carbon_footprints',
+    id: target.id,
+    field: 'system_boundary',
+    value: answer,
+    written: true,
+    recalc_product_id: pcf.product_id,
+  };
+}
+
+async function applyDossierDistribution(
+  supabase: SupabaseClient,
+  organizationId: string,
+  payload: AskPayload,
+  answer: unknown,
+): Promise<AppliedTo> {
+  const target = payload.target;
+  if (!target || target.table !== 'product_carbon_footprints') {
+    throw new Error('Malformed ask target.');
+  }
+  const km = toPositiveNumber(answer);
+
+  const pcf = await assertPcfInOrg(supabase, organizationId, target.id);
+
+  // Keep the existing leg's shape and only correct the distance: the user
+  // answered "how far", not "by what", and inventing a mode change would be
+  // putting words in their mouth.
+  const existing = pcf.distribution_config ?? {};
+  const existingLeg = existing.legs?.[0] ?? {};
+  const config = {
+    ...existing,
+    legs: [
+      {
+        ...existingLeg,
+        id: existingLeg.id ?? 'leg-1',
+        label: existingLeg.label ?? 'Factory to retail',
+        transportMode: existingLeg.transportMode ?? 'truck',
+        distanceKm: km,
+      },
+    ],
+  };
+
+  const { error } = await supabase
+    .from('product_carbon_footprints')
+    .update({ distribution_config: config })
+    .eq('id', target.id);
+  if (error) throw new Error(error.message);
+
+  await mergeWizardSetting(supabase, pcf.product_id, { distributionConfig: config });
+
+  return {
+    table: 'product_carbon_footprints',
+    id: target.id,
+    field: 'distribution_config',
+    value: km,
+    written: true,
+    recalc_product_id: pcf.product_id,
+  };
 }

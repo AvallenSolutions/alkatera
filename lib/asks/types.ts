@@ -39,7 +39,12 @@ export type AskType =
   | 'draft_gap_utility'
   | 'plausibility_production_run'
   | 'plausibility_packaging_weight'
-  | 'growth_signal';
+  | 'growth_signal'
+  // The two questions an LCA genuinely cannot answer for itself. Both used to
+  // be steps in the compliance wizard, asked in ISO vocabulary before the user
+  // had any way to know what the words meant.
+  | 'dossier_boundary'
+  | 'dossier_gap_distribution';
 
 export interface AskTarget {
   table: string;

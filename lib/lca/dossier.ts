@@ -96,6 +96,26 @@ export function boundaryLabel(boundary: string | null | undefined): string {
   return BOUNDARY_LABELS[boundary] ?? boundary;
 }
 
+/**
+ * True when distribution is still the leg the wizard injected on mount and
+ * nobody has looked at it: one leg, 50 km, by lorry, with the label it ships
+ * with. The wizard's own Next button accepted this untouched, so an exporter
+ * could ship a cradle-to-grave figure carrying an unexamined local-delivery
+ * assumption.
+ *
+ * Exported so the dossier and the ask sweep cannot drift into two different
+ * opinions about what "nobody has checked this" means.
+ */
+export function isUntouchedDistributionDefault(legs: any[] | null | undefined): boolean {
+  if (!Array.isArray(legs) || legs.length !== 1) return false;
+  const leg = legs[0];
+  return (
+    Number(leg?.distanceKm) === 50 &&
+    leg?.transportMode === 'truck' &&
+    String(leg?.label ?? '').toLowerCase() === 'factory to retail'
+  );
+}
+
 function share(part: number | null, whole: number | null): number | null {
   if (part === null || whole === null || whole <= 0) return null;
   return Math.round((part / whole) * 1000) / 10;
@@ -214,13 +234,7 @@ export function buildDossier(input: DossierInput): Dossier {
   const distributionKg = num(stages.distribution);
   const legs: any[] = pcf?.distribution_config?.legs ?? [];
   const inScope = boundary ? boundaryNeedsDistribution(boundary) : false;
-  // The 50 km truck leg the wizard injected on mount, untouched. One leg, that
-  // exact distance and mode, with the label it ships with.
-  const looksLikeUntouchedDefault =
-    legs.length === 1 &&
-    Number(legs[0]?.distanceKm) === 50 &&
-    legs[0]?.transportMode === 'truck' &&
-    (legs[0]?.label ?? '').toLowerCase() === 'factory to retail';
+  const looksLikeUntouchedDefault = isUntouchedDistributionDefault(legs);
 
   const distributionSection: DossierSection = {
     id: 'distribution',

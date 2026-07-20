@@ -41,6 +41,8 @@ import {
   type MaterialImpactContext,
 } from './impact';
 import type { AskCandidate, AskPayload, AskType } from './types';
+import { isUntouchedDistributionDefault } from '@/lib/lca/dossier';
+import { boundaryNeedsDistribution } from '@/lib/system-boundaries';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -327,6 +329,96 @@ export function generateGrowthSignalAsks(signals: Record<GrowthBandKey, GrowthSi
 }
 
 // ---------------------------------------------------------------------------
+// 4. Dossier gaps — the two questions an LCA cannot answer for itself
+//
+// Both of these were steps in the compliance wizard, asked in ISO vocabulary
+// at a point where the user had no way to know what the words meant, and both
+// passed validation with an untouched default. They belong here instead: one
+// plain question at a time, ordered by what it is worth.
+// ---------------------------------------------------------------------------
+
+export interface DossierBoundaryRow {
+  pcfId: string;
+  productId: string;
+  productName: string;
+  systemBoundary: string | null;
+}
+
+/** The three answers, in the words someone selling drinks would use. */
+export const BOUNDARY_CHOICES = [
+  { value: 'cradle-to-gate', label: 'Up to my factory gate' },
+  { value: 'cradle-to-shelf', label: 'Up to the shelf it sells from' },
+  { value: 'cradle-to-grave', label: 'All the way to the bin' },
+];
+
+export function generateDossierBoundaryAsks(rows: DossierBoundaryRow[]): AskCandidate[] {
+  return rows.map((row) =>
+    makeAsk(
+      'dossier_boundary',
+      `How far should ${row.productName}'s footprint go?`,
+      `We have assumed ${row.productName}'s footprint should stop at your factory gate. ` +
+        `Counting the journey to your customers, and what happens to the packaging afterwards, ` +
+        `usually makes the number bigger but truer. How far should it go?`,
+      {
+        answer_shape: 'choice',
+        options: BOUNDARY_CHOICES,
+        current_value: row.systemBoundary,
+        unit: null,
+        target: {
+          table: 'product_carbon_footprints',
+          id: row.pcfId,
+          field: 'system_boundary',
+        },
+        dedupe_key: `dossier_boundary:${row.pcfId}`,
+        href: `/products/${row.productId}/dossier`,
+        product_name: row.productName,
+        facility_name: null,
+        // Not computable: the whole point is that we do not yet know how much
+        // of this product's footprint is being left out.
+        impactShare: null,
+      },
+    ),
+  );
+}
+
+export interface DossierDistributionRow {
+  pcfId: string;
+  productId: string;
+  productName: string;
+  /** Share of this product's footprint the distribution stage currently carries. */
+  impactShare: number | null;
+}
+
+export function generateDossierDistributionAsks(
+  rows: DossierDistributionRow[],
+): AskCandidate[] {
+  return rows.map((row) =>
+    makeAsk(
+      'dossier_gap_distribution',
+      `How far does ${row.productName} travel to customers?`,
+      `${row.productName}'s footprint currently assumes a 50 km delivery by lorry, which is our ` +
+        `standard starting point rather than anything about your business. ` +
+        `Roughly how far does it actually travel to reach your customers?`,
+      {
+        answer_shape: 'number',
+        current_value: 50,
+        unit: 'km',
+        target: {
+          table: 'product_carbon_footprints',
+          id: row.pcfId,
+          field: 'distribution_config',
+        },
+        dedupe_key: `dossier_distribution:${row.pcfId}`,
+        href: `/products/${row.productId}/dossier`,
+        product_name: row.productName,
+        facility_name: null,
+        impactShare: row.impactShare,
+      },
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Gather — one round trip per source, org-scoped. Any failed query degrades
 // that source to an empty list rather than failing the whole sweep.
 // ---------------------------------------------------------------------------
@@ -340,6 +432,8 @@ export interface AskIngredients {
   growthSignals: Record<GrowthBandKey, GrowthSignal[]>;
   impactByProduct: Map<string, MaterialImpactContext>;
   orgTotalEmissionsKg: number | null;
+  dossierBoundaries: DossierBoundaryRow[];
+  dossierDistributions: DossierDistributionRow[];
 }
 
 /** Confirmed data_provenance values on facility_activity_entries — everything else is a draft-gap candidate. */
@@ -512,7 +606,82 @@ export async function gatherAskIngredients(db: any, organizationId: string): Pro
     growthSignals: computeGrowthSignals(growthIngredients as GrowthIngredients),
     impactByProduct,
     orgTotalEmissionsKg,
+    ...(await gatherDossierGaps(db, organizationId, productNameById)),
   };
+}
+
+/**
+ * The active footprints still resting on something we assumed rather than
+ * something anyone told us: a boundary we proposed, or the 50 km delivery leg
+ * the wizard injected on mount.
+ *
+ * Only 'completed' footprints are swept. A draft is mid-edit and asking about
+ * it would be interrupting, not helping.
+ */
+async function gatherDossierGaps(
+  db: any,
+  organizationId: string,
+  productNameById: Map<string, string>,
+): Promise<{
+  dossierBoundaries: DossierBoundaryRow[];
+  dossierDistributions: DossierDistributionRow[];
+}> {
+  const empty = { dossierBoundaries: [], dossierDistributions: [] };
+  try {
+    const { data } = await db
+      .from('product_carbon_footprints')
+      .select(
+        'id, product_id, system_boundary, boundary_source, distribution_config, aggregated_impacts',
+      )
+      .eq('organization_id', organizationId)
+      .eq('status', 'completed')
+      .limit(300);
+
+    if (!data) return empty;
+
+    const boundaries: DossierBoundaryRow[] = [];
+    const distributions: DossierDistributionRow[] = [];
+
+    for (const pcf of data as any[]) {
+      const productId = String(pcf.product_id);
+      const productName = productNameById.get(productId);
+      if (!productName) continue;
+
+      if (pcf.boundary_source === 'defaulted') {
+        boundaries.push({
+          pcfId: pcf.id,
+          productId,
+          productName,
+          systemBoundary: pcf.system_boundary ?? null,
+        });
+      }
+
+      // Only worth asking when distribution is actually in scope: a
+      // gate-only footprint legitimately does not count it.
+      const inScope = pcf.system_boundary
+        ? boundaryNeedsDistribution(pcf.system_boundary)
+        : false;
+      if (inScope && isUntouchedDistributionDefault(pcf.distribution_config?.legs)) {
+        const stages = pcf.aggregated_impacts?.breakdown?.by_lifecycle_stage ?? {};
+        const total = pcf.aggregated_impacts?.climate_change_gwp100;
+        const dist = stages.distribution;
+        distributions.push({
+          pcfId: pcf.id,
+          productId,
+          productName,
+          impactShare:
+            typeof dist === 'number' && typeof total === 'number' && total > 0
+              ? dist / total
+              : null,
+        });
+      }
+    }
+
+    return { dossierBoundaries: boundaries, dossierDistributions: distributions };
+  } catch {
+    // One failed source degrades to empty rather than failing the sweep.
+    return empty;
+  }
 }
 
 /** All generators run over one AskIngredients bundle. */
@@ -524,6 +693,8 @@ export function generateAllAsks(ingredients: AskIngredients): AskCandidate[] {
     ...generatePlausibilityProductionRunAsks(ingredients.flaggedRuns),
     ...generatePlausibilityPackagingAsks(ingredients.flaggedPackaging),
     ...generateGrowthSignalAsks(ingredients.growthSignals),
+    ...generateDossierBoundaryAsks(ingredients.dossierBoundaries),
+    ...generateDossierDistributionAsks(ingredients.dossierDistributions),
   ];
 }
 

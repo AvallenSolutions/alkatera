@@ -65,7 +65,12 @@ export function activityImpactShare(entryEmissionsKg: number | null, orgTotalEmi
 export const FALLBACK_IMPACT_TIER: Record<AskType, number> = {
   plausibility_production_run: 1,
   plausibility_packaging_weight: 1,
+  // How far the footprint follows the product decides whether whole stages are
+  // counted at all, so an assumed boundary can be wrong by more than any single
+  // figure inside it. It ranks with the plausibility flags for that reason.
+  dossier_boundary: 1,
   draft_gap_material: 2,
+  dossier_gap_distribution: 2,
   draft_gap_utility: 3,
   draft_gap_hospitality_quantities: 4,
   growth_signal: 5,
