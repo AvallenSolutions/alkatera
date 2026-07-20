@@ -255,6 +255,34 @@ export function studioPageCss(): string {
     }`;
 }
 
+/**
+ * "Not yet measured" tile: the statCard shell preserved so the metric grid
+ * never reflows, the phrase at 14px so a skeleton never out-shouts a real
+ * number beside it, and a mono-caps hint naming where in the app to add the
+ * measure. Never prints 'N/A' — that reads as NOT APPLICABLE, a different
+ * and false claim about an unmeasured thing.
+ */
+export function notMeasuredTile(label: string, hint?: string): string {
+  return `<div style="background:${CREAM};border:1px dashed ${HAIR};border-radius:6px;padding:18px">
+    <div style="font-family:${MONO};font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:${DIM}">${escapeHtml(label)}</div>
+    <div style="font-family:${SG};font-size:14px;font-weight:600;color:${DIM};margin-top:10px">Not yet measured</div>
+    ${hint ? `<div style="font-family:${MONO};font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:${DIM};margin-top:6px">${escapeHtml(hint)}</div>` : ''}
+  </div>`;
+}
+
+/**
+ * "Not yet measured" block: the wider-format sibling of notMeasuredTile for
+ * places that would otherwise render a table, list or story card. Same rules:
+ * quiet, honest, and it names where the data gets added.
+ */
+export function notMeasuredBlock(title: string, hint?: string): string {
+  return `<div style="background:${CREAM};border:1px dashed ${HAIR};border-radius:6px;padding:20px 22px">
+    <div style="font-family:${SG};font-size:14px;font-weight:600;color:${INK}">${escapeHtml(title)}</div>
+    <div style="font-family:${SG};font-size:13px;font-weight:500;color:${DIM};margin-top:6px">Not yet measured.</div>
+    ${hint ? `<div style="font-family:${MONO};font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:${DIM};margin-top:8px">${escapeHtml(hint)}</div>` : ''}
+  </div>`;
+}
+
 /** Google Fonts link tags for the studio's three voices. */
 export function studioFontLinks(): string {
   return `<link rel="preconnect" href="https://fonts.googleapis.com" />
