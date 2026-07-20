@@ -1,6 +1,18 @@
 # Handoff: redesign — main merged in (2026-07-20) + sustainability report programme
 Updated: 2026-07-20 | Branch: redesign (merge landed via `merge/main-into-redesign-20260720`) | Worktree: `.claude/worktrees/inspiring-varahamihira-baadb0`
 
+## THE STRATEGY (decided 2026-07-20, read `tasks/alkatera-v2-launch-plan.md` first)
+alkatera v2 = redesign UI + Vercel hosting + the EXISTING Alkatera2 database.
+Customer data never moves; the staging Supabase project is a disposable test bed,
+never promoted. Staging is where Tim tests until happy; at launch the additive
+migrations are applied to Alkatera2, redesign merges to main, Vercel production
+points at Alkatera2, DNS moves, Netlify shuts down after a watch week.
+STATUS: the five 20260719* migrations are APPLIED AND VERIFIED on staging
+(2026-07-20, via SQL editor, recorded in the tracker) — the packaging picker and
+LCA calculation now work there. Next per the plan: seed staging (`/admin/demo-seed`),
+real GEMINI/PDFShift/Stripe-test keys into the staging Vercel env, then the
+report-sections stream.
+
 ## NEW: main → redesign merge (2026-07-20)
 
 All 28 main-only commits (last two weeks of production fixes) are now on redesign.

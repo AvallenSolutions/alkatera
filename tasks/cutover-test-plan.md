@@ -1,5 +1,11 @@
 # Cutover test plan: main (Netlify) → redesign (Vercel)
 
+**DECIDED 2026-07-20 (Tim): customer data never moves.** Alkatera2 stays the one
+production database; the staging Supabase project is a disposable test bed and is
+never promoted. At launch the Vercel app points at Alkatera2 with the redesign's
+additive migrations applied. Strategy and phases: `tasks/alkatera-v2-launch-plan.md`.
+This document remains the tactical test detail behind that plan.
+
 Written 2026-07-20, immediately after the main → redesign merge. The cutover is three
 simultaneous changes (app code, hosting platform, database schema), so the plan is
 layered: each layer proves one of the three, and the order matters. Nothing below
