@@ -34,7 +34,12 @@ export const importFromUrlRun = inngest.createFunction(
     // One import at a time per brand site would be ideal, but jobs are
     // independent (different orgs, different sites) — cap total concurrency
     // so a burst of imports can't melt the Anthropic quota.
-    concurrency: { limit: 6 },
+    //
+    // Hard ceiling of 5: the Inngest plan's per-function concurrency limit.
+    // Anything higher makes the ENTIRE app fail to register, taking every
+    // other function down with it, so this is not a knob to raise casually.
+    // Same constraint documented on scraping-brand-run.
+    concurrency: { limit: 5 },
     // The worker function itself never throws (every failure path writes
     // status: 'failed' onto the job row), so retries are for genuine
     // infra-level failures (e.g. the step process dying mid-run).
@@ -69,7 +74,9 @@ export const ingestAutoRun = inngest.createFunction(
   {
     id: 'ingest-auto-run',
     name: 'Smart Upload: classify a large document',
-    concurrency: { limit: 8 },
+    // Capped at the Inngest plan's per-function limit of 5. Above that the
+    // whole app is rejected at sync time, not just this function.
+    concurrency: { limit: 5 },
     retries: 1,
     triggers: [{ event: 'ingest/auto.run' }],
     onFailure: async ({ event, error }) => {
