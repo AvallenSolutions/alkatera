@@ -97,4 +97,18 @@ Setup, once:
 
 (add lines here; a session works them off newest-first)
 
--
+- [FOUND 2026-07-20, FIX IN FLIGHT] The Drinks Co demo seeder assumes PROD's
+  existing rows (products 130-236, six fixed facilities, the hello@ owner
+  user) and 500s on any empty environment: the orchard upsert fails silently
+  on its facility FK, then "calvados BOM 228" throws. Staging would hit this
+  on the Phase 1 seed click. Fix: a foundation module that creates org/
+  facilities/products when missing + runtime owner resolution + error checks
+  on the silent upserts.
+- [SMALL] Arrival overlay's DialogContent has no DialogTitle (Radix a11y
+  warning on every mount).
+- [INCONCLUSIVE, RE-TEST] /desk appeared stuck on skeletons locally, but the
+  browser pane's viewport had collapsed to 0x0 (visibility-gated mounts never
+  fire at 0x0), so the evidence is contaminated. Re-test the desk in a fresh
+  session before treating it as a bug. While investigating: an org left
+  mid-arrival (dismissed but not completed) is a state worth an explicit
+  handling test on staging.
