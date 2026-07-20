@@ -244,3 +244,54 @@ The new default LCA page in the cellar, replacing the wizard as where
   a cellar surface using the existing kit of parts.
 - No dark-pattern shortcuts: every estimate stays labelled until a human
   confirms it, and nothing unlabelled reaches a signed report.
+
+---
+
+## 7. Build log (20 July 2026)
+
+All five phases are on `redesign`. The calculator, resolver, aggregator,
+recipe editor and PDF pipeline were not touched.
+
+| Phase | Commit | What landed |
+|---|---|---|
+| 1 | `72a7e369` | Calculation runs server-side under Inngest. `CalculationContext` injection seam, `lca_calculation_runs`, `/api/lca/recalc` + status. |
+| 2 | `72ab8dab` | The dossier at `/products/[id]/dossier`: five plain-language sections, provenance chips, section states. |
+| 3 | `4df33c96` | `dossier_boundary` and `dossier_gap_distribution` asks; answering dispatches a recalculation; Rosa's `get_lca_dossier`. |
+| 4+5 | `7a783a3f` | Every product born with an estimated footprint; export gated on confirmed share and tier; wizard demoted to "Open the full record". |
+
+Migrations applied to local: `20260718160000_lca_calculation_runs`,
+`20260718170000_pcf_boundary_source`. **Neither has run on prod.**
+
+### Three bugs the work exposed, all the same shape
+
+Each was a surface reporting more confidence than its inputs earned. Worth
+watching for elsewhere:
+
+1. The resolver gated OpenLCA and supplier lookups behind `if (session)` with
+   no else, so an off-browser run silently resolved from generic factors and
+   reported success. Same product, different number, no warning.
+2. The dossier's headline read "Confirmed." beside "0% confirmed", because
+   provenance came from the PCF's own status rather than the data under it.
+3. `boundary_source` did not exist, so a boundary we assumed was
+   indistinguishable from one a person chose.
+
+### What is NOT done
+
+- **No visual verification.** Every route compiles and serves, and the
+  assembler was run over real seeded data, but nobody has looked at the
+  dossier in a browser. Signing in needs a password. This is the first thing
+  to do.
+- **The dossier is read-only.** Sections show state and provenance but cannot
+  yet be corrected in place. The editable distribution card specced in §4
+  Phase 2 is not built; correcting still means the wizard or an ask.
+- **Facility volumes are not derived.** Decision 3 said derive from
+  `annual_production_volume` and Breww with a confirming ask; not implemented.
+  The dossier flags a missing site, but the volume question is still the
+  wizard's.
+- **Growth band not wired to confirmed share.** The `production` band still
+  counts LCAs, not how much of them is confirmed.
+- **The EoL allocation dropdown still exists** in the wizard. Phase 3 planned
+  to default it to cut-off and remove it from the user path.
+- **Export routes are not yet calling `checkLcaExportGate`.** The dossier
+  shows the verdict, but the PDF and passport paths still need wiring to it,
+  otherwise the gate is advisory only.
