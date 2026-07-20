@@ -105,9 +105,13 @@ Setup, once:
   run a no-op. The staging seed click now works.
 - [SMALL] Arrival overlay's DialogContent has no DialogTitle (Radix a11y
   warning on every mount).
-- [INCONCLUSIVE, RE-TEST] /desk appeared stuck on skeletons locally, but the
-  browser pane's viewport had collapsed to 0x0 (visibility-gated mounts never
-  fire at 0x0), so the evidence is contaminated. Re-test the desk in a fresh
-  session before treating it as a bug. While investigating: an org left
-  mid-arrival (dismissed but not completed) is a state worth an explicit
-  handling test on staging.
+- [FIXED 2026-07-20, commit 5405065c] The "stuck skeleton" Tim hit on staging:
+  an unauthenticated visit to any authenticated URL skeletoned forever instead
+  of redirecting to /login (organizationContext's user-changed effect took
+  neither branch when both the current and last user id were null, so
+  isLoading never cleared). Reproduced locally logged-out, fixed, verified:
+  logged-out /desk now lands on /login. The earlier "0x0 viewport" local
+  sighting was this same bug wearing a disguise.
+- [NOTE] Along the way, staging state was corrected by hand: Tim's arrival
+  marked complete, is_alkatera_admin set true. An org left mid-arrival is
+  still worth an explicit staging test (fresh-org signup, item 3).
