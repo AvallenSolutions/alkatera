@@ -1,4 +1,4 @@
-import { OWNER_USER_ID, REFERENCE_YEAR, type SeedCtx } from './shared';
+import { REFERENCE_YEAR, type SeedCtx } from './shared';
 
 const BCORP_FRAMEWORK_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
 
@@ -114,8 +114,8 @@ async function seedBCorp(ctx: SeedCtx): Promise<void> {
   const { data: docs, error: docErr } = await svc
     .from('evidence_documents')
     .insert([
-      { organization_id: orgId, title: 'Carbon Reduction Plan 2026', document_name: 'carbon-reduction-plan-2026.pdf', tags: ['climate', 'emissions'], storage_object_path: `${orgId}/demo/carbon-reduction-plan-2026.pdf`, mime_type: 'application/pdf', uploaded_by: OWNER_USER_ID },
-      { organization_id: orgId, title: 'Employee Handbook & Code of Conduct', document_name: 'employee-handbook.pdf', tags: ['governance', 'workers'], storage_object_path: `${orgId}/demo/employee-handbook.pdf`, mime_type: 'application/pdf', uploaded_by: OWNER_USER_ID },
+      { organization_id: orgId, title: 'Carbon Reduction Plan 2026', document_name: 'carbon-reduction-plan-2026.pdf', tags: ['climate', 'emissions'], storage_object_path: `${orgId}/demo/carbon-reduction-plan-2026.pdf`, mime_type: 'application/pdf', uploaded_by: ctx.ownerUserId },
+      { organization_id: orgId, title: 'Employee Handbook & Code of Conduct', document_name: 'employee-handbook.pdf', tags: ['governance', 'workers'], storage_object_path: `${orgId}/demo/employee-handbook.pdf`, mime_type: 'application/pdf', uploaded_by: ctx.ownerUserId },
     ])
     .select('id, title');
   if (docErr) ctx.warnings.push(`evidence_documents: ${docErr.message}`);

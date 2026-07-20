@@ -1,7 +1,6 @@
 import {
   FACILITIES,
   HISTORY_MONTHS,
-  OWNER_USER_ID,
   REFERENCE_YEAR,
   monthEnd,
   monthStart,
@@ -429,12 +428,12 @@ export async function seedHospitality(ctx: SeedCtx): Promise<void> {
  * hence the cautious wording — either way the rows still land.
  */
 async function resolveCreator(ctx: SeedCtx): Promise<string | null> {
-  const { data, error } = await ctx.svc.auth.admin.getUserById(OWNER_USER_ID);
+  const { data, error } = await ctx.svc.auth.admin.getUserById(ctx.ownerUserId);
   if (error || !data?.user) {
     ctx.warnings.push('hospitality: could not confirm the owner account, so rows were seeded without created_by');
     return null;
   }
-  return OWNER_USER_ID;
+  return ctx.ownerUserId;
 }
 
 /**

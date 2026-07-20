@@ -1,5 +1,4 @@
 import {
-  OWNER_USER_ID,
   REFERENCE_YEAR,
   replaceRows,
   upsert,
@@ -259,7 +258,7 @@ function generatedReportRow(ctx: SeedCtx, s: GeneratedReportSeed): Record<string
   return {
     id: s.id,
     organization_id: ctx.orgId,
-    created_by: OWNER_USER_ID,
+    created_by: ctx.ownerUserId,
     report_name: s.name,
     report_year: s.year,
     reporting_period_start: periodStart,
@@ -422,7 +421,7 @@ async function seedMateriality(ctx: SeedCtx): Promise<void> {
         // Non-null completed_at is what flips the hub into its "complete" state
         // and unlocks the ESRS index in the PDF.
         completed_at: `${year}-03-28T16:00:00.000Z`,
-        created_by: OWNER_USER_ID,
+        created_by: ctx.ownerUserId,
         updated_at: `${year}-03-28T16:00:00.000Z`,
       },
     ],
@@ -517,7 +516,7 @@ async function seedTransitionPlan(ctx: SeedCtx): Promise<void> {
         risks_and_opportunities: RISKS_AND_OPPORTUNITIES,
         sbti_aligned: true,
         sbti_target_year: 2030,
-        created_by: OWNER_USER_ID,
+        created_by: ctx.ownerUserId,
         updated_at: `${year}-04-11T10:30:00.000Z`,
       },
     ],
@@ -560,7 +559,7 @@ async function seedHistoricalImports(ctx: SeedCtx): Promise<void> {
       reporting_year: firstReportYear,
       source_document_name: `alkatera-drinks-co-sustainability-report-${firstReportYear}.pdf`,
       storage_object_path: null,
-      created_by: OWNER_USER_ID,
+      created_by: ctx.ownerUserId,
       extracted_data: {
         reporting_year: firstReportYear,
         organization_name: 'alkatera Drinks Co',
@@ -583,7 +582,7 @@ async function seedHistoricalImports(ctx: SeedCtx): Promise<void> {
       reporting_year: secondReportYear,
       source_document_name: `alkatera-drinks-co-sustainability-report-${secondReportYear}.pdf`,
       storage_object_path: null,
-      created_by: OWNER_USER_ID,
+      created_by: ctx.ownerUserId,
       extracted_data: {
         reporting_year: secondReportYear,
         organization_name: 'alkatera Drinks Co',
@@ -608,7 +607,7 @@ async function seedHistoricalImports(ctx: SeedCtx): Promise<void> {
       reporting_year: secondReportYear,
       source_document_name: `bath-gin-700ml-lca-${secondReportYear}.pdf`,
       storage_object_path: null,
-      created_by: OWNER_USER_ID,
+      created_by: ctx.ownerUserId,
       extracted_data: {
         product_name: 'Bath Gin 700ml',
         functional_unit: '1 x 700ml bottle, delivered to the retail distribution centre',
@@ -650,7 +649,7 @@ async function seedLcaTemplates(ctx: SeedCtx): Promise<void> {
       name: 'Standard cradle-to-gate (spirits & wine)',
       description: 'House default for the core range: cradle-to-gate, internal review, UK grid factors.',
       is_org_default: true,
-      created_by: OWNER_USER_ID,
+      created_by: ctx.ownerUserId,
       settings: {
         intendedApplication: 'Internal decarbonisation planning and customer carbon disclosure.',
         reasonsForStudy: 'Identify emissions hotspots across ingredients, packaging and production, and answer trade customer data requests.',
@@ -680,7 +679,7 @@ async function seedLcaTemplates(ctx: SeedCtx): Promise<void> {
       name: 'Full cradle-to-grave (externally reviewed)',
       description: 'For claims that go public: full life cycle including use and end of life, with external critical review.',
       is_org_default: false,
-      created_by: OWNER_USER_ID,
+      created_by: ctx.ownerUserId,
       settings: {
         intendedApplication: 'Public-facing product carbon claims and retailer sustainability scorecards.',
         reasonsForStudy: 'Support an externally communicated footprint covering the complete life cycle, including chilling at point of consumption and end-of-life packaging treatment.',

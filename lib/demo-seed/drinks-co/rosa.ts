@@ -1,5 +1,4 @@
 import {
-  OWNER_USER_ID,
   replaceRows,
   type SeedCtx,
 } from './shared';
@@ -119,7 +118,7 @@ async function seedConversations(ctx: SeedCtx): Promise<void> {
       .from('gaia_conversations')
       .insert({
         organization_id: orgId,
-        user_id: OWNER_USER_ID,
+        user_id: ctx.ownerUserId,
         title: thread.title,
         message_count: thread.turns.length * 2,
         created_at: created,
@@ -178,7 +177,7 @@ async function seedConversations(ctx: SeedCtx): Promise<void> {
       if (turn.rating) {
         const { error: fErr } = await svc.from('gaia_feedback').insert({
           message_id: (answer as any).id,
-          user_id: OWNER_USER_ID,
+          user_id: ctx.ownerUserId,
           organization_id: orgId,
           rating: turn.rating,
           feedback_text: turn.note ?? null,
@@ -228,14 +227,14 @@ async function seedMemory(ctx: SeedCtx): Promise<void> {
     },
     {
       organization_id: orgId,
-      user_id: OWNER_USER_ID,
+      user_id: ctx.ownerUserId,
       scope: 'user',
       key: 'response_style',
       value: 'Lead with the number. Keep it short. I do not need the methodology unless I ask.',
     },
     {
       organization_id: orgId,
-      user_id: OWNER_USER_ID,
+      user_id: ctx.ownerUserId,
       scope: 'user',
       key: 'persona',
       value: 'leadership',
@@ -279,17 +278,17 @@ async function seedTelemetry(ctx: SeedCtx): Promise<void> {
   for (let week = 11; week >= 0; week--) {
     const at = new Date(Date.now() - week * 7 * 24 * 3600 * 1000).toISOString();
     for (let i = 0; i < 3; i++) {
-      rows.push({ organization_id: orgId, user_id: OWNER_USER_ID, event: 'tile.shown', payload: {}, created_at: at });
+      rows.push({ organization_id: orgId, user_id: ctx.ownerUserId, event: 'tile.shown', payload: {}, created_at: at });
     }
     if (week % 3 !== 0) {
-      rows.push({ organization_id: orgId, user_id: OWNER_USER_ID, event: 'tile.clicked', payload: {}, created_at: at });
+      rows.push({ organization_id: orgId, user_id: ctx.ownerUserId, event: 'tile.clicked', payload: {}, created_at: at });
     }
     if (week % 5 === 0) {
-      rows.push({ organization_id: orgId, user_id: OWNER_USER_ID, event: 'tile.snoozed', payload: {}, created_at: at });
+      rows.push({ organization_id: orgId, user_id: ctx.ownerUserId, event: 'tile.snoozed', payload: {}, created_at: at });
     }
   }
-  rows.push({ organization_id: orgId, user_id: OWNER_USER_ID, event: 'tracker.opened', payload: {}, created_at: new Date().toISOString() });
-  rows.push({ organization_id: orgId, user_id: OWNER_USER_ID, event: 'persona.set', payload: { persona: 'leadership' }, created_at: new Date().toISOString() });
+  rows.push({ organization_id: orgId, user_id: ctx.ownerUserId, event: 'tracker.opened', payload: {}, created_at: new Date().toISOString() });
+  rows.push({ organization_id: orgId, user_id: ctx.ownerUserId, event: 'persona.set', payload: { persona: 'leadership' }, created_at: new Date().toISOString() });
 
   const count = await replaceRows(ctx, 'rosa_telemetry', { organization_id: orgId }, rows);
   ctx.report.rosaTelemetry = `${count} telemetry events over 12 weeks`;
@@ -307,7 +306,7 @@ async function seedPendingAction(ctx: SeedCtx): Promise<void> {
   const rows = [
     {
       organization_id: orgId,
-      user_id: OWNER_USER_ID,
+      user_id: ctx.ownerUserId,
       tool_name: 'propose_set_target',
       payload: {
         metric_key: 'total_emissions',

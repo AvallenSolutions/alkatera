@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { DELETE_PRODUCT_IDS, KEEP_PRODUCT_IDS, ORCHARD_ID, makeCtx, type SeedCtx } from './shared';
+import { ensureFoundation } from './foundation';
 import { seedEntities } from './entities';
 import { seedCompletedLcas } from './lca';
 import { seedOperations } from './operations';
@@ -30,6 +31,11 @@ export interface SeedOutcome {
  */
 export async function seedDrinksCoDemo(svc: SupabaseClient): Promise<SeedOutcome> {
   const ctx: SeedCtx = makeCtx(svc);
+
+  // First: on an empty environment (staging, fresh local) create the org,
+  // owner membership, facilities, vineyard and keeper products the rest of the
+  // seed assumes. On production, where they all exist, this changes nothing.
+  await ensureFoundation(ctx);
 
   await seedEntities(ctx);
   await seedCompletedLcas(ctx);

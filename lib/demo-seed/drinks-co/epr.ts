@@ -1,4 +1,4 @@
-import { OWNER_USER_ID, PRODUCTS, REFERENCE_YEAR, replaceRows, type SeedCtx } from './shared';
+import { PRODUCTS, REFERENCE_YEAR, replaceRows, type SeedCtx } from './shared';
 import {
   deriveEprMaterialType,
   deriveMaterialSubtype,
@@ -640,7 +640,7 @@ async function seedAuditLog(
     entity_type: entityType,
     entity_id: entityId,
     action,
-    performed_by: OWNER_USER_ID,
+    performed_by: ctx.ownerUserId,
     performed_at: at,
     ip_address: '203.0.113.24',
     user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/126.0 Safari/537.36',
@@ -816,7 +816,7 @@ export async function seedEpr(ctx: SeedCtx): Promise<void> {
       csv_storage_path: csvCut ? `epr-submissions/${orgId}/${period.period}-rpd.csv` : null,
       csv_checksum: csvCut ? checksumFor(period.period) : null,
       submitted_to_rpd_at: filed ? `${REFERENCE_YEAR}-08-11T08:55:00Z` : null,
-      submitted_by: filed ? OWNER_USER_ID : null,
+      submitted_by: filed ? ctx.ownerUserId : null,
       notes: filed
         ? `Filed via the Defra RPD portal; confirmation reference RPD-${period.period}-${RPD_ORGANISATION_ID}.`
         : period.status === 'ready'

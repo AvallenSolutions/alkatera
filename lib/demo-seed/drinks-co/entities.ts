@@ -61,7 +61,7 @@ async function ensureAgriculture(ctx: SeedCtx): Promise<void> {
   const { svc, orgId } = ctx;
 
   // --- Viticulture: vineyard -> Bacchus grapes ---
-  await svc
+  const { error: vineyardErr } = await svc
     .from('vineyards')
     .update({
       vine_planting_year: 2012,
@@ -71,19 +71,25 @@ async function ensureAgriculture(ctx: SeedCtx): Promise<void> {
       location_country_code: 'GB',
     })
     .eq('id', VINEYARD_ID);
+  if (vineyardErr) throw new Error(`agriculture vineyard: ${vineyardErr.message}`);
 
   // Attach the 2024 growing profile to the wine product.
-  await svc.from('vineyard_growing_profiles').update({ product_id: PRODUCTS.bacchus, is_draft: false }).eq('vineyard_id', VINEYARD_ID);
+  const { error: profileErr } = await svc.from('vineyard_growing_profiles').update({ product_id: PRODUCTS.bacchus, is_draft: false }).eq('vineyard_id', VINEYARD_ID);
+  if (profileErr) throw new Error(`agriculture vineyard profile: ${profileErr.message}`);
 
   // Mark the grape material self-grown so the calculator pulls cultivation data.
-  await svc
+  const { error: grapeErr } = await svc
     .from('product_materials')
     .update({ is_self_grown: true, vineyard_id: VINEYARD_ID })
     .eq('product_id', PRODUCTS.bacchus)
     .eq('material_name', 'Bacchus Grapes');
+  if (grapeErr) throw new Error(`agriculture grape material: ${grapeErr.message}`);
 
   // --- Orchard: apples -> Calvados ---
-  await svc.from('orchards').upsert(
+  // These two upserts were unchecked for a long time; on an empty environment
+  // the orchard insert failed silently on its facility FK and the seed only
+  // blew up later, in rebuildCalvados, with a baffling orchard_id FK error.
+  const { error: orchardErr } = await svc.from('orchards').upsert(
     {
       id: ORCHARD_ID,
       organization_id: orgId,
@@ -106,8 +112,9 @@ async function ensureAgriculture(ctx: SeedCtx): Promise<void> {
     },
     { onConflict: 'id' },
   );
+  if (orchardErr) throw new Error(`agriculture orchard: ${orchardErr.message}`);
 
-  await svc.from('orchard_growing_profiles').upsert(
+  const { error: orchardProfileErr } = await svc.from('orchard_growing_profiles').upsert(
     {
       orchard_id: ORCHARD_ID,
       organization_id: orgId,
@@ -134,6 +141,7 @@ async function ensureAgriculture(ctx: SeedCtx): Promise<void> {
     },
     { onConflict: 'orchard_id,harvest_year' },
   );
+  if (orchardProfileErr) throw new Error(`agriculture orchard profile: ${orchardProfileErr.message}`);
 
   ctx.report.agriculture = 'vineyard linked to Bacchus; orchard created + linked to Calvados';
 }
