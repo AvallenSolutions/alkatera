@@ -130,9 +130,14 @@ The five sections render with honest skeletons; the facilities page exists; the
 kg-vs-tonnes guard is tested; the completeness oracle drives both the document
 and the funnel's "N of M measures recorded" rows; SECTION_TO_TOPIC's FOUR phantom
 topic ids (products too, not just the three from planning) are fixed and pinned.
-Remaining from the plan's verification section: the browser walk-through on
-Local Dev Co (thin data = skeletons are the feature; add one demographics row
-and watch the mixed state) and a look at the funnel gap rows in situ. The
+BROWSER-VERIFIED 2026-07-20 on local (empty test org, the all-skeleton case):
+funnel gap rows render live ("0 of 13 measures recorded" for People & Culture,
+"0 of 4" for facilities, expandable MISSING rows with deep links), and the
+truthful preview's generated document contains the People & Culture page
+(previously silently absent) with the honest lead line, 10 "Not yet measured"
+tiles and ZERO N/A. Facilities is selectable (catalogue label is "Facility
+Emissions Breakdown", category Operations). Still worth one pass with THIN
+(not empty) data — add one demographics row and watch the mixed state. The
 "Recorded, not in scope" items (hasVineyards gate, dashboard fallback
 disagreements, three-oracle consolidation) still stand.
 
