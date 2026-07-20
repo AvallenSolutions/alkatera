@@ -221,19 +221,18 @@ The new default LCA page in the cellar, replacing the wizard as where
 
 ---
 
-## 5. Open decisions (for Tim before Phase 2)
+## 5. Decisions (settled with Tim, 20 July 2026)
 
-1. **Boundary default.** Category-based default with a confirm ask, or keep
-   cradle-to-gate as the universal default? Wider defaults show bigger, more
-   honest numbers but need distribution/EoL estimates from day one.
-2. **The tier gates.** Boundary width is tier-gated today (shelf = Blossom,
-   consumer/grave = Canopy). In an estimate-first world, does the gate move to
-   the export instead of the estimate? Recommend: estimate freely, gate the
-   confirmed export by tier.
-3. **Facility volumes.** Auto-derive from `annual_production_volume` and Breww
-   with an ask to confirm, or keep as a required entry? Recommend derive.
-4. **PDF wording.** Legal/comms sign-off on "methodology text authored by
-   alka**tera**, applied to this product" phrasing in the ISO document.
+1. **Boundary default: ask.** A category-based default is proposed, but it is
+   confirmed through an ask in plain language ("how far should this footprint
+   follow the product?"), never silently applied.
+2. **Tier gates move to the export.** Estimate freely at any boundary. The
+   confirmed export is gated by tier, and a user attempting to export beyond
+   their tier's boundary gets an upgrade prompt rather than a dead end.
+3. **Facility volumes: derive.** Auto-derived from `annual_production_volume`
+   and Breww, confirmed through an ask. Never a required entry field.
+4. **PDF wording: approved.** "Standard methodology, applied by alka**tera**"
+   attribution stands in the ISO document.
 
 ## 6. What this plan deliberately does not do
 

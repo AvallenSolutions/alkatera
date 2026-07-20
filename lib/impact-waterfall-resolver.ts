@@ -1,4 +1,5 @@
 import { getSupabaseBrowserClient } from './supabase/browser-client';
+import { resolveInternalCallAuth, type CalculationContext, type InternalCallAuthOk } from './lca/calculation-context';
 import { DEFAULT_AWARE_FACTOR, getAwareFactorValue } from './calculations/water-risk';
 import { getPreferredDatabase } from './openlca/agribalyse-aliases';
 import type { OpenLCADatabaseSource } from './openlca/client';
@@ -486,14 +487,19 @@ function detectMaterialCategory(material: ProductMaterial): MaterialCategoryType
  * @param material - The product material to resolve impacts for
  * @param quantity_kg - Quantity in kilograms
  * @param organizationId - Optional organization ID for OpenLCA config lookup
+ * @param fallbackEvents - Collector for downgrades away from the ideal source
+ * @param ctx - Where this run is happening. Omit in the browser; server runs
+ *   must inject a service-role client and a service credential, or the
+ *   supplier and OpenLCA branches will report themselves unavailable.
  */
 export async function resolveImpactFactors(
   material: ProductMaterial,
   quantity_kg: number,
   organizationId?: string,
   fallbackEvents?: FallbackEvent[],
+  ctx?: CalculationContext,
 ): Promise<WaterfallResult> {
-  const supabase = getSupabaseBrowserClient();
+  const supabase = ctx?.supabase ?? getSupabaseBrowserClient();
   const category = detectMaterialCategory(material);
 
   // ── SELF-GROWN: farm-linked ingredients ───────────────────────────────
@@ -561,21 +567,23 @@ export async function resolveImpactFactors(
       // so brand users can't read them with the client-side Supabase client)
       let supplierProduct: any = null;
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const authToken = sessionData?.session?.access_token;
-        if (authToken) {
-          const res = await fetch('/api/supplier-products/resolve', {
+        const auth = await resolveInternalCallAuth(supabase, ctx);
+        if (auth.ok) {
+          const res = await fetch(auth.url('/api/supplier-products/resolve'), {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${authToken}`,
-            },
+            headers: auth.headers,
             body: JSON.stringify({ supplier_product_id: material.supplier_product_id }),
           });
           if (res.ok) {
             const data = await res.json();
             supplierProduct = data.product;
           }
+        } else {
+          // Do not fall through quietly: this material was explicitly linked
+          // to supplier data and we are about to use something worse.
+          console.warn(
+            `[Waterfall] Supplier lookup unavailable for ${material.material_name}: ${auth.reason}`,
+          );
         }
       } catch (resolveErr) {
         console.warn('[Waterfall] Could not resolve supplier product via API:', resolveErr);
@@ -903,19 +911,16 @@ export async function resolveImpactFactors(
 
     const tryOpenLCAServer = async (
       db: OpenLCADatabaseSource,
-      token: string,
+      auth: InternalCallAuthOk,
       timeoutMs: number = 45000,
     ): Promise<OpenLCAAttemptResult> => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       try {
-        const response = await fetch('/api/openlca/calculate', {
+        const response = await fetch(auth.url('/api/openlca/calculate'), {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
+          headers: auth.headers,
           body: JSON.stringify({
             processId: material.data_source_id,
             quantity: quantity_kg,
@@ -1002,11 +1007,11 @@ export async function resolveImpactFactors(
     };
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const openLcaAuth = await resolveInternalCallAuth(supabase, ctx);
 
-      if (session?.access_token) {
+      if (openLcaAuth.ok) {
         // Try the primary database first (with automatic retry on timeout)
-        const primaryResult = await tryOpenLCAServer(materialDatabase, session.access_token);
+        const primaryResult = await tryOpenLCAServer(materialDatabase, openLcaAuth);
 
         if (primaryResult.ok) {
           // A stale no-match verdict just got disproven by a live result —
@@ -1031,7 +1036,7 @@ export async function resolveImpactFactors(
           const altDatabase: OpenLCADatabaseSource = materialDatabase === 'ecoinvent' ? 'agribalyse' : 'ecoinvent';
           console.log(`[Waterfall] Process not found (404) on ${materialDatabase}, trying ${altDatabase} for: ${material.material_name}`);
 
-          const altResult = await tryOpenLCAServer(altDatabase, session.access_token);
+          const altResult = await tryOpenLCAServer(altDatabase, openLcaAuth);
           triedAlternate = true;
           finalAttempt = altResult;
 
@@ -1080,6 +1085,25 @@ export async function resolveImpactFactors(
           factor_value_kg_co2e: 0,
           source_reference: '',
           category: fallbackCategory,
+        });
+      } else {
+        // No usable credential for the live lookup. This used to be a silent
+        // skip, which meant an off-browser run quietly resolved from generic
+        // factors and reported success: the same product, a different number,
+        // no warning anywhere. Record it as a transient fallback so the run
+        // carries the reason with it.
+        console.warn(
+          `[Waterfall] OpenLCA unreachable for ${material.material_name}: ${openLcaAuth.reason}`,
+        );
+        fallbackEvents?.push({
+          material_name: material.material_name,
+          material_id: material.id,
+          attempted_priority: `2.5 (OpenLCA/${materialDatabase})`,
+          resolved_priority: 0,
+          fallback_reason: `Live OpenLCA calculation could not be reached (${openLcaAuth.reason}); resolved from a generic factor`,
+          factor_value_kg_co2e: 0,
+          source_reference: '',
+          category: 'transient',
         });
       }
     } catch (error: any) {
@@ -1613,7 +1637,7 @@ export async function resolveImpactFactors(
   console.error(`[Waterfall] ✗ NO DATA FOUND for: ${material.material_name}`);
 
   // Fire-and-forget: log this miss to the factor requests table
-  logFactorMiss(material, organizationId).catch(() => {});
+  logFactorMiss(material, organizationId, ctx).catch(() => {});
 
   throw new Error(`No emission factor found for material: ${material.material_name}. Please add emission data or select a different material.`);
 }
@@ -1621,7 +1645,8 @@ export async function resolveImpactFactors(
 export async function validateMaterialsBeforeCalculation(
   materials: ProductMaterial[],
   organizationId?: string,
-  onProgress?: (materialIndex: number, totalMaterials: number, materialName: string) => void
+  onProgress?: (materialIndex: number, totalMaterials: number, materialName: string) => void,
+  ctx?: CalculationContext,
 ): Promise<{
   valid: boolean;
   missingData: Array<{ material: ProductMaterial; error: string }>;
@@ -1639,7 +1664,7 @@ export async function validateMaterialsBeforeCalculation(
   const tasks = materials.map(material => async () => {
     try {
       const quantityKg = normalizeToKg(material.quantity, material.unit);
-      const resolved = await resolveImpactFactors(material, quantityKg, organizationId);
+      const resolved = await resolveImpactFactors(material, quantityKg, organizationId, undefined, ctx);
       validMaterials.push({ material, resolved });
     } catch (error: any) {
       missingData.push({
@@ -1708,9 +1733,10 @@ function extractQualityGrade(factor: any): 'HIGH' | 'MEDIUM' | 'LOW' {
 async function logFactorMiss(
   material: ProductMaterial,
   organizationId?: string,
+  ctx?: CalculationContext,
 ): Promise<void> {
   try {
-    const supabase = getSupabaseBrowserClient();
+    const supabase = ctx?.supabase ?? getSupabaseBrowserClient();
     await supabase.rpc('log_emission_factor_request', {
       p_search_query: material.material_name,
       p_material_name: material.material_name,

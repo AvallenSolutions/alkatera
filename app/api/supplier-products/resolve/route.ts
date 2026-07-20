@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { isServiceCall } from '@/lib/lca/service-auth';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -26,10 +27,15 @@ export async function POST(request: NextRequest) {
       auth: { persistSession: false },
     });
 
-    // Verify the caller is authenticated
-    const { data: { user }, error: authError } = await adminClient.auth.getUser(token);
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Verify the caller is authenticated. A server-side LCA run has no user
+    // session and presents the internal service secret instead; without this
+    // branch the waterfall silently loses its supplier-verified data when it
+    // runs off-browser, and quietly resolves from worse factors.
+    if (!isServiceCall(request)) {
+      const { data: { user }, error: authError } = await adminClient.auth.getUser(token);
+      if (authError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
 
     const body = await request.json();

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createOpenLCAClientForDatabase } from '@/lib/openlca/client';
 import { ProviderLinking, type ImpactResult } from '@/lib/openlca/schema';
 import { classifyOpenLcaError } from '@/lib/openlca/classify-error';
+import { isServiceCall } from '@/lib/lca/service-auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120; // OpenLCA calculations can take 60-90s
@@ -102,13 +103,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    });
+    // A server-side LCA run presents the internal service secret rather than a
+    // user JWT, and reads through the service-role client. Without this branch
+    // the live OpenLCA lookup is unreachable off-browser, and the waterfall
+    // falls back to generic factors: the same product, a different number.
+    const serviceCall = isServiceCall(request);
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
-    const { data: user, error: userError } = await supabase.auth.getUser();
-    if (userError || !user?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (serviceCall && !serviceKey) {
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+
+    const supabase = serviceCall
+      ? createClient(supabaseUrl, serviceKey!, {
+          auth: { autoRefreshToken: false, persistSession: false },
+        })
+      : createClient(supabaseUrl, supabaseAnonKey, {
+          global: { headers: { Authorization: `Bearer ${token}` } },
+        });
+
+    if (!serviceCall) {
+      const { data: user, error: userError } = await supabase.auth.getUser();
+      if (userError || !user?.user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
 
     // Parse request body

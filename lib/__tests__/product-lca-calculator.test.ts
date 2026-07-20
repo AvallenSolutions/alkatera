@@ -919,7 +919,8 @@ describe('calculateProductCarbonFootprint', () => {
       const result = await calculateProductCarbonFootprint(params);
 
       expect(result.success).toBe(true);
-      expect(mockResolveImpactFactors).toHaveBeenCalledWith(expect.anything(), 0, 'org-456', expect.anything());
+      // 5th arg is the CalculationContext: undefined on the browser path.
+      expect(mockResolveImpactFactors).toHaveBeenCalledWith(expect.anything(), 0, 'org-456', expect.anything(), undefined);
     });
 
     it('should handle materials with string quantity', async () => {
@@ -939,7 +940,7 @@ describe('calculateProductCarbonFootprint', () => {
 
       expect(result.success).toBe(true);
       // 150g should be normalized to 0.15kg
-      expect(mockResolveImpactFactors).toHaveBeenCalledWith(expect.anything(), 0.15, 'org-456', expect.anything());
+      expect(mockResolveImpactFactors).toHaveBeenCalledWith(expect.anything(), 0.15, 'org-456', expect.anything(), undefined);
     });
 
     it('should handle packaging materials', async () => {
@@ -969,7 +970,7 @@ describe('calculateProductCarbonFootprint', () => {
 
       expect(result.success).toBe(true);
       // 350g should be normalized to 0.35kg
-      expect(mockResolveImpactFactors).toHaveBeenCalledWith(expect.anything(), 0.35, 'org-456', expect.anything());
+      expect(mockResolveImpactFactors).toHaveBeenCalledWith(expect.anything(), 0.35, 'org-456', expect.anything(), undefined);
     });
 
     it('should handle materials with supplier data source', async () => {

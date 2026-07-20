@@ -1,4 +1,5 @@
 import { getSupabaseBrowserClient } from './supabase/browser-client';
+import { isServerContext, type CalculationContext } from './lca/calculation-context';
 import { resolveImpactFactors, normalizeToKg, tryNormalizeToKg, type ProductMaterial, type WaterfallResult, type FallbackEvent } from './impact-waterfall-resolver';
 import { calculateTransportEmissions, type TransportMode } from './utils/transport-emissions-calculator';
 import { calculateDistributionEmissions } from './distribution-factors';
@@ -93,6 +94,23 @@ export interface CalculatePCFParams {
    *  autosave flow so draft state survives the calc without creating a
    *  duplicate row. */
   draftPcfId?: string;
+  /**
+   * Where this calculation is running. Omit in the browser and everything
+   * behaves exactly as it always has: the memoised browser client, the
+   * signed-in user's session for internal API hops.
+   *
+   * A server run (the Inngest function) must supply a service-role client and
+   * a service credential. Without the credential the supplier and OpenLCA
+   * branches cannot authenticate, and the run will report that rather than
+   * quietly resolving from worse factors.
+   */
+  context?: CalculationContext;
+  /**
+   * Who this calculation is attributed to. Required when `context.supabase`
+   * is injected, because there is no session to read a user from. Ignored in
+   * the browser, where the signed-in user is authoritative.
+   */
+  userId?: string;
 }
 
 /** @deprecated Use CalculatePCFParams instead */
@@ -370,17 +388,33 @@ function buildFunctionalUnit(
  * Uses GHG Protocol Product Standard and ISO 14067 methodology
  */
 export async function calculateProductCarbonFootprint(params: CalculatePCFParams): Promise<CalculatePCFResult> {
-  const supabase = getSupabaseBrowserClient();
+  const ctx = params.context;
+  const supabase = ctx?.supabase ?? getSupabaseBrowserClient();
   const { productId, functionalUnit, systemBoundary, referenceYear, onProgress } = params;
 
   try {
     console.log(`[calculateProductCarbonFootprint] Starting calculation for product: ${productId}`);
     onProgress?.('Loading product data...', 5);
 
-    // 1. Get user and organization
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      throw new Error('User not authenticated');
+    // 1. Establish who this calculation belongs to.
+    // In the browser that is the signed-in user. On a server run there is no
+    // session to read, so the caller must name the user explicitly; the
+    // organisation is taken off the product row either way, so nothing else
+    // downstream depends on this.
+    let actingUserId: string;
+    if (isServerContext(ctx)) {
+      if (!params.userId) {
+        throw new Error(
+          'A server-side calculation must supply userId: there is no session to attribute it to',
+        );
+      }
+      actingUserId = params.userId;
+    } else {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        throw new Error('User not authenticated');
+      }
+      actingUserId = user.id;
     }
 
     // 2. Fetch product details
@@ -1601,7 +1635,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           data_source_id: m.data_source_id,
           organization_id: product.organization_id,
         });
-        const result = await resolveImpactFactors(m as ProductMaterial, quantityKg, product.organization_id, fallbackEvents);
+        const result = await resolveImpactFactors(m as ProductMaterial, quantityKg, product.organization_id, fallbackEvents, ctx);
         resolvedFactors.set(String(m.id), result);
       });
 
@@ -1708,7 +1742,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           resolved = resolvedFactors.get(String(material.id))!;
         } else {
           // Fallback: resolve individually (should not happen, but safe)
-          resolved = await resolveImpactFactors(material as ProductMaterial, quantityKg, product.organization_id, fallbackEvents);
+          resolved = await resolveImpactFactors(material as ProductMaterial, quantityKg, product.organization_id, fallbackEvents, ctx);
         }
 
         // Calculate transport emissions (multi-modal preferred, single-leg fallback)
@@ -3880,7 +3914,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         .from('calculation_logs')
         .insert({
           organization_id: product.organization_id,
-          user_id: (await supabase.auth.getUser()).data.user?.id,
+          user_id: actingUserId,
           calculation_id: null, // FK references calculated_emissions, not product_carbon_footprints
           input_data: {
             product_id: productId,

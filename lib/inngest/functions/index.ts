@@ -23,6 +23,7 @@ import { referenceDataLoadRun } from './reference-data';
 import { geoSoilBaselineRun } from './geo';
 import { trialReminderSweep } from './trial-reminders';
 import { pulseRefreshRun } from './pulse-refresh';
+import { lcaRecalcRun } from './lca-recalc';
 import { outreachReportEnrich } from './outreach';
 import { growthStallSweep } from './growth';
 import { emailIntakePoll } from './email-intake';
@@ -59,6 +60,7 @@ export const allFunctions: InngestFunction.Any[] = [
   geoSoilBaselineRun,
   trialReminderSweep,
   pulseRefreshRun,
+  lcaRecalcRun,
   outreachReportEnrich,
   growthStallSweep,
   emailIntakePoll,

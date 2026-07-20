@@ -102,6 +102,14 @@ export interface AlkateraEvents {
     data: { run_id: string; base_url: string };
   };
 
+  // ─────────── LCA: recalculate a product footprint server-side ───────────
+  // base_url is required, not optional: the waterfall reaches OpenLCA and the
+  // supplier resolver over HTTP, and Node cannot resolve the relative paths
+  // the browser path uses.
+  'lca/recalc.requested': {
+    data: { run_id: string; base_url: string };
+  };
+
   // ─────────── Outbound reply-hook: background brand-report enrich ───────────
   'outreach/report.enrich': {
     data: { report_id: string };
