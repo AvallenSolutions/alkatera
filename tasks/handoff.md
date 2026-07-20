@@ -1,68 +1,105 @@
-# Handoff: Product-creation remediation, phase 2 (follow-ups)
-Updated: 2026-07-19 14:20 | Branch: main | Worktree: tasks-handoff-continue-dece9a | Dev port: 8893 (verify config, reverted after use)
-
-## PROGRESS THIS SESSION (2026-07-19) — both pushed to main
-- **LCA wizard boundary normalisation** — commit `fc43a631`. The "cosmetic aria-checked gap" noted last session was NOT cosmetic. `loadPcfData` and `buildInitialFormData` read the stored boundary straight into formData; `products.last_wizard_settings` carries the underscored DB enum and `product_carbon_footprints.system_boundary` is free text holding both forms. Every boundary predicate compares with strict equality, so an unnormalised value made `getStepIdsForBoundary` fall through to the 10 base steps: a resumed cradle-to-grave study silently lost Distribution, Use phase and End of Life. Added `normaliseBoundary()` to `lib/system-boundaries.ts` as the single source of truth and applied it at both load paths, the autosave demote check and the products-list badge. Proved with 3 failing tests first, then verified in the browser against local Supabase (PCF + products row + settings blob all `cradle_to_grave`: wizard renders all 14 steps, radio reports aria-checked). 535 LCA tests green.
-- **Em-dash rule, generated half** — commit `e7283900`. New `lib/copy-style.ts` (`NO_EM_DASH_RULE`, `HOUSE_STYLE`, `scrubEmDashes`). The rule was hand-copied into 14 prompts in five wordings and MISSING from a dozen prose prompts including Rosa's main persona (`lib/gaia/system-prompt.ts`), the LCA narrative prompt that flows into published PDFs, wizard field suggestions, board-pack/tender copy and public brand descriptions. Two prompts contained literal em dashes in their own instructions. Applied the shared rule across those sites, cleaned the contradictory dashes, and replaced the 2 hand-rolled scrub copies (one emitted a space before the comma; neither handled en dashes or protected the standalone `—` placeholder). Regression test `lib/__tests__/prompt-house-style.test.ts` fails if Rosa's persona loses the rule.
-
-**STILL OPEN:** item 1 (all-orgs recalc, Tim browser action), the STATIC em-dash sweep (~790 non-comment occurrences, mostly the `—` placeholder convention rather than prose — needs a scope decision, see below), item 5a re-scope, and the triplicated Rosa persona (below).
-
-### Flagged, not done
-- **The Rosa persona is triplicated and drifting.** `lib/gaia/system-prompt.ts`, `supabase/functions/gaia-query/index.ts` and the inline prompt in `app/api/rosa/chat/route.ts` are three independent definitions of the same character. I added the em-dash rule to the first; the Supabase edge function can't import from `lib/` so it stays divergent. Consolidating is the real fix and is an architectural call, not a sweep.
-- **Supabase edge function prompts** (`gaia-query`, `generate-water-recommendations`, `analyze-public-greenwash`, `analyze-greenwash-content`) generate user-facing prose without the rule. They're Deno, so they need either a duplicated constant or a shared file both runtimes can read.
-- 4 pre-existing vitest failures on main confirmed unchanged (distributor-brand-listing-dedup x2, distributor-completeness, rosa/actions). The rosa/actions one is a stale assertion; spawned as a task chip.
-
----
-## Previous session (2026-07-15)
-
-### Items 2, 3, 4 SHIPPED to main
-- **Items 2 + 3 (multipack own-packaging edit + Specification pull-through)** — commit `17af0c65`. New `MultipackPackagingSection` on the multipack Specification tab reuses `MultipackSecondaryPackagingForm`; add/edit/remove of the pack's own packaging now persists to product_materials and renders on both Specification and Overview. Mutation helpers added to `lib/multipacks.ts`. Verified end-to-end vs local Supabase (product 29). Single staleness banner (no duplicate).
-- **Item 4 (EPR "won't go green")** — commit `9e1b7ecb`. Tim chose the explicit-selector route: added an "EPR Material Type" Select to the packaging compliance section (`PackagingFormCard`), loaded/defaulted in `useRecipeEditor`, override honoured by `buildPackagingMaterialData`. Lets users fix rows that auto-derive to 'other'. Verified end-to-end (product 12: glass→steel override autosaved, reverted). Note: only the SELECTOR was built; the two completeness definitions (dashboard vs per-row `packagingComplianceStatus`) were deliberately NOT unified (Tim picked selector over "align definitions").
-- Both pushed to main. ~0 TS errors, packaging-material-data.test.ts 7/7 green.
-- Session plan/notes: `tasks/product-creation-phase2-todo.md`.
-
-- **Item 6 (copy/UX polish)** — commit `9642548b`. IngredientRow + PackagingRow summary rows converted from `<button>` (invalid nested-button HTML → hydration warning) to `div[role=button]` with keyboard support; LCA wizard em dashes removed (GuideStep, WizardSidebar). Verified no button-in-button + toggle works. NOT done: app-wide em-dash sweep (many more in GoalScopeForm/ComplianceWizard/etc — bounded follow-up).
-- **Item 5b (background reclassify >5MB)** — commit `c8b9d301`, BUILT at Tim's request. Shared `lib/ingest/reclassify.ts` used by the sync route (small files) + new Inngest fn `ingest-reclassify.ts` (large files: route → status='extracting' + `ingest/reclassify.run` + 202; UniversalDropzone polls GET). No migration. Verified: typecheck clean, /api/inngest compiles + registers, 80 ingest tests + 3 new runReclassify tests green. Live background run (Inngest + Claude on >5MB doc) NOT locally verifiable; mirrors the documents pipeline. **⚠️ GIT: client.ts + functions/index.ts had other-session inngest-refactor WIP (delete scraping.ts, add scheduled.ts); I committed ONLY my 2-line additions on a HEAD base (scraping.ts stays tracked → commit builds) and restored their WIP to the working tree. Their refactor, when it lands, must re-apply on top of my `ingestReclassifyRun` registration.**
-- **Item 5a (stash release)** — ASSESSED, deliberately NOT built. Doesn't deliver retry-after-cancel without also making the deep link resumable (file held in memory + URL params stripped on pickup); marginal, 4 sensitive files. Re-scope needed. Reasoning in `tasks/product-creation-phase2-todo.md`.
-
-REMAINING: item 1 (all-orgs recalc, Tim browser action), the two "Done (unverified)" manual click-throughs below (also spawned as a task chip this session), a re-scope decision on item 5, and the app-wide em-dash sweep. Original detail preserved below.
+# Handoff: main → redesign cutover prep, Rosa, and the demo seed
+Updated: 2026-07-19 21:10 | Branch: claude/tasks-handoff-continue-dece9a (pushes to main) | Worktree: `.claude/worktrees/tasks-handoff-continue-dece9a` | Dev port: 8893 (add a config to `.claude/launch.json`, revert it before committing)
 
 ## Goal
-Phase 1 (just-finished session) fixed ~100 findings across the whole product-creation journey (URL import → recipe → smart upload → packaging/EPR → maturation → LCA wizard → multipack). All shipped to main as 13 commits (43b238ff..e007950c), 6 migrations APPLIED to prod, ~1,500 tests green, key surfaces browser-verified. Full report: `tasks/product-creation-review-2026-07-14.md`. Memory: `project_product_creation_remediation.md`. This handoff is the REMAINING follow-up work: items deferred during phase 1, plus new gaps surfaced by Everleaf (Clair Ward), the first real EPR/multipack user.
+Prepare the move from the current production alkatera (branch `main`, hosted on **Netlify**,
+serving paying customers) to the redesign (branch `redesign`, hosted on **Vercel** at
+**https://alkatera-staging.vercel.app**, against the `alkatera-staging` Supabase project).
+This is THREE simultaneous changes: app code, hosting platform, and database schema. Along the
+way this session also consolidated Rosa, closed her feedback loop, and filled the demo seed so
+there is something to click through.
 
-## Done (verified) — context, do not redo
-- Calc engine, PCF lifecycle+security, recipe saves, EPR, URL import, ingest, staleness, multipack editor, archive, /uploads inbox — all committed, pushed, tested. See the review report's P0/P1/P2 for what each covered.
-- Prod migrations 20260714160000..210000 applied + verified (columns/constraints/policies present, no new advisors).
-- Browser-verified live: staleness banner, multipack contents editor (component qty write), archive filter+badge, /uploads inbox, recipe editor load, recalc-skip guard.
+**Read this first: the redesign is on VERCEL, not Netlify.** I got that wrong twice and it
+invalidated a whole plan. `redesign` has `vercel.json` and has DELETED `netlify.toml` and the
+entire `netlify/` directory. Vercel is staging-only for now; production stays on Netlify.
 
-## Done (NOW VERIFIED live, 2026-07-15) — was "Done (unverified)"
-Both exercised end-to-end on product 12 (Botanical Spirit demo, Local Dev Co / Canopy) against local Supabase via dev-main. Full record: `tasks/lca-wizard-live-verification-2026-07-15.md`.
-- **Boundary-change demotion** (WizardContext.tsx ~1285) — VERIFIED. Opened the wizard on a completed PCF (cradle_to_gate), changed the boundary radio to cradle-to-grave (via the confirm dialog); autosave flipped the completed PCF → `draft`, wrote `system_boundary=cradle-to-grave`, mirror-wrote `products.system_boundary=cradle_to_grave` + `last_wizard_settings`, logged the exact demote warning, and the wizard expanded the lifecycle steps so Calculate is no longer complete (prompts recalculation). Root cause of the prior "radio won't update under automation": the RadioGroupItem is `sr-only`, the click target is the `<label>`, wider boundaries are tier-gated (needed a Canopy org), and a confirm dialog gates the change — a real DOM click on the label fires onValueChange fine. NOTE (secondary, not blocking): on resume the boundary radio shows no option `aria-checked` — formData.systemBoundary doesn't match the hyphenated radio values at load; cosmetic display gap, worth a look.
-- **Full end-to-end calc writing projection columns + fingerprint** — VERIFIED. Real wizard calc inserted 10 `product_carbon_footprint_materials`: `source_material_id` populated on every row and correctly = the source `product_materials.id` (the FK the EoL loop keys pathway overrides on); `reuse_trips`/`container_material` written (null when the recipe leaves them unset — confirmed non-null passthrough by setting glass bottle container_material='glass'/reuse_trips=20 and re-running: both projected through). `calculation_fingerprint` populated (64-hex SHA-256) and input-sensitive (changed when the recipe changed). Local friction was real: local Supabase ships NO emission-factor data and the Calculate button is correctly disabled until factors + facility production volume resolve — needed placeholder `staging_emission_factors` + a `facility_reporting_sessions` row to get past validation (all fixtures since removed). Product 12's PCF left as `draft` (cleaned of placeholder-factor artifacts; it was never seed-defined — a `supabase db reset` restores pristine local state).
+## Done (verified)
+All pushed to main. Working tree clean at `b0a041d0`.
+- **LCA boundary normalisation** (`fc43a631`). `normaliseBoundary()` in `lib/system-boundaries.ts`;
+  an unnormalised stored boundary was collapsing cradle-to-grave studies to the 10 base steps,
+  silently dropping Distribution/Use/EoL. Proved with 3 failing tests first, then browser-verified.
+- **House copy style** (`e7283900`) `lib/copy-style.ts`, and **Rosa single source** (`5b4ab5a2`)
+  `lib/rosa/persona.ts`. Rosa was defined in 8 places, 2 of them dead. Full detail:
+  `tasks/rosa-single-source-plan.md`.
+- **Rosa feedback loop** (`c218e55d`) + **learning surface** (`582de1c5`) at `/admin/rosa-learning`.
+  Verified end to end against local Supabase: correction → `rosa_memory` → back into the prompt.
+- **Fixed 4 long-failing test suites** (`ccccef3f`). Verified by MUTATION, not by going green.
+- **gaia-query edge function removed** (`d85a2792`) after proving it unused five ways.
+- **Migration collision fixed on main** (`8550d30d`). Four collisions, renumbered to
+  `20260719100000`-`130000` + `20260622120001`. Ordering provably unchanged. See
+  `tasks/main-to-redesign-sync.md`.
+- **EPR migration APPLIED TO PROD** and verified: `epr_submission_lines.product_material_id`
+  bigint → uuid. Proved the fix with a real `product_materials.id` insert into a structural clone.
+
+## Done (unverified)
+Do not trust these without exercising them.
+- **The demo seed's four new modules** (`f11351bc`: hospitality, EPR, reports, Rosa) have been run
+  against LOCAL Supabase only, never against prod. Idempotency verified locally (identical counts
+  over two runs). Nobody has clicked `/admin/demo-seed` on prod since.
+- **The EPR DRS zero-rating fix** (`f11351bc`). The coercion bug is proven (`Number('2025-26')` is
+  NaN), and the corrected guard verified in isolation, but no real submission has been generated.
+- **Production-sites seeding** (`fd74af62`). Insert shape verified against the real schema, but the
+  full seeder cannot run locally (it needs prod product ids 130-236).
 
 ## In flight
-Nothing mid-edit. Session ended clean; working tree has only pre-existing/other-session dirt (inngest refactor, deleted netlify fns, lca-recalc-allocations, docs) — NOT ours, do not commit it.
+Nothing mid-edit. The next concrete piece of work is scoped but not started: **a repo diff of
+main's 11+ `netlify/functions/*` against redesign's `app/api/cron/*`**, to list which scheduled
+jobs would stop working after the cutover. This needs no Vercel API access and is the highest-value
+thing available today.
 
-## Next (follow-up work, roughly priority order)
-1. **RUN THE ALL-ORGS RECALC** (Tim action, browser). `/admin-tools/recalculate-lca` per org: demo org first, then Everleaf, then rest. Phase 1 changed headline numbers (packaging up on batch-mode/production-chain, EPR tonnage down ~24x on shared cases). Precondition done: recalc tool refuses to silently downgrade boundary; products missing last_wizard_settings get flagged, not downgraded.
-2. **Multipack own-packaging: edit after creation.** Clair's #1 gap. MultipackContentsEditor (components only) is built; the multipack's OWN transit packaging (MultipackSecondaryPackagingForm — shipment/secondary/tertiary, already exists in the CREATE flow at products/new/page.tsx) is NOT editable post-creation. Wire the packaging form (or a packaging section) into the multipack Specification tab / MultipackContentsEditor so shipment packaging can be added/edited/removed after the pack exists.
-3. **Multipack packaging pull-through to Specification/Overview.** Clair reported the single bottle + secondary packaging "not pulling through" on Specification after adding. Verify the multipack's own product_materials packaging rows render on Specification and Overview (fetchMultipackPackagingMaterials exists in lib/multipacks.ts). Likely a display-wiring gap.
-4. **EPR completeness "won't go green".** Clair: a packaging item saved but stays "3 of 4 sections complete". Phase 1 added an epr_material_type requirement to the completeness checker (app/(authenticated)/epr/page.tsx) AND fixed the save-blanking root cause. Confirm which section is the stubborn 4th for a fully-filled Marine packaging row; make sure a completed row actually turns green (section-complete logic may need the new material_type field wired in). Everleaf org needs the EPR beta flag on to see this.
-5. **Deferred from phase 1 (documented, not done):**
-   - Stash pickup-before-commit data loss (hooks/useIngestStash.ts, KNOWN LIMITATION comment): stash deleted on handoff pickup before the wizard commits; cancelling loses the file. Proper fix threads a release callback through onFile from each consumer page. No TTL cron shortcut.
-   - Full background forced-type reclassify for >5MB files (app/api/ingest/auto/[jobId]/reclassify/route.ts). Currently a 413 with an "edit the details by hand / split the file" message. A real fix routes forced-type extraction to the background function.
-6. **Static em-dash sweep (needs a scope decision).** The generated half is done (commit `e7283900`); this is the hand-written half. Measured 2026-07-19 across `app/ components/ lib/` (.ts/.tsx): 3,355 em dashes total, 2,468 in prose position, of which 1,680 sit in code comments (not "text copy" under the rule) leaving ~790 in code lines. Those ~790 still include LLM prompt strings, test fixtures and the `'—'` empty-state placeholder convention, so genuine user-facing prose is a few hundred at most. Long-tailed: no single directory holds more than ~26. Recommend NOT a blanket find-and-replace (mechanical, wide, low value per edit, real risk of mangling JSX); instead sweep per user-facing surface as each is touched, and leave the `'—'` placeholders alone. Also still open: pre-existing nested-button hydration warning in components/products/IngredientRow.tsx (AskRosaButton inside a button), cosmetic, not ours.
+## Next
+1. **Reissue the Vercel connector token** (Tim) — see Pending. Everything else about Vercel is
+   blocked on it.
+2. **The netlify → vercel scheduled-jobs diff.** `vercel.json` on redesign has NO `crons` key.
+   The `app/api/cron/*` routes exist; nothing visible fires them. 15 of main's Netlify functions
+   have no equivalent, including `pulse-snapshots`, `pulse-insights`, `pulse-anomalies`,
+   `trial-reminder-sweep`, `openlca-cert-monitor` and `deploy-succeeded` (which fires the
+   wiki→Rosa sync). Per the house rule those Netlify functions are heartbeats that kick Inngest;
+   if nothing kicks Inngest on Vercel, all of it stops SILENTLY.
+3. **Redesign's own migration duplicate.** `20260714200000` is shared by
+   `product_materials_ef_metadata` and `chemical_library_user_submissions`. Must be renumbered ON
+   that branch before any merge. Not fixable from main.
+4. **Merge main → redesign.** 22 commits main-only, 93 redesign-only, last shared history
+   2026-07-16. Do this only after 3. Expect real conflicts: main touches `netlify/functions/*`
+   which do not exist on redesign.
+5. **The numbers-don't-change harness.** Extend `lib/__tests__/packaging-parametric-golden.test.ts`:
+   snapshot prod's stored `aggregated_impacts` per completed PCF, assert redesign reproduces them.
+   Obstacle: the calculator is browser-only, so this needs the pure maths extracted or the recalc
+   tool driven headlessly. This is what makes a cutover provable rather than hopeful.
 
 ## Gotchas and decisions
-- **Push to main directly** on alkatera (house rule). Do NOT commit the working-tree dirt (other sessions' WIP).
-- **Local dev = LOCAL Supabase** (docker exec -i supabase_db_alkatera psql -U postgres). Migrations applied locally AND to prod this session.
-- **Full vitest run hangs** — always scope suites. Of the 4 known pre-existing failures on main I fixed 1 (lca-assumptions-generator stale ingredient-EoL test); others may remain outside product-creation.
-- **is_draft is overloaded** as archived historically; phase 1 added real `archived_at`. Do not reintroduce is_draft filters for archiving.
-- Calculator is **client-side only**; recalcs are browser actions, not server jobs — that is why the all-orgs recalc is a Tim action.
-- Multipack own packaging counted ONCE against the pack (it is the sellable unit); shared packaging within a single SKU divided by units_per_group. This is the answer given to Clair and matches the engine.
+- **I assumed the hosting platform twice and was wrong both times.** First I audited Netlify
+  exhaustively and concluded "no deployment exists"; it was on Vercel. Then the Vercel API 404'd
+  and I inferred the project lived elsewhere; it does not. VERIFY the platform before planning
+  against it, and when something is absent say "I cannot see it" rather than "it does not exist".
+- **The Vercel MCP token is project-scoped and predates `alkatera-staging`.** It returns exactly
+  4 projects (agentos 2 Jul, healthyhospo 4 Jul, founder-os 10 Jul, hayle-council 11 Jul);
+  `alkatera-staging` was created 18 Jul and 404s by team id, team slug, project slug AND
+  deployment hostname. Not an account boundary, a token scope.
+- **Cutting over today would silently revert the LCA engine.** `redesign` does NOT have main's
+  parametric packaging work: no `lib/calculations/packaging-factor.ts`, no
+  `PackagingMaterialClassPicker`, no golden test. Packaging would compute the old fuzzy-matched
+  way and every customer's numbers would shift back. This is the single biggest cutover risk.
+- **Sequence matters: run the recalc BEFORE porting.** Otherwise you cannot tell recalc drift from
+  redesign drift, and there are three number-states in play at once.
+- **Prod assigns its own migration timestamps at apply time** and matches by name, never by repo
+  filename. That is why the duplicate versions never bit prod, and why the renumbering needs
+  nothing re-applied anywhere.
+- **Do NOT run Recalculate LCAs after seeding the demo org.** The seed writes completed PCFs
+  directly; a recalc would skip all 7 and the admin page used to wrongly tell you to run it.
+- `gaia_knowledge_base` is SHARED across every org. Never write customer-derived text into it.
+- Local dev = LOCAL Supabase. Never bare `npx vitest run` (it hangs); always scope to files.
 
 ## Pending Tim actions
-- Run the all-orgs recalc (item 1). The big one — customers are on old numbers until it runs.
-- The two manual click-throughs under "Done (unverified)": boundary demote + one full wizard calc.
-- Turn on the EPR beta flag for Everleaf's org if not already, so Clair can use EPR (item 4).
-- Migrations: ALL 6 already applied to prod this session — nothing pending there.
+- **Reissue the Vercel connector token** with full-account scope, or add `alkatera-staging` to the
+  existing token's project list. Until then the Vercel API is useless to a session.
+- **Run the all-orgs recalc** at `/admin-tools/recalculate-lca`. It acts on the ACTIVE org, so
+  switch org then click; it runs in the browser so keep the tab open. Only two orgs matter:
+  **Happy Curations Ltd (16 products)** and **London Botanical Drinks / Everleaf (3)**. The rest
+  skip for want of facility allocations. Do Happy Curations first, check one report, then Everleaf.
+  Warn Clair first: packaging goes UP, EPR tonnage down ~24x on shared cases, and she may have
+  published those numbers.
+- **Click `/admin/demo-seed` → Seed Drinks Co demo** on prod to load the new breadth data.
+- **Delete the `gaia-query` edge function** in the Supabase dashboard (Edge Functions → gaia-query
+  → Delete). Removed from the repo and from CI, but still deployed and served.
+- Migrations: the EPR one is APPLIED to prod. Nothing else pending there.
