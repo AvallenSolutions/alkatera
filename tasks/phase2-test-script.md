@@ -97,13 +97,12 @@ Setup, once:
 
 (add lines here; a session works them off newest-first)
 
-- [FOUND 2026-07-20, FIX IN FLIGHT] The Drinks Co demo seeder assumes PROD's
-  existing rows (products 130-236, six fixed facilities, the hello@ owner
-  user) and 500s on any empty environment: the orchard upsert fails silently
-  on its facility FK, then "calvados BOM 228" throws. Staging would hit this
-  on the Phase 1 seed click. Fix: a foundation module that creates org/
-  facilities/products when missing + runtime owner resolution + error checks
-  on the silent upserts.
+- [FIXED 2026-07-20, commit 6c7dd675] The Drinks Co demo seeder assumed PROD's
+  existing rows and 500'd on any empty environment ("calvados BOM 228" FK
+  error after a silent orchard upsert failure). foundation.ts now creates
+  org/facilities/products when missing (never updates existing rows; prod
+  unchanged); verified twice on a wiped local org, identical counts, second
+  run a no-op. The staging seed click now works.
 - [SMALL] Arrival overlay's DialogContent has no DialogTitle (Radix a11y
   warning on every mount).
 - [INCONCLUSIVE, RE-TEST] /desk appeared stuck on skeletons locally, but the
