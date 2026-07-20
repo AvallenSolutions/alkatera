@@ -101,8 +101,16 @@ to main until go-live.
   run are all unproven.
 - Migrations `20260718120000_report_shares` and `20260718150000_report_draft_status` are
   applied to LOCAL + STAGING, not prod (correct: redesign never merged).
-- The merged packaging UI (parametric picker inside redesign's studio product forms) is
-  test-green and builds, but has not been walked in a browser yet.
+- ~~The merged packaging UI has not been walked in a browser yet.~~ WALKED 2026-07-20
+  against local Supabase (dev port 8897, config "merge-verify"): created a product,
+  ran the guided packaging wizard (glass bottle + aluminium screw cap + paper label),
+  and verified in product_materials that all three rows saved with
+  packaging_material_class set (glass/flint, aluminium, kraft),
+  data_source='parametric', match_status='verified' and catalogue circularity
+  defaults applied. No factor search appeared anywhere. Test product deleted after.
+  Still unwalked: a full LCA calculation over parametric rows in the wizard
+  (the golden test covers the maths; a real calc needs ingredients + facility
+  allocations).
 
 ## In flight
 **Report sections: render them, be honest about gaps.** Plan at `tasks/report-sections-plan.md`
@@ -121,9 +129,8 @@ commitments have been recorded yet"; `app/api/reports/preview-data` counts four 
 tables with zero callers; `app/api/reports/sample` passes 0-1 where the renderer wants 0-100.
 
 ## Next
-1. **Browser walk-through of the merged packaging flow** (add packaging via wizard +
-   PackagingFormCard on a product, confirm the picker drives the factor and the LCA
-   computes) — the one merge surface tests can't fully prove.
+1. ~~Browser walk-through of the merged packaging flow~~ DONE 2026-07-20 (see Done
+   section). Remaining slice: a full LCA calc over parametric packaging in the wizard.
 2. **Steps 2-10 of `tasks/report-sections-plan.md`.** Biggest open correctness gap. Tim's
    original ask (warn when a section's data is incomplete) is step 9 and needs the rest first.
 3. **Staging click-through of the whole programme** (needs Tim or staging creds): real prose
