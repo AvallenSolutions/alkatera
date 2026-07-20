@@ -125,9 +125,16 @@ to main until go-live.
   allocations).
 
 ## In flight
-**Report sections: render them, be honest about gaps.** Plan at `tasks/report-sections-plan.md`
-(10 ordered steps, each independently green). Step 1 shipped; steps 2-10 remain and step 3
-(six fetcher modules) is the bulk. Nothing is mid-edit; the tree is clean.
+**Report sections: ALL TEN STEPS SHIPPED (2026-07-20, commits 76cfab11..fb47b6e2).**
+The five sections render with honest skeletons; the facilities page exists; the
+kg-vs-tonnes guard is tested; the completeness oracle drives both the document
+and the funnel's "N of M measures recorded" rows; SECTION_TO_TOPIC's FOUR phantom
+topic ids (products too, not just the three from planning) are fixed and pinned.
+Remaining from the plan's verification section: the browser walk-through on
+Local Dev Co (thin data = skeletons are the feature; add one demographics row
+and watch the mixed state) and a look at the funnel gap rows in situ. The
+"Recorded, not in scope" items (hasVineyards gate, dashboard fallback
+disagreements, three-oracle consolidation) still stand.
 
 THE FINDING behind it: `assembleReportData` never fetches people / governance / community /
 suppliers / facilities data, the page renderers early-return empty, and the sections are
