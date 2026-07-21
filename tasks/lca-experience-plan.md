@@ -4,6 +4,11 @@
 This plan is the basis for how LCAs are created in the redesign. The main
 platform will not change; everything here lands in the cellar.
 
+**Companion plan (21 July):** `tasks/lca-end-use-scenarios-plan.md` covers
+how many LCAs a product needs (one core plus end-use scenarios per channel,
+replacing the one-LCA-per-SKU model). Its distribution/after sections build
+on this plan's phase 2 dossier surface; read both before touching either.
+
 ---
 
 ## 1. The diagnosis
