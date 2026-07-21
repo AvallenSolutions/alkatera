@@ -23,7 +23,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { ClipboardCheck, CheckCircle2, AlertCircle } from "lucide-react";
+import { ClipboardCheck, CheckCircle2, AlertCircle, Copy, Check } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 
 interface SendEsgSurveyDialogProps {
@@ -63,6 +63,16 @@ export function SendEsgSurveyDialog({
 }: SendEsgSurveyDialogProps) {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // What actually happened, as opposed to what we hoped happened. Kept so the
+  // panel can distinguish "delivered to the provider" from "we created the
+  // invitation but the email never left", and so the link is always offered
+  // as a fallback the brand can send themselves.
+  const [result, setResult] = useState<{
+    emailSent: boolean;
+    emailError: string | null;
+    invitationUrl: string | null;
+  } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const form = useForm<EsgSurveyValues>({
     resolver: zodResolver(esgSurveySchema),
@@ -86,6 +96,8 @@ export function SendEsgSurveyDialog({
       });
       setSuccess(false);
       setError(null);
+      setResult(null);
+      setCopied(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultEmail, defaultSupplierName, defaultContactName]);
@@ -119,16 +131,24 @@ export function SendEsgSurveyDialog({
         }),
       });
 
-      const result = await response.json();
+      const payload = await response.json();
       if (!response.ok) {
-        throw new Error(result.error || "Failed to send survey");
+        throw new Error(payload.error || "Failed to send survey");
       }
 
+      // The route reports email_sent separately from HTTP status: the
+      // invitation and supplier record can be created successfully while the
+      // email itself fails. Reading only response.ok is what let sixteen
+      // undelivered surveys report as sent in July 2026.
+      setResult({
+        emailSent: payload.email_sent !== false,
+        emailError: payload.email_error ?? null,
+        invitationUrl: payload.invitation?.invitation_url ?? null,
+      });
       setSuccess(true);
       onSent?.();
-      setTimeout(() => {
-        handleClose();
-      }, 2000);
+      // Deliberately no auto-close: the panel now carries the invitation link,
+      // and closing it out from under the user would take that away.
     } catch (err: any) {
       console.error("Error sending ESG survey:", err);
       setError(err.message || "Failed to send survey. Please try again.");
@@ -150,14 +170,84 @@ export function SendEsgSurveyDialog({
         </DialogHeader>
 
         {success ? (
-          <div className="py-8 flex flex-col items-center justify-center gap-4">
-            <CheckCircle2 className="h-12 w-12 text-green-500" />
-            <div className="text-center">
-              <h3 className="font-semibold text-lg">Survey Sent!</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                The supplier has been added to your list and emailed a link to
-                complete the assessment.
-              </p>
+          <div className="py-6 flex flex-col gap-4">
+            <div className="flex flex-col items-center gap-3 text-center">
+              {result?.emailSent ? (
+                <>
+                  <CheckCircle2 className="h-12 w-12 text-green-500" />
+                  <div>
+                    <h3 className="font-semibold text-lg">Survey sent</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      The supplier has been added to your list and emailed a link
+                      to complete the assessment. We&apos;ll show a warning here if
+                      it bounces.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="h-12 w-12 text-amber-500" />
+                  <div>
+                    <h3 className="font-semibold text-lg">
+                      Survey created, but the email didn&apos;t send
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {result?.emailError
+                        ? result.emailError
+                        : "The email provider rejected the message."}{" "}
+                      The supplier is on your list and the link below still
+                      works, so you can send it yourself.
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {result?.invitationUrl && (
+              <div className="rounded-lg border bg-muted/50 p-3 space-y-2">
+                <p className="text-xs font-medium">
+                  Invitation link
+                  <span className="font-normal text-muted-foreground">
+                    {" "}
+                    — sending this from your own mailbox usually gets a better
+                    response than a platform they don&apos;t recognise.
+                  </span>
+                </p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 truncate rounded bg-background px-2 py-1.5 text-xs">
+                    {result.invitationUrl}
+                  </code>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(result.invitationUrl!);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      } catch {
+                        // Clipboard is blocked in some embedded/insecure
+                        // contexts; the link is on screen to copy by hand.
+                        setCopied(false);
+                      }
+                    }}
+                  >
+                    {copied ? (
+                      <Check className="h-4 w-4" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                    <span className="ml-2">{copied ? "Copied" : "Copy"}</span>
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button type="button" onClick={handleClose}>
+                Done
+              </Button>
             </div>
           </div>
         ) : (
@@ -253,7 +343,8 @@ export function SendEsgSurveyDialog({
                 <ul className="list-disc list-inside space-y-1">
                   <li>The supplier is added to your supplier list</li>
                   <li>They receive an email with a link to the ESG survey</li>
-                  <li>A copy is sent to you and hello@alkatera.com</li>
+                  <li>Replies come straight back to your address</li>
+                  <li>You&apos;ll get the link to send yourself as well</li>
                   <li>Their score appears on their profile once verified</li>
                 </ul>
               </div>

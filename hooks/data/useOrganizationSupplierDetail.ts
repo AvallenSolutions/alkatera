@@ -68,6 +68,12 @@ export interface OrganizationSupplierDetail {
   /** Status of the latest ESG survey invitation this org sent the supplier
    *  ('pending' | 'accepted' | 'expired' | 'declined'), or null if none sent. */
   esgInvitationStatus: string | null;
+  /** Delivery state of the invitation email ('sent' | 'delivered' | 'bounced' |
+   *  'complained' | 'failed' | 'unsubscribed' | ...), or null if never sent.
+   *  Written by /api/webhooks/resend after the provider reports back. */
+  esgInvitationEmailStatus: string | null;
+  /** Provider-supplied reason when the email bounced or failed. */
+  esgInvitationEmailError: string | null;
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
@@ -82,6 +88,8 @@ export function useOrganizationSupplierDetail(
   const [products, setProducts] = useState<SupplierProduct[]>([]);
   const [esgAssessment, setEsgAssessment] = useState<SupplierEsgAssessment | null>(null);
   const [esgInvitationStatus, setEsgInvitationStatus] = useState<string | null>(null);
+  const [esgInvitationEmailStatus, setEsgInvitationEmailStatus] = useState<string | null>(null);
+  const [esgInvitationEmailError, setEsgInvitationEmailError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -126,6 +134,8 @@ export function useOrganizationSupplierDetail(
       let fetchedProducts: SupplierProduct[] = [];
       let fetchedEsg: SupplierEsgAssessment | null = null;
       let fetchedEsgInvitationStatus: string | null = null;
+      let fetchedEsgInvitationEmailStatus: string | null = null;
+      let fetchedEsgInvitationEmailError: string | null = null;
 
       if (viewData.contact_email) {
         try {
@@ -152,6 +162,8 @@ export function useOrganizationSupplierDetail(
                 fetchedEsg = detail.esg_assessment || null;
               }
               fetchedEsgInvitationStatus = detail.esg_invitation?.status ?? null;
+              fetchedEsgInvitationEmailStatus = detail.esg_invitation?.email_status ?? null;
+              fetchedEsgInvitationEmailError = detail.esg_invitation?.email_error ?? null;
             }
           }
         } catch (enrichErr) {
@@ -163,6 +175,8 @@ export function useOrganizationSupplierDetail(
       setProducts(fetchedProducts);
       setEsgAssessment(fetchedEsg);
       setEsgInvitationStatus(fetchedEsgInvitationStatus);
+      setEsgInvitationEmailStatus(fetchedEsgInvitationEmailStatus);
+      setEsgInvitationEmailError(fetchedEsgInvitationEmailError);
 
       // Build the profile: prefer suppliers table data (supplier-managed)
       // over platform_suppliers data (invite stub). Use a simple "first
@@ -210,6 +224,8 @@ export function useOrganizationSupplierDetail(
     products,
     esgAssessment,
     esgInvitationStatus,
+    esgInvitationEmailStatus,
+    esgInvitationEmailError,
     loading,
     error,
     refetch: fetchDetail,

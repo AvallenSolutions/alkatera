@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
       organizationId
         ? adminClient
             .from('supplier_invitations')
-            .select('status, invited_at')
+            .select('status, invited_at, email_status, email_error')
             .eq('organization_id', organizationId)
             .eq('request_kind', 'esg_assessment')
             .ilike('supplier_email', email)

@@ -34,6 +34,7 @@ import {
   Phone,
   Link2,
   ClipboardCheck,
+  AlertTriangle,
 } from "lucide-react";
 import { useOrganizationSupplierDetail } from "@/hooks/data/useOrganizationSupplierDetail";
 import { Progress } from "@/components/ui/progress";
@@ -52,9 +53,18 @@ export default function SupplierDetailPage() {
     products,
     esgAssessment,
     esgInvitationStatus,
+    esgInvitationEmailStatus,
+    esgInvitationEmailError,
     loading,
     error,
   } = useOrganizationSupplierDetail(orgSupplierId);
+
+  // A bounced or rejected invitation must not read as "awaiting completion".
+  // The supplier never got it, and the brand needs to chase another way.
+  const esgEmailUndelivered =
+    esgInvitationEmailStatus === "bounced" ||
+    esgInvitationEmailStatus === "failed" ||
+    esgInvitationEmailStatus === "suppressed";
 
   const [activeTab, setActiveTab] = useState("overview");
   const [esgSurveyOpen, setEsgSurveyOpen] = useState(false);
@@ -753,6 +763,29 @@ export default function SupplierDetailPage() {
                 );
               })}
             </>
+          ) : esgEmailUndelivered ? (
+            <Card className="border-destructive/50">
+              <CardContent className="py-12">
+                <div className="text-center">
+                  <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Survey email didn&apos;t reach them</h3>
+                  <p className="text-muted-foreground mb-2 max-w-md mx-auto">
+                    We sent the invitation but the supplier&apos;s mail server rejected
+                    it, so they never received it. Check the address is right, or
+                    ask them for a better contact.
+                  </p>
+                  {esgInvitationEmailError && (
+                    <p className="text-xs text-muted-foreground/80 mb-4 max-w-md mx-auto font-mono">
+                      {esgInvitationEmailError}
+                    </p>
+                  )}
+                  <Button variant="outline" onClick={() => setEsgSurveyOpen(true)}>
+                    <ClipboardCheck className="h-4 w-4 mr-2" />
+                    Try a different address
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           ) : esgInvitationStatus === "pending" || esgInvitationStatus === "accepted" ? (
             <Card>
               <CardContent className="py-12">
