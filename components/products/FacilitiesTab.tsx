@@ -25,6 +25,10 @@ import { StateChip } from "@/components/studio/state-chip";
 import { PillButton } from "@/components/studio/pill-button";
 import { toast } from "sonner";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import {
+  PRODUCTION_UNITS,
+  defaultProductionUnitForSize,
+} from "@/lib/constants/production-units";
 
 interface FacilitiesTabProps {
   productId: number;
@@ -58,32 +62,18 @@ interface FacilityAssignment {
   } | null;
 }
 
-const VOLUME_UNITS = [
-  { value: "units", label: "Units" },
-  { value: "litres", label: "Litres" },
-  { value: "kg", label: "Kilograms" },
-  { value: "tonnes", label: "Tonnes" },
-  { value: "bottles", label: "Bottles" },
-  { value: "cases", label: "Cases" },
-];
+const VOLUME_UNITS = PRODUCTION_UNITS;
 
 /** Small mono field label, studio idiom. */
 const FIELD_LABEL =
   "font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim";
 
-/** Map product unit_size_unit to a sensible production unit default */
-function defaultProductionUnit(unitSizeUnit: string | null): string {
-  switch (unitSizeUnit) {
-    case "ml":
-    case "L":
-      return "litres";
-    case "g":
-    case "kg":
-      return "kg";
-    default:
-      return "units";
-  }
-}
+/**
+ * Map product unit_size_unit to a sensible production unit default.
+ * Delegates to the shared helper -- this was one of three hand-rolled unit
+ * mappers that existed only to bridge the competing vocabularies.
+ */
+const defaultProductionUnit = defaultProductionUnitForSize;
 
 export function FacilitiesTab({
   productId,

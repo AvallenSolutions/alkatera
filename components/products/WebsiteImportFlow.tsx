@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { PRODUCT_CATEGORY_GROUPS, getCategoriesByGroup } from '@/lib/product-categories'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -20,13 +21,12 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-const CATEGORY_OPTIONS = [
-  'Spirits',
-  'Beer & Cider',
-  'Wine',
-  'Ready-to-Drink & Cocktails',
-  'Non-Alcoholic',
-]
+// The local CATEGORY_OPTIONS list that used to live here was a verbatim copy
+// of PRODUCT_CATEGORY_GROUPS, so the picker wrote a GROUP ("Spirits") into
+// products.product_category, which holds a CATEGORY ("Gin"). Imported products
+// therefore landed with a value the edit form's Select could not display, and
+// the user had to re-pick the category by hand. Uses the canonical grouped
+// list from lib/product-categories now.
 
 export interface ExtractedProduct {
   name: string
@@ -479,8 +479,15 @@ export function WebsiteImportFlow({
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {CATEGORY_OPTIONS.map(opt => (
-                                <SelectItem key={opt} value={opt} className="text-xs">{opt}</SelectItem>
+                              {PRODUCT_CATEGORY_GROUPS.map(group => (
+                                <SelectGroup key={group}>
+                                  <SelectLabel className="text-xs">{group}</SelectLabel>
+                                  {getCategoriesByGroup(group).map(cat => (
+                                    <SelectItem key={cat.value} value={cat.value} className="text-xs">
+                                      {cat.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
                               ))}
                             </SelectContent>
                           </Select>

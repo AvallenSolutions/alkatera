@@ -148,6 +148,9 @@ export function RecipeModePicker(props: RecipeModePickerProps) {
             yieldValue={batchYieldValue}
             yieldUnit={batchYieldUnit ?? null}
             onChange={onSaveScale}
+            // The mode is already chosen (and shown, with a Change button) by
+            // the summary above; render only the batch-yield fields.
+            yieldOnly
           />
         )}
         {currentMode === "per_chain" && (

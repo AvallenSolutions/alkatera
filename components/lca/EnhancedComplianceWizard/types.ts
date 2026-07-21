@@ -136,14 +136,11 @@ export interface ReportingSession {
 // CONSTANTS
 // ============================================================================
 
-export const PRODUCTION_UNITS = [
-  { value: 'units', label: 'Units' },
-  { value: 'litres', label: 'Litres' },
-  { value: 'kg', label: 'Kilograms' },
-  { value: 'tonnes', label: 'Tonnes' },
-  { value: 'cases', label: 'Cases' },
-  { value: 'pallets', label: 'Pallets' },
-];
+// Re-exported from the canonical vocabulary. This used to be one of TWO
+// exports named PRODUCTION_UNITS (the other, in lib/constants/utility-types,
+// was capitalised), which is how a product volume in 'litres' ended up being
+// compared against a facility total in 'Litres'.
+export { PRODUCTION_UNITS } from '@/lib/constants/production-units';
 
 // ============================================================================
 // PRE-CALCULATION STATE

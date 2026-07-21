@@ -21,7 +21,6 @@ import { RecipeChecklist } from "@/components/products/RecipeChecklist";
 import { PackagingTemplateDialog } from "@/components/products/PackagingTemplateDialog";
 import { PackagingWizard } from "@/components/products/packaging-wizard/PackagingWizard";
 import { IngredientTemplateDialog } from "@/components/products/IngredientTemplateDialog";
-import { RecipeScaleToggle } from "@/components/products/RecipeScaleToggle";
 import { ProductionChainEditor } from "@/components/products/ProductionChainEditor";
 import { RecipeModePicker } from "@/components/products/RecipeModePicker";
 import { RecipeToolbar } from "@/components/products/RecipeToolbar";

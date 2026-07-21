@@ -24,6 +24,18 @@ interface RecipeScaleToggleProps {
     batch_yield_value: number | null;
     batch_yield_unit: string | null;
   }) => void | Promise<void>;
+  /**
+   * Hide the per-unit / per-batch tabs and render only the batch-yield
+   * fields.
+   *
+   * RecipeModePicker already asks "How do you measure your ingredients?" and
+   * shows the chosen mode with a Change button. Mounting the full toggle
+   * underneath asked the same question a second time in a second vocabulary
+   * ("Per bottle / can" vs "Per unit"), on the same screen, wired to the same
+   * columns -- so switching the inner tab silently contradicted the summary
+   * directly above it.
+   */
+  yieldOnly?: boolean;
 }
 
 const YIELD_UNITS = ["bottles", "units", "L", "hL", "kL", "ml"] as const;
@@ -33,6 +45,7 @@ export function RecipeScaleToggle({
   yieldValue,
   yieldUnit,
   onChange,
+  yieldOnly = false,
 }: RecipeScaleToggleProps) {
   const [localValue, setLocalValue] = useState<string>(
     yieldValue != null ? String(yieldValue) : "",
@@ -73,20 +86,24 @@ export function RecipeScaleToggle({
 
   return (
     <div className="rounded-md border bg-muted/30 p-4 space-y-3">
-      <div>
-        <Label className="text-sm font-medium">Recipe scale</Label>
-        <p className="text-xs text-muted-foreground mt-1">
-          Choose how you enter ingredient quantities. Batch mode is for producers
-          who track inputs at the production-run level (e.g. mash bill, fermentation tank).
-        </p>
-      </div>
+      {!yieldOnly && (
+        <>
+          <div>
+            <Label className="text-sm font-medium">Recipe scale</Label>
+            <p className="text-xs text-muted-foreground mt-1">
+              Choose how you enter ingredient quantities. Batch mode is for producers
+              who track inputs at the production-run level (e.g. mash bill, fermentation tank).
+            </p>
+          </div>
 
-      <Tabs value={mode} onValueChange={handleModeChange}>
-        <TabsList>
-          <TabsTrigger value="per_unit">Per bottle / can</TabsTrigger>
-          <TabsTrigger value="per_batch">Per batch</TabsTrigger>
-        </TabsList>
-      </Tabs>
+          <Tabs value={mode} onValueChange={handleModeChange}>
+            <TabsList>
+              <TabsTrigger value="per_unit">Per bottle / can</TabsTrigger>
+              <TabsTrigger value="per_batch">Per batch</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </>
+      )}
 
       {mode === "per_batch" && (
         <div className="space-y-2 pt-1">

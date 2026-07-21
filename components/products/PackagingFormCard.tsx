@@ -1680,24 +1680,16 @@ function CircularitySection({
               )}
             </div>
 
-            {packaging.packaging_category !== 'container' && (
-              <div>
-                <Label htmlFor={`recycled-nc-${packaging.tempId}`}>Recycled Content (%)</Label>
-                <Input
-                  id={`recycled-nc-${packaging.tempId}`}
-                  type="number"
-                  step="1"
-                  min="0"
-                  max="100"
-                  placeholder="0"
-                  value={packaging.recycled_content_percentage}
-                  onChange={(e) => onUpdate(packaging.tempId, { recycled_content_percentage: e.target.value })}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  % of feedstock that is recycled material.
-                </p>
-              </div>
-            )}
+            {/*
+              A second "Recycled Content (%)" input used to live here, gated to
+              non-container rows. It bound the SAME state key and the SAME
+              product_materials.recycled_content_percentage column as the input
+              in the materials section above, which is ungated -- so every
+              secondary, tertiary, label and closure row rendered the identical
+              question twice in one card and the two inputs fought over one
+              value. Recycled content is asked once, above, where it also drives
+              the parametric factor interpolation.
+            */}
 
             <div>
               <Label htmlFor={`recyclability-${packaging.tempId}`}>Recyclability (%)</Label>

@@ -127,7 +127,7 @@ export default function ProductsPage() {
             Manage your product catalogue
           </p>
         </div>
-        <Link href="/dashboard/products/create">
+        <Link href="/products/new">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
             Add New Product

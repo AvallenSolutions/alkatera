@@ -18,6 +18,7 @@ import { calculateMultiVintageAverage } from './viticulture-multi-vintage';
 import type { VineyardGrowingProfile, Vineyard } from './types/viticulture';
 import { calculateOrchardImpacts } from './orchard-calculator';
 import { calculateMultiHarvestAverage } from './orchard-multi-harvest';
+import { normaliseProductionUnit } from './constants/production-units';
 import type { Orchard } from './types/orchard';
 import { calculateArableMultiHarvestAverage } from './arable-multi-harvest';
 import type { ArableField, ArableCalculatorInput } from './types/arable';
@@ -239,8 +240,19 @@ export function computeAttributionRatio(
   const total = Number(allocation.facilityTotalProduction) || 0;
   if (total <= 0) return { rawRatio: 0, warnings };
 
-  const prodUnit = (allocation.productionVolumeUnit || '').toLowerCase().trim();
-  const totalUnit = (allocation.facilityTotalProductionUnit || '').toLowerCase().trim();
+  // Normalise before comparing. Lowercasing alone was not enough: the
+  // production log modal writes singulars ('Litre', 'Hectolitre', 'Unit')
+  // while the facility and product forms write plurals, so two rows meaning
+  // the same unit fell through to the "can't be converted automatically"
+  // warning. normaliseProductionUnit folds every legacy spelling onto one
+  // canonical value. Falls back to the lowercased raw string so genuinely
+  // unknown units still behave as before.
+  const prodUnit =
+    normaliseProductionUnit(allocation.productionVolumeUnit) ??
+    (allocation.productionVolumeUnit || '').toLowerCase().trim();
+  const totalUnit =
+    normaliseProductionUnit(allocation.facilityTotalProductionUnit) ??
+    (allocation.facilityTotalProductionUnit || '').toLowerCase().trim();
 
   let rawRatio: number;
   if (!totalUnit || totalUnit === prodUnit) {
