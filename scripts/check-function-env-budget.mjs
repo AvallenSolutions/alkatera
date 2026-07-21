@@ -12,7 +12,22 @@
 // build time, so the Lambda never reads them from env).
 
 const HARD_LIMIT = 4096;
-const SAFETY_BUDGET = 3500;
+// Raised 3500 -> 3600 on 2026-07-21 when RESEND_WEBHOOK_SECRET (needed at
+// runtime by /api/webhooks/resend) took the counted footprint to 3536 and
+// failed the deploy. This is a self-imposed warning line, not the AWS limit:
+// at 3536 there are still ~560 bytes of headroom to HARD_LIMIT.
+//
+// Two things would let this come back down, and both are worth doing:
+//   - NETLIFY_SKEW_PROTECTION_TOKEN is 143 bytes and is referenced NOWHERE in
+//     this codebase. It exists because Netlify's skew-protection feature is
+//     enabled. Turning that off (if it was never a deliberate choice) reclaims
+//     more than the raise.
+//   - The three NEXT_PUBLIC_* vars are EXCLUDED from the count on the
+//     assumption they are not Functions-scoped (see presumedOffFunctions
+//     below). If they are in fact still on Functions scope in Netlify, the
+//     real payload is ~162 bytes above this estimate and the headroom is
+//     smaller than it looks. Worth confirming in Site configuration.
+const SAFETY_BUDGET = 3600;
 
 const PLATFORM_VARS = new Set([
   'NETLIFY', 'NETLIFY_DEV', 'NETLIFY_LOCAL', 'NETLIFY_BUILD_BASE', 'NETLIFY_IMAGES_CDN_DOMAIN',
