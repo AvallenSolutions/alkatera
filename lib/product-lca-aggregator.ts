@@ -17,6 +17,7 @@ import { calculateUsePhaseEmissions, type UsePhaseConfig } from './use-phase-fac
 import { calculateMaterialEoL, getMaterialFactorKey, getPackagingUnitsPerGroup, getRegionalDefaults, isStalePathwayOverride, EOL_DATA_YEAR, REGION_LABELS, type EoLRegion, type RegionalDefaults, type EoLConfig } from './end-of-life-factors';
 import { calculateDistributionEmissions, type DistributionConfig } from './distribution-factors';
 import { isStageIncluded, calculateLossMultiplier, type ProductLossConfig } from './system-boundaries';
+import { computeDownstreamStages, type DownstreamMaterial } from './lca/downstream-stages';
 import { IPCC_AR6_GWP } from './ghg-constants';
 import {
   assessMaterialDataQuality,
@@ -502,11 +503,47 @@ export async function aggregateProductImpacts(
     }
   }
 
+  // 8a-bis. Compute every downstream stage in one pure pass.
+  //
+  // Distribution, use phase and end of life are the ONLY stages that vary by
+  // where a product is sold, so they live in their own module and take their
+  // configs as arguments. That is what lets one core calculation serve several
+  // end-use scenarios (see tasks/lca-end-use-scenarios-plan.md). The code moved
+  // there verbatim; this block folds its deltas back into the running totals.
+  let downstreamVolumeLitres = 0;
+  if (
+    (isStageIncluded(effectiveBoundary, 'use_phase') ||
+      isStageIncluded(effectiveBoundary, 'distribution')) &&
+    usePhaseConfig
+  ) {
+    const { data: productForVolume } = await supabase
+      .from('products')
+      .select('unit_size_value, unit_size_unit')
+      .eq('id', lcaData?.product_id)
+      .single();
+    downstreamVolumeLitres = productForVolume?.unit_size_unit === 'ml'
+      ? Number(productForVolume.unit_size_value || 0) / 1000
+      : productForVolume?.unit_size_unit === 'L' || productForVolume?.unit_size_unit === 'l'
+        ? Number(productForVolume.unit_size_value || 0)
+        : Number(productForVolume?.unit_size_value || 0) / 1000; // Default assume ml
+  }
+
+  const downstream = await computeDownstreamStages({
+    boundary: effectiveBoundary,
+    materials: materials as unknown as DownstreamMaterial[],
+    volumeLitres: downstreamVolumeLitres,
+    distributionConfig,
+    usePhaseConfig,
+    eolConfig,
+    productLossConfig,
+  });
+  calculationWarnings.push(...downstream.warnings);
+
   // 8b. Apply product loss multiplier to upstream (gate) emissions.
   // Lost units at downstream stages still carry their full upstream burden,
   // which increases the per-unit footprint for units that reach the consumer.
   // Only applied for boundaries beyond cradle-to-gate.
-  const lossMultiplier = calculateLossMultiplier(effectiveBoundary, productLossConfig);
+  const lossMultiplier = downstream.lossMultiplier;
   if (lossMultiplier > 1.0) {
     console.log(`[aggregateProductImpacts] Product loss multiplier: ${lossMultiplier.toFixed(4)} (dist: ${productLossConfig?.distributionLossPercent || 0}%, retail: ${productLossConfig?.retailLossPercent || 0}%, consumer: ${productLossConfig?.consumerWastePercent || 0}%)`);
 
@@ -539,367 +576,53 @@ export async function aggregateProductImpacts(
     containerEmissions *= lossMultiplier;
   }
 
-  // 9a. Use-phase emissions (Cradle-to-Consumer or Cradle-to-Grave)
-  if (isStageIncluded(effectiveBoundary, 'use_phase') && usePhaseConfig) {
-    // Get product volume for use-phase calculation
-    const { data: productForVolume } = await supabase
-      .from('products')
-      .select('unit_size_value, unit_size_unit')
-      .eq('id', lcaData?.product_id)
-      .single();
-
-    const volumeLitres = productForVolume?.unit_size_unit === 'ml'
-      ? Number(productForVolume.unit_size_value || 0) / 1000
-      : productForVolume?.unit_size_unit === 'L' || productForVolume?.unit_size_unit === 'l'
-        ? Number(productForVolume.unit_size_value || 0)
-        : Number(productForVolume?.unit_size_value || 0) / 1000; // Default assume ml
-
-    if (volumeLitres > 0) {
-      const useResult = calculateUsePhaseEmissions(usePhaseConfig, volumeLitres);
-      usePhaseEmissions = useResult.total;
-      scope3Emissions += useResult.total;
-      totalClimate += useResult.total;
-      totalClimateFossil += useResult.refrigeration; // Refrigeration is fossil-based electricity
-      totalCO2Fossil += useResult.refrigeration;
-      // Carbonation origin depends on the CO2 source: fermentation CO2
-      // (beer, sparkling wine) is biogenic, but soft drinks and most RTDs
-      // are carbonated with fossil-derived industrial CO2 (ammonia-plant
-      // by-product). Booking everything biogenic misstated the ISO 14067
-      // origin split for every carbonated soft drink.
-      if (usePhaseConfig.carbonationType === 'soft_drink') {
-        totalClimateFossil += useResult.carbonation;
-        totalCO2Fossil += useResult.carbonation;
-      } else {
-        totalClimateBiogenic += useResult.carbonation; // Fermentation CO2 is biogenic
-        totalCO2Biogenic += useResult.carbonation;
-      }
-
-      console.log(`[aggregateProductImpacts] Use phase: ${useResult.total.toFixed(6)} kg CO2e (refrigeration: ${useResult.refrigeration.toFixed(6)}, carbonation: ${useResult.carbonation.toFixed(6)}, carbonation origin: ${usePhaseConfig.carbonationType === 'soft_drink' ? 'fossil (industrial CO2)' : 'biogenic (fermentation)'})`);
-    } else {
-      console.log('[aggregateProductImpacts] Use phase: skipped (no volume data)');
-    }
-  }
-
-  // 9a-ter. Retail refrigeration at Cradle-to-Shelf. The retail share of
-  // chilled storage happens BEFORE the consumer buys the product, so a
-  // shelf-boundary study must include it even though the use-phase step (a
-  // consumer-boundary concept) is excluded. Without this, chilled RTDs sold
-  // at shelf boundary carried zero retail chiller energy.
-  if (
-    !isStageIncluded(effectiveBoundary, 'use_phase') &&
-    isStageIncluded(effectiveBoundary, 'distribution') &&
-    usePhaseConfig
-  ) {
-    const { data: productForVolume } = await supabase
-      .from('products')
-      .select('unit_size_value, unit_size_unit')
-      .eq('id', lcaData?.product_id)
-      .single();
-    const volumeLitres = productForVolume?.unit_size_unit === 'ml'
-      ? Number(productForVolume.unit_size_value || 0) / 1000
-      : productForVolume?.unit_size_unit === 'L' || productForVolume?.unit_size_unit === 'l'
-        ? Number(productForVolume.unit_size_value || 0)
-        : Number(productForVolume?.unit_size_value || 0) / 1000;
-    if (volumeLitres > 0) {
-      const useResult = calculateUsePhaseEmissions(usePhaseConfig, volumeLitres);
-      const retailRefrigeration = useResult.breakdown?.retailRefrigeration ?? 0;
-      if (retailRefrigeration > 0) {
-        usePhaseEmissions += retailRefrigeration;
-        scope3Emissions += retailRefrigeration;
-        totalClimate += retailRefrigeration;
-        totalClimateFossil += retailRefrigeration;
-        totalCO2Fossil += retailRefrigeration;
-        console.log(`[aggregateProductImpacts] Retail refrigeration at shelf boundary: ${retailRefrigeration.toFixed(6)} kg CO2e`);
-      }
-    }
+  // 9a. Use phase, including the retail-refrigeration-at-shelf case.
+  // Computed above in computeDownstreamStages; fold in its deltas.
+  usePhaseEmissions = downstream.usePhase.total;
+  if (usePhaseEmissions !== 0) {
+    scope3Emissions += usePhaseEmissions;
+    totalClimate += usePhaseEmissions;
+    totalClimateFossil += downstream.usePhase.climateFossilDelta;
+    totalClimateBiogenic += downstream.usePhase.climateBiogenicDelta;
+    totalCO2Fossil += downstream.usePhase.co2FossilDelta;
+    totalCO2Biogenic += downstream.usePhase.co2BiogenicDelta;
+    console.log(`[aggregateProductImpacts] Use phase: ${usePhaseEmissions.toFixed(6)} kg CO2e`);
   }
 
   // 9a-bis. Distribution emissions (Cradle-to-Shelf, Cradle-to-Consumer, Cradle-to-Grave)
-  if (isStageIncluded(effectiveBoundary, 'distribution') && distributionConfig) {
-    try {
-      const distResult = await calculateDistributionEmissions(distributionConfig);
-      distributionEmissions = distResult.total;
-      scope3Emissions += distResult.total;
-      totalClimate += distResult.total;
-      totalClimateFossil += distResult.total; // Transport is fossil-fuel based
-      totalCO2Fossil += distResult.total;
+  distributionEmissions = downstream.distribution.total;
+  if (distributionEmissions !== 0) {
+    scope3Emissions += distributionEmissions;
+    totalClimate += distributionEmissions;
+    totalClimateFossil += distributionEmissions; // Transport is fossil-fuel based
+    totalCO2Fossil += distributionEmissions;
 
-      console.log(`[aggregateProductImpacts] Distribution: ${distResult.total.toFixed(6)} kg CO2e (${distResult.perLeg.length} legs)`);
-      for (const leg of distResult.perLeg) {
-        console.log(`[aggregateProductImpacts]   Leg "${leg.label}": ${leg.emissions.toFixed(6)} kg CO2e (${leg.mode}, ${leg.distanceKm} km)`);
-      }
-    } catch (err: any) {
-      console.warn(`[aggregateProductImpacts] Distribution calculation failed: ${err.message}`);
-      calculationWarnings.push(`Distribution calculation failed: ${err.message}. Distribution emissions will be zero.`);
+    console.log(`[aggregateProductImpacts] Distribution: ${distributionEmissions.toFixed(6)} kg CO2e (${downstream.distribution.perLeg.length} legs)`);
+    for (const leg of downstream.distribution.perLeg) {
+      console.log(`[aggregateProductImpacts]   Leg "${leg.label}": ${leg.emissions.toFixed(6)} kg CO2e (${leg.mode}, ${leg.distanceKm} km)`);
     }
   }
 
-  // 9b. End-of-life emissions (Cradle-to-Grave only)
-  // Collect per-material EoL breakdown for report transparency (ISO 14044 §4.4)
-  const eolMaterialBreakdown: Array<{
-    material: string; massKg: number; factorKey: string; region: string;
-    recyclingPct: number; landfillPct: number; incinerationPct: number;
-    compostingPct: number; adPct: number;
-    grossEmissions: number; avoidedEmissions: number; netEmissions: number;
-    allocationMethod: string;
-  }> = [];
-
+  // 9b. End-of-life emissions (Cradle-to-Grave only).
+  // Computed above in computeDownstreamStages; fold in its deltas. The
+  // per-material breakdown is kept for report transparency (ISO 14044 §4.4).
+  const eolMaterialBreakdown = downstream.endOfLife.breakdown;
   if (isStageIncluded(effectiveBoundary, 'end_of_life')) {
-    const eolRegion: EoLRegion = eolConfig?.region || 'eu';
-    // ISO 14044 §4.3.4.3: a material whose production impact is already
-    // discounted for recycled content should not ALSO receive a full
-    // avoided-burden recycling credit at end-of-life — that counts the same
-    // recycling benefit twice. We don't change the maths (the user may have
-    // a defensible reason), but we flag it plainly. Collected per material,
-    // warned once after the loop.
-    const doubleCreditMaterials: Array<{ name: string; recycledPct: number }> = [];
-    // Cut-off is the default allocation (GHG Protocol / PAS 2050 recycled-
-    // content convention): the recycling benefit is claimed once, on the
-    // input side, by whoever uses recycled material. Avoided-burden remains
-    // an explicit opt-in for legacy (non-parametric) rows only — parametric
-    // rows already carry their recycled benefit in the endpoint interpolation,
-    // so crediting them again at EoL would double-count and could net a
-    // bottle carbon-negative.
-    const requestedEolAllocation = eolConfig?.allocationMethod ?? 'cut-off';
-    let warnedParametricAvoidedBurden = false;
-
-    for (const material of materials as Material[]) {
-      const materialType = (material.material_type || '').toLowerCase();
-      // Defensive unit normalisation. product_carbon_footprint_materials rows are
-      // written by the calculator already in kg (unit: 'kg'), so this is normally
-      // a no-op — but it guards against any non-kg packaging row producing a
-      // 1000× EoL inflation.
-      const normalised = tryNormalizeToKg(material.quantity || 0, material.unit || 'kg');
-      if (!normalised.recognised) {
-        calculationWarnings.push(
-          `The packaging item "${material.material_name}" has an unrecognised unit "${material.unit}", ` +
-          `so its end-of-life impact was estimated assuming the amount is in kilograms. ` +
-          `Please edit the item and pick a unit from the list.`
-        );
-      }
-      const rawQuantity = normalised.kg;
-      if (rawQuantity <= 0) continue;
-
-      // Circularity: reuse_trips amortises a reusable container's physical
-      // material over many sales trips. The same 9 kg firkin serves 100 pints
-      // before going for scrap, so the EoL burden attributable to one pint is
-      // 1/100 of the scrap-event emissions. Must match the production-side
-      // divisor applied in product-lca-calculator.ts, otherwise reusables get
-      // a 100× EoL over-count.
-      const rawReuseTrips = (material as any).reuse_trips;
-      const reuseTrips = Number.isFinite(Number(rawReuseTrips)) && Number(rawReuseTrips) >= 1
-        ? Number(rawReuseTrips)
-        : 1;
-
-      // Shared-packaging allocation (ISO 14044 §4.3.4.2). Secondary/shipment/
-      // tertiary packaging (a 4-pack carton, a shipping case) serves multiple
-      // product units, so its EoL burden must be divided by units_per_group —
-      // the SAME divisor the production side applies in product-lca-calculator.ts.
-      // Without this, the full multipack carton was disposed against every single
-      // bottle, over-counting EoL by the pack factor (×4, ×6, …).
-      const unitsPerGroup = getPackagingUnitsPerGroup(material as any);
-
-      const quantity = rawQuantity / reuseTrips / unitsPerGroup;
-
-      // HIGH FIX #6: EoL should only apply to PACKAGING materials and food-waste
-      // ingredients. PRIMARY ingredients (barley, water, hops, grapes, etc.) are
-      // consumed during processing — they have no end-of-life in the product sense.
-      // Applying 'organic' waste factors to 500kg of malt falsely adds large
-      // EoL emissions to the total. Only process materials where:
-      //   (a) material_type is 'packaging' / 'packaging_material', OR
-      //   (b) the material has an explicit packaging_category set (backup guard)
-      // Synthetic maturation rows (named '[Maturation] ...' ) also excluded.
-      const isPackaging = materialType === 'packaging' || materialType === 'packaging_material';
-      const packagingCategory = (material as any).packaging_category || '';
-      const isMaturationRow = (material.material_name || '').startsWith('[Maturation]');
-
-      if (!isPackaging || isMaturationRow) {
-        // Skip: ingredients consumed during processing have no meaningful EoL pathway.
-        // Food waste (organic fraction) is typically handled by waste management and
-        // already partially captured in upstream processing emissions.
-        continue;
-      }
-
-      // Resolve the material composition (glass/paper/aluminium/…) for EoL
-      // factors. Wizard-created rows carry the material identity directly in
-      // container_material, which getMaterialFactorKey resolves exactly;
-      // manual rows fall back to name/factor-name inference because
-      // packaging_category holds a packaging *role*, not a material.
-      const factorName = (material as any).matched_source_name || (material as any).gwp_data_source || '';
-      const containerMaterial = (material as any).container_material || '';
-      const factorKey = getMaterialFactorKey(containerMaterial || packagingCategory || 'other', material.material_name, factorName);
-
-      // Get user pathway overrides from the wizard. The wizard keys pathways
-      // by the product_materials row id it loaded pre-calculation, which is
-      // carried onto this PCF row as source_material_id — that key is the one
-      // that actually matches. material.id (the freshly inserted PCF row id)
-      // is kept for completeness and factorKey for legacy configs.
-      let pathwayOverrides =
-        ((material as any).source_material_id
-          ? eolConfig?.pathways?.[(material as any).source_material_id]
-          : undefined) ||
-        eolConfig?.pathways?.[material.id] ||
-        eolConfig?.pathways?.[factorKey];
-
-      // Self-heal stale overrides: if the material was reclassified since the
-      // override was seeded (e.g. a glass bottle once read as 'other'), the
-      // stored split is a pristine default for the WRONG material. Discard it so
-      // we fall through to the correct regional default for the current factor —
-      // glass's 74/8/18 instead of 'other''s 28/22/50. Hand-edited splits, which
-      // match no regional default, are kept. Mirrors the wizard's re-seed.
-      if (isStalePathwayOverride(pathwayOverrides, eolRegion, factorKey)) {
-        pathwayOverrides = undefined;
-      }
-
-      const storedPathway = (material as any).end_of_life_pathway as string | null | undefined;
-      if (!pathwayOverrides && storedPathway) {
-        const pathwayMap: Record<string, { recycling: number; landfill: number; incineration: number; composting: number; anaerobic_digestion: number }> = {
-          recycling: { recycling: 100, landfill: 0, incineration: 0, composting: 0, anaerobic_digestion: 0 },
-          reuse: { recycling: 100, landfill: 0, incineration: 0, composting: 0, anaerobic_digestion: 0 },
-          landfill: { recycling: 0, landfill: 100, incineration: 0, composting: 0, anaerobic_digestion: 0 },
-          incineration: { recycling: 0, landfill: 0, incineration: 100, composting: 0, anaerobic_digestion: 0 },
-          composting: { recycling: 0, landfill: 0, incineration: 0, composting: 100, anaerobic_digestion: 0 },
-        };
-        if (pathwayMap[storedPathway]) {
-          pathwayOverrides = pathwayMap[storedPathway];
-        }
-      }
-
-      // Recyclability cap: if this item is only partly recyclable (e.g. a
-      // laminated pouch at 70%), clamp the recycling share and push the
-      // remainder into the regional landfill/incineration split. Prevents
-      // overstated recycling credits.
-      const rawRecyclability = (material as any).recyclability_percent;
-      // Treat null/undefined/'' as "not set" — Number(null) is 0, which would
-      // otherwise cap the user's recycling pathway to 0% whenever the field
-      // was simply never filled in on the material row.
-      const recyclabilityPct =
-        rawRecyclability === null || rawRecyclability === undefined || rawRecyclability === ''
-          ? null
-          : Number.isFinite(Number(rawRecyclability))
-          ? Math.max(0, Math.min(100, Number(rawRecyclability)))
-          : null;
-      if (recyclabilityPct != null && pathwayOverrides && pathwayOverrides.recycling > recyclabilityPct) {
-        const regional = getRegionalDefaults(eolRegion, factorKey);
-        const excess = pathwayOverrides.recycling - recyclabilityPct;
-        // Split excess between landfill and incineration according to the
-        // regional ratio between the two; fall back to 70/30 if both zero.
-        const lf = regional.landfill ?? 0;
-        const inc = regional.incineration ?? 0;
-        const lfShare = lf + inc > 0 ? lf / (lf + inc) : 0.7;
-        pathwayOverrides = {
-          ...pathwayOverrides,
-          recycling: recyclabilityPct,
-          landfill: (pathwayOverrides.landfill ?? 0) + excess * lfShare,
-          incineration: (pathwayOverrides.incineration ?? 0) + excess * (1 - lfShare),
-        };
-      }
-
-      // Parametric rows (pinned endpoint) are FORCED to cut-off; an
-      // avoided-burden request is acknowledged with a warning, not honoured.
-      const rowIsParametric = Boolean((material as any).packaging_endpoint_id);
-      const rowAllocationMethod = rowIsParametric ? 'cut-off' : requestedEolAllocation;
-      if (
-        rowIsParametric &&
-        eolConfig?.allocationMethod === 'avoided-burden' &&
-        !warnedParametricAvoidedBurden
-      ) {
-        warnedParametricAvoidedBurden = true;
-        calculationWarnings.push(
-          'The avoided-burden end-of-life credit was not applied to packaging modelled with the parametric ' +
-          'factor library: its recycling benefit is already counted in the recycled-content input, and crediting ' +
-          'it again at end-of-life would count the same benefit twice.'
-        );
-      }
-
-      const eolResult = calculateMaterialEoL(quantity, factorKey, eolRegion, pathwayOverrides, {
-        allocationMethod: rowAllocationMethod,
-        transportKm: eolConfig?.transportKm,
-      });
-
-      endOfLifeEmissions += eolResult.net;
-      scope3Emissions += eolResult.net;
-      totalClimate += eolResult.net;
-
-      // FIX #14 (biogenic/fossil split per ISO 14067 §6.4.9):
-      // Paper and organic materials produce biogenic CH₄/CO₂ when decomposing in
-      // landfill or composting/AD. Fossil-origin materials (glass, aluminium, plastics,
-      // steel) produce fossil CO₂. Recycling credits always reduce fossil CO₂
-      // (avoiding virgin production of fossil-origin materials).
-      //
-      // KNOWN SIMPLIFICATION: ISO 14067 strictly treats methane (CH₄) from
-      // anaerobic decomposition of biogenic materials as fossil-equivalent for
-      // GWP because the radiative forcing is not part of the short-cycle carbon
-      // exchange. Our EOL_FACTORS table reports a single CO₂e value per pathway
-      // and we route the entire amount to the biogenic bucket below for
-      // biogenic materials. Splitting CH₄ vs CO₂ within the EoL factor would
-      // require separate factor entries — tracked as a follow-up.
-      const isBiogenicMaterial = factorKey === 'paper' || factorKey === 'organic' || factorKey === 'cork';
-      if (isBiogenicMaterial) {
-        // Biogenic materials: landfill/composting/AD emissions are biogenic CO₂
-        // Incineration of biogenic materials is also biogenic (short-cycle carbon)
-        totalClimateBiogenic += eolResult.gross;
-        totalCO2Biogenic += eolResult.gross;
-        // Recycling credits for paper/cork still displace virgin fossil production
-        totalClimateFossil += eolResult.avoided;
-        totalCO2Fossil += eolResult.avoided;
-      } else {
-        // Fossil-origin materials: all EoL emissions are fossil
-        totalClimateFossil += eolResult.gross;
-        totalCO2Fossil += eolResult.gross;
-        totalClimateFossil += eolResult.avoided;
-        totalCO2Fossil += eolResult.avoided;
-      }
-
-      // Collect per-material EoL data for report transparency
-      const resolvedPathways = pathwayOverrides || getRegionalDefaults(eolRegion, factorKey);
-      eolMaterialBreakdown.push({
-        material: material.material_name || 'Packaging',
-        massKg: quantity,
-        factorKey,
-        region: eolRegion,
-        recyclingPct: resolvedPathways.recycling ?? 0,
-        landfillPct: resolvedPathways.landfill ?? 0,
-        incinerationPct: resolvedPathways.incineration ?? 0,
-        compostingPct: resolvedPathways.composting ?? 0,
-        adPct: resolvedPathways.anaerobic_digestion ?? 0,
-        grossEmissions: eolResult.gross,
-        avoidedEmissions: eolResult.avoided,
-        netEmissions: eolResult.net,
-        allocationMethod: rowAllocationMethod,
-      });
-
-      console.log(`[aggregateProductImpacts] EoL ${material.material_name} (${factorKey}): net=${eolResult.net.toFixed(6)}, avoided=${eolResult.avoided.toFixed(6)}, gross=${eolResult.gross.toFixed(6)}`);
-
-      // Potential double-count: recycled-content discount on production AND
-      // an actual avoided-burden credit at EoL (avoided < 0 means a credit
-      // was applied) for the same material.
-      const materialRecycledPct = Number((material as any).recycled_content_percentage || 0);
-      if (!rowIsParametric && materialRecycledPct > 0 && rowAllocationMethod === 'avoided-burden' && eolResult.avoided < 0) {
-        doubleCreditMaterials.push({
-          name: material.material_name || 'Packaging',
-          recycledPct: materialRecycledPct,
-        });
-      }
+    endOfLifeEmissions = downstream.endOfLife.total;
+    scope3Emissions += endOfLifeEmissions;
+    totalClimate += endOfLifeEmissions;
+    totalClimateFossil += downstream.endOfLife.climateFossilDelta;
+    totalClimateBiogenic += downstream.endOfLife.climateBiogenicDelta;
+    totalCO2Fossil += downstream.endOfLife.co2FossilDelta;
+    totalCO2Biogenic += downstream.endOfLife.co2BiogenicDelta;
+    for (const row of eolMaterialBreakdown) {
+      console.log(`[aggregateProductImpacts] EoL ${row.material} (${row.factorKey}): net=${row.netEmissions.toFixed(6)}, avoided=${row.avoidedEmissions.toFixed(6)}, gross=${row.grossEmissions.toFixed(6)}`);
     }
-
-    if (doubleCreditMaterials.length > 0) {
-      const list = doubleCreditMaterials
-        .map(m => `"${m.name}" (${m.recycledPct}% recycled)`)
-        .join(', ');
-      calculationWarnings.push(
-        `The packaging item${doubleCreditMaterials.length === 1 ? '' : 's'} ${list} already ` +
-        `receive${doubleCreditMaterials.length === 1 ? 's' : ''} a discount for recycled content, and the end-of-life settings ` +
-        `also give full credit for future recycling. This can count the same benefit twice and make the footprint ` +
-        `look smaller than it really is. Consider switching the end-of-life recycling credit to "cut-off" in the End of Life step.`
-      );
-    }
-  } else if (!isStageIncluded(effectiveBoundary, 'end_of_life')) {
+  } else {
     // Legacy: For cradle-to-gate/shelf/consumer, no EoL
     // (Previously had a crude 30% landfill placeholder — now removed)
     console.log('[aggregateProductImpacts] End-of-life: excluded by boundary');
   }
-
   const totalCarbonFootprint = totalClimate;
 
   // Fallback: if no scope allocation, put everything in Scope 3
