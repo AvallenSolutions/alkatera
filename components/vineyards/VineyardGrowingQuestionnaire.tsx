@@ -83,6 +83,8 @@ interface QuestionnaireProps {
   vineyardId: string;
   vineyardName: string;
   vineyardHectares: number;
+  /** Parent vineyard's annual_yield_tonnes, used to prefill the yield ask. */
+  vineyardAnnualYieldTonnes?: number | null;
   vineyardClimateZone: VineyardClimateZone;
   vineyardCertification: VineyardCertification;
   vineyardCountryCode: string | null;
@@ -156,6 +158,7 @@ export function VineyardGrowingQuestionnaire({
   vineyardId,
   vineyardName,
   vineyardHectares,
+  vineyardAnnualYieldTonnes,
   vineyardClimateZone,
   vineyardCertification,
   vineyardCountryCode,
@@ -202,7 +205,12 @@ export function VineyardGrowingQuestionnaire({
     is_irrigated: initSource?.is_irrigated ?? false,
     water_m3_per_ha: initSource?.water_m3_per_ha ?? 0,
     irrigation_energy_source: (initSource?.irrigation_energy_source ?? 'none') as IrrigationEnergySource,
-    grape_yield_tonnes: initSource?.grape_yield_tonnes ?? 0,
+    // Inherit the parent vineyard's annual yield, exactly as area_ha above
+    // inherits vineyardHectares. This was a required field defaulting to 0,
+    // so growers retyped a figure the farm record already held on every
+    // vintage.
+    grape_yield_tonnes:
+      initSource?.grape_yield_tonnes ?? vineyardAnnualYieldTonnes ?? 0,
     // Land use change (FLAG-C3) - stored on vineyard, not growing profile
     previous_land_use_type: (vineyardPreviousLandUse ?? 'permanent_vineyard') as PreviousLandUseType,
     land_conversion_year: vineyardLandConversionYear ?? null as number | null,

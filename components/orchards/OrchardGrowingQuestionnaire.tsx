@@ -69,6 +69,8 @@ interface QuestionnaireProps {
   orchardId: string;
   orchardName: string;
   orchardHectares: number;
+  /** Parent orchard's annual_yield_tonnes, used to prefill the yield ask. */
+  orchardAnnualYieldTonnes?: number | null;
   orchardType: OrchardType;
   orchardClimateZone: 'wet' | 'dry' | 'temperate';
   orchardCertification: OrchardCertification;
@@ -144,6 +146,7 @@ export function OrchardGrowingQuestionnaire({
   orchardId,
   orchardName,
   orchardHectares,
+  orchardAnnualYieldTonnes,
   orchardType,
   orchardClimateZone,
   orchardCertification,
@@ -188,7 +191,10 @@ export function OrchardGrowingQuestionnaire({
     is_irrigated: initSource?.is_irrigated ?? false,
     water_m3_per_ha: initSource?.water_m3_per_ha ?? 0,
     irrigation_energy_source: (initSource?.irrigation_energy_source ?? 'none') as IrrigationEnergySource,
-    fruit_yield_tonnes: initSource?.fruit_yield_tonnes ?? 0,
+    // Inherit the parent orchard's annual yield, exactly as area_ha above
+    // inherits orchardHectares.
+    fruit_yield_tonnes:
+      initSource?.fruit_yield_tonnes ?? orchardAnnualYieldTonnes ?? 0,
     // Transport
     transport_distance_km: initSource?.transport_distance_km ?? null as number | null,
     transport_mode: (initSource?.transport_mode ?? 'road') as TransportMode,

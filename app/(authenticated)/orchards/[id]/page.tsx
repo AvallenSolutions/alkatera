@@ -215,6 +215,7 @@ export default function OrchardDetailPage() {
             orchardId={orchard.id}
             orchardName={orchard.name}
             orchardHectares={orchard.hectares}
+            orchardAnnualYieldTonnes={orchard.annual_yield_tonnes}
             orchardType={orchard.orchard_type}
             orchardClimateZone={orchard.climate_zone}
             orchardCertification={orchard.certification}

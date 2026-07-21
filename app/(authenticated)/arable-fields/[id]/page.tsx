@@ -269,6 +269,7 @@ export default function ArableFieldDetailPage() {
             fieldId={field.id}
             fieldName={field.name}
             fieldHectares={field.hectares}
+            fieldAnnualYieldTonnes={field.annual_yield_tonnes}
             cropType={field.crop_type}
             fieldClimateZone={field.climate_zone as 'wet' | 'dry' | 'temperate'}
             fieldCertification={field.certification}

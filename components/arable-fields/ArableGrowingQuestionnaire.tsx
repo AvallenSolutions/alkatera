@@ -77,6 +77,8 @@ interface QuestionnaireProps {
   fieldId: string;
   fieldName: string;
   fieldHectares: number;
+  /** Parent field's annual_yield_tonnes, used to prefill the yield ask. */
+  fieldAnnualYieldTonnes?: number | null;
   cropType: CropType;
   fieldClimateZone: 'wet' | 'dry' | 'temperate';
   fieldCertification: ArableCertification;
@@ -149,6 +151,7 @@ export function ArableGrowingQuestionnaire({
   fieldId,
   fieldName,
   fieldHectares,
+  fieldAnnualYieldTonnes,
   cropType,
   fieldClimateZone,
   fieldCertification,
@@ -210,7 +213,10 @@ export function ArableGrowingQuestionnaire({
     // Step 5: Transport & Yield
     transport_distance_km: initSource?.transport_distance_km ?? null as number | null,
     transport_mode: (initSource?.transport_mode ?? 'road') as TransportMode,
-    grain_yield_tonnes: initSource?.grain_yield_tonnes ?? 0,
+    // Inherit the parent field's annual yield, exactly as area_ha above
+    // inherits fieldHectares.
+    grain_yield_tonnes:
+      initSource?.grain_yield_tonnes ?? fieldAnnualYieldTonnes ?? 0,
     grain_moisture_percent: initSource?.grain_moisture_percent ?? 14.5,
 
     // Land use change (FLAG-C3) - stored on field, not growing profile
