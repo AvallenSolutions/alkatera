@@ -42,20 +42,23 @@ Do not trust these without exercising them.
   full seeder cannot run locally (it needs prod product ids 130-236).
 
 ## In flight
-Nothing mid-edit. The next concrete piece of work is scoped but not started: **a repo diff of
-main's 11+ `netlify/functions/*` against redesign's `app/api/cron/*`**, to list which scheduled
-jobs would stop working after the cutover. This needs no Vercel API access and is the highest-value
-thing available today.
+Nothing mid-edit. The scheduled-jobs diff is **DONE** — full report at
+`tasks/netlify-to-vercel-jobs-diff.md`. Its premise turned out to be false; read the report
+before planning anything about background jobs.
 
 ## Next
 1. **Reissue the Vercel connector token** (Tim) — see Pending. Everything else about Vercel is
    blocked on it.
-2. **The netlify → vercel scheduled-jobs diff.** `vercel.json` on redesign has NO `crons` key.
-   The `app/api/cron/*` routes exist; nothing visible fires them. 15 of main's Netlify functions
-   have no equivalent, including `pulse-snapshots`, `pulse-insights`, `pulse-anomalies`,
-   `trial-reminder-sweep`, `openlca-cert-monitor` and `deploy-succeeded` (which fires the
-   wiki→Rosa sync). Per the house rule those Netlify functions are heartbeats that kick Inngest;
-   if nothing kicks Inngest on Vercel, all of it stops SILENTLY.
+2. ~~The netlify → vercel scheduled-jobs diff.~~ **DONE 2026-07-21, and the fear was unfounded.**
+   Redesign moved every heartbeat into the Inngest function definitions as native `{ cron: ... }`
+   triggers, so `vercel.json` having no `crons` key is correct. All 16 scheduled jobs and all 7
+   background functions have equivalents; nothing stops. Full table in
+   `tasks/netlify-to-vercel-jobs-diff.md`.
+   **The replacement task is an Inngest environment check.** Both branches are
+   `new Inngest({ id: 'alkatera' })`. If Vercel staging gets the PRODUCTION Inngest keys, Inngest
+   re-points every production function URL at the staging deployment, silently. Give staging a
+   Branch-environment key pair, and confirm in the Inngest dashboard which environment `alkatera`
+   is synced to. One dashboard look settles it.
 3. **Redesign's own migration duplicate.** `20260714200000` is shared by
    `product_materials_ef_metadata` and `chemical_library_user_submissions`. Must be renumbered ON
    that branch before any merge. Not fixable from main.
@@ -82,6 +85,11 @@ thing available today.
   way and every customer's numbers would shift back. This is the single biggest cutover risk.
 - **Sequence matters: run the recalc BEFORE porting.** Otherwise you cannot tell recalc drift from
   redesign drift, and there are three number-states in play at once.
+- **Two deployments, one Inngest app id.** `id: 'alkatera'` on both branches. Inngest keys are the
+  only thing keeping staging out of production's function registry. Treat the Inngest env vars on
+  Vercel as a production-safety control, not config.
+- **Wiki→Rosa sync changes cadence at cutover**, from once per successful deploy to every 6 hours.
+  Only behavioural regression found in the jobs diff. Small, but tell whoever edits the wiki.
 - **Prod assigns its own migration timestamps at apply time** and matches by name, never by repo
   filename. That is why the duplicate versions never bit prod, and why the renumbering needs
   nothing re-applied anywhere.
