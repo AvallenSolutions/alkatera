@@ -18,6 +18,7 @@ import { calculateMaterialEoL, getMaterialFactorKey, getPackagingUnitsPerGroup, 
 import { calculateDistributionEmissions, type DistributionConfig } from './distribution-factors';
 import { isStageIncluded, calculateLossMultiplier, type ProductLossConfig } from './system-boundaries';
 import { computeDownstreamStages, type DownstreamMaterial } from './lca/downstream-stages';
+import { carryScenariosForward } from './lca/scenarios';
 import { IPCC_AR6_GWP } from './ghg-constants';
 import {
   assessMaterialDataQuality,
@@ -1323,6 +1324,39 @@ export async function aggregateProductImpacts(
   // historical record as "resume where you left off" and eventually promoting
   // it back to completed. Version history became a shell game.
   if (lcaData?.product_id) {
+    // Carry end-use scenarios onto this version BEFORE superseding the old
+    // one. A new PCF version would otherwise lose every channel the user has
+    // configured, along with their confirmations, and the product would
+    // silently drop back to a single implied route to market.
+    let supersedeCandidates = supabase
+      .from('product_carbon_footprints')
+      .select('id')
+      .eq('product_id', lcaData.product_id)
+      .eq('status', 'completed')
+      .neq('id', productCarbonFootprintId);
+    if (lcaData.reference_year != null) {
+      supersedeCandidates = supersedeCandidates.eq('reference_year', lcaData.reference_year);
+    }
+    const { data: outgoing } = await supersedeCandidates;
+    const previousPcfId = (outgoing as Array<{ id: string }> | null)?.[0]?.id;
+    if (previousPcfId) {
+      try {
+        const carried = await carryScenariosForward(supabase, previousPcfId, productCarbonFootprintId);
+        if (carried > 0) {
+          console.log(`[aggregateProductImpacts] Carried ${carried} end-use scenario(s) forward from ${previousPcfId}`);
+        }
+      } catch (carryErr: any) {
+        // Non-fatal: a footprint that computed correctly should not fail
+        // because its scenarios could not be copied. Surfaced as a warning so
+        // the dossier can tell the user their channels need re-adding.
+        console.warn('[aggregateProductImpacts] Failed to carry scenarios forward:', carryErr?.message);
+        calculationWarnings.push(
+          'This product\'s end-use scenarios could not be carried onto the new version. ' +
+          'Check the routes to market on the LCA and re-add any that are missing.',
+        );
+      }
+    }
+
     let supersedeQuery = supabase
       .from('product_carbon_footprints')
       .update({ status: 'superseded', updated_at: new Date().toISOString() })

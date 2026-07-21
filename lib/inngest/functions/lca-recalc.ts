@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { inngest } from '../client';
 import { calculateProductLCA } from '@/lib/product-lca-calculator';
 import { toValidAllocations } from '@/lib/utils/lca-recalc-allocations';
+import { recomputeScenariosForPcf } from '@/lib/lca/scenarios';
 
 /**
  * Recalculate one product's footprint, server-side.
@@ -216,6 +217,20 @@ export const lcaRecalcRun = inngest.createFunction(
         throw new Error(result.error || 'Calculation failed');
       }
       return { pcfId: result.pcfId };
+    });
+
+    // ── Scenarios ────────────────────────────────────────────────────────
+    // One core, N cheap downstream passes. Separate step so a scenario failure
+    // retries on its own rather than re-running the expensive calculation, and
+    // so a product with no scenarios costs nothing.
+    await step.run('recompute-scenarios', async () => {
+      if (!outcome.pcfId) return { computed: 0 };
+      await patchRun(supabase, runId, { percent: 95, phase_message: 'Updating routes to market' });
+      const result = await recomputeScenariosForPcf(supabase, outcome.pcfId);
+      if (result.computed > 0) {
+        console.log(`[lcaRecalcRun] Recomputed ${result.computed} end-use scenario(s)`);
+      }
+      return result;
     });
 
     await step.run('finalise', async () => {
