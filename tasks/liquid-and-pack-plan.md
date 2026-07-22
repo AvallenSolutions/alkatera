@@ -188,3 +188,35 @@ re-run clean; **pending prod**.
 
 **Next: audit Phase 2**, promoting `ingredients` and `supplier_products` to
 first-class records. Then L1, L2, L3.
+
+### Audit Phase 2, first pass (22 July 2026)
+
+Commits `5de241d5`, `1a32fa14`. Migration `20260722110000_ingredients_first_class.sql`, **pending prod**.
+
+- **Packaging templates** round-trip `packaging_material_class` and
+  `packaging_material_variant` again. Both were missing from both directions,
+  so a restored row came back with no class and the next save NULLed the
+  column, dropping the row out of the parametric factor path. The hook had no
+  test at all; it has one now.
+- **Supplier-declared facts** stop being dropped. Recyclability, end-of-life
+  pathway and organic certification all have a home on the material row and
+  were being discarded. Extracted to `lib/suppliers/declared-facts.ts` so the
+  rule exists once. Two guards: never overwrite an answer the user gave, and
+  never assert a certification the supplier did not claim.
+- **`ingredients` is a real record.** Find-or-create on save, `material_id`
+  populated for the first time, facts accumulated rather than overwritten.
+  Verified end to end: 6 records created from the demo gin, 6 rows linked,
+  second save idempotent.
+
+Still open from Phase 2:
+- Move origin address/coords/country, transport legs and the inbound delivery
+  container to `supplier_products` and inherit them via
+  `ingredients.default_supplier_product_id` (the column exists; nothing reads
+  it yet). `supplier_products.origin_address` has carried the comment "Can be
+  overridden at material level" since it was created.
+- Surface the ingredient record in the UI: the recipe editor writes it but
+  nothing lets a user browse, edit or merge ingredients yet, and a second
+  product does not visibly inherit from the first.
+- Duplicate-ingredient detection and the propose-a-merge flow.
+
+Then L1, L2, L3.
