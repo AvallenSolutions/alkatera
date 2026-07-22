@@ -71,6 +71,10 @@ export const FALLBACK_IMPACT_TIER: Record<AskType, number> = {
   dossier_boundary: 1,
   draft_gap_material: 2,
   dossier_gap_distribution: 2,
+  // The sales split changes which number the product leads with, but every
+  // route is already computed and shown, so nothing is missing without it.
+  // It ranks below the gaps where a figure is genuinely absent.
+  dossier_sales_split: 3,
   draft_gap_utility: 3,
   draft_gap_hospitality_quantities: 4,
   growth_signal: 5,

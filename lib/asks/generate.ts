@@ -418,6 +418,57 @@ export function generateDossierDistributionAsks(
   );
 }
 
+export interface SalesSplitRow {
+  pcfId: string;
+  productId: string;
+  productName: string;
+  /** Names of the routes awaiting a share, for the question text. */
+  routeNames: string[];
+  /** Spread between the cheapest and dearest route, in kg CO2e per unit. */
+  spreadKgCo2e: number | null;
+}
+
+/**
+ * One question per product that sells more than one way and has not said how
+ * sales split. Until it is answered the headline is the main route only; after
+ * it, the headline becomes the volume-weighted mix, which is the figure
+ * corporate reporting should consume.
+ *
+ * The spread is what makes it worth asking: if bar and retail versions land
+ * within a gnat's whisker of each other the mix barely matters, and the ask is
+ * ordered accordingly rather than nagging.
+ */
+export function generateSalesSplitAsks(rows: SalesSplitRow[]): AskCandidate[] {
+  return rows.map((row) =>
+    makeAsk(
+      'dossier_sales_split',
+      `How do sales of ${row.productName} split between routes?`,
+      `${row.productName} sells through ${row.routeNames.length} routes ` +
+        `(${row.routeNames.join(', ')}), and each carries a different footprint` +
+        (row.spreadKgCo2e ? ` — they differ by ${row.spreadKgCo2e.toFixed(3)} kg CO₂e per unit` : '') +
+        `. Roughly what percentage goes down each? A rough split is fine, and it lets us show ` +
+        `one honest number across all of them instead of leading with just the main route.`,
+      {
+        // A split across N routes is several numbers that must add to 100, so
+        // it is answered in the dossier's own dialog rather than inline here.
+        answer_shape: 'link',
+        current_value: null,
+        unit: null,
+        target: {
+          table: 'pcf_end_use_scenarios',
+          id: row.pcfId,
+          field: 'share_pct',
+        },
+        dedupe_key: `dossier_sales_split:${row.pcfId}`,
+        href: `/products/${row.productId}/dossier`,
+        product_name: row.productName,
+        facility_name: null,
+        impactShare: null,
+      },
+    ),
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Gather — one round trip per source, org-scoped. Any failed query degrades
 // that source to an empty list rather than failing the whole sweep.
@@ -434,6 +485,7 @@ export interface AskIngredients {
   orgTotalEmissionsKg: number | null;
   dossierBoundaries: DossierBoundaryRow[];
   dossierDistributions: DossierDistributionRow[];
+  salesSplits: SalesSplitRow[];
 }
 
 /** Confirmed data_provenance values on facility_activity_entries — everything else is a draft-gap candidate. */
@@ -625,8 +677,9 @@ async function gatherDossierGaps(
 ): Promise<{
   dossierBoundaries: DossierBoundaryRow[];
   dossierDistributions: DossierDistributionRow[];
+  salesSplits: SalesSplitRow[];
 }> {
-  const empty = { dossierBoundaries: [], dossierDistributions: [] };
+  const empty = { dossierBoundaries: [], dossierDistributions: [], salesSplits: [] };
   try {
     const { data } = await db
       .from('product_carbon_footprints')
@@ -677,7 +730,47 @@ async function gatherDossierGaps(
       }
     }
 
-    return { dossierBoundaries: boundaries, dossierDistributions: distributions };
+    // Products selling more than one way that have not said how sales split.
+    // Until they do, the headline leads with the main route rather than the mix.
+    const salesSplits: SalesSplitRow[] = [];
+    const { data: scenarioRows } = await db
+      .from('pcf_end_use_scenarios')
+      .select('pcf_id, name, share_pct, stage_results')
+      .eq('organization_id', organizationId)
+      .limit(600);
+
+    if (scenarioRows) {
+      const byPcf = new Map<string, any[]>();
+      for (const row of scenarioRows as any[]) {
+        if (!byPcf.has(row.pcf_id)) byPcf.set(row.pcf_id, []);
+        byPcf.get(row.pcf_id)!.push(row);
+      }
+      const pcfById = new Map((data as any[]).map((p) => [String(p.id), p]));
+
+      for (const [pcfId, routes] of Array.from(byPcf.entries())) {
+        if (routes.length < 2) continue;
+        if (routes.every((r: any) => r.share_pct !== null)) continue;
+        const pcf = pcfById.get(String(pcfId));
+        if (!pcf) continue;
+        const productId = String(pcf.product_id);
+        const productName = productNameById.get(productId);
+        if (!productName) continue;
+
+        const totals = routes
+          .map((r: any) => r.stage_results?.total)
+          .filter((t: unknown): t is number => typeof t === 'number');
+
+        salesSplits.push({
+          pcfId,
+          productId,
+          productName,
+          routeNames: routes.map((r: any) => String(r.name)),
+          spreadKgCo2e: totals.length > 1 ? Math.max(...totals) - Math.min(...totals) : null,
+        });
+      }
+    }
+
+    return { dossierBoundaries: boundaries, dossierDistributions: distributions, salesSplits };
   } catch {
     // One failed source degrades to empty rather than failing the sweep.
     return empty;
@@ -695,6 +788,7 @@ export function generateAllAsks(ingredients: AskIngredients): AskCandidate[] {
     ...generateGrowthSignalAsks(ingredients.growthSignals),
     ...generateDossierBoundaryAsks(ingredients.dossierBoundaries),
     ...generateDossierDistributionAsks(ingredients.dossierDistributions),
+    ...generateSalesSplitAsks(ingredients.salesSplits),
   ];
 }
 

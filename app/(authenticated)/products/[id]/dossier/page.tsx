@@ -33,6 +33,8 @@ import { PageLoader } from '@/components/ui/page-loader';
 import { useOrganization } from '@/lib/organizationContext';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { DossierSectionPanel } from '@/components/lca/dossier/DossierSectionPanel';
+import { RoutesToMarket, AddRoute } from '@/components/lca/dossier/RoutesToMarket';
+import { SalesSplitDialog } from '@/components/lca/dossier/SalesSplitDialog';
 import type { Dossier } from '@/lib/lca/dossier';
 
 interface ActiveRun {
@@ -62,6 +64,8 @@ export default function DossierPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [recalculating, setRecalculating] = useState(false);
+  const [addingRoute, setAddingRoute] = useState(false);
+  const [splitOpen, setSplitOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!currentOrganization?.id) return;
@@ -146,6 +150,40 @@ export default function DossierPage() {
     }
   };
 
+  const handleAddRoute = async (channel: string) => {
+    if (!dossier?.pcfId) return;
+    setAddingRoute(true);
+    try {
+      const res = await fetch('/api/lca/scenarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pcf_id: dossier.pcfId, channel }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Could not add that route');
+      await load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not add that route');
+    } finally {
+      setAddingRoute(false);
+    }
+  };
+
+  const handleSaveShares = async (shares: Record<string, number>) => {
+    if (!dossier?.pcfId) return;
+    await Promise.all(
+      Object.entries(shares).map(([id, share_pct]) =>
+        fetch('/api/lca/scenarios', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, pcf_id: dossier.pcfId, share_pct }),
+        }),
+      ),
+    );
+    setSplitOpen(false);
+    await load();
+  };
+
   if (loading) return <PageLoader message="Opening the dossier" />;
 
   if (error || !dossier) {
@@ -163,6 +201,21 @@ export default function DossierPage() {
   }
 
   const hasNumber = dossier.headlineKgCo2e !== null;
+  const hasRoutes = dossier.scenarios.length > 1;
+
+  // With several routes to market the headline is the volume-weighted mix, or
+  // the main route while the sales split is unknown. Falls back to the PCF's
+  // own stored figure for the ordinary single-route product.
+  const posterValue = hasRoutes && dossier.headline
+    ? dossier.headline.value
+    : dossier.headlineKgCo2e;
+
+  // Distribution and "after it is sold" move inside the route tabs when there
+  // is more than one route, because those are precisely the two that differ.
+  // Showing them twice would leave the reader asking which one counts.
+  const sharedSections = hasRoutes
+    ? dossier.sections.filter((s) => s.id !== 'distribution' && s.id !== 'after')
+    : dossier.sections;
 
   return (
     <div className="container mx-auto max-w-4xl px-6 py-8">
@@ -184,12 +237,18 @@ export default function DossierPage() {
             )
           }
         >
-          {hasNumber && (
+          {hasNumber && posterValue !== null && (
             <BigNumber
               size="display"
               tone="room"
-              value={dossier.headlineKgCo2e!.toFixed(3)}
-              label="KG CO₂E PER UNIT"
+              value={posterValue.toFixed(3)}
+              label={
+                hasRoutes && dossier.headline?.basis === 'weighted'
+                  ? 'KG CO₂E PER UNIT · WEIGHTED ACROSS ROUTES'
+                  : hasRoutes
+                    ? 'KG CO₂E PER UNIT · MAIN ROUTE'
+                    : 'KG CO₂E PER UNIT'
+              }
             />
           )}
         </Statement>
@@ -245,10 +304,31 @@ export default function DossierPage() {
       )}
 
       <div className="mt-8 space-y-4">
-        {dossier.sections.map((section) => (
+        {sharedSections.map((section) => (
           <DossierSectionPanel key={section.id} section={section} />
         ))}
       </div>
+
+      <RoutesToMarket
+        scenarios={dossier.scenarios}
+        headline={dossier.headline}
+        onSetShares={() => setSplitOpen(true)}
+      />
+
+      {dossier.pcfId && (
+        <AddRoute
+          onAdd={handleAddRoute}
+          busy={addingRoute}
+          existingChannels={dossier.scenarios.map((s) => s.channel)}
+        />
+      )}
+
+      <SalesSplitDialog
+        open={splitOpen}
+        onOpenChange={setSplitOpen}
+        scenarios={dossier.scenarios}
+        onSave={handleSaveShares}
+      />
 
       <div className="mt-10 flex flex-wrap items-center gap-3">
         <PillButton variant="room" onClick={handleRecalculate} disabled={recalculating || !!activeRun}>

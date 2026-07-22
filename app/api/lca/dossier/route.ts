@@ -88,11 +88,23 @@ export async function GET(request: NextRequest) {
     .select('id', { count: 'exact', head: true })
     .eq('product_id', productId);
 
+  // Routes to market. A product sold one way has none, and the dossier shows
+  // no scenario machinery at all in that case.
+  const { data: scenarios } = pcf
+    ? await client
+        .from('pcf_end_use_scenarios')
+        .select('id, name, channel, is_primary, share_pct, distribution_config, stage_results')
+        .eq('pcf_id', pcf.id)
+        .order('is_primary', { ascending: false })
+        .order('name')
+    : { data: [] as any[] };
+
   const dossier = buildDossier({
     product: { id: product.id, name: product.name },
     pcf: pcf as any,
     materials: (materials ?? []) as any,
     facilityCount: facilityCount ?? 0,
+    scenarios: (scenarios ?? []) as any,
   });
 
   // Whether this could be shared today, and if not which of the two reasons

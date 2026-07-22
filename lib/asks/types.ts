@@ -44,7 +44,10 @@ export type AskType =
   // be steps in the compliance wizard, asked in ISO vocabulary before the user
   // had any way to know what the words meant.
   | 'dossier_boundary'
-  | 'dossier_gap_distribution';
+  | 'dossier_gap_distribution'
+  // Asked once per product that sells more than one way: the sales split is
+  // what turns the headline from "the main route" into the weighted mix.
+  | 'dossier_sales_split';
 
 export interface AskTarget {
   table: string;
