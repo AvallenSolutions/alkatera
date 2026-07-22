@@ -90,6 +90,34 @@ const LABEL = createMockPackaging({
   confidence_score: 75,
 });
 
+// Distribution reaches for the browser client to look up a DEFRA freight factor
+// in staging_emission_factors. Pinning the seeded DEFRA 2025 value here keeps
+// the leg arithmetic (kg → tonnes × km × factor) under test rather than
+// stubbing the distribution stage out entirely.
+vi.mock('../supabase/browser-client', () => ({
+  getSupabaseBrowserClient: () => ({
+    from: () => {
+      const chain: Record<string, unknown> = {
+        select: () => chain,
+        eq: () => chain,
+        maybeSingle: async () => ({
+          data: { co2_factor: 0.062, source: 'DEFRA 2025', metadata: {} },
+          error: null,
+        }),
+      };
+      return chain;
+    },
+  }),
+}));
+
+const DISTRIBUTION_CONFIG = {
+  productWeightKg: 0.545,
+  legs: [
+    { id: 'leg-1', label: 'Factory to distribution centre', transportMode: 'truck' as const, distanceKm: 200 },
+    { id: 'leg-2', label: 'Distribution centre to retail', transportMode: 'truck' as const, distanceKm: 150 },
+  ],
+};
+
 const MOCK_PCF = createMockPCF({ system_boundary: 'cradle-to-grave' });
 const MOCK_PRODUCT = createMockProduct({ unit_size_value: 330, unit_size_unit: 'ml' });
 
@@ -109,6 +137,76 @@ const EOL_CONFIG = {
     paper: { recycling: 82, landfill: 3, incineration: 10, composting: 3, anaerobic_digestion: 2 },
   },
 };
+
+// ============================================================================
+// GOLDEN VALUES
+// ============================================================================
+
+/**
+ * CAPTURED, NOT HAND-DERIVED.
+ *
+ * Read straight out of `aggregateProductImpacts` running against the fixtures
+ * in this file (capture run 2026-07-22, redesign branch, on top of the
+ * downstream-stage extraction in `lib/lca/downstream-stages.ts`). They record
+ * what the engine does, not what anyone wishes it did: a failure here means the
+ * engine moved, and the job is to explain the move before re-capturing.
+ *
+ * Why exact values: the downstream stages in this suite were asserted only
+ * directionally (`toBeGreaterThan(0)`, `not.toBe(0)`). A mutation inflating
+ * end-of-life by 50% passed all 102 tests across the aggregator suites, so
+ * distribution, use-phase and end-of-life drift never reached CI.
+ * `lib/lca/__tests__/downstream-stages.test.ts` set the pattern.
+ *
+ * Keys name the scenario: materials × boundary × EoL allocation.
+ */
+const GOLDEN = {
+  /** [MALT, ALU_CAN] at cradle-to-grave, cut-off EoL, no distribution. */
+  grave_malt_can_cutoff: {
+    distribution: 0,
+    use_phase: 0.004871723200000001,
+    end_of_life: 0.00011774999999999999,
+    raw_materials: 0.46,
+    packaging: 0.23,
+    total: 0.6949894732,
+    fossil: 0.6374894732,
+    biogenic: 0.0575,
+  },
+  /** [ALU_CAN] alone, avoided-burden opt-in: the recycling credit shows up. */
+  grave_can_avoided: {
+    end_of_life: -0.01675725,
+    eol_gross: 0.00011774999999999999,
+    eol_avoided: -0.016875,
+  },
+  /** [ALU_CAN] alone, cut-off default: gross disposal only. */
+  grave_can_cutoff: {
+    end_of_life: 0.00011774999999999999,
+  },
+  /** [ALU_CAN, LABEL]: aluminium (fossil) plus paper (biogenic) EoL. */
+  grave_can_label_cutoff: {
+    end_of_life: 0.000465,
+    eol_can: 0.00011774999999999999,
+    eol_label: 0.00034725,
+    biogenic: 0.008847250000000001,
+  },
+  /** [MALT, ALU_CAN] at cradle-to-consumer: use phase in, EoL out. */
+  consumer_malt_can: {
+    use_phase: 0.004871723200000001,
+    end_of_life: 0,
+  },
+  /** [MALT, ALU_CAN] at cradle-to-shelf WITH distribution. */
+  shelf_malt_can_dist: {
+    distribution: 0.011827,
+    use_phase: 0.0015205806, // retail chiller share only, no consumer fridge
+    end_of_life: 0,
+  },
+  /** [MALT, ALU_CAN] at cradle-to-grave WITH distribution: every stage live. */
+  grave_malt_can_dist: {
+    distribution: 0.011827,
+    use_phase: 0.004871723200000001,
+    end_of_life: 0.00011774999999999999,
+    total: 0.7068164732000001,
+  },
+} as const;
 
 // ============================================================================
 // TEST SETUP
@@ -421,6 +519,70 @@ describe('Product LCA Aggregator', () => {
   // END-OF-LIFE: PACKAGING ONLY (HIGH FIX #6)
   // --------------------------------------------------------------------------
 
+  // --------------------------------------------------------------------------
+  // DISTRIBUTION
+  // --------------------------------------------------------------------------
+
+  describe('Distribution', () => {
+    it('is exactly the two-leg freight total once the boundary includes it', async () => {
+      setupFromMock([MALT, ALU_CAN]);
+      const { aggregateProductImpacts } = await import('../product-lca-aggregator');
+      const result = await aggregateProductImpacts(
+        mockSupabaseClient as any,
+        'pcf-001',
+        [],
+        'cradle-to-grave',
+        USE_PHASE_CONFIG,
+        EOL_CONFIG,
+        DISTRIBUTION_CONFIG,
+      );
+
+      const stages = result.impacts.breakdown.by_lifecycle_stage;
+      // 0.545 kg ÷ 1000 × 350 km × 0.062 kg CO2e/tonne-km, rounded per leg.
+      expect(stages.distribution).toBe(GOLDEN.grave_malt_can_dist.distribution);
+      expect(stages.use_phase).toBe(GOLDEN.grave_malt_can_dist.use_phase);
+      expect(stages.end_of_life).toBe(GOLDEN.grave_malt_can_dist.end_of_life);
+      expect(result.total_carbon_footprint).toBe(GOLDEN.grave_malt_can_dist.total);
+    });
+
+    it('carries the retail chiller share but no consumer stages at cradle-to-shelf', async () => {
+      setupFromMock([MALT, ALU_CAN]);
+      const { aggregateProductImpacts } = await import('../product-lca-aggregator');
+      const result = await aggregateProductImpacts(
+        mockSupabaseClient as any,
+        'pcf-001',
+        [],
+        'cradle-to-shelf',
+        USE_PHASE_CONFIG,
+        EOL_CONFIG,
+        DISTRIBUTION_CONFIG,
+      );
+
+      const stages = result.impacts.breakdown.by_lifecycle_stage;
+      expect(stages.distribution).toBe(GOLDEN.shelf_malt_can_dist.distribution);
+      // Retail refrigeration only: the shelf boundary stops before the
+      // consumer's fridge and before the carbonation release.
+      expect(stages.use_phase).toBe(GOLDEN.shelf_malt_can_dist.use_phase);
+      expect(stages.end_of_life).toBe(GOLDEN.shelf_malt_can_dist.end_of_life);
+    });
+
+    it('is zero at cradle-to-gate even when a config is supplied', async () => {
+      setupFromMock([MALT, ALU_CAN]);
+      const { aggregateProductImpacts } = await import('../product-lca-aggregator');
+      const result = await aggregateProductImpacts(
+        mockSupabaseClient as any,
+        'pcf-001',
+        [],
+        'cradle-to-gate',
+        USE_PHASE_CONFIG,
+        EOL_CONFIG,
+        DISTRIBUTION_CONFIG,
+      );
+
+      expect(result.impacts.breakdown.by_lifecycle_stage.distribution).toBe(0);
+    });
+  });
+
   describe('End-of-life — packaging only', () => {
     it('EoL is applied to packaging (aluminium can), not to malt ingredient', async () => {
       setupFromMock([MALT, ALU_CAN]);
@@ -437,11 +599,16 @@ describe('Product LCA Aggregator', () => {
       expect(result.success).toBe(true);
       const eol = result.impacts.breakdown.by_lifecycle_stage.end_of_life;
 
-      // EoL should be non-zero (from aluminium can)
-      expect(eol).not.toBe(0);
+      // Exactly 15 g of aluminium on the EU 75/10/15 split under cut-off. The
+      // old pair of assertions (`not.toBe(0)` plus `abs(eol) < 0.1`) let a 50%
+      // inflation of the entire stage through, so the malt-exclusion claim this
+      // test is named after was never actually checked.
+      expect(eol).toBe(GOLDEN.grave_malt_can_cutoff.end_of_life);
 
-      // EoL should be small (15g aluminium only, not 500g malt)
-      expect(Math.abs(eol)).toBeLessThan(0.1);
+      // The can is the only EoL row: malt is consumed in processing.
+      const rows = (result.impacts as any).eol_material_breakdown as any[];
+      expect(rows.map(r => r.material)).toEqual(['Aluminium Can 330ml']);
+      expect(rows[0].massKg).toBe(0.015);
     });
 
     it('EoL with high recycling produces net negative ONLY under explicit avoided-burden opt-in', async () => {
@@ -459,8 +626,15 @@ describe('Product LCA Aggregator', () => {
       );
 
       const eol = result.impacts.breakdown.by_lifecycle_stage.end_of_life;
-      // Aluminium with 75% recycling → net negative credit
-      expect(eol).toBeLessThan(0);
+      // Aluminium with 75% recycling → net negative credit, exactly this much.
+      expect(eol).toBe(GOLDEN.grave_can_avoided.end_of_life);
+
+      // net = gross + avoided, and both halves are pinned: a sign flip or a
+      // scaled credit changes one of them without necessarily changing the sign.
+      const row = ((result.impacts as any).eol_material_breakdown as any[])[0];
+      expect(row.grossEmissions).toBe(GOLDEN.grave_can_avoided.eol_gross);
+      expect(row.avoidedEmissions).toBe(GOLDEN.grave_can_avoided.eol_avoided);
+      expect(row.allocationMethod).toBe('avoided-burden');
     });
 
     it('EoL defaults to cut-off: no recycling credit, non-negative stage', async () => {
@@ -476,7 +650,12 @@ describe('Product LCA Aggregator', () => {
       );
 
       const eol = result.impacts.breakdown.by_lifecycle_stage.end_of_life;
-      expect(eol).toBeGreaterThanOrEqual(0);
+      expect(eol).toBe(GOLDEN.grave_can_cutoff.end_of_life);
+      // Same can, same pathways as the avoided-burden case above: only the
+      // credit is withheld, so cut-off must equal that case's GROSS exactly.
+      expect(eol).toBe(GOLDEN.grave_can_avoided.eol_gross);
+      const row = ((result.impacts as any).eol_material_breakdown as any[])[0];
+      expect(row.avoidedEmissions === 0).toBe(true); // `===` because the engine produces -0
     });
 
     it('[Maturation] rows are excluded from EoL even though they are synthetic', async () => {
@@ -513,8 +692,22 @@ describe('Product LCA Aggregator', () => {
         EOL_CONFIG,
       );
 
-      // Both aluminium and paper label should contribute to EoL
-      expect(result.impacts.breakdown.by_lifecycle_stage.end_of_life).not.toBe(0);
+      // Both aluminium and paper label contribute, and the stage is exactly
+      // their sum — `not.toBe(0)` would still pass if the label were dropped.
+      const stages = result.impacts.breakdown.by_lifecycle_stage;
+      expect(stages.end_of_life).toBe(GOLDEN.grave_can_label_cutoff.end_of_life);
+
+      const rows = (result.impacts as any).eol_material_breakdown as any[];
+      const can = rows.find(r => r.material === 'Aluminium Can 330ml');
+      const label = rows.find(r => r.material === 'Paper Label');
+      expect(can.netEmissions).toBe(GOLDEN.grave_can_label_cutoff.eol_can);
+      expect(label.netEmissions).toBe(GOLDEN.grave_can_label_cutoff.eol_label);
+      expect(label.factorKey).toBe('paper');
+
+      // ISO 14067 §6.4.9: the paper label's disposal is biogenic carbon, the
+      // can's is fossil. Booking one as the other moves no total, so only the
+      // origin split can catch it.
+      expect(result.impacts.total_climate_biogenic).toBe(GOLDEN.grave_can_label_cutoff.biogenic);
     });
   });
 
@@ -563,8 +756,8 @@ describe('Product LCA Aggregator', () => {
         USE_PHASE_CONFIG,
       );
 
-      expect(result.impacts.breakdown.by_lifecycle_stage.use_phase).toBeGreaterThan(0);
-      expect(result.impacts.breakdown.by_lifecycle_stage.end_of_life).toBe(0);
+      expect(result.impacts.breakdown.by_lifecycle_stage.use_phase).toBe(GOLDEN.consumer_malt_can.use_phase);
+      expect(result.impacts.breakdown.by_lifecycle_stage.end_of_life).toBe(GOLDEN.consumer_malt_can.end_of_life);
     });
 
     it('cradle-to-grave: both use-phase and EoL included', async () => {
@@ -579,8 +772,10 @@ describe('Product LCA Aggregator', () => {
         EOL_CONFIG,
       );
 
-      expect(result.impacts.breakdown.by_lifecycle_stage.use_phase).toBeGreaterThan(0);
-      expect(result.impacts.breakdown.by_lifecycle_stage.end_of_life).not.toBe(0);
+      const stages = result.impacts.breakdown.by_lifecycle_stage;
+      expect(stages.use_phase).toBe(GOLDEN.grave_malt_can_cutoff.use_phase);
+      expect(stages.end_of_life).toBe(GOLDEN.grave_malt_can_cutoff.end_of_life);
+      expect(result.total_carbon_footprint).toBe(GOLDEN.grave_malt_can_cutoff.total);
     });
 
     it('defaults to cradle-to-gate when no boundary specified', async () => {

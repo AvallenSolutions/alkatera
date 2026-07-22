@@ -95,6 +95,35 @@ async function runAggregator(): Promise<AggregationResult> {
 const findEol = (result: AggregationResult, name: string) =>
   ((result.impacts as any)?.eol_material_breakdown as any[] | undefined)?.find(m => m.material === name);
 
+const stageEol = (result: AggregationResult) =>
+  result.impacts!.breakdown!.by_lifecycle_stage!.end_of_life;
+
+/**
+ * CAPTURED, NOT HAND-DERIVED.
+ *
+ * Read straight out of `aggregateProductImpacts` running against the fixtures
+ * in this file (capture run 2026-07-22, redesign branch, on top of the
+ * downstream-stage extraction in `lib/lca/downstream-stages.ts`). A failure
+ * here means the engine moved; explain the move before re-capturing.
+ *
+ * Why exact values: the ratio assertions this suite is built on
+ * (`shared.netEmissions ≈ full.netEmissions / 4`) hold under any uniform
+ * scaling of the stage, so a mutation inflating end-of-life by 50% sailed
+ * through them. The divisor and the absolute burden both need pinning.
+ * `lib/lca/__tests__/downstream-stages.test.ts` set the pattern.
+ *
+ * All UK region, cut-off allocation, zero production-side impacts, so the
+ * end-of-life stage total IS the sum of these rows.
+ */
+const GOLDEN = {
+  /** 0.134 kg carton ÷ 4 bottles = 0.0335 kg, paper factors at UK 74/5/15/4/2. */
+  box_shared_4: 0.0058909750000000006,
+  /** The same carton un-shared: exactly 4× the above. */
+  box_full: 0.023563900000000002,
+  /** 0.23 kg flint glass, never amortised despite its stray units_per_group. */
+  glass_bottle: 0.0018285,
+} as const;
+
 describe('Shared-packaging EoL allocation', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
@@ -107,33 +136,58 @@ describe('Shared-packaging EoL allocation', () => {
     expect(box.recyclingPct).toBeGreaterThan(60);
   });
 
-  it('divides the carton EoL mass by units_per_group', async () => {
+  it('divides the carton EoL mass AND burden by units_per_group', async () => {
     mockMaterials([makeBox(4)]);
-    const box = findEol(await runAggregator(), '4 × 420ml box');
+    const result = await runAggregator();
+    const box = findEol(result, '4 × 420ml box');
     // 0.134 kg carton ÷ 4 bottles = 0.0335 kg per bottle.
-    expect(box.massKg).toBeCloseTo(0.0335, 4);
+    expect(box.massKg).toBe(0.0335);
+    // And the burden that mass carries, in absolute terms. A ratio assertion
+    // alone survives any uniform inflation of the stage.
+    expect(box.netEmissions).toBe(GOLDEN.box_shared_4);
+    expect(box.grossEmissions).toBe(GOLDEN.box_shared_4);
+    expect(box.avoidedEmissions === 0).toBe(true); // cut-off; `===` because it is -0
+    // Nothing else in this fixture has an impact, so the stage IS this row.
+    expect(stageEol(result)).toBe(GOLDEN.box_shared_4);
   });
 
   it('carton EoL net scales 1/units_per_group (4-pack vs un-shared)', async () => {
     mockMaterials([makeBox(4)]);
-    const shared = findEol(await runAggregator(), '4 × 420ml box');
+    const sharedResult = await runAggregator();
+    const shared = findEol(sharedResult, '4 × 420ml box');
 
     vi.clearAllMocks();
     mockMaterials([makeBox(1)]);
-    const full = findEol(await runAggregator(), '4 × 420ml box');
+    const fullResult = await runAggregator();
+    const full = findEol(fullResult, '4 × 420ml box');
 
-    expect(full.massKg).toBeCloseTo(0.134, 4);
-    // EoL is linear in mass, so the 4-pack share is exactly 1/4 of the full carton.
-    expect(shared.netEmissions).toBeCloseTo(full.netEmissions / 4, 6);
-    expect(shared.massKg).toBeCloseTo(full.massKg / 4, 6);
+    expect(full.massKg).toBe(0.134);
+    expect(full.netEmissions).toBe(GOLDEN.box_full);
+    expect(stageEol(fullResult)).toBe(GOLDEN.box_full);
+
+    // EoL is linear in mass, so the 4-pack share is exactly 1/4 of the full
+    // carton. Kept alongside the absolute values: the ratio pins the divisor,
+    // the absolutes pin the burden. Neither catches the other's regression.
+    expect(shared.netEmissions).toBeCloseTo(full.netEmissions / 4, 12);
+    expect(shared.massKg).toBe(full.massKg / 4);
   });
 
   it('does NOT amortise primary packaging even when units_per_group is set', async () => {
     mockMaterials([GLASS_BOTTLE]);
-    const glass = findEol(await runAggregator(), '420ml flint glass bottle');
+    const result = await runAggregator();
+    const glass = findEol(result, '420ml flint glass bottle');
     expect(glass).toBeDefined();
     // Full per-bottle mass retained despite the stray units_per_group=4.
-    expect(glass.massKg).toBeCloseTo(0.230, 4);
+    expect(glass.massKg).toBe(0.230);
     expect(glass.factorKey).toBe('glass');
+    expect(glass.netEmissions).toBe(GOLDEN.glass_bottle);
+    expect(stageEol(result)).toBe(GOLDEN.glass_bottle);
+  });
+
+  it('sums a shared carton and an un-amortised bottle into one stage total', async () => {
+    // Both allocation rules firing at once, which is the real multipack case.
+    mockMaterials([makeBox(4), GLASS_BOTTLE]);
+    const result = await runAggregator();
+    expect(stageEol(result)).toBe(GOLDEN.box_shared_4 + GOLDEN.glass_bottle);
   });
 });

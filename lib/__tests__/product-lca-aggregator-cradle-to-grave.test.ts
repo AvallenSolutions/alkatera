@@ -18,6 +18,37 @@ import type { AggregationResult } from '../product-lca-aggregator';
 // SUPABASE MOCK
 // ============================================================================
 
+// Distribution reaches for the browser client to look up a DEFRA freight factor
+// in staging_emission_factors. Pinning the factor here (the seeded DEFRA 2025
+// values) keeps the leg arithmetic — kg → tonnes × km × factor — under test
+// instead of stubbing the whole distribution stage out.
+const DEFRA_FREIGHT_FACTORS: Record<string, number> = {
+  'Freight - Road (HGV, Average laden)': 0.062,
+  'Freight - Sea (Container ship, Average)': 0.011,
+};
+
+vi.mock('../supabase/browser-client', () => ({
+  getSupabaseBrowserClient: () => ({
+    from: () => {
+      let factorName = '';
+      const chain: Record<string, unknown> = {
+        select: () => chain,
+        eq: (_col: string, value: string) => {
+          if (value in DEFRA_FREIGHT_FACTORS) factorName = value;
+          return chain;
+        },
+        maybeSingle: async () => ({
+          data: factorName
+            ? { co2_factor: DEFRA_FREIGHT_FACTORS[factorName], source: 'DEFRA 2025', metadata: {} }
+            : null,
+          error: null,
+        }),
+      };
+      return chain;
+    },
+  }),
+}));
+
 const mockSupabaseClient = {
   from: vi.fn(),
 };
@@ -99,14 +130,24 @@ const MOCK_EOL_CONFIG = {
   },
 };
 
-// Use-phase: 330ml can, beer stored refrigerated 7 days
+// Use-phase: 330ml can, beer stored refrigerated 7 days.
+//
+// Both field names here were once wrong and both failed silently:
+//   - `retailFraction` is not a UsePhaseConfig field (it is
+//     `retailRefrigerationSplit`), so the retail/domestic chiller split fell
+//     back to its 0.5 default and happened to match by luck.
+//   - `carbonationType: 'beer_cider'` is not a member of the union
+//     ('beer' | 'sparkling_wine' | 'soft_drink'). CARBONATION_FACTORS had no
+//     such key, so carbonation resolved to ZERO and the fossil/biogenic
+//     carbonation split this fixture exists to exercise was never exercised.
+// Fixed to the real field names so the numbers below are the real numbers.
 const MOCK_USE_PHASE_CONFIG = {
   needsRefrigeration: true,
   refrigerationDays: 7,
-  retailFraction: 0.5,
+  retailRefrigerationSplit: 0.5,
   consumerCountryCode: 'GB',
   isCarbonated: true,
-  carbonationType: 'beer_cider' as const,
+  carbonationType: 'beer' as const,
 };
 
 // Product (330ml volume for use-phase calculation)
@@ -115,12 +156,92 @@ const MOCK_PRODUCT = {
   unit_size_unit: 'ml',
 };
 
+// Distribution: a national two-leg journey for a 545 g packed unit
+// (330 ml liquid + 15 g can). Shaped like the DISTRIBUTION_SCENARIOS.national
+// preset so the numbers below stay recognisable against the wizard.
+const MOCK_DISTRIBUTION_CONFIG = {
+  productWeightKg: 0.545,
+  legs: [
+    { id: 'leg-1', label: 'Factory to distribution centre', transportMode: 'truck' as const, distanceKm: 200 },
+    { id: 'leg-2', label: 'Distribution centre to retail', transportMode: 'truck' as const, distanceKm: 150 },
+  ],
+};
+
 // PCF record
 const MOCK_PCF = {
   product_id: 'prod-beer-001',
   organization_id: 'org-001',
   system_boundary: 'cradle-to-grave',
 };
+
+// ============================================================================
+// GOLDEN VALUES
+// ============================================================================
+
+/**
+ * CAPTURED, NOT HAND-DERIVED.
+ *
+ * Every number below was read straight out of `aggregateProductImpacts` running
+ * against the fixtures in this file (capture run 2026-07-22, redesign branch,
+ * on top of the downstream-stage extraction in `lib/lca/downstream-stages.ts`).
+ * They are a photograph of what the engine actually produces, not a target it
+ * is being asked to hit — so a failure here means the engine moved, and the
+ * only correct response is to work out WHY before re-capturing.
+ *
+ * Why exact values: this suite used to assert downstream stages only
+ * directionally (`toBeGreaterThan(0)`, `not.toBe(0)`, `abs(...) < 0.1`). A
+ * mutation inflating end-of-life by 50% passed all 102 tests across the
+ * aggregator suites, so value drift in distribution, use phase and end of life
+ * was invisible to CI. `lib/lca/__tests__/downstream-stages.test.ts` set the
+ * pattern; this file follows it.
+ *
+ * Fixture basis: 0.5 kg Pale Malt + a 15 g aluminium can, 330 ml, GB grid,
+ * 7 days chilled at a 50/50 retail/domestic split, beer carbonation, EU
+ * end-of-life at 70/15/10/5 for aluminium, two truck legs totalling 350 km at
+ * 545 g packed weight.
+ */
+const GOLDEN = {
+  'cradle-to-gate': {
+    distribution: 0,
+    use_phase: 0,
+    end_of_life: 0,
+    raw_materials: 0.46,
+    packaging: 0.23,
+    total: 0.6900000000000001,
+    fossil: 0.635,
+    biogenic: 0.055,
+  },
+  'cradle-to-shelf': {
+    distribution: 0.011827,
+    use_phase: 0.0015205806, // retail chiller share only: no consumer fridge, no carbonation
+    end_of_life: 0,
+    raw_materials: 0.46,
+    packaging: 0.23,
+    total: 0.7033475806000001,
+    fossil: 0.6483475806000001,
+    biogenic: 0.055,
+  },
+  'cradle-to-consumer': {
+    distribution: 0.011827,
+    use_phase: 0.004871723200000001, // retail + domestic chiller + 2.5 g carbonation
+    end_of_life: 0,
+    raw_materials: 0.46,
+    packaging: 0.23,
+    total: 0.7066987232,
+    fossil: 0.6491987232,
+    biogenic: 0.0575, // 0.055 material + 0.0025 biogenic fermentation CO2
+  },
+  'cradle-to-grave': {
+    distribution: 0.011827,
+    use_phase: 0.004871723200000001,
+    end_of_life: 0.00011774999999999999, // cut-off: gross disposal only, no recycling credit
+    raw_materials: 0.46,
+    packaging: 0.23,
+    total: 0.7068164732000001,
+    fossil: 0.6493164732000001,
+    biogenic: 0.0575,
+  },
+} as const;
 
 // ============================================================================
 // TEST SUITE
@@ -190,8 +311,10 @@ describe('Cradle-to-Grave LCA Aggregator', () => {
     expect(result.success).toBe(true);
 
     const usePhase = result.impacts?.breakdown?.by_lifecycle_stage?.use_phase ?? 0;
-    // Use-phase should be > 0 for refrigerated carbonated beer
-    expect(usePhase).toBeGreaterThan(0);
+    // Refrigerated carbonated beer: exact value, not merely "> 0". Without a
+    // distributionConfig here the stage is use phase only, so this is the same
+    // number as GOLDEN['cradle-to-consumer'].
+    expect(usePhase).toBe(GOLDEN['cradle-to-consumer'].use_phase);
 
     // Total should be more than just material emissions
     const materialOnly = MALT_INGREDIENT.impact_climate + ALUMINIUM_CAN_PACKAGING.impact_climate;
@@ -239,15 +362,14 @@ describe('Cradle-to-Grave LCA Aggregator', () => {
 
     const eolEmissions = graveResult.impacts?.breakdown?.by_lifecycle_stage?.end_of_life ?? 0;
 
-    // With 70% recycling, aluminium EoL can be negative (recycling credit)
-    // It should NOT be zero (that would mean EoL wasn't computed)
-    expect(eolEmissions).not.toBe(0);
+    // Exact: 15 g of aluminium disposed on the EU 70/15/10/5 split under
+    // cut-off. `abs(...) < 0.1` used to pass here, which meant a 50% inflation
+    // of the whole stage still looked fine — the malt-exclusion claim this test
+    // makes was never actually being checked.
+    expect(eolEmissions).toBe(GOLDEN['cradle-to-grave'].end_of_life);
 
-    // EoL contribution should only reflect aluminium (15g), not malt (500g)
-    // If malt were included, EoL would be unrealistically large (hundreds of grams × food waste factors)
-    // 500g of organic matter at organic waste factor ≈ 0.1 kg CO2e/kg → would add 0.05 kg CO2e
-    // Check that eolEmissions is small (magnitude comparable to packaging mass, not ingredient mass)
-    expect(Math.abs(eolEmissions)).toBeLessThan(0.1); // Should be << 0.05 kg CO2e for 15g Al
+    // And the gate control has none of it at all.
+    expect(gateResult.impacts?.breakdown?.by_lifecycle_stage?.end_of_life).toBe(0);
   });
 
   it('stage breakdown is internally consistent: each stage contribution is non-negative for normal materials', async () => {
@@ -267,16 +389,17 @@ describe('Cradle-to-Grave LCA Aggregator', () => {
     expect(stages).toBeDefined();
 
     // Raw materials and packaging should be positive (they have emissions)
-    expect(stages!.raw_materials).toBeGreaterThan(0);
-    expect(stages!.packaging).toBeGreaterThan(0);
+    expect(stages!.raw_materials).toBe(GOLDEN['cradle-to-grave'].raw_materials);
+    expect(stages!.packaging).toBe(GOLDEN['cradle-to-grave'].packaging);
 
-    // Use phase should be positive (refrigeration for 7 days)
-    expect(stages!.use_phase).toBeGreaterThan(0);
+    // Use phase: refrigeration for 7 days plus carbonation release.
+    expect(stages!.use_phase).toBe(GOLDEN['cradle-to-grave'].use_phase);
 
     // End-of-life defaults to CUT-OFF allocation (no recycling credit): the
     // recycled-content benefit is claimed once, on the input side, so EoL is
     // gross disposal emissions only and must be non-negative. Avoided-burden
     // is now an explicit opt-in via eolConfig.allocationMethod.
+    expect(stages!.end_of_life).toBe(GOLDEN['cradle-to-grave'].end_of_life);
     expect(stages!.end_of_life).toBeGreaterThan(0);
 
     // Total is reported separately and doesn't need to exactly equal stage sum
@@ -322,6 +445,67 @@ describe('Cradle-to-Grave LCA Aggregator', () => {
     // totalClimate = materialClimateSum (no facility, no use-phase, no EoL for gate)
     // Transport is in stage buckets but NOT in totalClimate — so materialSum matches total
     expect(materialSum).toBeCloseTo(result.total_carbon_footprint, 3);
+  });
+
+  // ── Exact downstream stage values, per boundary ───────────────────────────
+
+  for (const [boundary, expected] of Object.entries(GOLDEN)) {
+    it(`pins every stage value at ${boundary}`, async () => {
+      const { aggregateProductImpacts } = await import('../product-lca-aggregator');
+      const result: AggregationResult = await aggregateProductImpacts(
+        mockSupabaseClient as any,
+        'pcf-001',
+        [],
+        boundary,
+        MOCK_USE_PHASE_CONFIG,
+        MOCK_EOL_CONFIG,
+        MOCK_DISTRIBUTION_CONFIG,
+      );
+
+      expect(result.success).toBe(true);
+      const stages = result.impacts!.breakdown!.by_lifecycle_stage as Record<string, number>;
+
+      expect(stages.distribution).toBe(expected.distribution);
+      expect(stages.use_phase).toBe(expected.use_phase);
+      expect(stages.end_of_life).toBe(expected.end_of_life);
+      expect(stages.raw_materials).toBe(expected.raw_materials);
+      expect(stages.packaging).toBe(expected.packaging);
+      expect(result.total_carbon_footprint).toBe(expected.total);
+      expect(result.impacts!.total_climate_fossil).toBe(expected.fossil);
+      expect(result.impacts!.total_climate_biogenic).toBe(expected.biogenic);
+    });
+  }
+
+  it('books the whole aluminium can EoL at exact mass and pathway split', async () => {
+    const { aggregateProductImpacts } = await import('../product-lca-aggregator');
+    const result: AggregationResult = await aggregateProductImpacts(
+      mockSupabaseClient as any,
+      'pcf-001',
+      [],
+      'cradle-to-grave',
+      MOCK_USE_PHASE_CONFIG,
+      MOCK_EOL_CONFIG,
+      MOCK_DISTRIBUTION_CONFIG,
+    );
+
+    const rows = (result.impacts as any)?.eol_material_breakdown as any[] | undefined;
+    expect(rows).toBeDefined();
+    // Malt is consumed in processing, so exactly one row: the can.
+    expect(rows!.length).toBe(1);
+    const can = rows![0];
+    expect(can.material).toBe('Aluminium Can 330ml');
+    expect(can.massKg).toBe(0.015);
+    expect(can.factorKey).toBe('aluminium');
+    expect(can.recyclingPct).toBe(70);
+    expect(can.landfillPct).toBe(15);
+    expect(can.incinerationPct).toBe(10);
+    expect(can.compostingPct).toBe(5);
+    expect(can.allocationMethod).toBe('cut-off');
+    expect(can.grossEmissions).toBe(0.00011774999999999999);
+    // Cut-off claims the recycling credit on the input side, so nothing is
+    // avoided here. Compared with `===` because the engine produces -0.
+    expect(can.avoidedEmissions === 0).toBe(true);
+    expect(can.netEmissions).toBe(0.00011774999999999999);
   });
 
   it('warns when use-phase config is missing for consumer boundary', async () => {

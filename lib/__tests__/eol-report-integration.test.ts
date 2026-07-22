@@ -14,6 +14,65 @@ import { calculateMaterialEoL, getMaterialFactorKey, getRegionalDefaults, EOL_FA
 
 describe('EoL Report Transparency Integration', () => {
 
+  // ── Fix #0: the numbers themselves ────────────────────────────────────────
+
+  describe('Absolute end-of-life values per kg', () => {
+    /**
+     * CAPTURED, NOT HAND-DERIVED.
+     *
+     * `[gross, avoided, net]` in kg CO2e for 1.0 kg of each material, read
+     * straight out of `calculateMaterialEoL` (capture run 2026-07-22, redesign
+     * branch). A failure here means the EOL_FACTORS table, the REGIONAL_DEFAULTS
+     * splits, the collection-transport term or the pathway arithmetic moved.
+     * Work out which before re-capturing: every one of those changes every
+     * customer's published end-of-life figure.
+     *
+     * Why exact values: everything else in this file is either relational
+     * (`aluminium.avoided` bigger than `glass.avoided`) or recomputes the
+     * expectation from the same constants it is checking. Both survive a
+     * uniform inflation of the stage — a mutation adding 50% to end-of-life
+     * passed all 102 tests across these suites. `lib/lca/__tests__/
+     * downstream-stages.test.ts` set the pattern this follows.
+     */
+    const PER_KG: Record<string, readonly [number, number, number]> = {
+      eu_glass: [0.007750000000000001, -0.26599999999999996, -0.25825],
+      eu_aluminium: [0.007750000000000001, -1.1400000000000001, -1.1322500000000002],
+      eu_pet: [0.8218499999999999, -0.0168, 0.8050499999999998],
+      eu_paper: [0.09975, -0.0084, 0.09135],
+      eu_cork: [0.13885, -0.002, 0.13685],
+      uk_glass: [0.00795, -0.259, -0.25105],
+      uk_aluminium: [0.008150000000000001, -1.08, -1.07185],
+      uk_pet: [1.07135, -0.0152, 1.05615],
+      uk_paper: [0.17584999999999998, -0.0074, 0.16845],
+      uk_cork: [0.13485, -0.0016, 0.13325],
+      us_glass: [0.01225, -0.1085, -0.09625],
+      us_aluminium: [0.010350000000000002, -0.75, -0.73965],
+      us_pet: [0.33335, -0.0116, 0.32175],
+      us_paper: [0.26180000000000003, -0.0068000000000000005, 0.255],
+      us_cork: [0.2085, -0.001, 0.2075],
+    };
+
+    for (const [key, [gross, avoided, net]] of Object.entries(PER_KG)) {
+      const [region, material] = key.split('_') as ['eu' | 'uk' | 'us', string];
+      it(`pins ${material} at ${region.toUpperCase()} under avoided-burden`, () => {
+        const result = calculateMaterialEoL(1.0, material, region);
+        expect(result.gross).toBe(gross);
+        expect(result.avoided).toBe(avoided);
+        expect(result.net).toBe(net);
+      });
+
+      it(`pins ${material} at ${region.toUpperCase()} under cut-off`, () => {
+        // Cut-off withholds the credit and nothing else, so net must land
+        // exactly on the avoided-burden gross.
+        const result = calculateMaterialEoL(1.0, material, region, undefined, {
+          allocationMethod: 'cut-off',
+        });
+        expect(result.avoided === 0).toBe(true); // `===` because the engine produces -0
+        expect(result.net).toBe(gross);
+      });
+    }
+  });
+
   // ── Fix #1: EoL Methodology data completeness ─────────────────────
 
   describe('EoL Methodology data', () => {
@@ -166,7 +225,12 @@ describe('EoL Report Transparency Integration', () => {
       expect(typeof result.gross).toBe('number');
       expect(typeof result.net).toBe('number');
 
-      // For aluminium, net should be negative (strong recycling credit)
+      // For aluminium, net should be negative (strong recycling credit).
+      // 0.015 kg is a 330 ml can, and EoL is linear in mass, so these are the
+      // per-kg golden values above scaled by 0.015.
+      expect(result.gross).toBeCloseTo(0.007750000000000001 * 0.015, 12);
+      expect(result.avoided).toBeCloseTo(-1.1400000000000001 * 0.015, 12);
+      expect(result.net).toBeCloseTo(-1.1322500000000002 * 0.015, 12);
       expect(result.net).toBeLessThan(0);
       expect(result.avoided).toBeLessThan(result.net); // Avoided is more negative than net
     });
