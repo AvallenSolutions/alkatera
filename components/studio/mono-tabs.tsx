@@ -21,11 +21,30 @@ interface MonoTabsProps {
   className?: string;
 }
 
+/**
+ * Reduce an href or a pathname to a comparable form: no trailing slash, no
+ * query string. The room registry writes hrefs with a trailing slash
+ * ('/products/') while `usePathname()` returns none ('/products'), so a
+ * literal comparison matched nothing and NO tab has ever shown as active in
+ * any room. One href also carries a query ('/settings?tab=billing'), which a
+ * pathname never does.
+ */
+function comparablePath(value: string): string {
+  const withoutQuery = value.split('?')[0];
+  return withoutQuery.length > 1 ? withoutQuery.replace(/\/+$/, '') : withoutQuery;
+}
+
 /** Finds the tab whose href is the longest prefix of the current path. */
-function activeHref(pathname: string, tabs: RoomTab[]): string | undefined {
+export function activeHref(pathname: string, tabs: RoomTab[]): string | undefined {
+  const path = comparablePath(pathname);
   return tabs
-    .filter((t) => pathname === t.href || pathname.startsWith(`${t.href}/`))
-    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+    .filter((t) => {
+      const href = comparablePath(t.href);
+      // Longest-prefix, so a nested surface ('/products/liquids') lights its
+      // own tab rather than its parent's.
+      return path === href || path.startsWith(`${href}/`);
+    })
+    .sort((a, b) => comparablePath(b.href).length - comparablePath(a.href).length)[0]?.href;
 }
 
 /** The room's surfaces as mono tabs; the active one carries a 3px rule. */
