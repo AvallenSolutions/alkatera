@@ -84,6 +84,10 @@ Nothing. Tree committed and clean.
 
 ## Next
 
+0. **Sign in locally and click through the organisation switch** (`dev@local.test`,
+   credential in `LOCAL_DEV.md`). Switch org, hard reload, confirm it sticks, and
+   confirm the token claim moved. The fix in `2fb0aa73` is unverified in the browser
+   because the local session got logged out while diagnosing it.
 1. **Finish verifying the composition surface** — see the browser-pane note. The
    cheapest honest route is a Playwright/RTL test over `ComposeProductPage` driving
    the two picks and asserting the insert payload, rather than more time in the pane.
@@ -123,12 +127,15 @@ Nothing. Tree committed and clean.
     doing anything else, or the next three actions silently no-op.
   - `get_page_text` serves stale content after a client-side navigation; trust
     `javascript_tool` reading `location` and `innerText`.
-- **Switching organisation does not survive a hard reload** until the JWT refreshes,
-  because the org is resolved from `app_metadata` baked into the access token
-  (`/api/organizations/switch` says so in its own docblock). In-session it works
-  because the provider sets state directly. Navigate client-side after switching, or
-  wait for the token to roll. Worth a proper fix: the switch should call
-  `refreshSession()`.
+- **Switching organisation** — fixed in `2fb0aa73`, and worth knowing why. The active
+  org lives in `app_metadata`, baked into the access token, and that claim is what
+  `get_current_organization_id()`, RLS and `get_user_bootstrap` read. `updateUser` and
+  `refreshSession` both persist the session, so the old ordering raced two writes for
+  one cookie and could keep the stale claim — meaning the server answered as the old
+  tenant while the sidebar showed the new one. `activateOrganization` now does
+  app_metadata → user_metadata → one refresh, then verifies the claim moved.
+  If you touch this: never write the session twice in a switch, and never trust
+  `user.app_metadata` on the client object over the decoded token claim.
 - **Worktree discipline**: the shell's cwd reset to the session worktree mid-session
   again, and a test run silently executed in the wrong checkout. Use absolute paths
   under `.claude/worktrees/redesign`, or `pwd` first.
