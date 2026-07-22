@@ -142,14 +142,43 @@ Nothing. Tree committed and clean.
 - **Never merge `redesign` to `main`.** Netlify only builds main. Nothing is pushed.
 - **Local dev = local Supabase only.** No prod service-role key in this workspace.
 
+## Applied to staging
+
+Both migrations from the naming/scoping fix are **applied to `alkatera-staging`**
+(22 July 2026) and verified against the live data:
+
+- `pack_format_names` — 9 packs renamed to their container ("Bath Gin" →
+  "700ml Flint Glass Bottle"), `name_is_custom` added and false everywhere.
+- `liquids_are_drinks_only` — 20 liquids → 8, all 12 hospitality links removed,
+  and all 62 hospitality ingredient rows intact. `products.liquid_id` is
+  `ON DELETE SET NULL`, so deleting a liquid can never reach a product.
+
+Three packs now share the name "700ml Flint Glass Bottle". That is the honest
+answer: they are near-duplicates and `pack-identity` proposes the merge.
+
+Nothing was applied to `Alkatera2`, and nothing from the redesign should be.
+
 ## Pending Tim actions
 
-- **Staging migration history is inconsistent with its schema.** All five migrations
-  are on `alkatera-staging` (`vwhdyqvlgjqmlzmsvaes`), but the first four were pasted
-  into the SQL editor, which writes no row to `supabase_migrations.schema_migrations`.
-  Staging's recorded history still ends at `20260719140000`. A `db diff` against
-  staging will propose recreating tables that exist. Offered to backfill the four
-  rows; not yet done.
+- **Staging migration history is inconsistent with its schema — now measured exactly.**
+  Ten migration files from `20260719150000` onwards ARE applied to
+  `alkatera-staging` (`vwhdyqvlgjqmlzmsvaes`), each verified by checking that the object
+  it creates exists. The ledger does not match the filenames:
+  - **Seven are applied and unrecorded** (`lca_calculation_runs` … `liquids`), pasted
+    into the SQL editor, which writes no row.
+  - **Three are recorded under generated timestamps rather than their file versions**:
+    `pack_formats` as `20260722185732`, `pack_format_names` as `20260722213911`,
+    `liquids_are_drinks_only` as `20260722213954`. `apply_migration` stamps its own
+    version, so running migrations through the MCP tool adds to this drift rather than
+    fixing it — worth knowing before reaching for it again.
+
+  Net effect is unchanged: `supabase db diff`/`db push` compares the ledger against
+  filenames, so it still sees ten local files as unapplied and will propose recreating
+  tables that exist. The reconciliation is ledger-only (drop the three stray rows,
+  insert the ten file versions), touching no schema and no data — **it was blocked by
+  the permission classifier**, correctly, since editing
+  `supabase_migrations.schema_migrations` should need a human. Needs Tim's go-ahead, or
+  a local `supabase migration repair --status applied <version>` per file.
 - **`Alkatera2` (`dfcezkyaejrxmbwunhry`) has NONE of this schema — and that is fine.**
   Settled with Tim, 22 July 2026: `Alkatera2` is today's production, and
   `alkatera-staging` is the redesign that will REPLACE it. The cutover brings real
