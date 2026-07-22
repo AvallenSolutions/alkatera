@@ -46,6 +46,10 @@ const page = createPageShell({ footerMeta: 'ISO 14040/44 &amp; 14067' });
 
 function renderCoverPage(data: LCAReportData): string {
   const boundary = escapeHtml(data.goalAndScope.systemBoundary);
+  // A product sold through several channels has a different footprint down
+  // each one. Naming the route on the cover stops two honest reports for the
+  // same product reading as contradictory numbers.
+  const scenario = data.goalAndScope.endUseScenario ?? null;
   const refYear = data.meta.referenceYear ? String(data.meta.referenceYear) : escapeHtml(data.meta.assessmentPeriod);
   const fact = (label: string, value: string) => `<div>
       <div style="font-family:${MONO};font-size:9.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;opacity:.7">${label}</div>
@@ -65,9 +69,10 @@ function renderCoverPage(data: LCAReportData): string {
         <div style="font-family:${INTER};font-size:13px;line-height:1.55;opacity:.85;margin-top:22px;max-width:400px">Prepared in accordance with ISO 14067:2018 and ISO 14044:2006.</div>
       </div>
       <div style="position:relative">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;border-top:1px solid rgba(242,241,234,.3);padding-top:20px">
+        <div style="display:grid;grid-template-columns:${scenario ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr'};gap:24px;border-top:1px solid rgba(242,241,234,.3);padding-top:20px">
           ${fact('Functional unit', escapeHtml(data.functionalUnit.value))}
           ${fact('System boundary', boundary)}
+          ${scenario ? fact('Route to market', escapeHtml(scenario.name)) : ''}
           ${fact('Reference year', refYear)}
         </div>
       </div>
@@ -132,6 +137,10 @@ function renderGoalAndScopePages(data: LCAReportData): string[] {
       <div style="font-family:${MONO};font-size:9.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:${COBALT}">SYSTEM BOUNDARY · ${escapeHtml(gs.systemBoundary)}</div>
       ${bodyP(escapeHtml(gs.systemBoundaryDescription), { color: INK, mt: 10 })}
     </div>
+    ${gs.endUseScenario ? `<div style="background:${CREAM};border:1px solid ${HAIR};border-radius:6px;padding:18px 20px;margin-top:14px">
+      <div style="font-family:${MONO};font-size:9.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:${COBALT}">ROUTE TO MARKET · ${escapeHtml(gs.endUseScenario.name)}</div>
+      ${bodyP(escapeHtml(gs.endUseScenario.description), { color: INK, mt: 10 })}
+    </div>` : ''}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:20px">
       ${defBlock('Cut&#8209;off Criteria', escapeHtml(gs.cutOffCriteria))}
       ${defBlock('Allocation Procedure', escapeHtml(gs.allocationProcedure))}

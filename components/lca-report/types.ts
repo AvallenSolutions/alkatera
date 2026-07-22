@@ -29,6 +29,13 @@ export interface LCAReportData {
     allocationProcedure: string;
     assumptionsAndLimitations: Array<{ type: string; text: string }>;
     referenceStandards: string[];
+    /**
+     * Which route to market this study models, when the product sells through
+     * more than one. ISO 14067 §6.4.9 requires downstream scenario assumptions
+     * to be stated, and two reports for one product that differ only in their
+     * journey must say so on their face or they read as contradicting numbers.
+     */
+    endUseScenario?: { name: string; description: string } | null;
   };
   executiveSummary: {
     content: string;

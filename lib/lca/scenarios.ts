@@ -52,6 +52,14 @@ export interface ScenarioStageResults {
   distribution: number;
   usePhase: number;
   endOfLife: number;
+  /**
+   * This scenario's Scope 3 per unit. Carried separately because corporate
+   * reporting consumes Scope 3, not the headline: facility Scope 1 and 2 are
+   * already in the corporate inventory and must not be counted twice.
+   *
+   * Null when the PCF has no scope breakdown to recover it from.
+   */
+  scope3: number | null;
   /** Full downstream detail, for the dossier's per-section provenance. */
   detail: DownstreamStageResults;
 }
@@ -190,7 +198,13 @@ export async function computeScenario(
     'distribution_config' | 'use_phase_config' | 'eol_config' | 'product_loss_config'
   >,
   core: number,
-  context: { boundary: string; materials: DownstreamMaterial[]; volumeLitres: number },
+  context: {
+    boundary: string;
+    materials: DownstreamMaterial[];
+    volumeLitres: number;
+    /** Upstream Scope 3 per unit BEFORE any loss multiplier. Null skips scope3. */
+    coreScope3?: number | null;
+  },
 ): Promise<ScenarioStageResults> {
   const detail = await computeDownstreamStages({
     boundary: context.boundary,
@@ -210,6 +224,17 @@ export async function computeScenario(
     detail.usePhase.total +
     detail.endOfLife.total;
 
+  // Scope 3 follows the same shape as the total: upstream scaled by losses,
+  // then the downstream stages added. Every downstream stage is Scope 3
+  // (GHG Protocol categories 4, 9, 11 and 12), so nothing here can land in
+  // Scope 1 or 2.
+  const downstreamTotal =
+    detail.distribution.total + detail.usePhase.total + detail.endOfLife.total;
+  const scope3 =
+    context.coreScope3 == null
+      ? null
+      : context.coreScope3 * detail.lossMultiplier + downstreamTotal;
+
   return {
     total,
     core,
@@ -217,6 +242,7 @@ export async function computeScenario(
     distribution: detail.distribution.total,
     usePhase: detail.usePhase.total,
     endOfLife: detail.endOfLife.total,
+    scope3,
     detail,
   };
 }
@@ -268,11 +294,21 @@ export async function recomputeScenariosForPcf(
     volumeLitres,
     productLossConfig: primary?.product_loss_config ?? (pcf as any).product_loss_config ?? undefined,
   });
+  const impacts = (pcf as any).aggregated_impacts;
   const core = recoverCore(
-    (pcf as any).aggregated_impacts,
+    impacts,
     Number((pcf as any).total_ghg_emissions ?? 0),
     primaryDetail.lossMultiplier,
   );
+
+  // The same recovery, on the Scope 3 line. The stored figure is the primary
+  // scenario's, so its downstream stages come off and its loss multiplier
+  // divides out, leaving the upstream Scope 3 every scenario shares.
+  const storedScope3 = impacts?.breakdown?.by_scope?.scope3;
+  const coreScope3 =
+    typeof storedScope3 === 'number'
+      ? recoverCore(impacts, storedScope3, primaryDetail.lossMultiplier)
+      : null;
 
   let computed = 0;
   const computedAt = new Date().toISOString();
@@ -281,6 +317,7 @@ export async function recomputeScenariosForPcf(
       boundary,
       materials: (materials ?? []) as DownstreamMaterial[],
       volumeLitres,
+      coreScope3,
     });
     const { error } = await supabase
       .from('pcf_end_use_scenarios')
@@ -357,6 +394,67 @@ export function headlineFootprint(scenarios: EndUseScenario[]): HeadlineFootprin
     max,
     sharesComplete: false,
   };
+}
+
+/**
+ * The Scope 3 figure corporate reporting should consume for a product that
+ * sells through several channels.
+ *
+ * Returns null unless the user has actually told us the mix. That is the whole
+ * safety property: a corporate inventory must not silently move because the
+ * platform started guessing at a sales split. Until the ask is answered the
+ * caller keeps using the stored PCF figure, which is the primary scenario, and
+ * nothing anywhere changes.
+ */
+export function weightedScope3PerUnit(scenarios: EndUseScenario[]): number | null {
+  const computed = scenarios.filter((s) => s.stage_results?.scope3 != null);
+  if (computed.length < 2) return null;
+
+  const shares = computed.map((s) => (s.share_pct == null ? null : Number(s.share_pct)));
+  if (shares.some((v) => v == null)) return null;
+  if (Math.abs((shares as number[]).reduce((a, b) => a + b, 0) - 100) >= 0.5) return null;
+
+  return computed.reduce(
+    (sum, s) => sum + Number(s.stage_results!.scope3) * (Number(s.share_pct) / 100),
+    0,
+  );
+}
+
+/**
+ * Weighted Scope 3 per unit for a whole organisation, keyed by product id.
+ *
+ * One query rather than one per product: the corporate roll-up runs in the
+ * browser on the emissions tab, and this sits in its hot path.
+ */
+export async function weightedScope3ByProduct(
+  supabase: SupabaseClient,
+  organizationId: string,
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>();
+
+  const { data } = await supabase
+    .from('pcf_end_use_scenarios')
+    .select('pcf_id, share_pct, stage_results, is_primary, product_carbon_footprints!inner(product_id, status)')
+    .eq('organization_id', organizationId);
+  if (!data || data.length === 0) return result;
+
+  const byPcf = new Map<string, any[]>();
+  for (const row of data as any[]) {
+    // Only the live footprint: a superseded version's routes describe a number
+    // nobody is reporting any more.
+    if (row.product_carbon_footprints?.status !== 'completed') continue;
+    if (!byPcf.has(row.pcf_id)) byPcf.set(row.pcf_id, []);
+    byPcf.get(row.pcf_id)!.push(row);
+  }
+
+  for (const rows of Array.from(byPcf.values())) {
+    const weighted = weightedScope3PerUnit(rows as EndUseScenario[]);
+    if (weighted == null) continue;
+    const productId = rows[0]?.product_carbon_footprints?.product_id;
+    if (productId != null) result.set(String(productId), weighted);
+  }
+
+  return result;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

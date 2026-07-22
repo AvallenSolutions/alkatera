@@ -318,7 +318,9 @@ function calculatePedigreeMatrix(
 export function transformLCADataForReport(
   lca: LCADatabaseData,
   calculationLog: CalculationLogData | null,
-  organization: OrganizationData | null
+  organization: OrganizationData | null,
+  /** The route to market being reported, when the product sells several ways. */
+  endUseScenario?: { name: string; description: string } | null,
 ): LCAReportData {
   const impacts = lca.aggregated_impacts || {};
   const breakdown = impacts.breakdown || {};
@@ -1080,6 +1082,7 @@ export function transformLCADataForReport(
       allocationProcedure: (impacts as any).allocation_summary?.description
         || 'Physical allocation by mass is applied for all co-products following the ISO 14044 Clause 4.3.4 hierarchy. Mass-based physical allocation was used throughout this assessment; no economic allocation was applied.',
       assumptionsAndLimitations: assumptionsLimitations,
+      endUseScenario: endUseScenario ?? null,
       referenceStandards: [
         'ISO 14040:2006 — Environmental management — Life cycle assessment — Principles and framework',
         'ISO 14044:2006 — Environmental management — Life cycle assessment — Requirements and guidelines',

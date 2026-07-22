@@ -21,6 +21,7 @@ import { getYearRangeForOrg } from '@/lib/log-data/period-utils';
 import { getOrgFyStartMonth } from '@/lib/log-data/org-fiscal-year';
 import { calculateHospitality } from './hospitality-emissions';
 import { HOSPITALITY_KINDS } from '@/lib/hospitality/constants';
+import { weightedScope3ByProduct } from '@/lib/lca/scenarios';
 
 // ============================================================================
 // TYPES
@@ -454,6 +455,16 @@ export async function calculateScope3(
       }
     }
 
+    // A product sold through several channels carries a different footprint
+    // down each one, so the honest figure for the inventory is the mix rather
+    // than whichever route happens to be primary. Only applied where the user
+    // has actually told us the split: a corporate number must never move
+    // because the platform started guessing.
+    const weightedByProduct = await weightedScope3ByProduct(supabase, organizationId);
+    for (const [pid, weighted] of Array.from(weightedByProduct.entries())) {
+      if (scope3PerUnitByProduct.has(pid)) scope3PerUnitByProduct.set(pid, weighted);
+    }
+
     for (const log of productionData) {
       if (!log.units_produced || log.units_produced <= 0) continue;
       if (hospitalityProductIds.has(String(log.product_id))) continue; // counted via hospitality
@@ -491,11 +502,17 @@ export async function calculateScope3(
       // unitsProduced resolution order. Contributions are summed in array order
       // afterwards so accumulation is bit-identical to the previous loop, and
       // Promise.all (not allSettled) preserves throw-on-error behaviour.
+      // Same channel-mix adjustment as the production-log path above, so the
+      // two routes into this number cannot disagree about a product.
+      const weightedByProductFallback = await weightedScope3ByProduct(supabase, organizationId);
+
       const fallbackContributions = await Promise.all(
         Array.from(latestByProduct.entries()).map(async ([productId, lca]) => {
           if (lca.status !== 'completed') return 0;
 
-          const scope3PerUnit = lca.aggregated_impacts?.breakdown?.by_scope?.scope3 || 0;
+          const scope3PerUnit =
+            weightedByProductFallback.get(String(productId)) ??
+            (lca.aggregated_impacts?.breakdown?.by_scope?.scope3 || 0);
           if (scope3PerUnit <= 0) return 0;
 
           // Get production volume from production sites (Facility Allocation)
