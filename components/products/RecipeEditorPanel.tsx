@@ -79,7 +79,6 @@ export function RecipeEditorPanel({
   initialTab = "ingredients",
 }: RecipeEditorPanelProps) {
   const { currentOrganization } = useOrganization();
-  const { products: linkedSupplierProducts } = useLinkedSupplierProducts(organizationId);
   const [activeTab, setActiveTab] = useState(initialTab);
   const [showBOMImport, setShowBOMImport] = useState(false);
   const [showPackagingWizard, setShowPackagingWizard] = useState(false);
@@ -155,6 +154,28 @@ export function RecipeEditorPanel({
     clearProductionChain,
   } = useRecipeEditor(productId, organizationId);
 
+  /**
+   * The organisation that owns this PRODUCT, which is not necessarily the one
+   * the browser happens to be switched to.
+   *
+   * They normally agree, so a mismatch stays invisible until it is not:
+   * ingredient records were filed under the wrong organisation, and the liquid
+   * picker silently offered nothing. Both were patched where they surfaced
+   * before it became clear they were one root. This panel takes the context
+   * organisation and hands it to a dozen children, every one of which inherits
+   * the same mistake, so it is derived once here to close the class rather
+   * than the instances.
+   *
+   * `useRecipeEditor` keeps taking the prop, because the product this is
+   * derived from is what that hook loads; it resolves the same thing
+   * internally for its own writes.
+   */
+  const ownerOrganizationId: string = (product as any)?.organization_id ?? organizationId;
+
+  // Below the product load, so the supplier list follows the product's
+  // organisation too.
+  const { products: linkedSupplierProducts } = useLinkedSupplierProducts(ownerOrganizationId);
+
 
   /**
    * Apply a typical-recipe starter: add the scaled ingredient rows instantly,
@@ -180,7 +201,7 @@ export function RecipeEditorPanel({
     void Promise.all(rows.map(async (row, i) => {
       const match = await autoMatchEmissionFactor({
         query: starter.ingredients[i].searchQuery,
-        organizationId,
+        organizationId: ownerOrganizationId,
         materialType: 'ingredient',
       });
       if (!match) {
@@ -211,7 +232,7 @@ export function RecipeEditorPanel({
     if (!needsAutoMatch) return;
     void autoMatchEmissionFactor({
       query: needsAutoMatch,
-      organizationId,
+      organizationId: ownerOrganizationId,
       materialType: 'ingredient',
     }).then((match) => {
       if (!match) {
@@ -241,7 +262,7 @@ export function RecipeEditorPanel({
     addPackagingRows([row]);
     void autoMatchEmissionFactor({
       query: efSearchQuery,
-      organizationId,
+      organizationId: ownerOrganizationId,
       materialType: 'packaging',
       packagingCategory: row.packaging_category || undefined,
     }).then((match) => {
@@ -419,7 +440,7 @@ export function RecipeEditorPanel({
     await saveMaturation({
       ...formData,
       product_id: parseInt(productId),
-      organization_id: organizationId,
+      organization_id: ownerOrganizationId,
     } as any);
     onSaveComplete?.();
   };
@@ -484,7 +505,7 @@ export function RecipeEditorPanel({
 
       <SearchGuidePanel />
 
-      <RecipeStalenessBanner productId={productId} organizationId={organizationId} />
+      <RecipeStalenessBanner productId={productId} organizationId={ownerOrganizationId} />
 
       <Tabs
         value={
@@ -524,7 +545,7 @@ export function RecipeEditorPanel({
                   at a liquid they already make. */}
               <CompositionStrip
                 kind="liquid"
-                organizationId={(product as any)?.organization_id ?? organizationId}
+                organizationId={ownerOrganizationId}
                 productId={productId}
                 liquidId={(product as any)?.liquid_id ?? null}
                 onChanged={fetchProductData}
@@ -631,7 +652,7 @@ export function RecipeEditorPanel({
               )}
 
               <IngredientComposer
-                organizationId={organizationId}
+                organizationId={ownerOrganizationId}
                 onAdd={handleComposerAdd}
               />
 
@@ -659,7 +680,7 @@ export function RecipeEditorPanel({
                       key={ingredient.tempId}
                       ingredient={ingredient}
                       index={index}
-                      organizationId={organizationId}
+                      organizationId={ownerOrganizationId}
                       productionFacilities={productionFacilities}
                       organizationLat={currentOrganization?.address_lat}
                       organizationLng={currentOrganization?.address_lng}
@@ -727,7 +748,7 @@ export function RecipeEditorPanel({
                   else shares it. */}
               <CompositionStrip
                 kind="pack"
-                organizationId={(product as any)?.organization_id ?? organizationId}
+                organizationId={ownerOrganizationId}
                 productId={productId}
                 liquidId={(product as any)?.pack_format_id ?? null}
                 onChanged={fetchProductData}
@@ -783,7 +804,7 @@ export function RecipeEditorPanel({
               )}
 
               <PackagingComposer
-                organizationId={organizationId}
+                organizationId={ownerOrganizationId}
                 containerSizeMl={unitSizeToMl(product?.unit_size_value, product?.unit_size_unit)}
                 onAdd={handlePackagingComposerAdd}
               />
@@ -824,7 +845,7 @@ export function RecipeEditorPanel({
                     key={packaging.tempId}
                     packaging={packaging}
                     index={index}
-                    organizationId={organizationId}
+                    organizationId={ownerOrganizationId}
                     productionFacilities={productionFacilities}
                     organizationLat={currentOrganization?.address_lat}
                     organizationLng={currentOrganization?.address_lng}
@@ -866,7 +887,7 @@ export function RecipeEditorPanel({
         <TabsContent value="maturation" className="space-y-4">
           <MaturationProfileCard
             profile={maturationProfile}
-            organizationId={organizationId}
+            organizationId={ownerOrganizationId}
             productId={productId}
             productCategory={productCategory}
             productAbvPercent={productAbvPercent}
@@ -899,7 +920,7 @@ export function RecipeEditorPanel({
       <PackagingWizard
         open={showPackagingWizard}
         onOpenChange={setShowPackagingWizard}
-        organizationId={organizationId}
+        organizationId={ownerOrganizationId}
         containerSizeMl={unitSizeToMl(product?.unit_size_value, product?.unit_size_unit)}
         onComplete={(rows) => {
           addPackagingRows(rows);
@@ -928,7 +949,7 @@ export function RecipeEditorPanel({
           }
         }}
         onImportComplete={handleBOMImportComplete}
-        organizationId={organizationId}
+        organizationId={ownerOrganizationId}
         initialFile={initialBomFile}
         initialItems={initialBomItems}
         productUnitSizeMl={unitSizeToMl(product?.unit_size_value, product?.unit_size_unit)}
@@ -937,7 +958,7 @@ export function RecipeEditorPanel({
       <PackagingTemplateDialog
         open={showTemplateDialog}
         onOpenChange={setShowTemplateDialog}
-        organizationId={organizationId}
+        organizationId={ownerOrganizationId}
         mode={templateDialogMode}
         currentPackaging={packagingForms}
         onApplyTemplate={(items) => {
@@ -949,7 +970,7 @@ export function RecipeEditorPanel({
       <IngredientTemplateDialog
         open={showIngredientTemplateDialog}
         onOpenChange={setShowIngredientTemplateDialog}
-        organizationId={organizationId}
+        organizationId={ownerOrganizationId}
         mode={ingredientTemplateDialogMode}
         currentIngredients={ingredientForms}
         currentProductVolumeValue={product?.unit_size_value ?? null}
