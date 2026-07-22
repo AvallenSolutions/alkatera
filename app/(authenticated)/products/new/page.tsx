@@ -414,6 +414,22 @@ export default function NewProductLCAPage() {
         <section className="space-y-3 border-t border-studio-hairline pt-6">
           <Eyebrow>HOW WOULD YOU LIKE TO START</Eyebrow>
           <div className="divide-y divide-border">
+            {/*
+              First, because it is the shortest honest path: a product is one
+              liquid in one pack, and both are usually things you already make.
+              tasks/liquid-pack-entry-design.md §4.
+            */}
+            <button
+              type="button"
+              onClick={() => router.push("/products/new/compose")}
+              className="group w-full"
+            >
+              {chooserRow(
+                "Compose it from what you make",
+                "Pick a liquid and a pack you already have, and watch the footprint form"
+              )}
+            </button>
+
             <button
               type="button"
               onClick={() => setCreationMethod("manual")}

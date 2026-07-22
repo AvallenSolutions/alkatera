@@ -277,9 +277,25 @@ export function CompositionStrip({
               Cancel
             </button>
           ) : (
-            <PillButton variant="outline" onClick={() => setPicking(true)}>
-              {K.pick}
-            </PillButton>
+            <>
+              {/*
+                The under-a-minute case the whole composition model exists for:
+                a producer who already makes this gin adds the 50 ml. The
+                compose surface opens with the liquid slot already filled, so
+                nothing about the recipe is asked again.
+              */}
+              {kind === "liquid" && current && (
+                <Link
+                  href={`/products/new/compose?liquid=${current.id}`}
+                  className="font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] text-studio-dim underline decoration-studio-hairline underline-offset-4 hover:text-studio-ink"
+                >
+                  Same liquid, different pack
+                </Link>
+              )}
+              <PillButton variant="outline" onClick={() => setPicking(true)}>
+                {K.pick}
+              </PillButton>
+            </>
           )}
         </div>
 
