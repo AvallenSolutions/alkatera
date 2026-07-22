@@ -143,8 +143,19 @@ Nothing. Tree committed and clean.
   Staging's recorded history still ends at `20260719140000`. A `db diff` against
   staging will propose recreating tables that exist. Offered to backfill the four
   rows; not yet done.
-- **`Alkatera2` (`dfcezkyaejrxmbwunhry`) has NONE of this schema.** If that is
-  production, the whole liquid/pack/ingredient layer is staging-only.
+- **`Alkatera2` (`dfcezkyaejrxmbwunhry`) has NONE of this schema — and that is fine.**
+  Settled with Tim, 22 July 2026: `Alkatera2` is today's production, and
+  `alkatera-staging` is the redesign that will REPLACE it. The cutover brings real
+  user data across into the new platform rather than shipping this schema back to
+  `Alkatera2`. So the liquid/pack/ingredient layer being staging-only is the plan,
+  not a gap, and nothing here should be back-ported.
+  Two consequences worth holding onto:
+  - The migration that matters is `Alkatera2` data → the redesign schema. Every
+    decision that leaves data un-backfillable (see the ingredient backfill below) is
+    really a question about what that cutover will be able to carry.
+  - `ingredients_templates` therefore survives until the cutover import has run
+    (plan decision 4). Customer templates on `Alkatera2` are real work and come
+    across as liquids nothing links to yet.
 - **Decide the ingredient backfill.** `ingredients` fills only as recipes are re-saved,
   so the shelf and the Xero linker are empty until then. A backfill from distinct
   `material_name` creates records by name-matching, which propose-only argues against.

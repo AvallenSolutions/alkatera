@@ -4,6 +4,8 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { supabase } from './supabaseClient'
 import { useAuth } from '@/hooks/useAuth'
 import { setBootstrapCache, clearBootstrapCache } from '@/lib/auth/bootstrap-cache'
+import { organizationClaim } from '@/lib/auth/organization-claim'
+import { toast } from 'sonner'
 import type { User } from '@supabase/supabase-js'
 
 export interface Organization {
@@ -53,9 +55,12 @@ const OrganizationContext = createContext<OrganizationContextType | undefined>(u
 
 /**
  * Persist the active organisation to SERVER-ONLY app_metadata via the switch
- * route (CRIT-2), then refresh the session so the new app_metadata lands in the
- * JWT. Returns false on failure. user_metadata is no longer the source of truth
- * for tenant context; it remains only as a validated legacy fallback.
+ * route (CRIT-2). user_metadata is no longer the source of truth for tenant
+ * context; it remains only as a validated legacy fallback.
+ *
+ * This deliberately does NOT refresh the session. Refreshing is the LAST step
+ * of `activateOrganization`, so there is exactly one session write at the end
+ * of a switch — see the note there.
  */
 async function persistCurrentOrg(orgId: string): Promise<boolean> {
   try {
@@ -68,12 +73,65 @@ async function persistCurrentOrg(orgId: string): Promise<boolean> {
       console.error('❌ OrganizationContext: Failed to persist current organisation:', res.status)
       return false
     }
-    await supabase.auth.refreshSession()
     return true
   } catch (e) {
     console.error('❌ OrganizationContext: Error persisting current organisation:', e)
     return false
   }
+}
+
+/**
+ * Make an organisation the active one, everywhere that matters.
+ *
+ * The active organisation lives in `app_metadata`, which is baked into the
+ * access token. That token is what `get_current_organization_id()`, the RLS
+ * policies and `get_user_bootstrap` all read, so until it carries the new
+ * organisation the switch has not really happened — it only looked like it had,
+ * because the provider had already set React state.
+ *
+ * Order is the whole point, and it used to be wrong:
+ *
+ *   1. Write app_metadata server-side FIRST. The route verifies membership, so
+ *      this is the authoritative, checked write.
+ *   2. Then user_metadata, for the legacy fallback.
+ *   3. Then refresh, ONCE, LAST. The refreshed token is minted from the user
+ *      row as it now stands, so it carries both.
+ *
+ * Previously `updateUser` ran first and `refreshSession` ran inside
+ * `persistCurrentOrg`. Both persist the session, so two writes raced for the
+ * same cookie and the loser could be the one holding the stale claim. The
+ * symptom was a switch that worked until you reloaded the page, then silently
+ * reverted — and, less visibly, a server that was still answering as the old
+ * tenant the whole time.
+ */
+async function activateOrganization(orgId: string): Promise<boolean> {
+  if (!(await persistCurrentOrg(orgId))) return false
+
+  const { error } = await supabase.auth.updateUser({
+    data: { current_organization_id: orgId },
+  })
+  if (error) {
+    // Not fatal: app_metadata is the source of truth and is already written.
+    console.error('❌ OrganizationContext: Error updating user metadata:', error)
+  }
+
+  const { data, error: refreshError } = await supabase.auth.refreshSession()
+  if (refreshError) {
+    console.error('❌ OrganizationContext: Could not refresh the session after switching:', refreshError)
+    return false
+  }
+
+  // Confirm the claim actually moved rather than assuming it did. A silent
+  // failure here is the difference between "switched" and "looks switched",
+  // and it is invisible until the next page load.
+  const landed = organizationClaim(data.session?.access_token)
+  if (landed !== orgId) {
+    console.error(
+      `❌ OrganizationContext: session still claims ${landed ?? 'no organisation'} after switching to ${orgId}`
+    )
+    return false
+  }
+  return true
 }
 
 export function OrganizationProvider({ children }: { children: React.ReactNode }) {
@@ -197,13 +255,12 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
             setCurrentOrganization(orgToSet)
             setUserRole((b.user_role as string | null) ?? null)
 
-            // Background the session-sync write (don't block first paint). Same
-            // effect as the legacy inline block, just not awaited.
+            // The claim disagreed with what we resolved — usually a first login,
+            // or an organisation the user has since lost access to. Make the
+            // token agree, in the background so first paint is not blocked.
+            // It converges: once the claim matches, this branch stops firing.
             if (orgToSet.id !== claimOrgId) {
-              void supabase.auth
-                .updateUser({ data: { current_organization_id: orgToSet.id } })
-                .then(() => persistCurrentOrg(orgToSet.id))
-                .catch(() => {})
+              void activateOrganization(orgToSet.id).catch(() => {})
             }
 
             setIsLoading(false)
@@ -357,8 +414,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
         if (orgToSet.id !== currentOrgIdFromSession) {
             console.log('🔧 OrganizationContext: Syncing session with default organization.')
-            await supabase.auth.updateUser({ data: { current_organization_id: orgToSet.id } })
-            await persistCurrentOrg(orgToSet.id)
+            await activateOrganization(orgToSet.id)
         }
 
         // Set role from the already-fetched membership data (includes role name via join).
@@ -390,17 +446,22 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
     // The bootstrap hand-off cache is scoped to the previously-resolved org;
     // clear it so post-switch subscription/admin reads go live for the new org.
+    const previous = currentOrganization
     clearBootstrapCache()
     setCurrentOrganization(org)
 
-    // Write user_metadata (instant, and keeps working with the pre-migration RLS
-    // function) AND the server-only app_metadata source (preferred post-migration).
-    const { error } = await supabase.auth.updateUser({ data: { current_organization_id: orgId } })
-    if (error) {
-        console.error('❌ OrganizationContext: Error updating user metadata:', error)
-        return;
+    // app_metadata, then user_metadata, then one refresh — see
+    // activateOrganization. If the claim does not land, the server is still
+    // answering as the old tenant, so put the UI back where it was rather than
+    // leaving someone reading one organisation's name over another's data.
+    // Showing the new name over the old tenant's rows is the worst of the three
+    // possible outcomes, and it is what this whole change exists to prevent.
+    const activated = await activateOrganization(orgId)
+    if (!activated) {
+      setCurrentOrganization(previous)
+      toast.error('Could not switch organisation. Please reload and try again.')
+      return
     }
-    await persistCurrentOrg(orgId)
 
     // CRITICAL: Check if user is a supplier first (authoritative check)
     const { data: supplierCtx } = await supabase.rpc('get_supplier_context')
@@ -431,7 +492,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setUserRole(advisorAccess ? 'advisor' : null)
       }
     }
-  }, [organizations, user])
+  }, [organizations, user, currentOrganization])
 
   const refreshOrganizations = useCallback(async () => {
     await fetchOrganizations()
@@ -444,19 +505,9 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setCurrentOrganization(organization);
         setUserRole(role);
 
-        // Keep user_metadata for instant UI on the new-user path, and also set
-        // the server-only app_metadata source (CRIT-2) via the switch route.
-        const { error } = await supabase.auth.updateUser({
-            data: {
-                current_organization_id: organization.id
-            }
-        });
-
-        if (error) {
-            console.error('❌ OrganizationContext: Error setting initial organization for new user:', error);
-        }
-
-        await persistCurrentOrg(organization.id);
+        // Same ordering as a switch: the new organisation has to reach the
+        // access token, or this user's very first page load answers as nobody.
+        await activateOrganization(organization.id);
 
     } else {
         await fetchOrganizations();
