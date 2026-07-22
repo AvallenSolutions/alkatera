@@ -42,6 +42,8 @@ export default function LiquidShelfPage() {
   const [rows, setRows] = useState<LiquidRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [merging, setMerging] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState("");
 
   const load = useCallback(async () => {
     if (!orgId) return;
@@ -113,6 +115,30 @@ export default function LiquidShelfPage() {
   }, [load]);
 
   const identical = useMemo(() => findIdenticalLiquids(rows), [rows]);
+
+  /**
+   * Rename a liquid.
+   *
+   * The 1:1 backfill named every liquid after whichever product it was lifted
+   * from, which stops being right the moment two formats share one: "House Gin
+   * 700ml" is a poor name for the liquid inside the 50ml as well.
+   *
+   * Renaming touches nothing but the label. It is not a merge, so no product
+   * moves and no recipe changes.
+   */
+  const rename = async (row: LiquidRow) => {
+    const next = draftName.trim();
+    setRenaming(null);
+    if (!next || next === row.name) return;
+
+    // Optimistic: the shelf is a list of labels and a failed write is loud.
+    setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, name: next } : r)));
+    const { error } = await supabase.from("liquids").update({ name: next }).eq("id", row.id);
+    if (error) {
+      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, name: row.name } : r)));
+      toast.error(error.message || "Could not rename that liquid");
+    }
+  };
 
   const merge = async (survivorId: string, mergedIds: string[], fingerprint: string) => {
     setMerging(fingerprint);
@@ -230,9 +256,31 @@ export default function LiquidShelfPage() {
                   >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-baseline gap-3">
-                        <span className="font-display text-[14.5px] font-semibold text-studio-ink">
-                          {row.name}
-                        </span>
+                        {renaming === row.id ? (
+                          <input
+                            autoFocus
+                            value={draftName}
+                            onChange={(e) => setDraftName(e.target.value)}
+                            onBlur={() => rename(row)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") rename(row);
+                              if (e.key === "Escape") setRenaming(null);
+                            }}
+                            className="w-[260px] border-b border-studio-ink bg-transparent font-display text-[14.5px] font-semibold text-studio-ink outline-none"
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRenaming(row.id);
+                              setDraftName(row.name);
+                            }}
+                            title="Rename this liquid"
+                            className="font-display text-[14.5px] font-semibold text-studio-ink underline decoration-transparent underline-offset-4 transition-colors duration-150 hover:decoration-studio-hairline"
+                          >
+                            {row.name}
+                          </button>
+                        )}
                         {row.recipe_scale_mode === "per_batch" && row.batch_yield_value && (
                           <span className="font-mono text-[10px] text-studio-dim">
                             {Number(row.batch_yield_value).toLocaleString()}{" "}
