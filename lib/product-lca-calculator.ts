@@ -2674,8 +2674,48 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         category_type: 'maturation',
       });
 
+      // Bug X4: the same warehouse electricity can be counted twice, once here
+      // from the maturation profile and again from that facility's utility
+      // data. Until maturation_profiles gained warehouse_facility_id there was
+      // no way to tell whether the ageing warehouse was one of the linked
+      // facilities, so the calculator could only warn about it.
+      //
+      // The exclusion is deliberately narrow: it fires only when the user has
+      // explicitly named a warehouse facility AND that facility is allocated to
+      // this product AND it has electricity logged for the period. A product
+      // that has not named a warehouse is left exactly as it was, so no
+      // existing footprint moves until someone opts in by picking one.
+      const warehouseFacilityId = (maturationProfile as any).warehouse_facility_id ?? null;
+      let warehouseEnergyInFacilityData = false;
+      if (warehouseFacilityId && warehousePerBottle > 0) {
+        const warehouseAllocation = params.facilityAllocations?.find(
+          (a) => a.facilityId === warehouseFacilityId
+        );
+        if (warehouseAllocation) {
+          const { data: warehouseUtility } = await supabase
+            .from('utility_data_entries')
+            .select('id')
+            .eq('facility_id', warehouseFacilityId)
+            .in('utility_type', ['electricity', 'grid_electricity'])
+            .lte('reporting_period_start', warehouseAllocation.reportingPeriodEnd)
+            .gte('reporting_period_end', warehouseAllocation.reportingPeriodStart)
+            .limit(1);
+          warehouseEnergyInFacilityData = (warehouseUtility?.length ?? 0) > 0;
+        }
+      }
+
+      if (warehouseEnergyInFacilityData) {
+        console.log(
+          `[calculateProductCarbonFootprint] Skipping the synthetic maturation warehouse row: facility ${warehouseFacilityId} already reports electricity for this period, so counting it here as well would double it.`
+        );
+        calculatorWarnings.push(
+          `Warehouse energy is counted from the facility's own electricity readings, not from the maturation profile's ${maturationProfile.warehouse_energy_kwh_per_barrel_year} kWh per barrel per year estimate. ` +
+          `Measured data beats an estimate, and counting both would double it.`
+        );
+      }
+
       // Inject warehouse energy as a synthetic material (per-bottle)
-      lcaMaterialsWithImpacts.push({
+      if (!warehouseEnergyInFacilityData) lcaMaterialsWithImpacts.push({
         product_carbon_footprint_id: lca.id,
         name: '[Maturation] Warehouse Energy',
         material_name: '[Maturation] Warehouse Energy',
@@ -2731,14 +2771,18 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
       console.log(`[calculateProductCarbonFootprint] ✓ Maturation impacts (per-bottle): barrel=${barrelPerBottle.toFixed(4)} kg CO2e, warehouse=${warehousePerBottle.toFixed(4)} kg CO2e, angel's share=${matResult.angel_share_loss_percent_total.toFixed(1)}% volume loss, VOC=${vocPerBottle.toFixed(4)} kg/bottle`);
 
-      // Double-count guard: warehouse energy can also live in a linked
-      // facility's utility data. There is no facility link on maturation
-      // profiles yet, so we cannot dedupe automatically — but we can make
-      // sure nobody double-enters it unknowingly.
-      if (matResult.warehouse_co2e_total > 0 && (params.facilityAllocations?.length ?? 0) > 0) {
+      // Double-count guard for the products that have NOT named a warehouse
+      // facility, where the overlap still cannot be detected automatically.
+      // Once a warehouse is named the check above dedupes it properly and this
+      // warning would be noise, so it is suppressed.
+      if (
+        !warehouseFacilityId &&
+        matResult.warehouse_co2e_total > 0 &&
+        (params.facilityAllocations?.length ?? 0) > 0
+      ) {
         calculatorWarnings.push(
           `Warehouse energy for maturation (${maturationProfile.warehouse_energy_kwh_per_barrel_year} kWh per barrel per year) is included from the maturation profile. ` +
-          `If the ageing warehouse is one of the production facilities linked to this product, make sure its electricity is not ALSO in that facility's utility data, or it will be counted twice.`
+          `If the ageing warehouse is one of the production facilities linked to this product, name it on the maturation card and we will stop counting it twice.`
         );
       }
     }
