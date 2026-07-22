@@ -7,7 +7,7 @@ import {
 } from '../widget-registry';
 
 /**
- * Locks the Pulse-widget tier matrix: Seed (6) = live awareness + targets,
+ * Locks the Pulse-widget tier matrix: Seed (7) = live awareness + targets,
  * Blossom (+6) = operational analytics, Canopy (+11) = financial valuation +
  * compliance. Mirrors the feature/metric min-tier maps.
  */
@@ -18,10 +18,11 @@ describe('Pulse widget tier gating', () => {
     }
   });
 
-  it('Seed gets exactly the 6 awareness/targets widgets', () => {
+  it('Seed gets exactly the 7 awareness/targets widgets', () => {
     expect(widgetIdsForTier('seed').sort()).toEqual(
       [
         'ask-rosa',
+        'energy-timing',
         'grid-carbon',
         'insight-card',
         'live-activity',
@@ -31,16 +32,16 @@ describe('Pulse widget tier gating', () => {
     );
   });
 
-  it('Blossom adds 6 operational widgets (12 total)', () => {
+  it('Blossom adds 6 operational widgets (13 total)', () => {
     const blossom = widgetIdsForTier('blossom');
-    expect(blossom).toHaveLength(12);
+    expect(blossom).toHaveLength(13);
     for (const id of ['alerts-inbox', 'peer-benchmark', 'facility-impact', 'supplier-hotspots', 'harvest-seasons', 'carbon-budgets'] as const) {
       expect(blossom).toContain(id);
     }
     expect(blossom).not.toContain('financial-footprint');
   });
 
-  it('Canopy gets every widget (23 total)', () => {
+  it('Canopy gets every widget (24 total)', () => {
     expect(widgetIdsForTier('canopy').sort()).toEqual([...ALL_WIDGET_IDS].sort());
   });
 
