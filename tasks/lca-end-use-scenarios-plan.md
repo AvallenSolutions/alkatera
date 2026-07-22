@@ -212,6 +212,13 @@ sold one way. The scenario machinery appears only when it earns its place:
 
 ## 8. The build, in four phases
 
+**ALL FOUR SHIPPED, 21-22 July 2026** (commits 22b693ad, ce0444e9, 46e4ce62,
+9610a74e, f699d1d0 on `redesign`, local only). Migration
+`20260721100000_pcf_end_use_scenarios.sql` is applied LOCALLY only; staging
+and prod still pending. Decisions taken: scenarios free and uncapped,
+volume-weighted headline, existing duplicate products left alone with a merge
+tool deferred.
+
 Sequenced so each ships value alone; nothing touches the wizard.
 
 ### Phase 1: the engine seam
