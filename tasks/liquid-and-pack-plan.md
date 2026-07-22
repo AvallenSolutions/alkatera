@@ -183,15 +183,14 @@ New shared component `components/studio/inherited-field.tsx` carries the
 audit's P2 (inherit with override) and P3 (derive, then state the assumption).
 Phase 2 reuses it rather than reimplementing the pattern per form.
 
-Migration `20260722100000_phase1_inheritance_homes.sql`, applied locally and
-re-run clean; **pending prod**.
+Migration `20260722100000_phase1_inheritance_homes.sql` — **APPLIED TO PROD 22 Jul 2026**.
 
 **Next: audit Phase 2**, promoting `ingredients` and `supplier_products` to
 first-class records. Then L1, L2, L3.
 
 ### Audit Phase 2, first pass (22 July 2026)
 
-Commits `5de241d5`, `1a32fa14`. Migration `20260722110000_ingredients_first_class.sql`, **pending prod**.
+Commits `5de241d5`, `1a32fa14`. Migration `20260722110000_ingredients_first_class.sql` — **APPLIED TO PROD 22 Jul 2026**.
 
 - **Packaging templates** round-trip `packaging_material_class` and
   `packaging_material_variant` again. Both were missing from both directions,
@@ -224,7 +223,9 @@ Then L1, L2, L3.
 ### Audit Phase 2 complete, L1 landed (22 July 2026)
 
 Commits `a5f6e311`, `e56b3eb4`, `5dd032b1`. Migrations `20260722120000` and
-`20260722130000`, **both pending prod**.
+`20260722130000` — **both APPLIED TO PROD 22 Jul 2026**. Post-run check on prod:
+20 liquids / 20 products linked / 20 products with a recipe, the invariant the
+1:1 backfill is supposed to produce.
 
 **Phase 2 finished:**
 - `supplier_products` gained `transport_legs` and the six `inbound_container_*`
@@ -284,3 +285,24 @@ Still open before L2:
   renamed. That is the smallest remaining gap and the most visible.
 - Maturation and production stages still hang off the product, not the liquid.
 - `ingredients_templates` retirement, deferred to L3 per decision 4.
+
+### Post-migration state on prod (22 July 2026)
+
+All four migrations applied. `liquids` = 20, `products.liquid_id` set on 20,
+20 products have a recipe. The invariant holds.
+
+**One thing the migrations deliberately do NOT do:** there is no backfill for
+`ingredients` or for `product_materials.material_id`. Ingredient records are
+created by the recipe editor's find-or-create on save, so on prod today:
+
+- the ingredient shelf at `/products/ingredients` is empty,
+- `/api/emissions/inventory` returns no rows (it no longer 42703s, but there is
+  nothing to return), so the Xero inventory linker still shows its empty state,
+- ingredient-level inheritance does nothing yet.
+
+All three fill in per product as recipes are saved. A backfill is possible
+(insert distinct `product_materials.material_name` per org, then set
+`material_id`) and would make the shelf useful immediately, but it writes
+customer data on the basis of name-matching, which is the thing the duplicate
+decision says to propose rather than do. Not written; raise with Tim if the
+empty shelf is worth more than that caution.
