@@ -220,3 +220,38 @@ Still open from Phase 2:
 - Duplicate-ingredient detection and the propose-a-merge flow.
 
 Then L1, L2, L3.
+
+### Audit Phase 2 complete, L1 landed (22 July 2026)
+
+Commits `a5f6e311`, `e56b3eb4`, `5dd032b1`. Migrations `20260722120000` and
+`20260722130000`, **both pending prod**.
+
+**Phase 2 finished:**
+- `supplier_products` gained `transport_legs` and the six `inbound_container_*`
+  columns, so the route from an origin and the container it arrives in have a
+  supplier-level home. `supplierDeliveryDefaults()` replaces the origin block
+  that was duplicated in both link handlers.
+- The recipe editor's load path overlays each row's ingredient record, so a
+  second product opens with the factor, biogenic flag, organic status and farm
+  link already answered.
+- `is_organic_certified` is now null-means-inherit. The column is nullable, so
+  null genuinely means "nobody has said"; `|| false` collapsed that and pinned
+  every row. `is_biogenic_carbon` is NOT NULL and cannot express it, so that
+  asymmetry is stated in the code rather than being an accident.
+- The ingredient shelf at `/products/ingredients`: what the organisation buys,
+  which products use each, and duplicates proposed (never merged).
+
+**L1 landed:** `liquids` + `products.liquid_id`, 1:1 backfill (21 products →
+21 liquids locally), and recipe saves fan out to every product sharing the
+liquid, with a recalc requested for each. Exit criterion met and verified.
+
+Still open before L2:
+- The liquid has no UI of its own yet. Nothing lets a user name a liquid,
+  browse liquids, or point a second product at an existing one, so the shared
+  case is reachable only from the database today. That is the first L1
+  follow-on and the thing L3's composition surface builds on.
+- Maturation and production stages still hang off the product, not the liquid.
+  The plan lists them as part of the liquid; moving them is a separate slice.
+- Identical-liquid detection and the propose-a-merge flow (decision 2), which
+  can reuse the ingredient duplicate-detection shape.
+- `ingredients_templates` retirement stays deferred to L3 per decision 4.
