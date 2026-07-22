@@ -183,14 +183,14 @@ New shared component `components/studio/inherited-field.tsx` carries the
 audit's P2 (inherit with override) and P3 (derive, then state the assumption).
 Phase 2 reuses it rather than reimplementing the pattern per form.
 
-Migration `20260722100000_phase1_inheritance_homes.sql` — **APPLIED TO PROD 22 Jul 2026**.
+Migration `20260722100000_phase1_inheritance_homes.sql` — **APPLIED TO STAGING 22 Jul 2026**.
 
 **Next: audit Phase 2**, promoting `ingredients` and `supplier_products` to
 first-class records. Then L1, L2, L3.
 
 ### Audit Phase 2, first pass (22 July 2026)
 
-Commits `5de241d5`, `1a32fa14`. Migration `20260722110000_ingredients_first_class.sql` — **APPLIED TO PROD 22 Jul 2026**.
+Commits `5de241d5`, `1a32fa14`. Migration `20260722110000_ingredients_first_class.sql` — **APPLIED TO STAGING 22 Jul 2026**.
 
 - **Packaging templates** round-trip `packaging_material_class` and
   `packaging_material_variant` again. Both were missing from both directions,
@@ -286,9 +286,11 @@ Still open before L2:
 - Maturation and production stages still hang off the product, not the liquid.
 - `ingredients_templates` retirement, deferred to L3 per decision 4.
 
-### Post-migration state on prod (22 July 2026)
+### Post-migration state on STAGING (22 July 2026)
 
-All four migrations applied. `liquids` = 20, `products.liquid_id` set on 20,
+All four migrations applied to `alkatera-staging` (vwhdyqvlgjqmlzmsvaes), NOT
+to production. An earlier version of this log said "prod"; that was wrong, and
+`Alkatera2` (dfcezkyaejrxmbwunhry) still has none of them. `liquids` = 20, `products.liquid_id` set on 20,
 20 products have a recipe. The invariant holds.
 
 **One thing the migrations deliberately do NOT do:** there is no backfill for
@@ -310,7 +312,8 @@ empty shelf is worth more than that caution.
 ### Naming, and L2 (22 July 2026)
 
 Commits `806f9822` (naming), `00b5c0d1` (L2). Migration
-`20260722140000_pack_formats.sql`, **pending prod**.
+`20260722140000_pack_formats.sql` — **APPLIED TO STAGING 22 Jul 2026** via the
+Supabase connector (9 products with packaging → 9 formats, all linked).
 
 - **Liquids can be renamed** inline on the shelf. The backfill named each after
   whichever product it was lifted from, which stops being right the moment two
@@ -340,3 +343,24 @@ Still open:
 - Audit Phase 3 (wizard reads/writes canonical) and Phase 4 (duplicate tables).
 - The org-mismatch grep: two found and fixed so far, both from trusting the
   browser's current organisation over the product's.
+
+### Where the migrations actually are (22 July 2026)
+
+All five are on **`alkatera-staging`** (`vwhdyqvlgjqmlzmsvaes`). None is on
+**`Alkatera2`** (`dfcezkyaejrxmbwunhry`), which is the older, larger project
+(112 products) and has none of the liquid/pack/ingredient schema.
+
+Two things to know before a production run:
+
+1. **Migration history on staging does not record the first four.** They were
+   pasted into the SQL editor, which creates the objects but writes no row to
+   `supabase_migrations.schema_migrations`; staging's recorded history still
+   ends at `20260719140000`. The fifth (`pack_formats`) WAS applied through the
+   connector and so IS recorded. So the history is now inconsistent with the
+   schema. Anything that diffs migrations against staging will be wrong until
+   the first four are backfilled into the history table.
+
+2. **Staging is behind main's own migrations too.** Its recorded history stops
+   before `20260719150000_lca_calculation_runs`, `20260719160000_pcf_boundary_source`
+   and `20260721100000_pcf_end_use_scenarios`. Whether those objects exist
+   (pasted) or genuinely do not is unverified.
