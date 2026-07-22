@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { InheritedField } from '@/components/studio/inherited-field';
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +56,13 @@ export interface MaturationFormData {
   warehouse_energy_kwh_per_barrel_year: number;
   warehouse_energy_source: EnergySource;
   warehouse_country_code: string | null;
+  /**
+   * The facility used as the maturation warehouse. Resolves the warehouse
+   * country from the facility record rather than asking for it again, and is
+   * what lets the calculator tell whether that facility's utility data already
+   * accounts for the same electricity.
+   */
+  warehouse_facility_id: string | null;
   allocation_method: 'cut_off' | 'avoided_burden';
   bottles_produced: number | null;
   notes: string | null;
@@ -67,7 +75,13 @@ interface MaturationProfileCardProps {
   productCategory?: string | null;
   productAbvPercent?: number | null;
   productBottleSizeMl?: number | null;
-  primaryFacilityCountryCode?: string | null;
+  /**
+   * The organisation's facilities, for picking the maturation warehouse.
+   * Replaces `primaryFacilityCountryCode`, which was declared and threaded
+   * through RecipeEditorPanel but never passed by the only caller, so the
+   * country fallback was always null and the card asked cold every time.
+   */
+  facilities?: { id: string; name: string; address_country?: string | null }[];
   onSave: (profile: MaturationFormData) => void;
   onRemove: () => void;
   saving?: boolean;
@@ -87,6 +101,7 @@ const GENERIC_DEFAULT_FORM: MaturationFormData = {
   warehouse_energy_kwh_per_barrel_year: 15,
   warehouse_energy_source: 'grid_electricity',
   warehouse_country_code: null,
+  warehouse_facility_id: null,
   allocation_method: 'cut_off',
   bottles_produced: null,
   notes: null,
@@ -99,7 +114,7 @@ export function MaturationProfileCard({
   productCategory,
   productAbvPercent,
   productBottleSizeMl,
-  primaryFacilityCountryCode,
+  facilities = [],
   onSave,
   onRemove,
   saving = false,
@@ -120,6 +135,7 @@ export function MaturationProfileCard({
         cask_fill_abv_percent: profile.cask_fill_abv_percent ?? null,
         warehouse_energy_kwh_per_barrel_year: profile.warehouse_energy_kwh_per_barrel_year,
         warehouse_energy_source: profile.warehouse_energy_source,
+        warehouse_facility_id: (profile as any).warehouse_facility_id ?? null,
         warehouse_country_code: profile.warehouse_country_code ?? null,
         allocation_method: profile.allocation_method,
         bottles_produced: profile.bottles_produced ?? null,
@@ -138,7 +154,8 @@ export function MaturationProfileCard({
       climate_zone: d.climate_zone,
       angel_share_percent_per_year: ANGEL_SHARE_DEFAULTS[d.climate_zone],
       cask_fill_abv_percent: d.cask_fill_abv_percent,
-      warehouse_country_code: primaryFacilityCountryCode ?? null,
+      warehouse_country_code: null,
+      warehouse_facility_id: null,
     };
   };
 
@@ -164,15 +181,24 @@ export function MaturationProfileCard({
   const hasSeededRef = useRef(!!profile);
   useEffect(() => {
     if (profile || hasSeededRef.current) return;
-    if (!productCategory && !primaryFacilityCountryCode) return;
+    if (!productCategory) return;
     hasSeededRef.current = true;
     setForm(buildInitialForm());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productCategory, primaryFacilityCountryCode]);
+  }, [productCategory]);
 
   const update = (updates: Partial<MaturationFormData>) => {
     setForm(prev => ({ ...prev, ...updates }));
   };
+
+  // The warehouse country comes from the chosen facility unless this profile
+  // deliberately says otherwise, so the same country is not typed once per
+  // product for a distillery that ages everything in one place.
+  const warehouseFacility = facilities.find(f => f.id === form.warehouse_facility_id) ?? null;
+  const inheritedWarehouseCountry = warehouseFacility?.address_country ?? null;
+  const resolvedWarehouseCountry = form.warehouse_country_code ?? inheritedWarehouseCountry;
+  const warehouseCountryLabel = (code: string | null) =>
+    code ? COUNTRIES.find(c => c.value === code)?.label ?? code : 'Not specified';
 
   // Auto-set angel's share when climate zone changes, unless the user has
   // locked the field to pin their measured value.
@@ -210,7 +236,7 @@ export function MaturationProfileCard({
           updated_at: '',
         } as MaturationProfile,
         {
-          warehouseCountryCode: form.warehouse_country_code ?? primaryFacilityCountryCode ?? null,
+          warehouseCountryCode: resolvedWarehouseCountry,
           caskFillAbvPercent: form.cask_fill_abv_percent ?? undefined,
           bottleAbvPercent: productAbvPercent ?? undefined,
         }
@@ -218,7 +244,7 @@ export function MaturationProfileCard({
     } catch {
       return null;
     }
-  }, [form, showForm, productId, organizationId, primaryFacilityCountryCode, productAbvPercent]);
+  }, [form, showForm, productId, organizationId, resolvedWarehouseCountry, productAbvPercent]);
 
   const handleSave = () => {
     if (!form.fill_volume_litres || form.fill_volume_litres <= 0) return;
@@ -462,28 +488,85 @@ export function MaturationProfileCard({
           </div>
 
           {/* Warehouse */}
-          <div className="grid grid-cols-3 gap-4">
+          {facilities.length > 0 && (
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Warehouse Country</Label>
+              <Label className="text-xs font-medium">Maturation warehouse</Label>
               <Select
-                value={form.warehouse_country_code ?? '__none__'}
-                onValueChange={(v) => update({ warehouse_country_code: v === '__none__' ? null : v })}
+                value={form.warehouse_facility_id ?? '__none__'}
+                onValueChange={(v) =>
+                  update({ warehouse_facility_id: v === '__none__' ? null : v })
+                }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select country" />
+                  <SelectValue placeholder="Choose a facility" />
                 </SelectTrigger>
-                <SelectContent className="max-h-[320px]">
+                <SelectContent>
                   <SelectItem value="__none__">
-                    <span className="text-muted-foreground">Not specified</span>
+                    <span className="text-muted-foreground">Not one of your facilities</span>
                   </SelectItem>
-                  {COUNTRIES.map((country) => (
-                    <SelectItem key={country.value} value={country.value}>
-                      {country.label}
+                  {facilities.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-[10px] text-muted-foreground">
+                Naming the warehouse lets its country and its energy come from the facility
+                you already set up.
+              </p>
             </div>
+          )}
+
+          <div className="grid grid-cols-3 gap-4">
+            {inheritedWarehouseCountry ? (
+              <InheritedField
+                label="Warehouse country"
+                source={warehouseFacility?.name ?? 'the warehouse facility'}
+                inheritedValue={warehouseCountryLabel(inheritedWarehouseCountry)}
+                overridden={form.warehouse_country_code !== null}
+                onOverride={() => update({ warehouse_country_code: inheritedWarehouseCountry })}
+                onRevert={() => update({ warehouse_country_code: null })}
+              >
+                <Select
+                  value={form.warehouse_country_code ?? '__none__'}
+                  onValueChange={(v) => update({ warehouse_country_code: v === '__none__' ? null : v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[320px]">
+                    {COUNTRIES.map((country) => (
+                      <SelectItem key={country.value} value={country.value}>
+                        {country.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </InheritedField>
+            ) : (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Warehouse Country</Label>
+                <Select
+                  value={form.warehouse_country_code ?? '__none__'}
+                  onValueChange={(v) => update({ warehouse_country_code: v === '__none__' ? null : v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[320px]">
+                    <SelectItem value="__none__">
+                      <span className="text-muted-foreground">Not specified</span>
+                    </SelectItem>
+                    {COUNTRIES.map((country) => (
+                      <SelectItem key={country.value} value={country.value}>
+                        {country.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Energy (kWh/barrel/yr)</Label>

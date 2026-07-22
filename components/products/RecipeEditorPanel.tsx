@@ -60,7 +60,6 @@ interface RecipeEditorPanelProps {
   productCategory?: string | null;
   productAbvPercent?: number | null;
   productBottleSizeMl?: number | null;
-  primaryFacilityCountryCode?: string | null;
   onSaveComplete?: () => void;
   onDirtyChange?: (isDirty: boolean) => void;
   compact?: boolean;
@@ -73,7 +72,6 @@ export function RecipeEditorPanel({
   productCategory,
   productAbvPercent,
   productBottleSizeMl,
-  primaryFacilityCountryCode,
   onSaveComplete,
   onDirtyChange,
   compact = false,
@@ -849,7 +847,7 @@ export function RecipeEditorPanel({
             productCategory={productCategory}
             productAbvPercent={productAbvPercent}
             productBottleSizeMl={productBottleSizeMl}
-            primaryFacilityCountryCode={primaryFacilityCountryCode}
+            facilities={productionFacilities}
             onSave={handleSaveMaturation}
             onRemove={handleRemoveMaturation}
             saving={saving}

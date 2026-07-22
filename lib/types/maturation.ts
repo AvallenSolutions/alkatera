@@ -61,6 +61,8 @@ export interface MaturationProfile {
   warehouse_energy_source: EnergySource;
   /** ISO 3166-1 alpha-2 country code for the maturation warehouse. */
   warehouse_country_code: string | null;
+  /** The facility used as the maturation warehouse. NULL means it is not one of the org's facilities. */
+  warehouse_facility_id?: string | null;
 
   // Allocation method
   allocation_method: AllocationMethod;
@@ -93,6 +95,8 @@ export interface MaturationTemplateData {
   warehouse_energy_kwh_per_barrel_year: number;
   warehouse_energy_source: EnergySource;
   warehouse_country_code: string | null;
+  /** The facility used as the maturation warehouse. NULL means it is not one of the org's facilities. */
+  warehouse_facility_id?: string | null;
   allocation_method: AllocationMethod;
   notes: string | null;
 }

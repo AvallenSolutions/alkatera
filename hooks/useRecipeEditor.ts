@@ -41,6 +41,8 @@ interface ProductionFacility {
   name: string;
   address_lat: number | null;
   address_lng: number | null;
+  /** Seeds the maturation warehouse country when this facility is the warehouse. */
+  address_country?: string | null;
   production_share?: number;
 }
 
@@ -179,7 +181,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         .from("facility_product_assignments")
         .select(`
           id, facility_id, is_primary_facility,
-          facilities ( id, name, address_lat, address_lng )
+          facilities ( id, name, address_lat, address_lng, address_country )
         `)
         .eq("product_id", productId)
         .eq("assignment_status", "active");
@@ -192,6 +194,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
             name: a.facilities.name,
             address_lat: typeof a.facilities.address_lat === 'string' ? parseFloat(a.facilities.address_lat) : a.facilities.address_lat,
             address_lng: typeof a.facilities.address_lng === 'string' ? parseFloat(a.facilities.address_lng) : a.facilities.address_lng,
+            address_country: a.facilities.address_country ?? null,
             production_share: a.is_primary_facility ? 100 : 0,
           }));
         facilitiesToUse.push(...assignedFacilities);
@@ -880,6 +883,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         warehouse_energy_kwh_per_barrel_year: profile.warehouse_energy_kwh_per_barrel_year,
         warehouse_energy_source: profile.warehouse_energy_source,
         warehouse_country_code: profile.warehouse_country_code ?? null,
+        warehouse_facility_id: profile.warehouse_facility_id ?? null,
         allocation_method: profile.allocation_method,
         bottles_produced: profile.bottles_produced || null,
         notes: profile.notes || null,
