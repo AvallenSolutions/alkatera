@@ -21,9 +21,18 @@ import type { IngredientFormData } from '@/components/products/IngredientFormCar
 export function buildIngredientMaterialData(
   form: IngredientFormData,
   productId: string,
+  /**
+   * The org-level `ingredients` record this row is an instance of. The recipe
+   * editor never set this, so `product_materials.material_id` was null on
+   * every row it created and nothing could join a material back to the
+   * ingredient it is made of. `/api/emissions/reconcile-consumption` joins on
+   * exactly this column and therefore never matched anything.
+   */
+  materialId?: string | null,
 ): Record<string, any> {
   const materialData: any = {
     product_id: parseInt(productId),
+    material_id: materialId ?? null,
     material_name: form.name,
     matched_source_name: form.matched_source_name || null,
     quantity: Number(form.amount),

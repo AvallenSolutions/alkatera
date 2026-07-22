@@ -8,6 +8,8 @@ import {
 } from '@/lib/products/packaging-material-data';
 import { autoMatchEmissionFactor } from '@/lib/products/ef-auto-match';
 import { buildIngredientMaterialData } from '@/lib/products/ingredient-material-data';
+import { findOrCreateIngredient, factsFromForm } from '@/lib/products/ingredient-records';
+import { supabaseIngredientStore } from '@/lib/products/ingredient-store';
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { useAutoSave } from "@/hooks/useAutoSave";
@@ -605,6 +607,47 @@ export function useRecipeEditor(productId: string, organizationId: string) {
   };
 
   // Save operations
+
+  /**
+   * Resolve every ingredient row to its org-level `ingredients` record,
+   * creating the record on first use and folding in whatever this form knows.
+   *
+   * Returns a map from tempId to ingredient id, so the row builder can set
+   * `product_materials.material_id`. The recipe editor never did this, which
+   * is why the ingredients table sat empty while the same malt's origin and
+   * emission factor were retyped for every SKU.
+   *
+   * Deliberately non-fatal: an ingredient record is an authoring convenience,
+   * so if the lookup fails the recipe still saves with a null material_id
+   * rather than losing the user's work.
+   */
+  const resolveIngredientIds = useCallback(
+    async (forms: IngredientFormData[]): Promise<Map<string, string>> => {
+      const ids = new Map<string, string>();
+      // File the ingredient under the PRODUCT's organisation, not whichever
+      // organisation the browser happens to be switched to. They normally
+      // agree, but when they diverge the context org would file another
+      // organisation's ingredients under this one.
+      const ownerOrgId = (product as any)?.organization_id ?? organizationId;
+      if (!ownerOrgId) return ids;
+      for (const form of forms) {
+        try {
+          const id = await findOrCreateIngredient(
+            supabaseIngredientStore,
+            ownerOrgId,
+            form.name,
+            factsFromForm(form as unknown as Record<string, unknown>)
+          );
+          if (id) ids.set(form.tempId, id);
+        } catch (err) {
+          console.error('[useRecipeEditor] ingredient record failed for', form.name, err);
+        }
+      }
+      return ids;
+    },
+    [organizationId, product]
+  );
+
   const saveIngredients = async () => {
     bumpSaveEpoch(); // Invalidate any autosave already past its debounce
     cancelAutoSave(); // and cancel any still pending
@@ -663,7 +706,9 @@ export function useRecipeEditor(productId: string, organizationId: string) {
 
       // Shared row builder (also used by autosave) so the two paths can never
       // write different fields again.
-      const buildMaterialData = (form: IngredientFormData) => buildIngredientMaterialData(form, productId);
+      const ingredientIds = await resolveIngredientIds(validForms);
+      const buildMaterialData = (form: IngredientFormData) =>
+        buildIngredientMaterialData(form, productId, ingredientIds.get(form.tempId) ?? null);
 
       for (const form of existingItems) {
         const { error: updateError } = await supabase
@@ -979,7 +1024,9 @@ export function useRecipeEditor(productId: string, organizationId: string) {
     // Shared row builder (also used by the manual Save button). Conditional
     // columns get explicit null defaults so updating an existing row clears
     // stale values exactly like the old delete-and-reinsert did.
-    const buildMaterialData = (form: IngredientFormData) => buildIngredientMaterialData(form, productId);
+    const ingredientIds = await resolveIngredientIds(validForms);
+    const buildMaterialData = (form: IngredientFormData) =>
+      buildIngredientMaterialData(form, productId, ingredientIds.get(form.tempId) ?? null);
 
     for (const form of existingItems) {
       const { error: updateError } = await supabase
@@ -999,7 +1046,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
 
     // Update snapshot without refetching (avoids form reset/flicker)
     savedIngredientSnapshot.current = formFingerprint(forms);
-  }, [productId, organizationId]);
+  }, [productId, organizationId, resolveIngredientIds]);
 
   // Silent save for packaging (no toasts, no fetchProductData)
   const autoSavePackaging = useCallback(async (forms: PackagingFormData[]) => {
