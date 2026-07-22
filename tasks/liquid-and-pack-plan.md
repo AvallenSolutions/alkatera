@@ -255,3 +255,32 @@ Still open before L2:
 - Identical-liquid detection and the propose-a-merge flow (decision 2), which
   can reuse the ingredient duplicate-detection shape.
 - `ingredients_templates` retirement stays deferred to L3 per decision 4.
+
+### The liquid UI (22 July 2026)
+
+Commit `3f738486`. No migration.
+
+- **The liquid shelf** at `/products/liquids`: what the organisation makes,
+  which formats bottle each, identical recipes proposed, and a merge that
+  repoints products rather than rewriting any material row (so no footprint
+  moves and nothing needs recalculating).
+- **LiquidStrip** on the recipe editor: "Made from", a warning naming the other
+  formats an edit will reach, and the second-format flow that adopts an
+  existing liquid's recipe.
+- Identity is exact, not fuzzy, and units are not converted. A recipe is the
+  product, so a wrong merge proposal is worse than a missed one.
+- Switch ordering extracted to `lib/products/switch-liquid.ts`: donor read
+  before clearing, link set last, nothing cleared when there is no recipe to
+  adopt.
+
+Two org-mismatch bugs of the same class have now been found and fixed (the
+ingredient save path, the liquid picker). Both came from trusting the browser's
+current organisation instead of the product's. Worth grepping for the pattern
+before L2 rather than finding a third.
+
+Still open before L2:
+- Naming a liquid. The shelf lists them and the strip picks them, but a liquid
+  is still named after whichever product it was lifted from and cannot be
+  renamed. That is the smallest remaining gap and the most visible.
+- Maturation and production stages still hang off the product, not the liquid.
+- `ingredients_templates` retirement, deferred to L3 per decision 4.
