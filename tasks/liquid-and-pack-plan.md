@@ -152,3 +152,39 @@ is not cosmetic: every distribution stage will move when the update lands.
    as liquids nothing links to yet (lossless: source volume, items and
    maturation are all a liquid needs). The table drops only after cutover
    data lands, not when L3 ships.
+
+---
+
+## 7. Progress log
+
+### Audit Phase 1 complete (22 July 2026, branch `redesign`)
+
+Build item 1 of 5. Commits `d1ab8e87`, `6a7e3bc9`, `fe6bd7cb`, `9e0fa9f1`.
+
+- **EPR inheritance.** `lib/epr/inheritance.ts` is the one cascade (row →
+  organisation → platform), shared by the forms, the gaps page and the
+  submission generator, which each carried their own version. Measured on real
+  local data (alkatera Drinks Co, 31 packaging rows): 31 gaps / 67 questions
+  became 5 gaps / 5 questions, and the 5 survivors are all EPR material type,
+  a fact no higher level can answer. `BulkEditStep` deleted; the EPR wizard is
+  15 steps.
+- **Facility hybrid overrides** persist to `facilities.default_hybrid_overrides`
+  and seed every allocation. They previously survived only inside a single
+  run's `draft_data` blob and were dropped entirely on facility save.
+- **EoL region and consumer market** default from `organizations.country`. The
+  wizard never loaded the organisation record at all.
+- **Bug X4** closed both ways: `maturation_profiles.warehouse_facility_id`
+  gives the warehouse country a home, and the synthetic warehouse row is
+  dropped when that facility's measured electricity already covers the period.
+  Narrow by decision: only fires once a warehouse is explicitly named, so no
+  existing footprint moves until a user opts in.
+
+New shared component `components/studio/inherited-field.tsx` carries the
+audit's P2 (inherit with override) and P3 (derive, then state the assumption).
+Phase 2 reuses it rather than reimplementing the pattern per form.
+
+Migration `20260722100000_phase1_inheritance_homes.sql`, applied locally and
+re-run clean; **pending prod**.
+
+**Next: audit Phase 2**, promoting `ingredients` and `supplier_products` to
+first-class records. Then L1, L2, L3.
