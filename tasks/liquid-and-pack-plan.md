@@ -306,3 +306,37 @@ All three fill in per product as recipes are saved. A backfill is possible
 customer data on the basis of name-matching, which is the thing the duplicate
 decision says to propose rather than do. Not written; raise with Tim if the
 empty shelf is worth more than that caution.
+
+### Naming, and L2 (22 July 2026)
+
+Commits `806f9822` (naming), `00b5c0d1` (L2). Migration
+`20260722140000_pack_formats.sql`, **pending prod**.
+
+- **Liquids can be renamed** inline on the shelf. The backfill named each after
+  whichever product it was lifted from, which stops being right the moment two
+  formats share one.
+- **L2 landed.** `pack_formats` + `products.pack_format_id`, 1:1 backfill (12
+  products with packaging → 12 formats locally), fan-out on packaging save,
+  identity + propose-only merge, a shelf at `/products/packs`, a PACKS tab, and
+  the strip on the packaging tab.
+
+L1's machinery was generalised rather than copied: `composition-fanout`,
+`switch-composition` and `composition-identity` now serve both halves,
+parameterised by link column and material type. `/api/liquids/merge` became
+`/api/compositions/merge`. Copying tested logic would have been the exact
+failure this programme exists to remove.
+
+`pack_formats` is deliberately thin. The first draft denormalised container
+format/material/size onto it; that is a second home for facts that live on
+`product_materials` and would drift on the first correction. A pack's spec is
+its rows.
+
+Still open:
+- **L3**: composition as the creation flow (pick a liquid, a fill volume, a
+  pack), estimate-first birth, and `ingredients_templates` retirement.
+- Maturation and production stages still hang off the product, not the liquid.
+- The entry-design ladder (§7 of tasks/liquid-pack-entry-design.md): brew sheet
+  extraction, spec sheet → pack, archetypes, Breww, the supplier flywheel.
+- Audit Phase 3 (wizard reads/writes canonical) and Phase 4 (duplicate tables).
+- The org-mismatch grep: two found and fixed so far, both from trusting the
+  browser's current organisation over the product's.
