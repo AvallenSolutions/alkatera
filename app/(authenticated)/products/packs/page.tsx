@@ -27,6 +27,7 @@ import { BigNumber } from "@/components/studio/big-number";
 import { StateChip } from "@/components/studio/state-chip";
 import { PillButton } from "@/components/studio/pill-button";
 import { PageLoader } from "@/components/ui/page-loader";
+import { COMPOSABLE_PRODUCT_KIND } from "@/lib/products/composable-kind";
 import {
   findIdenticalPacks,
   suggestPackSurvivor,
@@ -81,6 +82,7 @@ export default function PackShelfPage() {
         .from("products")
         .select("id, name, pack_format_id")
         .eq("organization_id", orgId)
+        .eq("product_kind", COMPOSABLE_PRODUCT_KIND)
         .not("pack_format_id", "is", null);
 
       const byPack = new Map<string, { id: number; name: string }[]>();
@@ -145,7 +147,14 @@ export default function PackShelfPage() {
     if (!next || next === row.name) return;
 
     setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, name: next } : r)));
-    const { error } = await supabase.from("pack_formats").update({ name: next }).eq("id", row.id);
+    // A pack's default name is derived from its container component, and is
+    // re-derived when the components change. The moment a person names it —
+    // producers have internal names for their packs — that stops: their name
+    // outranks anything we could work out.
+    const { error } = await supabase
+      .from("pack_formats")
+      .update({ name: next, name_is_custom: true })
+      .eq("id", row.id);
     if (error) {
       setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, name: row.name } : r)));
       toast.error(error.message || "Could not rename that pack format");

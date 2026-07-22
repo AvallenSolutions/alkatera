@@ -38,6 +38,7 @@ import { PillButton } from "@/components/studio/pill-button";
 import { RecordPicker } from "@/components/studio/record-picker";
 import { Input } from "@/components/ui/input";
 import { PageLoader } from "@/components/ui/page-loader";
+import { COMPOSABLE_PRODUCT_KIND } from "@/lib/products/composable-kind";
 import { recipeRowsFor } from "@/lib/products/switch-composition";
 import {
   estimateComposition,
@@ -139,7 +140,8 @@ export default function ComposeProductPage() {
           supabase
             .from("products")
             .select("id, liquid_id, pack_format_id")
-            .eq("organization_id", orgId),
+            .eq("organization_id", orgId)
+            .eq("product_kind", COMPOSABLE_PRODUCT_KIND),
         ]);
 
       const byLiquid = new Map<string, number[]>();

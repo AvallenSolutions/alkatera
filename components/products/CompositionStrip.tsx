@@ -26,6 +26,7 @@ import { Eyebrow } from "@/components/studio/eyebrow";
 import { StateChip } from "@/components/studio/state-chip";
 import { PillButton } from "@/components/studio/pill-button";
 import { RecordPicker } from "@/components/studio/record-picker";
+import { COMPOSABLE_PRODUCT_KIND } from "@/lib/products/composable-kind";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -124,6 +125,7 @@ export function CompositionStrip({
         .from("products")
         .select(`id, name, ${K.linkColumn}`)
         .eq("organization_id", organizationId)
+        .eq("product_kind", COMPOSABLE_PRODUCT_KIND)
         .not(K.linkColumn, "is", null);
 
       if (!live) return;

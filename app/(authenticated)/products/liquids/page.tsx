@@ -26,6 +26,7 @@ import { BigNumber } from "@/components/studio/big-number";
 import { StateChip } from "@/components/studio/state-chip";
 import { PillButton } from "@/components/studio/pill-button";
 import { PageLoader } from "@/components/ui/page-loader";
+import { COMPOSABLE_PRODUCT_KIND } from "@/lib/products/composable-kind";
 import {
   findIdenticalLiquids,
   suggestLiquidSurvivor,
@@ -60,6 +61,7 @@ export default function LiquidShelfPage() {
         .from("products")
         .select("id, name, liquid_id")
         .eq("organization_id", orgId)
+        .eq("product_kind", COMPOSABLE_PRODUCT_KIND)
         .not("liquid_id", "is", null);
 
       const byLiquid = new Map<string, { id: number; name: string }[]>();
