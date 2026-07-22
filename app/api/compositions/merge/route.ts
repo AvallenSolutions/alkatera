@@ -8,7 +8,8 @@ import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access';
 export const dynamic = 'force-dynamic';
 
 /**
- * Merge liquids the user has decided are the same recipe.
+ * Merge compositions the user has decided are the same: two liquids holding
+ * one recipe, or two pack formats holding one specification.
  *
  * Only ever runs when a person asks for it. The platform detects identical
  * liquids and proposes; this is the accept. That split is decision 2 of
@@ -24,16 +25,21 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const survivorId: string | undefined = body?.survivorId;
   const mergedIds: string[] = Array.isArray(body?.mergedIds) ? body.mergedIds : [];
+  const kind: 'liquid' | 'pack' = body?.kind === 'pack' ? 'pack' : 'liquid';
+  const { table, linkColumn } =
+    kind === 'pack'
+      ? { table: 'pack_formats', linkColumn: 'pack_format_id' }
+      : { table: 'liquids', linkColumn: 'liquid_id' };
 
   if (!survivorId || mergedIds.length === 0) {
     return NextResponse.json(
-      { error: 'A surviving liquid and at least one liquid to merge are required' },
+      { error: 'A survivor and at least one composition to merge are required' },
       { status: 400 }
     );
   }
   if (mergedIds.includes(survivorId)) {
     return NextResponse.json(
-      { error: 'The surviving liquid cannot also be one of the merged ones' },
+      { error: 'The survivor cannot also be one of the merged ones' },
       { status: 400 }
     );
   }
@@ -78,11 +84,11 @@ export async function POST(request: NextRequest) {
   const denied = await denyReadOnlyAdvisor(admin, user, organizationId);
   if (denied) return denied;
 
-  // The service-role client bypasses RLS, so every liquid named here is
+  // The service-role client bypasses RLS, so every composition named here is
   // checked against the caller's organisation rather than assumed.
   const allIds = [survivorId, ...mergedIds];
   const { data: liquids, error: loadError } = await admin
-    .from('liquids')
+    .from(table)
     .select('id, organization_id, name')
     .in('id', allIds);
 
@@ -90,7 +96,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: loadError.message }, { status: 500 });
   }
   if (!liquids || liquids.length !== allIds.length) {
-    return NextResponse.json({ error: 'One or more liquids were not found' }, { status: 404 });
+    return NextResponse.json({ error: 'One or more were not found' }, { status: 404 });
   }
   if (liquids.some((l) => l.organization_id !== organizationId)) {
     return NextResponse.json({ error: 'Not authorised' }, { status: 403 });
@@ -100,15 +106,15 @@ export async function POST(request: NextRequest) {
   // try again; deleting first would strand products on a missing liquid.
   const { data: moved, error: repointError } = await admin
     .from('products')
-    .update({ liquid_id: survivorId })
-    .in('liquid_id', mergedIds)
+    .update({ [linkColumn]: survivorId })
+    .in(linkColumn, mergedIds)
     .select('id');
 
   if (repointError) {
     return NextResponse.json({ error: repointError.message }, { status: 500 });
   }
 
-  const { error: deleteError } = await admin.from('liquids').delete().in('id', mergedIds);
+  const { error: deleteError } = await admin.from(table).delete().in('id', mergedIds);
   if (deleteError) {
     // The products are already safely on the survivor, so this is untidy
     // rather than harmful: the merged liquids simply linger with no products.
@@ -116,7 +122,7 @@ export async function POST(request: NextRequest) {
       {
         merged: true,
         productsMoved: moved?.length ?? 0,
-        warning: 'The products were moved but the empty liquids could not be removed.',
+        warning: 'The products were moved but the empty records could not be removed.',
       },
       { status: 200 }
     );

@@ -1,10 +1,12 @@
 /**
- * Pointing a product at a liquid it is not currently made from.
+ * Pointing a product at a composition it is not currently using.
  *
- * The "same liquid, different pack" case: a producer who already makes a gin
- * adds a 50ml of it and should not retype the recipe. Switching adopts the
- * target liquid's recipe, and from then on the two products stay in step
- * through the fan-out.
+ * Serves both halves. The "same liquid, different pack" case: a producer who
+ * already makes a gin adds a 50ml and should not retype the recipe. And its
+ * mirror, "same bottle, different liquid": a second spirit in the same 700ml
+ * flint bottle should not need the glass weighed again. Switching adopts the
+ * target's rows, and from then on the products stay in step through the
+ * fan-out.
  *
  * Extracted from `LiquidStrip` so the ordering rules below are testable. They
  * matter more than they look: this is one of the few operations in the
@@ -13,19 +15,19 @@
  * one.
  */
 
-export interface SwitchLiquidStore {
-  /** A product already bottling the target liquid, to copy the recipe from. */
-  donorFor(liquidId: string, excludingProductId: number): Promise<number | null>;
-  /** The donor's ingredient rows. */
+export interface SwitchCompositionStore {
+  /** A product already using the target, to copy its rows from. */
+  donorFor(compositionId: string, excludingProductId: number): Promise<number | null>;
+  /** The donor's rows for this composition's material type. */
   ingredientRows(productId: number): Promise<Record<string, unknown>[]>;
-  /** Replace a product's ingredient rows with these. */
+  /** Replace a product's rows of that material type with these. */
   replaceIngredients(productId: number, rows: Record<string, unknown>[]): Promise<void>;
-  /** Point the product at the liquid. */
-  setLiquid(productId: number, liquidId: string): Promise<void>;
+  /** Point the product at the composition. */
+  setLiquid(productId: number, compositionId: string): Promise<void>;
 }
 
-export interface SwitchLiquidResult {
-  /** True when the target liquid had a recipe to adopt. */
+export interface SwitchCompositionResult {
+  /** True when the target had rows to adopt. */
   adoptedRecipe: boolean;
   rowsCopied: number;
 }
@@ -46,34 +48,33 @@ export function recipeRowsFor(
 }
 
 /**
- * Adopt a liquid, and its recipe if it has one.
+ * Adopt a composition, and its rows if it has any.
  *
  * Order is deliberate. The donor's rows are read BEFORE this product's are
  * cleared, so a failed read leaves the existing recipe untouched, and the link
  * is set LAST, so a product is never pointing at a liquid whose recipe it does
  * not yet hold. A failure at any step leaves a state the user can retry from.
  *
- * A liquid with no products yet is a valid target: the user is choosing to
- * make this product from a liquid they are about to write the recipe for, and
- * nothing is cleared in that case.
+ * A composition with no products yet is a valid target: the user is choosing
+ * one they are about to specify, and nothing is cleared in that case.
  */
-export async function switchProductLiquid(
-  store: SwitchLiquidStore,
+export async function switchProductComposition(
+  store: SwitchCompositionStore,
   productId: number,
-  targetLiquidId: string
-): Promise<SwitchLiquidResult> {
-  const donorId = await store.donorFor(targetLiquidId, productId);
+  targetCompositionId: string
+): Promise<SwitchCompositionResult> {
+  const donorId = await store.donorFor(targetCompositionId, productId);
 
   if (donorId === null) {
-    // No recipe to adopt. Link only, and leave this product's own rows alone:
-    // clearing them would destroy a recipe and put nothing in its place.
-    await store.setLiquid(productId, targetLiquidId);
+    // Nothing to adopt. Link only, and leave this product's own rows alone:
+    // clearing them would destroy a specification and put nothing in its place.
+    await store.setLiquid(productId, targetCompositionId);
     return { adoptedRecipe: false, rowsCopied: 0 };
   }
 
   const donorRows = await store.ingredientRows(donorId);
   await store.replaceIngredients(productId, recipeRowsFor(donorRows, productId));
-  await store.setLiquid(productId, targetLiquidId);
+  await store.setLiquid(productId, targetCompositionId);
 
   return { adoptedRecipe: true, rowsCopied: donorRows.length };
 }

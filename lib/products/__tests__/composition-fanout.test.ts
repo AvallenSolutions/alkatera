@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   rowsForProduct,
-  fanOutLiquidRecipe,
+  fanOutComposition,
   describeFanout,
   type FanoutStore,
-} from '../liquid-fanout';
+} from '../composition-fanout';
 
 /**
  * L1's exit criterion: correcting one ingredient in a liquid updates every
@@ -58,10 +58,10 @@ describe('rowsForProduct', () => {
   });
 });
 
-describe('fanOutLiquidRecipe', () => {
+describe('fanOutComposition', () => {
   it('does nothing when the product has no liquid', async () => {
     const { store } = makeStore([2, 3]);
-    const result = await fanOutLiquidRecipe(store, null, 1, ROWS);
+    const result = await fanOutComposition(store, null, 1, ROWS);
     expect(result).toEqual({ updated: [], failed: [] });
     expect(store.siblingsOf).not.toHaveBeenCalled();
   });
@@ -70,14 +70,14 @@ describe('fanOutLiquidRecipe', () => {
     // The 1:1 state every product starts in after the backfill: nothing
     // anyone sees changes on day one.
     const { store } = makeStore([]);
-    const result = await fanOutLiquidRecipe(store, 'liq-1', 1, ROWS);
+    const result = await fanOutComposition(store, 'liq-1', 1, ROWS);
     expect(result.updated).toEqual([]);
     expect(store.replaceIngredients).not.toHaveBeenCalled();
   });
 
   it('writes the recipe to every sibling and asks for a recalc', async () => {
     const { store, writes, recalcs } = makeStore([2, 3]);
-    const result = await fanOutLiquidRecipe(store, 'liq-1', 1, ROWS);
+    const result = await fanOutComposition(store, 'liq-1', 1, ROWS);
 
     expect(result.updated).toEqual([2, 3]);
     expect(result.failed).toEqual([]);
@@ -94,7 +94,7 @@ describe('fanOutLiquidRecipe', () => {
       if (productId === 3) throw new Error('constraint violation');
     });
 
-    const result = await fanOutLiquidRecipe(store, 'liq-1', 1, ROWS);
+    const result = await fanOutComposition(store, 'liq-1', 1, ROWS);
     expect(result.updated).toEqual([2, 4]);
     expect(result.failed).toEqual([{ productId: 3, message: 'constraint violation' }]);
   });
@@ -103,7 +103,7 @@ describe('fanOutLiquidRecipe', () => {
     // A stale footprint is recoverable; a lost recipe is not.
     const { store } = makeStore([2]);
     (store.requestRecalc as any).mockRejectedValue(new Error('inngest down'));
-    const result = await fanOutLiquidRecipe(store, 'liq-1', 1, ROWS);
+    const result = await fanOutComposition(store, 'liq-1', 1, ROWS);
     expect(result.updated).toEqual([2]);
     expect(result.failed).toEqual([]);
   });

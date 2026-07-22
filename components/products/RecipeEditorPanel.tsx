@@ -15,7 +15,7 @@ import { BOMImportFlow } from "@/components/products/BOMImportFlow";
 import { stashedLineItemsToExtracted } from "@/lib/bom/parser";
 import type { ExtractedBOMItem } from "@/lib/bom/types";
 import { MaturationProfileCard } from "@/components/products/MaturationProfileCard";
-import { LiquidStrip } from "@/components/products/LiquidStrip";
+import { CompositionStrip } from "@/components/products/CompositionStrip";
 import { isMaturationEligibleProduct } from "@/lib/maturation-eligibility";
 import { SearchGuidePanel } from "@/components/products/SearchGuidePanel";
 import { RecipeChecklist } from "@/components/products/RecipeChecklist";
@@ -522,7 +522,8 @@ export function RecipeEditorPanel({
                   until now: the fan-out worked but nothing told the user
                   their recipe was shared, or let them point a second format
                   at a liquid they already make. */}
-              <LiquidStrip
+              <CompositionStrip
+                kind="liquid"
                 organizationId={(product as any)?.organization_id ?? organizationId}
                 productId={productId}
                 liquidId={(product as any)?.liquid_id ?? null}
@@ -721,6 +722,17 @@ export function RecipeEditorPanel({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* The pack half of the composition, mirroring the liquid strip
+                  on the recipe tab: what this product is packed in, and who
+                  else shares it. */}
+              <CompositionStrip
+                kind="pack"
+                organizationId={(product as any)?.organization_id ?? organizationId}
+                productId={productId}
+                liquidId={(product as any)?.pack_format_id ?? null}
+                onChanged={fetchProductData}
+              />
+
               <RecipeToolbar
                 itemCount={packagingCount}
                 onAdd={addPackaging}

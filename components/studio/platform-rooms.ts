@@ -104,6 +104,7 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
       // What a product is made of, one level up from the product itself: the
       // liquid you make and the ingredients you buy, each owned once.
       { label: 'Liquids', href: '/products/liquids/' },
+      { label: 'Packs', href: '/products/packs/' },
       { label: 'Ingredients', href: '/products/ingredients/' },
       { label: 'LCAs', href: '/reports/lcas/' },
       { label: 'Vitality', href: '/performance/' },

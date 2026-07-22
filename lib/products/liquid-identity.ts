@@ -14,6 +14,12 @@
  */
 
 import { normaliseIngredientName } from './ingredient-duplicates';
+import {
+  groupByFingerprint,
+  suggestSurvivor,
+  type CompositionLike,
+  type IdenticalGroup,
+} from './composition-identity';
 
 export interface LiquidRecipeLine {
   material_name: string;
@@ -21,16 +27,12 @@ export interface LiquidRecipeLine {
   unit: string | null;
 }
 
-export interface LiquidLike {
-  id: string;
-  name: string;
+export interface LiquidLike extends CompositionLike {
   recipe_scale_mode?: string | null;
   batch_yield_value?: number | string | null;
   batch_yield_unit?: string | null;
   /** The liquid's recipe, from the material rows of the products that bottle it. */
   lines: LiquidRecipeLine[];
-  /** Products bottling this liquid, for showing what a merge would affect. */
-  productCount: number;
 }
 
 /**
@@ -70,51 +72,18 @@ export function liquidRecipeFingerprint(liquid: LiquidLike): string {
   return `${scale}|${lines.join('|')}`;
 }
 
-export interface IdenticalLiquidGroup {
-  fingerprint: string;
-  members: LiquidLike[];
-  /** How many products would end up sharing one liquid if merged. */
-  productCount: number;
-}
+export type IdenticalLiquidGroup = IdenticalGroup<LiquidLike>;
 
 /**
- * Group liquids whose recipes are identical.
- *
- * Liquids with no recipe at all are skipped rather than grouped together: a
- * shelf full of empty liquids is not evidence that they are the same drink.
+ * Group liquids whose recipes are identical. The grouping itself is shared
+ * with pack formats (`composition-identity`); only the fingerprint differs.
  */
 export function findIdenticalLiquids(liquids: LiquidLike[]): IdenticalLiquidGroup[] {
-  const byFingerprint = new Map<string, LiquidLike[]>();
-
-  for (const liquid of liquids) {
-    const fingerprint = liquidRecipeFingerprint(liquid);
-    if (!fingerprint) continue;
-    const group = byFingerprint.get(fingerprint);
-    if (group) group.push(liquid);
-    else byFingerprint.set(fingerprint, [liquid]);
-  }
-
-  const groups: IdenticalLiquidGroup[] = [];
-  for (const [fingerprint, members] of Array.from(byFingerprint.entries())) {
-    if (members.length < 2) continue;
-    groups.push({
-      fingerprint,
-      members,
-      productCount: members.reduce((n, m) => n + m.productCount, 0),
-    });
-  }
-
-  return groups.sort((a, b) => b.members.length - a.members.length);
+  return groupByFingerprint(liquids, liquidRecipeFingerprint);
 }
 
 /**
- * Which liquid of an identical group to keep.
- *
- * The one already bottled by the most products, so a merge repoints the fewest
- * products and the name most people recognise survives. Only a suggestion.
+ * Which liquid of an identical group to keep: the one already bottled by the
+ * most products, so a merge repoints the fewest. Only a suggestion.
  */
-export function suggestLiquidSurvivor(group: IdenticalLiquidGroup): LiquidLike {
-  return [...group.members].sort(
-    (a, b) => b.productCount - a.productCount || a.name.localeCompare(b.name)
-  )[0];
-}
+export const suggestLiquidSurvivor = suggestSurvivor<LiquidLike>;

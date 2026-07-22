@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   recipeRowsFor,
-  switchProductLiquid,
-  type SwitchLiquidStore,
-} from '../switch-liquid';
+  switchProductComposition,
+  type SwitchCompositionStore,
+} from '../switch-composition';
 
 /**
  * Switching a product onto another liquid is one of the few authoring
@@ -12,9 +12,9 @@ import {
  * there is nothing to put in place.
  */
 
-function makeStore(over: Partial<SwitchLiquidStore> = {}) {
+function makeStore(over: Partial<SwitchCompositionStore> = {}) {
   const calls: string[] = [];
-  const store: SwitchLiquidStore = {
+  const store: SwitchCompositionStore = {
     donorFor: vi.fn(async () => {
       calls.push('donorFor');
       return 12;
@@ -61,10 +61,10 @@ describe('recipeRowsFor', () => {
   });
 });
 
-describe('switchProductLiquid', () => {
+describe('switchProductComposition', () => {
   it('adopts the target liquid’s recipe', async () => {
     const { store } = makeStore();
-    const result = await switchProductLiquid(store, 29, 'liq-1');
+    const result = await switchProductComposition(store, 29, 'liq-1');
 
     expect(result).toEqual({ adoptedRecipe: true, rowsCopied: 2 });
     expect(store.replaceIngredients).toHaveBeenCalledWith(29, [
@@ -78,7 +78,7 @@ describe('switchProductLiquid', () => {
     // A failed read must leave the existing recipe untouched, and a product
     // must never point at a liquid whose recipe it does not yet hold.
     const { store, calls } = makeStore();
-    await switchProductLiquid(store, 29, 'liq-1');
+    await switchProductComposition(store, 29, 'liq-1');
     expect(calls).toEqual(['donorFor', 'ingredientRows', 'replaceIngredients', 'setLiquid']);
   });
 
@@ -88,7 +88,7 @@ describe('switchProductLiquid', () => {
         throw new Error('network');
       }),
     });
-    await expect(switchProductLiquid(store, 29, 'liq-1')).rejects.toThrow('network');
+    await expect(switchProductComposition(store, 29, 'liq-1')).rejects.toThrow('network');
     expect(store.replaceIngredients).not.toHaveBeenCalled();
     expect(store.setLiquid).not.toHaveBeenCalled();
   });
@@ -99,7 +99,7 @@ describe('switchProductLiquid', () => {
         throw new Error('constraint');
       }),
     });
-    await expect(switchProductLiquid(store, 29, 'liq-1')).rejects.toThrow('constraint');
+    await expect(switchProductComposition(store, 29, 'liq-1')).rejects.toThrow('constraint');
     expect(store.setLiquid).not.toHaveBeenCalled();
   });
 
@@ -107,7 +107,7 @@ describe('switchProductLiquid', () => {
     // Choosing a liquid you are about to write the recipe for is valid, and
     // must not destroy the recipe this product already has.
     const { store } = makeStore({ donorFor: vi.fn(async () => null) });
-    const result = await switchProductLiquid(store, 29, 'liq-empty');
+    const result = await switchProductComposition(store, 29, 'liq-empty');
 
     expect(result).toEqual({ adoptedRecipe: false, rowsCopied: 0 });
     expect(store.replaceIngredients).not.toHaveBeenCalled();

@@ -1,7 +1,11 @@
 "use client";
 
 /**
- * What this product is made from, above its recipe.
+ * What this product is made from, or packed in, above its rows.
+ *
+ * One component for both halves of the composition, because the interaction is
+ * the same: say what it uses, warn when an edit will reach other products, and
+ * let the user point it at one they already have.
  *
  * The composition model says a product is one liquid at a fill volume in one
  * pack format. Until now the liquid was invisible: the entity existed and the
@@ -17,7 +21,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
-import { switchProductLiquid } from "@/lib/products/switch-liquid";
+import { switchProductComposition } from "@/lib/products/switch-composition";
 import { Eyebrow } from "@/components/studio/eyebrow";
 import { StateChip } from "@/components/studio/state-chip";
 import { PillButton } from "@/components/studio/pill-button";
@@ -39,13 +43,51 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-interface LiquidOption {
+interface CompositionOption {
   id: string;
   name: string;
   productCount: number;
 }
 
-interface LiquidStripProps {
+/** Everything that differs between the liquid half and the pack half. */
+const KINDS = {
+  liquid: {
+    table: 'liquids',
+    linkColumn: 'liquid_id',
+    materialType: 'ingredient',
+    eyebrow: 'Made from',
+    empty: 'No liquid yet',
+    emptyHint: 'Save a recipe and this product gets a liquid of its own.',
+    loneHint: 'Only this product uses it. Point another format at it to share the recipe.',
+    pick: '{K.pick}',
+    placeholder: 'Choose a liquid you make',
+    sharedNoun: 'format',
+    editNoun: 'recipe',
+    tab: 'ingredients',
+    rowsNoun: 'ingredient',
+  },
+  pack: {
+    table: 'pack_formats',
+    linkColumn: 'pack_format_id',
+    materialType: 'packaging',
+    eyebrow: 'Packed in',
+    empty: 'No pack format yet',
+    emptyHint: 'Save packaging and this product gets a pack format of its own.',
+    loneHint: 'Only this product uses it. Point another product at it to share the spec.',
+    pick: 'Use another pack',
+    placeholder: 'Choose a pack you already use',
+    sharedNoun: 'product',
+    editNoun: 'packaging',
+    tab: 'packaging',
+    rowsNoun: 'component',
+  },
+} as const;
+
+export type CompositionStripKind = keyof typeof KINDS;
+
+interface CompositionStripProps {
+  /** Which half of the composition this strip governs. */
+  kind: CompositionStripKind;
   /**
    * The PRODUCT's organisation, not whichever one the browser is switched to.
    * They normally agree, but when they diverge the liquid list would come from
@@ -53,18 +95,21 @@ interface LiquidStripProps {
    */
   organizationId: string;
   productId: string;
+  /** The product's current composition id for this kind. */
   liquidId: string | null;
-  /** Called after the product's liquid changes, so the editor can reload. */
+  /** Called after the product's composition changes, so the editor can reload. */
   onChanged: () => void;
 }
 
-export function LiquidStrip({
+export function CompositionStrip({
+  kind,
   organizationId,
   productId,
   liquidId,
   onChanged,
-}: LiquidStripProps) {
-  const [options, setOptions] = useState<LiquidOption[]>([]);
+}: CompositionStripProps) {
+  const K = KINDS[kind];
+  const [options, setOptions] = useState<CompositionOption[]>([]);
   const [siblings, setSiblings] = useState<{ id: number; name: string }[]>([]);
   const [picking, setPicking] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -76,24 +121,25 @@ export function LiquidStrip({
 
     (async () => {
       const { data: liquids } = await supabase
-        .from("liquids")
+        .from(K.table)
         .select("id, name")
         .eq("organization_id", organizationId)
         .order("name");
 
       const { data: products } = await supabase
         .from("products")
-        .select("id, name, liquid_id")
+        .select(`id, name, ${K.linkColumn}`)
         .eq("organization_id", organizationId)
-        .not("liquid_id", "is", null);
+        .not(K.linkColumn, "is", null);
 
       if (!live) return;
 
       const counts = new Map<string, number>();
       const others: { id: number; name: string }[] = [];
       for (const p of (products ?? []) as any[]) {
-        counts.set(p.liquid_id, (counts.get(p.liquid_id) ?? 0) + 1);
-        if (liquidId && p.liquid_id === liquidId && String(p.id) !== String(productId)) {
+        const link = p[K.linkColumn];
+        counts.set(link, (counts.get(link) ?? 0) + 1);
+        if (liquidId && link === liquidId && String(p.id) !== String(productId)) {
           others.push({ id: p.id, name: p.name });
         }
       }
@@ -120,16 +166,16 @@ export function LiquidStrip({
     if (!pendingId) return;
     setSwitching(true);
     try {
-      // The ordering rules live in switchProductLiquid, where they can be
+      // The ordering rules live in switchProductComposition, where they can be
       // tested: read the donor before clearing, link last, never clear when
       // there is nothing to put in place.
-      const result = await switchProductLiquid(
+      const result = await switchProductComposition(
         {
           async donorFor(liquidId, excludingProductId) {
             const { data } = await supabase
               .from("products")
               .select("id")
-              .eq("liquid_id", liquidId)
+              .eq(K.linkColumn, pendingId)
               .neq("id", excludingProductId)
               .limit(1)
               .maybeSingle();
@@ -140,7 +186,7 @@ export function LiquidStrip({
               .from("product_materials")
               .select("*")
               .eq("product_id", donorProductId)
-              .eq("material_type", "ingredient");
+              .eq("material_type", K.materialType);
             if (error) throw error;
             return data ?? [];
           },
@@ -149,7 +195,7 @@ export function LiquidStrip({
               .from("product_materials")
               .delete()
               .eq("product_id", targetProductId)
-              .eq("material_type", "ingredient");
+              .eq("material_type", K.materialType);
             if (clearError) throw clearError;
             if (rows.length === 0) return;
             const { error: insertError } = await supabase
@@ -157,10 +203,10 @@ export function LiquidStrip({
               .insert(rows);
             if (insertError) throw insertError;
           },
-          async setLiquid(targetProductId, liquidId) {
+          async setLiquid(targetProductId, compositionId) {
             const { error } = await supabase
               .from("products")
-              .update({ liquid_id: liquidId })
+              .update({ [K.linkColumn]: compositionId })
               .eq("id", targetProductId);
             if (error) throw error;
           },
@@ -171,14 +217,14 @@ export function LiquidStrip({
 
       toast.success(
         result.adoptedRecipe
-          ? `Now made from ${pending?.name}, with its ${result.rowsCopied} ingredient${result.rowsCopied === 1 ? "" : "s"}.`
-          : `Now made from ${pending?.name}.`
+          ? `Now ${K.eyebrow.toLowerCase()} ${pending?.name}, with its ${result.rowsCopied} ${K.rowsNoun}${result.rowsCopied === 1 ? "" : "s"}.`
+          : `Now ${K.eyebrow.toLowerCase()} ${pending?.name}.`
       );
       setPendingId(null);
       setPicking(false);
       onChanged();
     } catch (err: any) {
-      toast.error(err.message ?? "Could not switch this product's liquid");
+      toast.error(err.message ?? `Could not switch this product's ${kind === "pack" ? "pack format" : "liquid"}`);
     } finally {
       setSwitching(false);
     }
@@ -188,26 +234,26 @@ export function LiquidStrip({
     <>
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-studio-hairline pb-4">
         <div className="min-w-0">
-          <Eyebrow>Made from</Eyebrow>
+          <Eyebrow>{K.eyebrow}</Eyebrow>
           <div className="mt-1 flex flex-wrap items-baseline gap-3">
             <span className="font-display text-[15px] font-semibold text-studio-ink">
-              {current ? current.name : "No liquid yet"}
+              {current ? current.name : K.empty}
             </span>
             {siblings.length > 0 && (
               <StateChip tone="good">
-                Shared with {siblings.length} other format{siblings.length === 1 ? "" : "s"}
+                Shared with {siblings.length} other {K.sharedNoun}{siblings.length === 1 ? "" : "s"}
               </StateChip>
             )}
           </div>
           <p className="mt-1 font-mono text-[10px] leading-relaxed text-studio-dim">
             {siblings.length > 0 ? (
               <>
-                Editing this recipe also updates{" "}
+                Editing this {K.editNoun} also updates{" "}
                 {siblings.slice(0, 2).map((s, i) => (
                   <span key={s.id}>
                     {i > 0 && ", "}
                     <Link
-                      href={`/products/${s.id}/recipe?tab=ingredients`}
+                      href={`/products/${s.id}/recipe?tab=${K.tab}`}
                       className="text-studio-ink underline decoration-studio-hairline underline-offset-2"
                     >
                       {s.name}
@@ -217,9 +263,9 @@ export function LiquidStrip({
                 {siblings.length > 2 && ` +${siblings.length - 2}`}.
               </>
             ) : current ? (
-              "Only this product uses it. Point another format at it to share the recipe."
+              K.loneHint
             ) : (
-              "Save a recipe and this product gets a liquid of its own."
+              K.emptyHint
             )}
           </p>
         </div>
@@ -229,7 +275,7 @@ export function LiquidStrip({
             <>
               <Select value={pendingId ?? ""} onValueChange={setPendingId}>
                 <SelectTrigger className="h-9 w-[240px] text-xs">
-                  <SelectValue placeholder="Choose a liquid you make" />
+                  <SelectValue placeholder={K.placeholder} />
                 </SelectTrigger>
                 <SelectContent>
                   {options
@@ -238,7 +284,7 @@ export function LiquidStrip({
                       <SelectItem key={o.id} value={o.id} className="text-xs">
                         {o.name}
                         {o.productCount > 0 &&
-                          ` · ${o.productCount} format${o.productCount === 1 ? "" : "s"}`}
+                          ` · ${o.productCount} ${K.sharedNoun}${o.productCount === 1 ? "" : "s"}`}
                       </SelectItem>
                     ))}
                 </SelectContent>
@@ -256,7 +302,7 @@ export function LiquidStrip({
             </>
           ) : (
             <PillButton variant="outline" onClick={() => setPicking(true)}>
-              Use another liquid
+              {K.pick}
             </PillButton>
           )}
         </div>
@@ -266,21 +312,25 @@ export function LiquidStrip({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Make this product from {pending?.name}?
+              {kind === "pack"
+                ? `Pack this product in ${pending?.name}?`
+                : `Make this product from ${pending?.name}?`}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This product&apos;s ingredients will be replaced with {pending?.name}&apos;s recipe,
-              and from then on the two stay in step: correcting one corrects both. Its packaging,
-              fill volume and everything else are untouched.
+              This product&apos;s {K.editNoun} will be replaced with {pending?.name}&apos;s, and
+              from then on the two stay in step: correcting one corrects both.{" "}
+              {kind === "pack"
+                ? "Its recipe, fill volume and everything else are untouched."
+                : "Its packaging, fill volume and everything else are untouched."}
               {current && siblings.length === 0 && (
-                <> The liquid it uses now, {current.name}, will be left with no products.</>
+                <> The one it uses now, {current.name}, will be left with no products.</>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={switching}>Keep as it is</AlertDialogCancel>
             <AlertDialogAction onClick={(e) => { e.preventDefault(); applySwitch(); }} disabled={switching}>
-              {switching ? "Switching…" : "Use this liquid"}
+              {switching ? "Switching…" : kind === "pack" ? "Use this pack" : "Use this liquid"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -10,8 +10,8 @@ import { autoMatchEmissionFactor } from '@/lib/products/ef-auto-match';
 import { buildIngredientMaterialData } from '@/lib/products/ingredient-material-data';
 import { findOrCreateIngredient, factsFromForm, inheritFactsIntoForm, INGREDIENT_SELECT } from '@/lib/products/ingredient-records';
 import { supabaseIngredientStore } from '@/lib/products/ingredient-store';
-import { fanOutLiquidRecipe, describeFanout } from '@/lib/products/liquid-fanout';
-import { supabaseFanoutStore } from '@/lib/products/liquid-fanout-store';
+import { fanOutComposition, describeFanout } from '@/lib/products/composition-fanout';
+import { liquidFanoutStore, packFanoutStore } from '@/lib/products/composition-fanout-store';
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { useAutoSave } from "@/hooks/useAutoSave";
@@ -782,8 +782,8 @@ export function useRecipeEditor(productId: string, organizationId: string) {
       // Fan the recipe out to every other product made from this liquid. The
       // user's own product is already saved above, so a sibling that fails is
       // reported rather than presented as "your recipe did not save".
-      const fanout = await fanOutLiquidRecipe(
-        supabaseFanoutStore,
+      const fanout = await fanOutComposition(
+        liquidFanoutStore,
         (product as any)?.liquid_id ?? null,
         parseInt(productId, 10),
         validForms.map(buildMaterialData)
@@ -952,7 +952,23 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         }
       }
 
+      // Fan the pack out to every other product packed in this format, the
+      // mirror of the liquid's recipe fan-out. This product is already saved
+      // above, so a sibling that fails is reported rather than presented as
+      // "your packaging did not save".
+      const fanout = await fanOutComposition(
+        packFanoutStore,
+        (product as any)?.pack_format_id ?? null,
+        parseInt(productId, 10),
+        validForms.map(buildMaterialData)
+      );
+
       toast.success(`${validForms.length} packaging item${validForms.length === 1 ? '' : 's'} saved successfully`, { id: "save-packaging" });
+      const fanoutNote = describeFanout(fanout, 'pack');
+      if (fanoutNote) {
+        if (fanout.failed.length > 0) toast.warning(fanoutNote);
+        else toast.info(fanoutNote);
+      }
       await fetchProductData();
     } catch (error: any) {
       console.error("Save packaging error:", error);
