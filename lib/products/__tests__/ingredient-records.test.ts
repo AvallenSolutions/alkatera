@@ -216,3 +216,24 @@ describe('findOrCreateIngredient', () => {
     expect(rows[0].name).toBe('Maris Otter');
   });
 });
+
+describe('organic inherits through null, not false', () => {
+  it('inherits onto a row that has never been asked', () => {
+    // product_materials.is_organic_certified is nullable, so null genuinely
+    // means "nobody has said" and can inherit. `|| false` in the write shaper
+    // used to collapse that and pin every row as not-organic.
+    const form = inheritFactsIntoForm({ is_organic_certified: null }, { is_organic_certified: true });
+    expect(form.is_organic_certified).toBe(true);
+  });
+
+  it('respects a deliberate "not organic"', () => {
+    const form = inheritFactsIntoForm({ is_organic_certified: false }, { is_organic_certified: true });
+    expect(form.is_organic_certified).toBe(false);
+  });
+
+  it('does not inherit biogenic onto a row that carries false', () => {
+    // is_biogenic_carbon is NOT NULL and so cannot express "unanswered".
+    const form = inheritFactsIntoForm({ is_biogenic_carbon: false }, { is_biogenic_carbon: true });
+    expect(form.is_biogenic_carbon).toBe(false);
+  });
+});

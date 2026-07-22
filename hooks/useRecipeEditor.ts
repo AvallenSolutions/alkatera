@@ -8,7 +8,7 @@ import {
 } from '@/lib/products/packaging-material-data';
 import { autoMatchEmissionFactor } from '@/lib/products/ef-auto-match';
 import { buildIngredientMaterialData } from '@/lib/products/ingredient-material-data';
-import { findOrCreateIngredient, factsFromForm } from '@/lib/products/ingredient-records';
+import { findOrCreateIngredient, factsFromForm, inheritFactsIntoForm, INGREDIENT_SELECT } from '@/lib/products/ingredient-records';
 import { supabaseIngredientStore } from '@/lib/products/ingredient-store';
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
@@ -55,7 +55,7 @@ const DEFAULT_INGREDIENT: IngredientFormData = {
   amount: '',
   unit: 'kg',
   origin_country: '',
-  is_organic_certified: false,
+  is_organic_certified: null,
   transport_mode: 'truck',
   distance_km: '',
 };
@@ -119,6 +119,46 @@ function formFingerprint(forms: Array<{ [key: string]: any }>): string {
       return normalised;
     })
   );
+}
+
+
+/**
+ * Overlay each row's org-level ingredient record onto the row, filling only
+ * what the row leaves blank.
+ *
+ * Non-fatal by design: the record is an authoring convenience, so a failed
+ * lookup leaves the recipe exactly as it is on disk rather than blocking the
+ * editor from opening.
+ */
+async function applyIngredientRecords(
+  forms: IngredientFormData[]
+): Promise<IngredientFormData[]> {
+  const ids = Array.from(
+    new Set(forms.map((f) => (f as any).material_id).filter(Boolean))
+  ) as string[];
+  if (ids.length === 0) return forms;
+
+  try {
+    const { data, error } = await supabase
+      .from('ingredients')
+      .select(INGREDIENT_SELECT)
+      .in('id', ids);
+    if (error) throw error;
+
+    const byId = new Map((data ?? []).map((row: any) => [row.id, row]));
+    return forms.map((form) => {
+      const record = byId.get(form.material_id ?? '');
+      return record
+        ? (inheritFactsIntoForm(
+            form as unknown as Record<string, unknown>,
+            record
+          ) as unknown as IngredientFormData)
+        : form;
+    });
+  } catch (err) {
+    console.error('[useRecipeEditor] ingredient records unavailable:', err);
+    return forms;
+  }
 }
 
 export function useRecipeEditor(productId: string, organizationId: string) {
@@ -272,6 +312,10 @@ export function useRecipeEditor(productId: string, organizationId: string) {
       if (ingredientItems.length > 0) {
         const mappedIngredients = ingredientItems.map(item => ({
           tempId: item.id.toString(),
+          // The link back to the org-level ingredient record. Carried on the
+          // form so the load path can inherit from it and the save path can
+          // keep the link rather than re-resolving it by name.
+          material_id: item.material_id ?? null,
           name: item.material_name,
           matched_source_name: item.matched_source_name || undefined,
           data_source: item.data_source as any,
@@ -284,7 +328,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
           origin_lat: item.origin_lat || undefined,
           origin_lng: item.origin_lng || undefined,
           origin_country_code: item.origin_country_code || '',
-          is_organic_certified: item.is_organic_certified || false,
+          is_organic_certified: item.is_organic_certified ?? null,
           match_status: item.match_status ?? null,
           transport_mode: item.transport_mode || 'truck',
           distance_km: item.distance_km || '',
@@ -314,8 +358,15 @@ export function useRecipeEditor(productId: string, organizationId: string) {
           ef_uncertainty_percent: item.ef_uncertainty_percent ?? undefined,
           ef_reference_unit: item.ef_reference_unit || undefined,
         }));
-        setIngredientForms(mappedIngredients);
-        savedIngredientSnapshot.current = formFingerprint(mappedIngredients);
+        // Fill blanks from the org-level ingredient record, so a second
+        // product using the same malt opens with its emission factor,
+        // biogenic flag, organic status and farm link already answered
+        // instead of asking again. Only blanks: anything this row already
+        // says wins, and the snapshot is taken AFTER inheriting so inherited
+        // values do not read as unsaved edits.
+        const inherited = await applyIngredientRecords(mappedIngredients);
+        setIngredientForms(inherited);
+        savedIngredientSnapshot.current = formFingerprint(inherited);
       } else {
         const defaultForms: IngredientFormData[] = [];
         setIngredientForms(defaultForms);

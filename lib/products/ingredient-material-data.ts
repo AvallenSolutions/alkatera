@@ -40,7 +40,9 @@ export function buildIngredientMaterialData(
     material_type: 'ingredient',
     match_status: form.match_status ?? null,
     origin_country: form.origin_country || null,
-    is_organic_certified: form.is_organic_certified || false,
+    // Null is meaningful: it is what keeps the row inheriting from the
+    // ingredient record. `|| false` collapsed it and pinned every row.
+    is_organic_certified: form.is_organic_certified ?? null,
     stage_id: form.stage_id || null,
 
     // Emission-factor quality metadata (drives the quality tooltip and the

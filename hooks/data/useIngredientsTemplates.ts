@@ -21,7 +21,8 @@ export interface IngredientTemplateItem {
   origin_lat?: number;
   origin_lng?: number;
   origin_country_code?: string;
-  is_organic_certified: boolean;
+  /** Null means inherit from the ingredient record; a template must round-trip that. */
+  is_organic_certified: boolean | null;
   transport_mode: 'truck' | 'train' | 'ship' | 'air';
   distance_km: number | string;
   transport_legs?: DistributionLeg[] | null;

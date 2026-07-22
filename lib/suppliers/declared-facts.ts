@@ -15,6 +15,8 @@
  * had any test.
  */
 
+import type { DistributionLeg } from '@/lib/distribution-factors';
+
 /** The shape both cards receive from /api/suppliers/linked-products. */
 export interface SupplierProductRow {
   recyclability_pct?: number | null;
@@ -115,6 +117,106 @@ export function packagingDeclaredFacts(
   return facts;
 }
 
+export interface SupplierDeliveryDefaults {
+  origin_address?: string;
+  origin_lat?: number;
+  origin_lng?: number;
+  origin_country_code?: string;
+  origin_country?: string;
+  transport_legs?: DistributionLeg[];
+  inbound_container_type?: string;
+  inbound_container_volume_l?: number;
+  inbound_container_tare_kg?: number;
+  inbound_container_reuse_cycles?: number;
+  inbound_container_ef?: number;
+  inbound_container_material?: string;
+}
+
+/**
+ * Where a supplier product comes from and how it arrives.
+ *
+ * The origin half was already copied by both link handlers, with a fallback to
+ * the supplier's own profile address. The route from that origin and the
+ * container it arrives in had no supplier-level home at all until the delivery
+ * defaults migration, so they were retyped on every material row that used the
+ * same supplier.
+ *
+ * As everywhere in this layer, only blanks are filled.
+ */
+export function supplierDeliveryDefaults(
+  product: SupplierProductRow & {
+    origin_address?: string | null;
+    origin_lat?: number | null;
+    origin_lng?: number | null;
+    origin_country_code?: string | null;
+    supplier_address?: string | null;
+    supplier_city?: string | null;
+    supplier_country?: string | null;
+    supplier_lat?: number | null;
+    supplier_lng?: number | null;
+    supplier_country_code?: string | null;
+  },
+  current: Record<string, unknown>
+): SupplierDeliveryDefaults {
+  const defaults: SupplierDeliveryDefaults = {};
+
+  // Origin: the product's own origin wins, then the supplier's profile
+  // address. A supplier with one site is the common case and should not have
+  // to restate it per product.
+  const address =
+    product.origin_address ||
+    product.supplier_address ||
+    [product.supplier_city, product.supplier_country].filter(Boolean).join(', ') ||
+    null;
+  const lat = product.origin_lat ?? product.supplier_lat ?? null;
+  const lng = product.origin_lng ?? product.supplier_lng ?? null;
+  const countryCode = product.origin_country_code ?? product.supplier_country_code ?? null;
+
+  if (address && isUnset(current.origin_address)) defaults.origin_address = address;
+  // Latitude and longitude travel together: product_materials has an
+  // origin_coordinates_completeness CHECK, and half a coordinate pair is
+  // rejected by the database rather than merely being useless.
+  if (lat != null && lng != null && isUnset(current.origin_lat) && isUnset(current.origin_lng)) {
+    defaults.origin_lat = lat;
+    defaults.origin_lng = lng;
+  }
+  if (countryCode && isUnset(current.origin_country_code)) {
+    defaults.origin_country_code = countryCode;
+    defaults.origin_country = countryCode;
+  }
+
+  if (Array.isArray(product.transport_legs) && product.transport_legs.length > 0) {
+    const currentLegs = current.transport_legs;
+    if (!Array.isArray(currentLegs) || currentLegs.length === 0) {
+      defaults.transport_legs = product.transport_legs as DistributionLeg[];
+    }
+  }
+
+  if (product.inbound_container_type && isUnset(current.inbound_container_type)) {
+    defaults.inbound_container_type = product.inbound_container_type as string;
+    // The container's dimensions only mean anything alongside its type, so
+    // they travel as one set rather than leaving a tare weight attached to no
+    // container.
+    if (product.inbound_container_volume_l != null) {
+      defaults.inbound_container_volume_l = product.inbound_container_volume_l as number;
+    }
+    if (product.inbound_container_tare_kg != null) {
+      defaults.inbound_container_tare_kg = product.inbound_container_tare_kg as number;
+    }
+    if (product.inbound_container_reuse_cycles != null) {
+      defaults.inbound_container_reuse_cycles = product.inbound_container_reuse_cycles as number;
+    }
+    if (product.inbound_container_ef != null) {
+      defaults.inbound_container_ef = product.inbound_container_ef as number;
+    }
+    if (product.inbound_container_material) {
+      defaults.inbound_container_material = product.inbound_container_material as string;
+    }
+  }
+
+  return defaults;
+}
+
 export interface IngredientDeclaredFacts {
   is_organic_certified?: boolean;
 }
@@ -128,7 +230,7 @@ export interface IngredientDeclaredFacts {
  */
 export function ingredientDeclaredFacts(
   product: SupplierProductRow,
-  current: { is_organic_certified?: boolean }
+  current: { is_organic_certified?: boolean | null }
 ): IngredientDeclaredFacts {
   const facts: IngredientDeclaredFacts = {};
 

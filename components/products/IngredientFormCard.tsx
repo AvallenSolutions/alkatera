@@ -38,7 +38,7 @@ import { isOrchardEligible } from "@/lib/orchard-utils";
 import type { VineyardGrowingProfile } from "@/lib/types/viticulture";
 import { LocationPicker, LocationData } from "@/components/shared/LocationPicker";
 import type { DataSource } from "@/lib/types/lca";
-import { ingredientDeclaredFacts } from '@/lib/suppliers/declared-facts';
+import { ingredientDeclaredFacts, supplierDeliveryDefaults } from '@/lib/suppliers/declared-facts';
 import { calculateDistance } from "@/lib/utils/distance-calculator";
 import { getTransportModeWarning, formatTransportMode, type TransportMode } from "@/lib/utils/transport-emissions-calculator";
 import {
@@ -56,6 +56,11 @@ import { toast } from "sonner";
 
 export interface IngredientFormData {
   tempId: string;
+  /**
+   * The org-level `ingredients` record this row is an instance of. Null until
+   * the row has been saved once; the editor find-or-creates the record on save.
+   */
+  material_id?: string | null;
   name: string;
   matched_source_name?: string; // Database match name when proxy used
   data_source: DataSource | null;
@@ -69,7 +74,12 @@ export interface IngredientFormData {
   origin_lat?: number;
   origin_lng?: number;
   origin_country_code?: string;
-  is_organic_certified: boolean;
+  /**
+   * Null means "nobody has said", which is what lets the org-level ingredient
+   * record answer it. False is a deliberate "not organic" and is preserved.
+   * Same null-means-inherit pattern as the EPR fields on the packaging card.
+   */
+  is_organic_certified: boolean | null;
   transport_mode: 'truck' | 'train' | 'ship' | 'air';
   distance_km: number | string;
   // Multi-modal transport legs (replaces single transport_mode/distance_km when present)
@@ -905,14 +915,6 @@ export function IngredientFormCard({
   );
 
   const handleSupplierProductSelect = (product: any) => {
-    // Resolve origin: prefer product-level origin, fall back to supplier-level location
-    const originAddress = product.origin_address || product.supplier_address
-      || [product.supplier_city, product.supplier_country].filter(Boolean).join(', ')
-      || undefined;
-    const originLat = product.origin_lat ?? product.supplier_lat ?? undefined;
-    const originLng = product.origin_lng ?? product.supplier_lng ?? undefined;
-    const originCountryCode = product.origin_country_code ?? product.supplier_country_code ?? undefined;
-
     onUpdate(ingredient.tempId, {
       name: product.name,
       matched_source_name: product.name,
@@ -925,11 +927,11 @@ export function IngredientFormCard({
       ef_source_type: 'primary',
       match_status: 'verified',
       ...(!ingredient.amount ? { unit: product.unit || 'kg' } : {}),
-      // Origin/location data from supplier product or supplier profile
-      ...(originAddress ? { origin_address: originAddress } : {}),
-      ...(originLat != null ? { origin_lat: originLat } : {}),
-      ...(originLng != null ? { origin_lng: originLng } : {}),
-      ...(originCountryCode ? { origin_country_code: originCountryCode, origin_country: originCountryCode } : {}),
+      // Where it comes from, how it travels and what it arrives in: the
+      // supplier's facts, filled only where this row is still blank. The route
+      // and the container had no supplier-level home before the delivery
+      // defaults migration and were retyped on every product.
+      ...supplierDeliveryDefaults(product, ingredient as unknown as Record<string, unknown>),
       // An organic-certified supplier product used to leave the organic box
       // unticked, so the user was asked about a certification the supplier had
       // already declared. Never clears a flag they set themselves.
@@ -1298,7 +1300,7 @@ export function IngredientFormCard({
             <div className="flex items-center space-x-2">
               <Checkbox
                 id={`organic-${ingredient.tempId}`}
-                checked={ingredient.is_organic_certified}
+                checked={ingredient.is_organic_certified === true}
                 onCheckedChange={(checked) =>
                   onUpdate(ingredient.tempId, { is_organic_certified: checked as boolean })
                 }

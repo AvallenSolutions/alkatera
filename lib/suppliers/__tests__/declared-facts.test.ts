@@ -4,6 +4,7 @@ import {
   certificationsImplyOrganic,
   packagingDeclaredFacts,
   ingredientDeclaredFacts,
+  supplierDeliveryDefaults,
 } from '../declared-facts';
 
 /**
@@ -136,5 +137,93 @@ describe('ingredientDeclaredFacts', () => {
     expect(
       ingredientDeclaredFacts({ certifications: ['Fairtrade'] }, { is_organic_certified: false })
     ).toEqual({});
+  });
+});
+
+describe('supplierDeliveryDefaults', () => {
+  const SUPPLIER = {
+    origin_address: 'Speyside, Scotland',
+    origin_lat: 57.4,
+    origin_lng: -3.2,
+    origin_country_code: 'GB',
+    transport_legs: [{ id: 'l1', transportMode: 'truck', distanceKm: 120 }],
+    inbound_container_type: 'ibc',
+    inbound_container_volume_l: 1000,
+    inbound_container_tare_kg: 55,
+    inbound_container_reuse_cycles: 20,
+    inbound_container_material: 'hdpe',
+  };
+
+  it('fills origin, route and container from the supplier', () => {
+    const d = supplierDeliveryDefaults(SUPPLIER, {});
+    expect(d.origin_address).toBe('Speyside, Scotland');
+    expect(d.origin_lat).toBe(57.4);
+    expect(d.origin_lng).toBe(-3.2);
+    expect(d.origin_country_code).toBe('GB');
+    expect(d.origin_country).toBe('GB');
+    expect(d.transport_legs).toHaveLength(1);
+    expect(d.inbound_container_type).toBe('ibc');
+    expect(d.inbound_container_volume_l).toBe(1000);
+    expect(d.inbound_container_reuse_cycles).toBe(20);
+  });
+
+  it('falls back to the supplier profile when the product has no origin', () => {
+    const d = supplierDeliveryDefaults(
+      { supplier_city: 'Cognac', supplier_country: 'France' },
+      {}
+    );
+    expect(d.origin_address).toBe('Cognac, France');
+  });
+
+  it('never overwrites an origin the row already carries', () => {
+    const d = supplierDeliveryDefaults(SUPPLIER, {
+      origin_address: 'Islay',
+      origin_lat: 55.7,
+      origin_lng: -6.2,
+      origin_country_code: 'GB',
+    });
+    expect(d.origin_address).toBeUndefined();
+    expect(d.origin_lat).toBeUndefined();
+    expect(d.origin_country_code).toBeUndefined();
+  });
+
+  it('only copies coordinates as a complete pair', () => {
+    // product_materials has an origin_coordinates_completeness CHECK, so half
+    // a pair is rejected by the database, not merely useless.
+    expect(supplierDeliveryDefaults({ origin_lat: 57.4 }, {}).origin_lat).toBeUndefined();
+    expect(supplierDeliveryDefaults({ origin_lng: -3.2 }, {}).origin_lng).toBeUndefined();
+  });
+
+  it('does not replace a route the row already has', () => {
+    const d = supplierDeliveryDefaults(SUPPLIER, {
+      transport_legs: [{ id: 'own', transportMode: 'ship', distanceKm: 900 }],
+    });
+    expect(d.transport_legs).toBeUndefined();
+  });
+
+  it('treats an empty leg array as no route', () => {
+    const d = supplierDeliveryDefaults(SUPPLIER, { transport_legs: [] });
+    expect(d.transport_legs).toHaveLength(1);
+  });
+
+  it('carries container dimensions only alongside a container type', () => {
+    // A tare weight attached to no container is meaningless.
+    const d = supplierDeliveryDefaults(
+      { inbound_container_tare_kg: 55, inbound_container_volume_l: 1000 },
+      {}
+    );
+    expect(d.inbound_container_type).toBeUndefined();
+    expect(d.inbound_container_tare_kg).toBeUndefined();
+    expect(d.inbound_container_volume_l).toBeUndefined();
+  });
+
+  it('leaves the container alone when the row already names one', () => {
+    const d = supplierDeliveryDefaults(SUPPLIER, { inbound_container_type: 'drum' });
+    expect(d.inbound_container_type).toBeUndefined();
+    expect(d.inbound_container_tare_kg).toBeUndefined();
+  });
+
+  it('copies nothing from an empty supplier product', () => {
+    expect(supplierDeliveryDefaults({}, {})).toEqual({});
   });
 });

@@ -164,7 +164,11 @@ export function inheritFactsIntoForm<T extends Record<string, unknown>>(
   if (record.is_biogenic_carbon && next.is_biogenic_carbon === undefined) {
     next.is_biogenic_carbon = true;
   }
-  if (record.is_organic_certified && next.is_organic_certified === undefined) {
+  // Organic is nullable on product_materials, so null genuinely means "nobody
+  // has said" and can inherit. is_biogenic_carbon is NOT NULL and therefore
+  // cannot express that, so it only inherits onto a row that has no value at
+  // all; a loaded row always carries false and keeps it.
+  if (record.is_organic_certified && next.is_organic_certified == null) {
     next.is_organic_certified = true;
   }
   if (record.is_self_grown && next.is_self_grown === undefined) {
