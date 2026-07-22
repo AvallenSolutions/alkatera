@@ -81,18 +81,25 @@ CREATE UNIQUE INDEX IF NOT EXISTS "pcf_end_use_scenarios_one_primary"
 
 ALTER TABLE "public"."pcf_end_use_scenarios" ENABLE ROW LEVEL SECURITY;
 
+-- Each policy is dropped before it is created: Postgres has no
+-- CREATE POLICY IF NOT EXISTS, so without this the migration fails on a
+-- second run rather than being the no-op it should be.
+
+DROP POLICY IF EXISTS "pcf_end_use_scenarios_member_read" ON "public"."pcf_end_use_scenarios";
 CREATE POLICY "pcf_end_use_scenarios_member_read" ON "public"."pcf_end_use_scenarios"
   FOR SELECT USING (("organization_id" IN (
     SELECT "om"."organization_id" FROM "public"."organization_members" "om"
     WHERE ("om"."user_id" = "auth"."uid"())
   )));
 
+DROP POLICY IF EXISTS "pcf_end_use_scenarios_member_insert" ON "public"."pcf_end_use_scenarios";
 CREATE POLICY "pcf_end_use_scenarios_member_insert" ON "public"."pcf_end_use_scenarios"
   FOR INSERT WITH CHECK (("organization_id" IN (
     SELECT "om"."organization_id" FROM "public"."organization_members" "om"
     WHERE ("om"."user_id" = "auth"."uid"())
   )));
 
+DROP POLICY IF EXISTS "pcf_end_use_scenarios_member_update" ON "public"."pcf_end_use_scenarios";
 CREATE POLICY "pcf_end_use_scenarios_member_update" ON "public"."pcf_end_use_scenarios"
   FOR UPDATE USING (("organization_id" IN (
     SELECT "om"."organization_id" FROM "public"."organization_members" "om"
@@ -103,28 +110,22 @@ CREATE POLICY "pcf_end_use_scenarios_member_update" ON "public"."pcf_end_use_sce
     WHERE ("om"."user_id" = "auth"."uid"())
   )));
 
+DROP POLICY IF EXISTS "pcf_end_use_scenarios_member_delete" ON "public"."pcf_end_use_scenarios";
 CREATE POLICY "pcf_end_use_scenarios_member_delete" ON "public"."pcf_end_use_scenarios"
   FOR DELETE USING (("organization_id" IN (
     SELECT "om"."organization_id" FROM "public"."organization_members" "om"
     WHERE ("om"."user_id" = "auth"."uid"())
   )));
 
--- Keep updated_at honest.
-CREATE OR REPLACE FUNCTION "public"."touch_pcf_end_use_scenarios"()
-RETURNS trigger
-LANGUAGE plpgsql
-SET search_path = ''
-AS $$
-BEGIN
-  NEW."updated_at" = now();
-  RETURN NEW;
-END;
-$$;
-
+-- Keep updated_at honest. Reuses the schema's shared trigger function (already
+-- behind 32 other triggers) rather than defining a 33rd identical one — which
+-- also keeps this migration free of a dollar-quoted body, since statement
+-- splitters cut those at the first semicolon inside and leave a truncated
+-- statement behind.
 DROP TRIGGER IF EXISTS "pcf_end_use_scenarios_touch" ON "public"."pcf_end_use_scenarios";
 CREATE TRIGGER "pcf_end_use_scenarios_touch"
   BEFORE UPDATE ON "public"."pcf_end_use_scenarios"
-  FOR EACH ROW EXECUTE FUNCTION "public"."touch_pcf_end_use_scenarios"();
+  FOR EACH ROW EXECUTE FUNCTION "public"."update_updated_at_column"();
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Backfill: every PCF that already reaches past the gate gets a primary
