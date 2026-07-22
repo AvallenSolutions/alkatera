@@ -1,216 +1,97 @@
-# Handoff: redesign — main merged in (2026-07-20) + sustainability report programme
-Updated: 2026-07-20 | Branch: redesign (merge landed via `merge/main-into-redesign-20260720`) | Worktree: `.claude/worktrees/inspiring-varahamihira-baadb0`
-
-## THE STRATEGY (decided 2026-07-20, read `tasks/alkatera-v2-launch-plan.md` first)
-alkatera v2 = redesign UI + Vercel hosting + the EXISTING Alkatera2 database.
-Customer data never moves; the staging Supabase project is a disposable test bed,
-never promoted. Staging is where Tim tests until happy; at launch the additive
-migrations are applied to Alkatera2, redesign merges to main, Vercel production
-points at Alkatera2, DNS moves, Netlify shuts down after a watch week.
-STATUS: the five 20260719* migrations are APPLIED AND VERIFIED on staging
-(2026-07-20, via SQL editor, recorded in the tracker) — the packaging picker and
-LCA calculation now work there. Next per the plan: seed staging (`/admin/demo-seed`),
-real GEMINI/PDFShift/Stripe-test keys into the staging Vercel env, then the
-report-sections stream.
-
-## NEW: main → redesign merge (2026-07-20)
-
-All 28 main-only commits (last two weeks of production fixes) are now on redesign.
-Merge base was `0132d992` (2026-07-16); 23 files conflicted and were resolved by hand.
-Full analysis and the cutover test plan: `tasks/cutover-test-plan.md`.
-
-What came across cleanly (whole-subsystem adds):
-- **Parametric packaging factors** (`257adce8`): `lib/calculations/packaging-factor.ts`,
-  `PackagingMaterialClassPicker`, material classes + golden test. This was THE cutover
-  blocker (numbers would have silently reverted to fuzzy matching).
-- **Rosa persona single source** `lib/rosa/persona.ts`, **house copy style** `lib/copy-style.ts`,
-  the LCA boundary normalisation (`normaliseBoundary`, verified wired in WizardContext),
-  auth fixes, the ~64-route fetch-cache fixes, ISO 14044 gate + Monte Carlo, demo-seed
-  breadth modules, and migrations `20260719100000`–`140000`.
-
-Conflict resolutions worth knowing:
-- **Rosa surfaces**: kept REDESIGN's implementations (feedback verdicts →
-  `rosa_message_feedback`, learning cases/exemplars page, `system-prompt.ts` base prompt,
-  which already carries the "never say AI" rules and is byte-shared with the eval harness).
-  Adopted main's injection-hardened `buildRosaPageContextBlock` (persona.ts) for page
-  context in the chat route. Main's `buildRosaChatPersona` is NOT used by the chat route;
-  persona.ts still serves pulse commentary, anomaly explains and gaia. Follow-up worth
-  doing: compose `system-prompt.ts` from persona.ts blocks so the persona text isn't in
-  two places again.
-- **Packaging**: parametric picker wins in `PackagingFormCard`; removed redesign's
-  packaging auto-match/auto-proxy effect (it belonged to the retired fuzzy model and would
-  fight the endpoint-derived factors). Ingredients keep their auto-match.
-  `PackagingWizard` keeps redesign's `makePackagingRow` builder + main's parametric-first
-  `handleComplete`.
-- **Slidespeak routes + Sidebar.tsx**: kept redesign's deletions (main's edits were only
-  fetch-cache opt-outs; `/admin/rosa-learning` is linked from admin-tools, so no nav loss).
-- **Reports/PDF**: kept redesign's studio implementations; verified main's fixes are
-  natively covered (`route-auth.ts` has noStoreFetch, render-lca-html has the 0.316/0.326
-  reconciliation, no neon).
-- Cron routes (detect-anomalies, generate-insights): redesign's sweep-helper structure +
-  main's noStoreFetch added to the raw clients.
-
-Verified after the merge: `tsc --noEmit` clean; scoped vitest 811 tests green
-(packaging golden + factor + classes, copy-style, prompt-house-style, rosa, reports,
-provenance, pdf, report-builder, calculations, epr, products); production build green.
-
-Known deltas to carry:
-- **Demo-seed Rosa module writes `gaia_feedback`** (main's table) but redesign's
-  /admin/rosa-learning reads `rosa_message_feedback` + learning cases, so a seeded org
-  won't fully light that page up. Decide whether to point the seeder at the redesign
-  tables.
-- Main's "remember this correction" feedback flow (free text + org-memory write) was NOT
-  ported; redesign's verdict chips are the shipped UX. The `saveMemory` select-then-write
-  fix IS on redesign (auto-merged).
-- **Staging migrations**: `supabase db push` against alkatera-staging will now apply the
-  five `20260719*` migrations (fresh versions, no collisions — the old
-  `20260717*` collision was defused by main's renumbering; the rumoured redesign-side
-  `chemical_library_user_submissions` duplicate does not exist).
-- **Prod cutover**: ALL scheduling on redesign is Inngest-native crons (14 jobs). Vercel
-  prod MUST be registered as an Inngest app (INNGEST_EVENT_KEY + SIGNING_KEY, serve URL
-  /api/inngest) or every scheduled job stops silently. Staging deliberately stays
-  NO-Inngest.
+# Handoff: alkatera v2 — Phase 2 testing on staging
+Updated: 2026-07-21 | Branch: merge/main-into-redesign-20260720 (pushes to redesign) | Worktree: `.claude/worktrees/inspiring-varahamihira-baadb0` | Dev port: 8897 (launch config "merge-verify", uncommitted)
 
 ## Goal
-The alkatera redesign ("house of rooms" studio design language) lives on branch `redesign`
-and auto-deploys to Vercel staging on push. The current programme rebuilt the document
-generators in the studio design and upgraded sustainability-report customisation (plan:
-`tasks/sustainability-report-redesign-plan.md`, phases A-E). **All five phases are shipped.**
-Work now in flight: making the social and value-chain report sections actually render, with
-honest "not yet measured" gaps (plan: `tasks/report-sections-plan.md`). Redesign NEVER merges
-to main until go-live.
+alkatera v2 = redesign UI + Vercel hosting + the EXISTING Alkatera2 database. Customer
+data never moves; the staging Supabase project (`vwhdyqvlgjqmlzmsvaes`) is a disposable
+test bed, never promoted. Staging (https://alkatera-staging.vercel.app, auto-deploys
+`redesign` on push) is where Tim tests until happy; then the additive migrations go to
+Alkatera2, redesign merges to main, DNS moves, Netlify shuts down. Strategy:
+`tasks/alkatera-v2-launch-plan.md`. We are in PHASE 2: Tim's room-by-room pass per
+`tasks/phase2-test-script.md`, sessions work the punch list at its foot.
 
-## Done (verified — all walked in a browser on LOCAL, against Local Dev Co)
-- **Phase A+B** (99481453, 4b3a2454, 8f631439): theme picker was a placebo (forewords and
-  cover photos never reached PDFs); themes made studio-native; five audience-led styles.
-- **Phase E** (78bd38f4): one confirm-not-ask funnel replacing the 4-step wizard and Quick
-  Generate (19 files, ~7k LOC deleted); real share links (`report_shares` + private bucket +
-  `/report/[token]`), gated at creation so issued links keep working.
-- **Phase C** (0465fad0): draft-then-edit narratives. Reports park as `draft`, narratives
-  draft into `data_snapshot`, the funnel gains a review step (inline edit flips the AI flag
-  server-side, per-block regenerate with a tone hint, voice override, CEO-foreword accept).
-  Unreviewed AI text prints a small "AI-assisted draft" note; edited text prints clean.
-- **Phase D** (5c601edd): brand kit tab (logo, colours, foreword author, image library,
-  merge-written into shared `report_defaults`); named imagery slots replacing heroImages
-  indices with legacy fallback; theme is the single look authority for imagery; running-order
-  chevrons + per-section scopes (picked SKUs, trends year range); truthful preview reviving
-  the orphaned `/api/reports/preview` behind a sandboxed iframe.
-- **Confirmed-data gate** (37777b31): it sat on the two PDF routes only, so HTML ship, public
-  share links and three exports bypassed it. Fixed the METRIC first because widening a broken
-  lock would have locked customers out: areas with NO records are now excluded from the
-  weighting instead of scoring 0% (this capped a no-facilities org at 65% against an 80%
-  threshold FOREVER); archived products no longer inflate the denominator; parametric
-  packaging counts as confirmed. LCA publishing is now scoped to that product's materials,
-  not catalogue coverage. Demo org 17% -> 29%, still blocked but for fixable reasons.
-- **Report sections step 1/10** (372c4f6e): `lib/reports/sections/types.ts` owns the five
-  payload interfaces; nullability tightened (tsc immediately found six unguarded `.toFixed()`
-  that would throw once these sections render); notMeasured* skeleton helpers added.
+## Done (verified)
+- **main merged into redesign** (`094cac4d`, 28 commits incl. parametric packaging).
+  811 scoped tests, tsc, prod build green; packaging wizard walked in a browser
+  (parametric rows in product_materials, no factor search). Divergence with main: 0.
+- **Five 20260719* migrations applied to STAGING** and verified (13 endpoints, 3
+  gap-fillers, EPR uuid, PCF index, RLS policy); recorded in its migration tracker.
+- **Report-sections plan: all 10 steps shipped** (`76cfab11..fb47b6e2`). Five sections
+  render with honest skeletons, facilities page new, zero N/A, four phantom
+  SECTION_TO_TOPIC ids fixed, one completeness oracle drives document AND funnel.
+  Browser-verified on empty org: funnel "0 of 13 measures recorded" rows, generated doc
+  contains the People page with the honest line.
+- **Demo seeder now self-sufficient** (`6c7dd675`): foundation.ts creates org/
+  facilities/products when missing (prod unchanged); seed ran twice on a wiped local
+  org, identical counts, second run a no-op.
+- **Unauthenticated deep-link bug fixed** (`5405065c`): cold visit to an authed URL
+  skeletoned forever (org provider never cleared isLoading when user was null at boot);
+  verified logged-out /desk now redirects to /login. This was Tim's staging symptom.
+- **Staging account unblocked by hand** (via Supabase MCP): tim@alkatera.com arrival
+  marked complete, `is_alkatera_admin=true`, org Avallenspirits set canopy/active
+  (was seed/pending, which the payment gate correctly bounced).
+- GEMINI_API_KEY added to staging Vercel (Tim) and deployed; env audit found nothing
+  else missing that matters (PostHog key absent = harmless console noise).
 
-## Done (unverified — do not trust these)
-- **Nothing in the whole programme has been exercised on STAGING.** Local has no GEMINI key
-  and no PDFShift, so every narrative seen so far is the deterministic fallback and no PDF has
-  ever been produced end to end. Tone-of-voice threading, real prose quality, and the PDFShift
-  run are all unproven.
-- Migrations `20260718120000_report_shares` and `20260718150000_report_draft_status` are
-  applied to LOCAL + STAGING, not prod (correct: redesign never merged).
-- ~~The merged packaging UI has not been walked in a browser yet.~~ WALKED 2026-07-20
-  against local Supabase (dev port 8897, config "merge-verify"): created a product,
-  ran the guided packaging wizard (glass bottle + aluminium screw cap + paper label),
-  and verified in product_materials that all three rows saved with
-  packaging_material_class set (glass/flint, aluminium, kraft),
-  data_source='parametric', match_status='verified' and catalogue circularity
-  defaults applied. No factor search appeared anywhere. Test product deleted after.
-  Still unwalked: a full LCA calculation over parametric rows in the wizard
-  (the golden test covers the maths; a real calc needs ingredients + facility
-  allocations).
+## Done (unverified)
+- Nothing on staging beyond login has been exercised: the demo-seed click, the rooms,
+  reports end-to-end with real Gemini + PDFShift are all untested there.
+- Report sections against RICH data (only the all-skeleton empty-org case is proven);
+  the thin-data mixed state (one demographics row → some tiles real, rest skeletons)
+  is the exact case Tim originally asked for and still needs eyes.
 
 ## In flight
-**Report sections: ALL TEN STEPS SHIPPED (2026-07-20, commits 76cfab11..fb47b6e2).**
-The five sections render with honest skeletons; the facilities page exists; the
-kg-vs-tonnes guard is tested; the completeness oracle drives both the document
-and the funnel's "N of M measures recorded" rows; SECTION_TO_TOPIC's FOUR phantom
-topic ids (products too, not just the three from planning) are fixed and pinned.
-BROWSER-VERIFIED 2026-07-20 on local (empty test org, the all-skeleton case):
-funnel gap rows render live ("0 of 13 measures recorded" for People & Culture,
-"0 of 4" for facilities, expandable MISSING rows with deep links), and the
-truthful preview's generated document contains the People & Culture page
-(previously silently absent) with the honest lead line, 10 "Not yet measured"
-tiles and ZERO N/A. Facilities is selectable (catalogue label is "Facility
-Emissions Breakdown", category Operations). Still worth one pass with THIN
-(not empty) data — add one demographics row and watch the mixed state. The
-"Recorded, not in scope" items (hasVineyards gate, dashboard fallback
-disagreements, three-oracle consolidation) still stand.
+**A PARALLEL SESSION is building the cellar LCA dossier stream** (commits up to
+`aad9f57f`: server-side footprint calc under Inngest, the dossier UI, asks, a share
+gate, an Inngest concurrency-cap fix). Its state lives in its own build log
+(`tasks/` docs from commits `69b4ee8a`/`15c6d703`). Coordinate before touching
+cellar/LCA files; this handoff does not speak for that stream.
 
-THE FINDING behind it: `assembleReportData` never fetches people / governance / community /
-suppliers / facilities data, the page renderers early-return empty, and the sections are
-skipped because `dataAvailability.hasX` is never set. So ticking People & Culture yields a
-report with NO such page, silently, while the funnel says "Data ready". Facilities has no
-renderer at all. Predates Phase C. Four more silent failures found while planning, all
-scheduled in the plan: `SECTION_TO_TOPIC` points at topic ids that do not exist (materiality
-callouts can never appear on governance/community/supply-chain); `renderTargetsPage` reads
-never-populated `data.governance`, so EVERY report ever generated says "No climate
-commitments have been recorded yet"; `app/api/reports/preview-data` counts four nonexistent
-tables with zero callers; `app/api/reports/sample` passes 0-1 where the renderer wants 0-100.
+Tim is mid Phase 2 setup: just unblocked past /complete-subscription. His next clicks:
+refresh staging → desk loads → `/admin/demo-seed` → Seed Drinks Co demo (do NOT run
+Recalculate LCAs after) → start the Cellar checklist in `tasks/phase2-test-script.md`.
 
 ## Next
-1. ~~Browser walk-through of the merged packaging flow~~ DONE 2026-07-20 (see Done
-   section). Remaining slice: a full LCA calc over parametric packaging in the wizard.
-2. **Steps 2-10 of `tasks/report-sections-plan.md`.** Biggest open correctness gap. Tim's
-   original ask (warn when a section's data is incomplete) is step 9 and needs the rest first.
-3. **Staging click-through of the whole programme** (needs Tim or staging creds): real prose
-   replaces fallbacks, voice switching genuinely changes register, foreword accept, ship a
-   PDF through PDFShift, share it. This is the main go-live risk.
-4. **Decide what "products confirmed" should mean for a whole-company report** — it still
-   means "has a completed LCA" (coverage), which is right for the LCA gate but arguably wrong
-   for a company report. Check the corrected metric on a real org (Everleaf), not demo data.
-5. Same-family bugs recorded: `hasVineyards` gates the vineyards page with no section check;
-   the dashboards' invented fallbacks (livingWageCompliance 50, genderPayGap 0) will disagree
-   with the report once sections render (the report is correct); three availability oracles
-   (`useReportDataAvailability`, `sectionCompleteness`, `dataAvailability`) want consolidating.
-6. Smaller: share-link expiry UI (`expires_at` exists, no picker), screenMode polish audits
-   (Board/Editorial), a11y aria-labels on style cards, /uploads rebuild (last pre-studio live
-   surface), Tabs->MonoTabs on /settings + /reports/sustainability, delete dead pulse widgets
-   (~740 LOC, zero refs), compose `lib/rosa/system-prompt.ts` from persona.ts blocks.
+1. Work the punch list in `tasks/phase2-test-script.md` as Tim adds items (3 done so far).
+2. Thin-data mixed-state report check (add one demographics row, regenerate).
+3. If Tim wants the full arrival checkout testable on staging: add a Stripe TEST-mode
+   webhook endpoint pointing at the staging URL first.
+4. Phase 3 in parallel (see launch plan): goldens harness AFTER Tim's prod recalc;
+   migration rehearsal on an Alkatera2 clone; production Vercel project + env parity;
+   Inngest registration (mandatory or all 14 crons stop silently); enable RLS with read
+   policies on the 11 flagged reference tables; rotate the old prod service-role key.
 
 ## Gotchas and decisions
-- ⚠️ **CWD DISCIPLINE**: the shell cwd resets between Bash calls and silently lands in the
-  MAIN repo. It bit twice this session (a tsc run and a grep both reported on main). `cd` the
-  worktree in EVERY Bash call, and prefer absolute paths in file tools.
-- ⚠️ **Verify scripted edits.** Several `python3` search-and-replace edits on the handoff
-  silently no-oped because the anchor text had already changed, while still printing
-  "updated". Use the Edit tool (which fails loudly on a miss) or assert the match.
-- ⚠️ **kg vs tonnes**: `facility_emissions_aggregated.total_co2e` is in KG; every other figure
-  in the renderer is tonnes. The facilities page must divide by 1000, guarded on the `unit`
-  column, or one site publishes at 1000x the whole company. Highest-consequence line left.
-- Browser-pane synthetic clicks do NOT register on these React buttons (positions verified
-  correct); `element.click()` via `javascript_tool` works and proves the handlers. The app
-  scrolls `<main>`, not the window, so scroll via JS or `scroll_to`.
-- `report-shares` bucket mime allowlist matches EXACTLY: upload as plain `text/html`, no
-  charset suffix. Shares are served THROUGH the server from a PRIVATE bucket so revocation
-  really cuts access; never move them to the public report-assets bucket.
-- Raw `createClient` calls need the no-store fetch override or Next 14 serves stale reads
-  (a revoked share kept serving until this landed). Main's ~64-route sweep is now merged in.
-- Studio canon: no dark pages, working tones are mono caps and NEVER pills, radius 6, Space
-  Grotesk speaks / Inter explains / JetBrains Mono annotates. British English, no em dashes,
-  plain language, alka**tera** lowercase.
-- Fixed A4 page divs are DELIBERATE (a Chromium spike proved CSS-flow paging fails here).
-- Staging is deliberately NO-Inngest: a stray `INNGEST_*` key silently reroutes background
-  dispatch into the void. Burned us twice. (Prod is the opposite: Inngest registration is
-  mandatory or all 14 crons stop — see the merge section above.)
-- Full `vitest` hangs: always scope (`npx vitest run lib/reports lib/pdf lib/provenance
-  components/report-builder`). 811 green across the merge-touched suites at last run;
-  `npx tsc --noEmit` clean.
+- THE DECIDED PATH: Alkatera2 is production forever; staging DB never promoted. The one
+  sanctioned redesign→main merge happens at launch only. Push work to `redesign`.
+- Staging is deliberately NO-Inngest (stray INNGEST_* keys strand jobs); production
+  cutover REQUIRES Inngest app registration.
+- Payment gate: an org with subscription 'pending' outside the arrival ritual bounces
+  to /complete-subscription BY DESIGN; on staging unblock via DB (tier+status), never
+  by clicking through Stripe.
+- Stripe webhook points at prod Netlify; a staging checkout will hang after payment.
+  Config gap, not a bug; repoint is a Layer 4 cutover item.
+- Anthropic quota exhausted until ~1 Aug: the arrival website scrape on staging fails
+  and falls back to manual entry. Expected.
+- get_user_bootstrap / get_supplier_context RPCs are absent on staging (prod-only,
+  applied ad hoc); code falls back by design, but staging↔prod function drift is real.
+- Browser-pane quirks: viewport can collapse to 0x0 (fix: resize_window desktop, then
+  dispatch a resize event); Radix components need full pointerdown→click sequences;
+  the app scrolls <main>, not the window. Never bare `npx vitest run` (hangs) — scope.
+- Worktree dirty-by-design, do NOT commit: `.claude/launch.json` (merge-verify :8897),
+  `tsconfig.json` (Next auto-edit), `.env.local` (local-only Supabase demo keys).
+- Local DB hand-tweaks this session: dev@local.test is admin, its metadata org points
+  at Local Dev Co, local Avallenspirits arrival completed, local demo org fully seeded.
+- Seeder foundation quirk: advancing the products id sequence uses throwaway inserts
+  (PostgREST cannot setval); gated so it never runs where products already existed.
 
 ## Pending Tim actions
-- **Staging click-through** (item 3 above). Login tim@alkatera.com / alkatera-staging-2026.
-  Vercel Deployment Protection blocks Claude's browser there, so this one needs you.
-- **Push staging migrations**: after this merge deploys, run `supabase db push` against
-  alkatera-staging (or paste the five `20260719*` files in the SQL editor) so the packaging
-  endpoint tables exist there — `lib/calculations/packaging-factor.ts` queries them.
-- **~1 Aug**: Anthropic quota resets, then retest the URL-import scrape on staging. Report
-  narratives are GEMINI and are testable on staging NOW.
-- **Prod**: 10+ redesign migrations pending (never merged); the two main-branch bug chips
-  (stale fetch cache in `getServiceRoleClient`, ambiguous `products!inner` joins) are running
-  in your other sessions.
+- Refresh staging; seed the demo org; walk `tasks/phase2-test-script.md`, adding one
+  punch-list line per issue.
+- Staging Supabase Auth → URL Configuration → Add URL:
+  `https://alkatera-staging.vercel.app/**` (redirect allow-list was empty).
+- Phase 3, when ready: run the all-orgs recalc on PROD (/admin-tools/recalculate-lca,
+  Happy Curations then Everleaf, warn Clair first) BEFORE we snapshot goldens; delete
+  the gaia-query edge function in the prod Supabase dashboard.
 
 Next session opener: `Read tasks/handoff.md and continue.`
