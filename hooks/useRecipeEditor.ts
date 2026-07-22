@@ -10,6 +10,8 @@ import { autoMatchEmissionFactor } from '@/lib/products/ef-auto-match';
 import { buildIngredientMaterialData } from '@/lib/products/ingredient-material-data';
 import { findOrCreateIngredient, factsFromForm, inheritFactsIntoForm, INGREDIENT_SELECT } from '@/lib/products/ingredient-records';
 import { supabaseIngredientStore } from '@/lib/products/ingredient-store';
+import { fanOutLiquidRecipe, describeFanout } from '@/lib/products/liquid-fanout';
+import { supabaseFanoutStore } from '@/lib/products/liquid-fanout-store';
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { useAutoSave } from "@/hooks/useAutoSave";
@@ -777,10 +779,27 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         if (insertError) throw new Error(`Failed to save ingredients: ${insertError.message}`);
       }
 
+      // Fan the recipe out to every other product made from this liquid. The
+      // user's own product is already saved above, so a sibling that fails is
+      // reported rather than presented as "your recipe did not save".
+      const fanout = await fanOutLiquidRecipe(
+        supabaseFanoutStore,
+        (product as any)?.liquid_id ?? null,
+        parseInt(productId, 10),
+        validForms.map(buildMaterialData)
+      );
+
       toast.success(
         validForms.length === 0 ? 'Recipe saved' : `${validForms.length} ingredient${validForms.length === 1 ? '' : 's'} saved successfully`,
         { id: "save-ingredients" }
       );
+      const fanoutNote = describeFanout(fanout);
+      if (fanoutNote) {
+        // Never silent: a recipe edit that quietly rewrote three other
+        // products is the surprise the propagation decision rules out.
+        if (fanout.failed.length > 0) toast.warning(fanoutNote);
+        else toast.info(fanoutNote);
+      }
       await fetchProductData();
     } catch (error: any) {
       console.error("Save ingredients error:", error);
