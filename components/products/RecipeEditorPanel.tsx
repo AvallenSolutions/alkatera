@@ -15,6 +15,7 @@ import { BOMImportFlow } from "@/components/products/BOMImportFlow";
 import { stashedLineItemsToExtracted } from "@/lib/bom/parser";
 import type { ExtractedBOMItem } from "@/lib/bom/types";
 import { MaturationProfileCard } from "@/components/products/MaturationProfileCard";
+import { LiquidStrip } from "@/components/products/LiquidStrip";
 import { isMaturationEligibleProduct } from "@/lib/maturation-eligibility";
 import { SearchGuidePanel } from "@/components/products/SearchGuidePanel";
 import { RecipeChecklist } from "@/components/products/RecipeChecklist";
@@ -517,6 +518,17 @@ export function RecipeEditorPanel({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* What this product is made from. The liquid was invisible
+                  until now: the fan-out worked but nothing told the user
+                  their recipe was shared, or let them point a second format
+                  at a liquid they already make. */}
+              <LiquidStrip
+                organizationId={(product as any)?.organization_id ?? organizationId}
+                productId={productId}
+                liquidId={(product as any)?.liquid_id ?? null}
+                onChanged={fetchProductData}
+              />
+
               <RecipeModePicker
                 recipeScaleMode={recipeScaleMode}
                 batchYieldValue={batchYieldValue}
