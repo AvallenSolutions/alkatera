@@ -136,16 +136,19 @@ is not cosmetic: every distribution stage will move when the update lands.
   customer-communication moment as the parametric-packaging recalc rather
   than letting numbers move twice in a month.
 
-## 6. Decisions for Tim
+## 6. Decisions (settled with Tim, 22 July 2026)
 
-1. **Sequencing.** Recommended: audit Phases 1 and 2 first (they shrink every
-   form this plan composes), then L1 to L3. The alternative, L1 first, gives
-   the flashier win sooner but builds the liquid on un-promoted ingredient
-   rows and re-derives work later.
-2. **Identical-liquid merges at migration**: propose-only (recommended), or
-   auto-merge where recipes match exactly.
-3. **Propagation consent**: a liquid edit recalculates all linked products
-   automatically (recommended, with the dossier's "recalculated because the
-   recipe changed" note), or asks first when more than N products are linked.
-4. **Retiring `ingredients_templates`** in L3: migrate-and-remove
-   (recommended), or keep indefinitely as an import path.
+1. **Sequencing: audit Phases 1 and 2 first**, then L1 to L3. They shrink
+   every form this plan composes.
+2. **Identical-liquid merges: propose-only.** The platform detects and
+   proposes; the user holds the authority to merge. Never silent.
+3. **Propagation: automatic.** A liquid edit recalculates every linked
+   product, and the dossier says why the number moved ("recalculated because
+   the recipe changed").
+4. **Templates: retire the feature, keep the mapping until cutover.** The UI
+   goes at L3, but `ingredients_templates` and the template-to-liquid
+   conversion survive until the production import has actually run: customer
+   templates on the production platform are real work, and they come across
+   as liquids nothing links to yet (lossless: source volume, items and
+   maturation are all a liquid needs). The table drops only after cutover
+   data lands, not when L3 ships.
