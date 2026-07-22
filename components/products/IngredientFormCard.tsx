@@ -38,6 +38,7 @@ import { isOrchardEligible } from "@/lib/orchard-utils";
 import type { VineyardGrowingProfile } from "@/lib/types/viticulture";
 import { LocationPicker, LocationData } from "@/components/shared/LocationPicker";
 import type { DataSource } from "@/lib/types/lca";
+import { ingredientDeclaredFacts } from '@/lib/suppliers/declared-facts';
 import { calculateDistance } from "@/lib/utils/distance-calculator";
 import { getTransportModeWarning, formatTransportMode, type TransportMode } from "@/lib/utils/transport-emissions-calculator";
 import {
@@ -929,6 +930,12 @@ export function IngredientFormCard({
       ...(originLat != null ? { origin_lat: originLat } : {}),
       ...(originLng != null ? { origin_lng: originLng } : {}),
       ...(originCountryCode ? { origin_country_code: originCountryCode, origin_country: originCountryCode } : {}),
+      // An organic-certified supplier product used to leave the organic box
+      // unticked, so the user was asked about a certification the supplier had
+      // already declared. Never clears a flag they set themselves.
+      ...ingredientDeclaredFacts(product, {
+        is_organic_certified: ingredient.is_organic_certified,
+      }),
     });
   };
 

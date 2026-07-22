@@ -61,6 +61,7 @@ import {
   type DistributionResult,
 } from "@/lib/distribution-factors";
 import { InheritedField } from "@/components/studio/inherited-field";
+import { packagingDeclaredFacts } from "@/lib/suppliers/declared-facts";
 import { useEprOrgDefaults } from "@/hooks/data/useEprOrgDefaults";
 import {
   resolveEprInheritedFields,
@@ -791,6 +792,18 @@ export function PackagingFormCard({
     if (product.epr_is_drinks_container != null) {
       updates.epr_is_drinks_container = product.epr_is_drinks_container;
     }
+
+    // Recyclability, end-of-life pathway and primary material: facts the
+    // supplier had already declared and this handler used to drop, leaving the
+    // user to answer them again. Only fills what is still blank.
+    Object.assign(
+      updates,
+      packagingDeclaredFacts(product, {
+        recyclability_percent: packaging.recyclability_percent,
+        end_of_life_pathway: packaging.end_of_life_pathway,
+        container_material: packaging.container_material,
+      })
+    );
 
     onUpdate(packaging.tempId, updates);
   };

@@ -15,6 +15,16 @@ export interface PackagingTemplateItem {
   amount: number | string;
   unit: string;
   packaging_category: string | null;
+  /**
+   * The parametric material identity. Omitting these two was the single
+   * costliest gap in the template feature: a restored row came back with no
+   * class, the next save NULLed the column, and the row then fell out of the
+   * parametric factor path in the calculator and was matched by name instead.
+   * A template exists to avoid re-entry, so it must carry the fields that
+   * drive the emission factor.
+   */
+  packaging_material_class?: string | null;
+  packaging_material_variant?: string | null;
   net_weight_g: number | string;
   recycled_content_percentage: number | string;
   printing_process: string;
@@ -80,6 +90,8 @@ export function packagingToTemplateItem(form: PackagingFormData): PackagingTempl
     amount: form.amount,
     unit: form.unit,
     packaging_category: form.packaging_category,
+    packaging_material_class: form.packaging_material_class,
+    packaging_material_variant: form.packaging_material_variant,
     net_weight_g: form.net_weight_g,
     recycled_content_percentage: form.recycled_content_percentage,
     printing_process: form.printing_process,
@@ -160,6 +172,8 @@ export function templateItemToPackagingForm(item: PackagingTemplateItem): Packag
     container_material: item.container_material ?? null,
     container_size_ml: item.container_size_ml ?? null,
     transport_legs: item.transport_legs ?? null,
+    packaging_material_class: item.packaging_material_class ?? null,
+    packaging_material_variant: item.packaging_material_variant ?? null,
   };
 }
 
