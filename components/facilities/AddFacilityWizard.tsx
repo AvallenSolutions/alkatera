@@ -233,6 +233,14 @@ export function AddFacilityWizard({
             operationalControl === 'third_party' && defaultDataMode !== 'primary'
               ? defaultProxyJustification || null
               : null,
+          // The wizard already collects these; before this they were discarded
+          // on save and had to be retyped on every LCA run.
+          default_hybrid_overrides:
+            operationalControl === 'third_party' &&
+            defaultDataMode === 'hybrid' &&
+            Object.keys(defaultHybridOverrides).length > 0
+              ? defaultHybridOverrides
+              : null,
         })
         .select()
         .single();

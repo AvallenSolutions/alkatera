@@ -25,6 +25,7 @@ import {
   isStalePathwayOverride,
   calculateMaterialEoL,
   DEFAULT_EOL_TRANSPORT_KM,
+  eolRegionForCountry,
 } from '@/lib/end-of-life-factors';
 import { normalizeToKg } from '@/lib/impact-waterfall-resolver';
 
@@ -89,8 +90,11 @@ function circularityPathways(
 export function EndOfLifeStep() {
   const { formData, updateField, preCalcState } = useWizardContext();
 
+  // The region follows the organisation's country rather than assuming the EU
+  // for everyone. A saved config always wins, so reopening a finished wizard
+  // never has its region moved underneath it.
   const config: EoLConfig = formData.eolConfig || {
-    region: 'eu',
+    region: eolRegionForCountry(preCalcState.organizationCountry),
     pathways: {},
   };
 

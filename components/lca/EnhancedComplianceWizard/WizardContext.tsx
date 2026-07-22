@@ -456,7 +456,7 @@ export function WizardProvider({
         sb.from('products').select('*').eq('id', productId).maybeSingle(),
         sb.from('product_materials').select('*').eq('product_id', productId),
         sb.from('facility_product_assignments')
-          .select('*, facilities (id, name, operational_control, address_city, address_country, default_data_collection_mode, default_archetype_id, default_proxy_justification)')
+          .select('*, facilities (id, name, operational_control, address_city, address_country, default_data_collection_mode, default_archetype_id, default_proxy_justification, default_hybrid_overrides)')
           .eq('product_id', productId)
           .eq('assignment_status', 'active'),
       ]);
@@ -468,6 +468,17 @@ export function WizardProvider({
       }
 
       setPreCalcState((prev) => ({ ...prev, product: productData }));
+
+      // The organisation's country. The wizard never loaded the organisation
+      // at all, so end-of-life defaulted to the EU and the consumer market to
+      // the global grid average no matter who the producer was.
+      const { data: orgData } = await sb
+        .from('organizations')
+        .select('country')
+        .eq('id', productData.organization_id)
+        .maybeSingle();
+      const orgCountry: string | null = (orgData as any)?.country ?? null;
+      setPreCalcState((prev) => ({ ...prev, organizationCountry: orgCountry }));
 
       // Look up an existing draft PCF for this product so the wizard
       // resumes where the user left off. We only do this when the caller
@@ -611,6 +622,10 @@ export function WizardProvider({
           const defaultMode = (f.facility as any).default_data_collection_mode || 'primary';
           const defaultArchetypeId = (f.facility as any).default_archetype_id || undefined;
           const defaultJustification = (f.facility as any).default_proxy_justification || undefined;
+          // The facility's saved per-unit overrides seed the allocation, so
+          // hybrid mode stops asking for the same four numbers on every run.
+          const defaultHybridOverrides =
+            (f.facility as any).default_hybrid_overrides || undefined;
 
           if (latestSession) {
             return {
@@ -629,6 +644,7 @@ export function WizardProvider({
               dataCollectionMode: defaultMode,
               archetypeId: defaultArchetypeId,
               proxyJustification: defaultJustification,
+              hybridOverrides: defaultHybridOverrides,
             };
           }
           return {
@@ -644,6 +660,7 @@ export function WizardProvider({
             dataCollectionMode: defaultMode,
             archetypeId: defaultArchetypeId,
             proxyJustification: defaultJustification,
+            hybridOverrides: defaultHybridOverrides,
           };
         });
       }

@@ -680,3 +680,35 @@ export const REGION_LABELS: Record<EoLRegion, string> = {
   uk: 'United Kingdom',
   us: 'United States',
 };
+
+/**
+ * The EU-27 plus the EEA and Switzerland, whose waste systems the EU regional
+ * defaults represent. Everything else falls to the EU profile as the
+ * best-documented default, which is what the wizard hardcoded before the
+ * organisation's own country was consulted at all.
+ */
+const EU_PROFILE_COUNTRIES = new Set([
+  'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU',
+  'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES',
+  'SE', 'IS', 'LI', 'NO', 'CH',
+]);
+
+/**
+ * The end-of-life region an organisation's country belongs to.
+ *
+ * The wizard defaulted every product to `'eu'` regardless of who the producer
+ * was, so a UK distillery got EU recycling rates unless someone noticed the
+ * select and changed it. `organizations.country` is the honest default.
+ *
+ * Accepts an ISO 3166-1 alpha-2 code; anything unrecognised (including a full
+ * country name, which some older organisation rows hold) returns 'eu', the
+ * same value the hardcoded default used.
+ */
+export function eolRegionForCountry(countryCode: string | null | undefined): EoLRegion {
+  if (!countryCode) return 'eu';
+  const code = countryCode.trim().toUpperCase();
+  if (code === 'GB' || code === 'UK') return 'uk';
+  if (code === 'US') return 'us';
+  if (EU_PROFILE_COUNTRIES.has(code)) return 'eu';
+  return 'eu';
+}

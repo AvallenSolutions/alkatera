@@ -47,6 +47,7 @@ interface Facility {
   default_data_collection_mode?: 'primary' | 'archetype_proxy' | 'hybrid' | null;
   default_archetype_id?: string | null;
   default_proxy_justification?: string | null;
+  default_hybrid_overrides?: Record<string, number> | null;
 }
 
 interface FacilityArchetypeSummary {
@@ -613,6 +614,7 @@ export default function FacilityDetailPage() {
           initialMode={(facility.default_data_collection_mode as any) || 'primary'}
           initialArchetypeId={facility.default_archetype_id ?? null}
           initialJustification={facility.default_proxy_justification ?? ''}
+          initialHybridOverrides={facility.default_hybrid_overrides ?? null}
           onSaved={loadFacilityData}
         />
       )}

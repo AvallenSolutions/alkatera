@@ -26,6 +26,8 @@ interface Props {
   initialMode: DataCollectionMode;
   initialArchetypeId: string | null;
   initialJustification: string;
+  /** The facility's saved per-unit overrides, so reopening shows what it uses. */
+  initialHybridOverrides?: HybridOverrides | null;
   onSaved?: () => void;
 }
 
@@ -36,12 +38,13 @@ export function FacilityDataSourcingDialog({
   initialMode,
   initialArchetypeId,
   initialJustification,
+  initialHybridOverrides,
   onSaved,
 }: Props) {
   const [mode, setMode] = useState<DataCollectionMode>(initialMode);
   const [archetypeId, setArchetypeId] = useState<string | null>(initialArchetypeId);
   const [justification, setJustification] = useState(initialJustification);
-  const [hybridOverrides, setHybridOverrides] = useState<HybridOverrides>({});
+  const [hybridOverrides, setHybridOverrides] = useState<HybridOverrides>(initialHybridOverrides ?? {});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -49,8 +52,9 @@ export function FacilityDataSourcingDialog({
       setMode(initialMode);
       setArchetypeId(initialArchetypeId);
       setJustification(initialJustification);
+      setHybridOverrides(initialHybridOverrides ?? {});
     }
-  }, [open, initialMode, initialArchetypeId, initialJustification]);
+  }, [open, initialMode, initialArchetypeId, initialJustification, initialHybridOverrides]);
 
   const handleSave = async () => {
     if (mode !== 'primary') {
@@ -72,6 +76,11 @@ export function FacilityDataSourcingDialog({
           default_data_collection_mode: mode,
           default_archetype_id: mode === 'primary' ? null : archetypeId,
           default_proxy_justification: mode === 'primary' ? null : justification || null,
+          // The four per-unit overrides used to be collected here and then
+          // dropped on save, so they were retyped on every LCA run and only
+          // ever survived inside that run's draft_data blob.
+          default_hybrid_overrides:
+            mode === 'hybrid' && Object.keys(hybridOverrides).length > 0 ? hybridOverrides : null,
         })
         .eq('id', facilityId);
 

@@ -154,6 +154,12 @@ export interface PreCalculationState {
   editingMaterialId: string | null;
   savingMaterialId: string | null;
   product: any | null;
+  /**
+   * The organisation's ISO country code. Seeds the end-of-life region and the
+   * consumer market, which were hardcoded to the EU and to the global grid
+   * average because the wizard never loaded the organisation record at all.
+   */
+  organizationCountry: string | null;
 
   // Facility allocation
   linkedFacilities: LinkedFacility[];
@@ -177,6 +183,7 @@ export const INITIAL_PRE_CALC_STATE: PreCalculationState = {
   editingMaterialId: null,
   savingMaterialId: null,
   product: null,
+  organizationCountry: null,
   linkedFacilities: [],
   facilityAllocations: [],
   reportingSessions: {},

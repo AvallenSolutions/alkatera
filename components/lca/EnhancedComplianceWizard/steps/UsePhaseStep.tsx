@@ -37,11 +37,17 @@ export function UsePhaseStep() {
     }
   }, [productCategory]);
 
+  // The consumer market defaults to the organisation's own country instead of
+  // the global grid average, which is the better guess for most producers and
+  // is stated rather than silently assumed.
   const config: UsePhaseConfig = formData.usePhaseConfig || {
     needsRefrigeration: false,
     refrigerationDays: 7,
     retailRefrigerationSplit: 0.5,
     isCarbonated: false,
+    consumerCountryCode: preCalcState.organizationCountry
+      ? preCalcState.organizationCountry.toUpperCase()
+      : undefined,
   };
 
   const updateConfig = (partial: Partial<UsePhaseConfig>) => {
