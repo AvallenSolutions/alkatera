@@ -73,7 +73,9 @@ const createDefaultPackaging = (): PackagingFormData => ({
   components: [],
   epr_packaging_level: undefined,
   epr_packaging_activity: undefined,
-  epr_is_household: true,
+  // Null, not true: a new row inherits household status from the
+  // organisation's EPR settings until someone deliberately overrides it.
+  epr_is_household: null,
   epr_ram_rating: undefined,
   epr_uk_nation: undefined,
   epr_material_type: undefined,

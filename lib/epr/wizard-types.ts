@@ -34,7 +34,6 @@ export type EPRWizardStep =
   // Phase 3: Packaging Data
   | 'defaults'
   | 'data-review'
-  | 'bulk-edit'
   // Phase 4: Validate & Generate
   | 'validation'
   | 'generate'
@@ -74,12 +73,11 @@ export const EPR_WIZARD_STEPS: EPRWizardStepConfig[] = [
   // Phase 3: Packaging Data
   { id: 'defaults', phase: 'packaging-data', title: 'Defaults', description: 'Set default EPR values', skippable: true, index: 10 },
   { id: 'data-review', phase: 'packaging-data', title: 'Data Review', description: 'Check packaging completeness', skippable: false, index: 11 },
-  { id: 'bulk-edit', phase: 'packaging-data', title: 'Bulk Edit', description: 'Update multiple items at once', skippable: true, index: 12 },
   // Phase 4: Validate & Generate
-  { id: 'validation', phase: 'validate-generate', title: 'Validation', description: 'Final compliance check', skippable: false, index: 13 },
-  { id: 'generate', phase: 'validate-generate', title: 'Generate', description: 'Create RPD submission', skippable: false, index: 14 },
+  { id: 'validation', phase: 'validate-generate', title: 'Validation', description: 'Final compliance check', skippable: false, index: 12 },
+  { id: 'generate', phase: 'validate-generate', title: 'Generate', description: 'Create RPD submission', skippable: false, index: 13 },
   // Phase 5: Export & Finish
-  { id: 'export-complete', phase: 'export-finish', title: 'Export', description: 'Download CSVs & finish', skippable: false, index: 15 },
+  { id: 'export-complete', phase: 'export-finish', title: 'Export', description: 'Download CSVs & finish', skippable: false, index: 14 },
 ]
 
 export const TOTAL_EPR_WIZARD_STEPS = EPR_WIZARD_STEPS.length
@@ -211,11 +209,9 @@ export const ROSA_WIZARD_MESSAGES: Record<EPRWizardStep, string> = {
   'partners':
     "As a partnership, HMRC requires the details of each individual partner. Please add all partners registered with Companies House.",
   'defaults':
-    "Setting defaults here saves you clicking the same values on every product. Most drinks brands are 'Brand Owner' selling primarily in one nation. You can always override these on individual products.",
+    "Set these once and every packaging item follows them, so you never answer the same three questions per product again. Most drinks brands are 'Brand Owner' selling primarily in one nation. Any item that genuinely differs can override them.",
   'data-review':
     "Here's where we check that every packaging item has the EPR fields filled in. Think of it as a pre-flight checklist before generating your submission. Items highlighted in amber need your attention.",
-  'bulk-edit':
-    "If many of your products share the same packaging activity or nation, you can set them all at once here. Much faster than editing one by one! Just tick the items you want to update.",
   'validation':
     "Nearly there! Let me check everything one last time, both your packaging data and HMRC registration details. Green ticks mean you're good to go. If anything's missing, I'll tell you exactly what needs fixing.",
   'generate':

@@ -160,7 +160,11 @@ export function buildPackagingMaterialData(form: PackagingFormData, productId: s
   // the level is set on every packaging row for single SKUs and multipacks.
   materialData.epr_packaging_level =
     form.epr_packaging_level || eprLevelForCategory(form.packaging_category) || null;
-  if (form.epr_packaging_activity) materialData.epr_packaging_activity = form.epr_packaging_activity;
+  // Activity, nation and household status inherit from the organisation's EPR
+  // settings. Null is meaningful here: it is what keeps a row following the
+  // organisation, so an unset field must be written as null rather than left
+  // out of the payload (which would strand a previous override on the row).
+  materialData.epr_packaging_activity = form.epr_packaging_activity ?? null;
   // epr_material_type drives the RPD fee band. Only bulk-import used to set
   // it, so normally-created rows fell to 'other' (the wrong rate for glass,
   // aluminium etc.). Derive it from the row's material identity here, using
@@ -173,9 +177,9 @@ export function buildPackagingMaterialData(form: PackagingFormData, productId: s
       material_name: form.name,
       matched_source_name: form.matched_source_name,
     });
-  materialData.epr_is_household = form.epr_is_household !== undefined ? form.epr_is_household : true;
+  materialData.epr_is_household = form.epr_is_household ?? null;
   if (form.epr_ram_rating) materialData.epr_ram_rating = form.epr_ram_rating;
-  if (form.epr_uk_nation) materialData.epr_uk_nation = form.epr_uk_nation;
+  materialData.epr_uk_nation = form.epr_uk_nation ?? null;
   materialData.epr_is_drinks_container = form.epr_is_drinks_container || false;
 
   // Emission factor provenance (apply + flag). Null = unknown/legacy.

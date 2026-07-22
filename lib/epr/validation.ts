@@ -7,22 +7,37 @@
 
 import type { PackagingCategory } from '@/lib/types/lca';
 import type { EPRDataGap, EPRDataCompletenessResult } from './types';
+import { hasEprOrgDefaults, type EPROrgDefaults } from './inheritance';
 
 // =============================================================================
 // Required Fields per Packaging Category
 // =============================================================================
 
 /**
- * Fields that are required for EPR reporting on every packaging item.
+ * Fields that are required for EPR reporting on every packaging item and that
+ * no higher level can answer.
  */
 const ALWAYS_REQUIRED = [
-  'epr_packaging_activity',
-  'epr_uk_nation',
   'net_weight_g',
 ] as const;
 
 /**
+ * Fields that are required, but which the organisation's EPR settings supply
+ * for every row that does not override them. These are only gaps when the
+ * organisation has no EPR settings at all, and then the gap belongs to the
+ * organisation rather than to each of its packaging rows.
+ *
+ * Counting these per row is what produced roughly 80 phantom gaps for a
+ * 20-product organisation and justified the existence of `BulkEditStep`.
+ */
+const INHERITED_FROM_ORG = [
+  'epr_packaging_activity',
+  'epr_uk_nation',
+] as const;
+
+/**
  * Additional fields required for primary packaging (container, label, closure).
+ * Household status also inherits from the organisation.
  */
 const PRIMARY_REQUIRED = [
   'epr_is_household',
@@ -81,8 +96,15 @@ interface PackagingItem {
  * Check a single packaging item for missing EPR fields.
  * Returns an array of missing field names.
  */
-export function checkMissingFields(item: PackagingItem): string[] {
+export function checkMissingFields(
+  item: PackagingItem,
+  settings?: EPROrgDefaults | null
+): string[] {
   const missing: string[] = [];
+  // With EPR settings in place, the organisation answers activity, nation and
+  // household status for every row that does not override them, so an unset
+  // row is inheriting rather than incomplete.
+  const orgAnswers = hasEprOrgDefaults(settings);
 
   // Always required
   for (const field of ALWAYS_REQUIRED) {
@@ -93,9 +115,27 @@ export function checkMissingFields(item: PackagingItem): string[] {
     }
   }
 
+  // Missing or 'other' material type falls to the wrong RPD fee band, so
+  // surface it rather than silently charging the 'other' rate. This rule used
+  // to live only in the gaps page's own hand-rolled copy of this function;
+  // it is the stricter and more correct of the two, so both now share it.
+  if (!item.epr_material_type || item.epr_material_type === 'other') {
+    missing.push(FIELD_DISPLAY_NAMES.epr_material_type);
+  }
+
+  // Inherited from the organisation, so only a gap when nothing can supply them
+  if (!orgAnswers) {
+    for (const field of INHERITED_FROM_ORG) {
+      const value = item[field as keyof PackagingItem];
+      if (value == null || value === '') {
+        missing.push(FIELD_DISPLAY_NAMES[field] || field);
+      }
+    }
+  }
+
   // Primary packaging requires household flag
   const isPrimary = ['container', 'label', 'closure'].includes(item.packaging_category);
-  if (isPrimary) {
+  if (isPrimary && !orgAnswers) {
     for (const field of PRIMARY_REQUIRED) {
       if (item[field as keyof PackagingItem] == null) {
         missing.push(FIELD_DISPLAY_NAMES[field] || field);
@@ -118,12 +158,15 @@ export function checkMissingFields(item: PackagingItem): string[] {
 /**
  * Assess EPR data completeness across all packaging items for an organisation.
  */
-export function assessDataCompleteness(items: PackagingItem[]): EPRDataCompletenessResult {
+export function assessDataCompleteness(
+  items: PackagingItem[],
+  settings?: EPROrgDefaults | null
+): EPRDataCompletenessResult {
   const gaps: EPRDataGap[] = [];
   let completeCount = 0;
 
   for (const item of items) {
-    const missingFields = checkMissingFields(item);
+    const missingFields = checkMissingFields(item, settings);
 
     if (missingFields.length === 0) {
       completeCount++;
@@ -153,6 +196,9 @@ export function assessDataCompleteness(items: PackagingItem[]): EPRDataCompleten
  * Check if all items needed for a submission period have sufficient data.
  * Returns true if completeness is 100%.
  */
-export function isSubmissionReady(items: PackagingItem[]): boolean {
-  return items.every(item => checkMissingFields(item).length === 0);
+export function isSubmissionReady(
+  items: PackagingItem[],
+  settings?: EPROrgDefaults | null
+): boolean {
+  return items.every(item => checkMissingFields(item, settings).length === 0);
 }

@@ -60,6 +60,14 @@ import {
   type DistributionLeg,
   type DistributionResult,
 } from "@/lib/distribution-factors";
+import { InheritedField } from "@/components/studio/inherited-field";
+import { useEprOrgDefaults } from "@/hooks/data/useEprOrgDefaults";
+import {
+  resolveEprInheritedFields,
+  eprSourcePhrase,
+  EPR_ACTIVITY_LABELS,
+  EPR_NATION_LABELS,
+} from "@/lib/epr/inheritance";
 
 export interface PackagingFormData {
   tempId: string;
@@ -96,10 +104,16 @@ export interface PackagingFormData {
   has_component_breakdown: boolean;
   components: PackagingMaterialComponent[];
   epr_packaging_level?: EPRPackagingLevel;
-  epr_packaging_activity?: EPRPackagingActivity;
-  epr_is_household: boolean;
+  /**
+   * These three inherit from the organisation's EPR settings. `null` or
+   * `undefined` means "inherit"; a value means this row deliberately differs.
+   * Reverting an override writes `null` rather than a value, so the row keeps
+   * following the organisation when the organisation's answer later changes.
+   */
+  epr_packaging_activity?: EPRPackagingActivity | null;
+  epr_is_household: boolean | null;
   epr_ram_rating?: EPRRAMRating;
-  epr_uk_nation?: EPRUKNation;
+  epr_uk_nation?: EPRUKNation | null;
   /**
    * Explicit EPR material type. When unset, it is derived from the material at
    * save time (buildPackagingMaterialData). Setting it here overrides the
@@ -216,6 +230,15 @@ function EPRComplianceSection({
 }) {
   const [isOpen, setIsOpen] = useState(false);
 
+  // Packaging activity, UK nation and household status resolve
+  // row → organisation → platform, so a row nobody has touched shows the
+  // organisation's answer instead of an empty required select.
+  const { defaults: eprDefaults } = useEprOrgDefaults();
+  const { activity, nation, isHousehold: household } = resolveEprInheritedFields(
+    packaging,
+    eprDefaults
+  );
+
   return (
     <div className="pt-2 border-t">
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -255,10 +278,20 @@ function EPRComplianceSection({
             </p>
           </div>
 
+          {/*
+            Packaging activity and UK nation belong to the organisation, not to
+            each packaging row. They inherit from EPR settings and only ask
+            anything of the user when this row genuinely differs.
+          */}
           <div className="grid grid-cols-2 gap-4">
-            {/* Packaging Activity */}
-            <div>
-              <Label className="text-xs">Packaging Activity</Label>
+            <InheritedField
+              label="Packaging activity"
+              source={eprSourcePhrase(activity.source)}
+              inheritedValue={EPR_ACTIVITY_LABELS[activity.value]}
+              overridden={activity.source === 'row'}
+              onOverride={() => onUpdate({ epr_packaging_activity: activity.value })}
+              onRevert={() => onUpdate({ epr_packaging_activity: null })}
+            >
               <Select
                 value={packaging.epr_packaging_activity || ''}
                 onValueChange={(value) => onUpdate({ epr_packaging_activity: value as EPRPackagingActivity })}
@@ -267,19 +300,23 @@ function EPRComplianceSection({
                   <SelectValue placeholder="Select activity..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {EPR_PACKAGING_ACTIVITIES.map((activity) => (
-                    <SelectItem key={activity.value} value={activity.value} className="text-xs">
-                      {activity.label}
+                  {EPR_PACKAGING_ACTIVITIES.map((a) => (
+                    <SelectItem key={a.value} value={a.value} className="text-xs">
+                      {a.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-[10px] text-muted-foreground mt-0.5">How this packaging was supplied</p>
-            </div>
+            </InheritedField>
 
-            {/* UK Nation */}
-            <div>
-              <Label className="text-xs">UK Nation</Label>
+            <InheritedField
+              label="UK nation"
+              source={eprSourcePhrase(nation.source)}
+              inheritedValue={EPR_NATION_LABELS[nation.value]}
+              overridden={nation.source === 'row'}
+              onOverride={() => onUpdate({ epr_uk_nation: nation.value })}
+              onRevert={() => onUpdate({ epr_uk_nation: null })}
+            >
               <Select
                 value={packaging.epr_uk_nation || ''}
                 onValueChange={(value) => onUpdate({ epr_uk_nation: value as EPRUKNation })}
@@ -288,15 +325,14 @@ function EPRComplianceSection({
                   <SelectValue placeholder="Select nation..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {EPR_UK_NATIONS.map((nation) => (
-                    <SelectItem key={nation.value} value={nation.value} className="text-xs">
-                      {nation.label}
+                  {EPR_UK_NATIONS.map((n) => (
+                    <SelectItem key={n.value} value={n.value} className="text-xs">
+                      {n.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Where packaging is supplied/discarded</p>
-            </div>
+            </InheritedField>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -327,9 +363,15 @@ function EPRComplianceSection({
               <p className="text-[10px] text-muted-foreground mt-0.5">For EPR fee modulation</p>
             </div>
 
-            {/* Household Toggle */}
-            <div className="space-y-2">
-              <Label className="text-xs">Packaging Type</Label>
+            {/* Household status, likewise an organisation-level fact */}
+            <InheritedField
+              label="Packaging type"
+              source={eprSourcePhrase(household.source)}
+              inheritedValue={household.value ? 'Household' : 'Non-household'}
+              overridden={household.source === 'row'}
+              onOverride={() => onUpdate({ epr_is_household: household.value })}
+              onRevert={() => onUpdate({ epr_is_household: null })}
+            >
               <div className="flex items-center gap-4">
                 <label className="flex items-center gap-2 text-xs cursor-pointer">
                   <input
@@ -352,7 +394,7 @@ function EPRComplianceSection({
                   Non-household
                 </label>
               </div>
-            </div>
+            </InheritedField>
           </div>
 
           {/* Drinks Container checkbox - only show for containers */}

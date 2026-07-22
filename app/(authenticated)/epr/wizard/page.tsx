@@ -33,7 +33,6 @@ import { BrandsStep } from '@/components/epr/wizard/steps/BrandsStep'
 import { PartnersStep } from '@/components/epr/wizard/steps/PartnersStep'
 import { DefaultsStep } from '@/components/epr/wizard/steps/DefaultsStep'
 import { DataReviewStep } from '@/components/epr/wizard/steps/DataReviewStep'
-import { BulkEditStep } from '@/components/epr/wizard/steps/BulkEditStep'
 import { ValidationStep } from '@/components/epr/wizard/steps/ValidationStep'
 import { GenerateStep } from '@/components/epr/wizard/steps/GenerateStep'
 import { ExportCompleteStep } from '@/components/epr/wizard/steps/ExportCompleteStep'
@@ -51,7 +50,6 @@ const STEP_COMPONENTS: Record<string, React.ComponentType<{ onComplete: () => vo
   'partners': PartnersStep,
   'defaults': DefaultsStep,
   'data-review': DataReviewStep,
-  'bulk-edit': BulkEditStep,
   'validation': ValidationStep,
   'generate': GenerateStep,
   'export-complete': ExportCompleteStep,

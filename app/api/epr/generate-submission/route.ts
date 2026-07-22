@@ -8,6 +8,7 @@ import { isDRSExcluded, isGlassDrinksContainer, processContainerComponents, extr
 import { FEE_YEARS, RPD_MATERIAL_NAMES } from '@/lib/epr/constants'
 import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access'
 import { getPackagingUnitsPerGroup } from '@/lib/end-of-life-factors'
+import { resolveEprActivity, resolveEprNation, resolveEprHousehold } from '@/lib/epr/inheritance'
 import type { EPRFeeRate, RPDMaterialCode, RPDOrganisationSize } from '@/lib/epr/types'
 import type { EPRMaterialType, EPRPackagingActivity, EPRPackagingLevel, EPRRAMRating, EPRUKNation, PackagingCategory } from '@/lib/types/lca'
 
@@ -199,22 +200,28 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      // Use material-level EPR fields, falling back to org defaults
-      const activity = (material.epr_packaging_activity || settings.default_packaging_activity || 'brand') as EPRPackagingActivity
-      const nation = (material.epr_uk_nation || settings.default_uk_nation || 'england') as EPRUKNation
+      // Use material-level EPR fields, falling back to org defaults. This
+      // cascade is now shared with the forms and the gaps page so the three
+      // cannot drift apart (lib/epr/inheritance).
+      const activityResolved = resolveEprActivity(material, settings)
+      const nationResolved = resolveEprNation(material, settings)
+      const activity = activityResolved.value
+      const nation = nationResolved.value
       const ramRating = (material.epr_ram_rating || null) as EPRRAMRating | null
       const packagingCategory = (material.packaging_category || 'container') as PackagingCategory
       const packagingLevel = (material.epr_packaging_level || null) as EPRPackagingLevel | null
       const materialType = (material.epr_material_type || 'other') as EPRMaterialType
       const isDrinksContainer = material.epr_is_drinks_container ?? false
-      const isHousehold = material.epr_is_household ?? true
+      const isHousehold = resolveEprHousehold(material, settings).value
 
-      // Missing field warnings
-      if (!material.epr_packaging_activity) {
-        warnings.push(`${product.name} / ${material.material_name}: Using default packaging activity (${activity}).`)
+      // Missing field warnings. Inheriting from the organisation's EPR
+      // settings is the intended path, so only warn when even the settings had
+      // nothing to say and alkatera's own fallback had to apply.
+      if (activityResolved.source === 'platform') {
+        warnings.push(`${product.name} / ${material.material_name}: No packaging activity set here or in your EPR settings, so the default (${activity}) applied.`)
       }
-      if (!material.epr_uk_nation) {
-        warnings.push(`${product.name} / ${material.material_name}: Using default UK nation (${nation}).`)
+      if (nationResolved.source === 'platform') {
+        warnings.push(`${product.name} / ${material.material_name}: No UK nation set here or in your EPR settings, so the default (${nation}) applied.`)
       }
 
       // Unit size for DRS check

@@ -49,6 +49,15 @@ export function useEPRDataCompleteness(): UseEPRDataCompletenessResult {
 
       if (fetchError) throw fetchError;
 
+      // Activity, nation and household status inherit from the organisation,
+      // so the settings row decides whether an unset packaging row is a gap or
+      // simply inheriting.
+      const { data: settings } = await supabase
+        .from('epr_organization_settings')
+        .select('default_packaging_activity, default_uk_nation, default_is_household')
+        .eq('organization_id', currentOrganization.id)
+        .maybeSingle();
+
       const items = (data || []).map((row: any) => ({
         id: row.id,
         product_id: row.product_id,
@@ -65,7 +74,7 @@ export function useEPRDataCompleteness(): UseEPRDataCompletenessResult {
         epr_material_type: row.epr_material_type,
       }));
 
-      setCompleteness(assessDataCompleteness(items));
+      setCompleteness(assessDataCompleteness(items, settings));
     } catch (err: any) {
       console.error('Error assessing EPR data completeness:', err);
       const message = err.message || 'Failed to assess data completeness';

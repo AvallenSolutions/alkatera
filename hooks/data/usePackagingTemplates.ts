@@ -28,10 +28,15 @@ export interface PackagingTemplateItem {
   has_component_breakdown: boolean;
   components: any[];
   epr_packaging_level?: string;
-  epr_packaging_activity?: string;
-  epr_is_household: boolean;
+  /**
+   * Null means "inherit from the organisation's EPR settings". A template must
+   * round-trip that faithfully: stamping a concrete value onto every row it is
+   * applied to would pin rows that should keep following the organisation.
+   */
+  epr_packaging_activity?: string | null;
+  epr_is_household: boolean | null;
   epr_ram_rating?: string;
-  epr_uk_nation?: string;
+  epr_uk_nation?: string | null;
   epr_is_drinks_container: boolean;
   units_per_group: number | string;
   // Circularity + structured identity + factor metadata (round-tripped so a

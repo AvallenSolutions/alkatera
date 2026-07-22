@@ -30,6 +30,8 @@ import { Statement } from '@/components/studio/statement';
 import { Panel } from '@/components/studio/panel';
 import { StateChip } from '@/components/studio/state-chip';
 import { obligationStatusTone } from '@/lib/epr/status-tones';
+import { assessDataCompleteness } from '@/lib/epr/validation';
+import type { EPROrgDefaults } from '@/lib/epr/inheritance';
 import {
   REPORTING_DEADLINES,
   type ReportingDeadline,
@@ -202,16 +204,27 @@ export default function EPRDashboardPage() {
           `)
           .eq('products.organization_id', orgId)
           .not('packaging_category', 'is', null),
-        // EPR settings (for wizard state)
+        // EPR settings (wizard state, plus the defaults packaging rows inherit)
         fetch(`/api/epr/settings?organizationId=${orgId}`).then(async (r) => {
           if (!r.ok) throw new Error('Failed to fetch settings');
-          return r.json() as Promise<{ settings: { wizard_state?: { completed?: boolean } | null } }>;
+          return r.json() as Promise<{
+            settings: ({ wizard_state?: { completed?: boolean } | null } & Partial<EPROrgDefaults>) | null;
+          }>;
         }),
       ]);
 
       // Process wizard state
+      let eprDefaults: EPROrgDefaults | null = null;
       if (settingsRes.status === 'fulfilled') {
-        setWizardCompleted(settingsRes.value.settings?.wizard_state?.completed === true);
+        const s = settingsRes.value.settings;
+        setWizardCompleted(s?.wizard_state?.completed === true);
+        eprDefaults = s
+          ? {
+              default_packaging_activity: s.default_packaging_activity ?? null,
+              default_uk_nation: s.default_uk_nation ?? null,
+              default_is_household: s.default_is_household ?? null,
+            }
+          : null;
       }
 
       // Process obligation
@@ -228,51 +241,34 @@ export default function EPRDashboardPage() {
         setFeeData(feeRes.value);
       }
 
-      // Process completeness
+      // Process completeness. The gap rule lives in lib/epr/validation, which
+      // knows that activity, nation and household status inherit from the
+      // organisation's EPR settings: an unset row is inheriting, not
+      // incomplete. This page used to carry its own copy of the rule, and the
+      // two drifted.
       if (completenessResult.status === 'fulfilled') {
         const { data: items } = completenessResult.value;
         if (items && items.length > 0) {
-          const gaps: EPRDataGap[] = [];
-          let completeCount = 0;
-
-          for (const item of items) {
-            const product = item.products as any;
-            const missing: string[] = [];
-
-            if (!item.net_weight_g || item.net_weight_g <= 0) missing.push('Net Weight');
-            if (!item.epr_packaging_activity) missing.push('Packaging Activity');
-            if (!item.epr_uk_nation) missing.push('UK Nation');
-            // Missing/other material type falls to the wrong RPD fee band, so
-            // surface it as a gap the user can fix rather than silently
-            // charging the 'other' rate.
-            if (!item.epr_material_type || item.epr_material_type === 'other') missing.push('Material Type');
-
-            const isPrimary = ['container', 'label', 'closure'].includes(item.packaging_category || '');
-            if (isPrimary && item.epr_is_household == null) missing.push('Household/Non-household');
-            if (item.packaging_category === 'container' && item.epr_is_drinks_container == null)
-              missing.push('Drinks Container flag');
-
-            if (missing.length === 0) {
-              completeCount++;
-            } else {
-              gaps.push({
-                product_id: product?.id ?? 0,
-                product_name: product?.name || 'Unknown Product',
-                product_material_id: item.id,
+          setCompleteness(
+            assessDataCompleteness(
+              items.map((item: any) => ({
+                id: item.id,
+                product_id: (item.products as any)?.id ?? 0,
+                product_name: (item.products as any)?.name || 'Unknown Product',
                 material_name: item.material_name || 'Unknown Material',
                 packaging_category: item.packaging_category || 'unknown',
-                missing_fields: missing,
-              });
-            }
-          }
-
-          setCompleteness({
-            total_packaging_items: items.length,
-            complete_items: completeCount,
-            incomplete_items: items.length - completeCount,
-            completeness_pct: items.length > 0 ? Math.round((completeCount / items.length) * 100) : 100,
-            gaps,
-          });
+                net_weight_g: item.net_weight_g,
+                epr_packaging_activity: item.epr_packaging_activity,
+                epr_packaging_level: item.epr_packaging_level,
+                epr_uk_nation: item.epr_uk_nation,
+                epr_ram_rating: item.epr_ram_rating,
+                epr_is_household: item.epr_is_household,
+                epr_is_drinks_container: item.epr_is_drinks_container,
+                epr_material_type: item.epr_material_type,
+              })),
+              eprDefaults
+            )
+          );
         } else {
           setCompleteness({
             total_packaging_items: 0,
