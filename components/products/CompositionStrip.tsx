@@ -25,13 +25,7 @@ import { switchProductComposition } from "@/lib/products/switch-composition";
 import { Eyebrow } from "@/components/studio/eyebrow";
 import { StateChip } from "@/components/studio/state-chip";
 import { PillButton } from "@/components/studio/pill-button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { RecordPicker } from "@/components/studio/record-picker";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -59,8 +53,8 @@ const KINDS = {
     empty: 'No liquid yet',
     emptyHint: 'Save a recipe and this product gets a liquid of its own.',
     loneHint: 'Only this product uses it. Point another format at it to share the recipe.',
-    pick: '{K.pick}',
-    placeholder: 'Choose a liquid you make',
+    pick: 'Use another liquid',
+    placeholder: 'Search the liquids you make',
     sharedNoun: 'format',
     editNoun: 'recipe',
     tab: 'ingredients',
@@ -75,7 +69,7 @@ const KINDS = {
     emptyHint: 'Save packaging and this product gets a pack format of its own.',
     loneHint: 'Only this product uses it. Point another product at it to share the spec.',
     pick: 'Use another pack',
-    placeholder: 'Choose a pack you already use',
+    placeholder: 'Search the packs you already use',
     sharedNoun: 'product',
     editNoun: 'packaging',
     tab: 'packaging',
@@ -272,43 +266,53 @@ export function CompositionStrip({
 
         <div className="flex shrink-0 items-center gap-3">
           {picking ? (
-            <>
-              <Select value={pendingId ?? ""} onValueChange={setPendingId}>
-                <SelectTrigger className="h-9 w-[240px] text-xs">
-                  <SelectValue placeholder={K.placeholder} />
-                </SelectTrigger>
-                <SelectContent>
-                  {options
-                    .filter((o) => o.id !== liquidId)
-                    .map((o) => (
-                      <SelectItem key={o.id} value={o.id} className="text-xs">
-                        {o.name}
-                        {o.productCount > 0 &&
-                          ` · ${o.productCount} ${K.sharedNoun}${o.productCount === 1 ? "" : "s"}`}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <button
-                type="button"
-                onClick={() => {
-                  setPicking(false);
-                  setPendingId(null);
-                }}
-                className="font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] text-studio-dim underline decoration-studio-hairline underline-offset-4 hover:text-studio-ink"
-              >
-                Cancel
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={() => {
+                setPicking(false);
+                setPendingId(null);
+              }}
+              className="font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] text-studio-dim underline decoration-studio-hairline underline-offset-4 hover:text-studio-ink"
+            >
+              Cancel
+            </button>
           ) : (
             <PillButton variant="outline" onClick={() => setPicking(true)}>
               {K.pick}
             </PillButton>
           )}
         </div>
+
+        {picking && (
+          <div className="w-full max-w-md">
+            <RecordPicker
+              id={`composition-picker-${kind}`}
+              placeholder={K.placeholder}
+              emptyLabel={K.emptyHint}
+              options={options
+                .filter((o) => o.id !== liquidId)
+                .map((o) => ({
+                  id: o.id,
+                  name: o.name,
+                  hint:
+                    o.productCount > 0
+                      ? `${o.productCount} ${K.sharedNoun}${o.productCount === 1 ? "" : "s"}`
+                      : undefined,
+                }))}
+              onSelect={setPendingId}
+            />
+          </div>
+        )}
       </div>
 
-      <AlertDialog open={Boolean(pendingId) && picking} onOpenChange={(o) => !o && setPendingId(null)}>
+      {/*
+        Gated on the RESOLVED option, not the raw id. The options list reloads
+        whenever the composition changes, and an id that outlives its option
+        (mid-reload, or after a switch) rendered a dialog headed "Pack this
+        product in undefined?" offering to replace the recipe with nothing.
+        No option, no question.
+      */}
+      <AlertDialog open={Boolean(pending) && picking} onOpenChange={(o) => !o && setPendingId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
