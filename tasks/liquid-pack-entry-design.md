@@ -160,17 +160,19 @@ Ordered by value against effort, after audit Phases 1 and 2 and L1/L2 land:
 | Product photo → pack draft (3c) | Medium | Genuinely new; ship after the others prove the draft-and-correct loop |
 | Rosa composition tools (§6) | Small | Thin wrappers once the APIs exist |
 
-## 8. Decisions for Tim
+## 8. Decisions (settled with Tim, 22 July 2026)
 
-1. **Archetype liquids**: curate an initial set ourselves (recommended: one
-   per major category, ~10 to start, factors from the reference sets), or
-   launch without and rely on documents only?
-2. **Photo-to-pack**: in the first release of the composition flow, or held
-   back until the draft-and-correct loop has proven itself on documents
-   (recommended: held back)?
-3. **Supplier flywheel scope**: start with ask-the-supplier on existing
-   supplier-linked lines only (recommended), or hold it until
-   supplier-declared pack components ship so both directions land together?
-4. **Visual design next**: mock the composition surface and the two draft
-   review screens on the Superdesign canvas before build, or go straight to
-   build from this document?
+1. **Archetype liquids: yes at launch.** An initial curated set, roughly ten,
+   one per major category, factors from the reference sets.
+2. **Photo-to-pack: held back** until the draft-and-correct loop has proven
+   itself on documents.
+3. **Supplier flywheel: start with ask-the-supplier** on existing
+   supplier-linked lines. Strategic weight, in Tim's words: the more users
+   contact their suppliers, the faster suppliers land on the platform. This
+   is a supplier-acquisition channel, not just a data-quality feature, and
+   should be prioritised and measured as one (asks sent to suppliers,
+   suppliers who respond, suppliers who convert to the portal).
+4. **No mockups: build straight from this document**, in the studio design
+   canon. Explicitly NOT a copy of the production alkatera layouts; the
+   composition surface and draft-review screens are designed fresh within
+   the design system.
