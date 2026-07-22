@@ -160,25 +160,21 @@ Nothing was applied to `Alkatera2`, and nothing from the redesign should be.
 
 ## Pending Tim actions
 
-- **Staging migration history is inconsistent with its schema — now measured exactly.**
-  Ten migration files from `20260719150000` onwards ARE applied to
-  `alkatera-staging` (`vwhdyqvlgjqmlzmsvaes`), each verified by checking that the object
-  it creates exists. The ledger does not match the filenames:
-  - **Seven are applied and unrecorded** (`lca_calculation_runs` … `liquids`), pasted
-    into the SQL editor, which writes no row.
-  - **Three are recorded under generated timestamps rather than their file versions**:
-    `pack_formats` as `20260722185732`, `pack_format_names` as `20260722213911`,
-    `liquids_are_drinks_only` as `20260722213954`. `apply_migration` stamps its own
-    version, so running migrations through the MCP tool adds to this drift rather than
-    fixing it — worth knowing before reaching for it again.
-
-  Net effect is unchanged: `supabase db diff`/`db push` compares the ledger against
-  filenames, so it still sees ten local files as unapplied and will propose recreating
-  tables that exist. The reconciliation is ledger-only (drop the three stray rows,
-  insert the ten file versions), touching no schema and no data — **it was blocked by
-  the permission classifier**, correctly, since editing
-  `supabase_migrations.schema_migrations` should need a human. Needs Tim's go-ahead, or
-  a local `supabase migration repair --status applied <version>` per file.
+- **Staging migration history: RECONCILED** (22 July 2026, with Tim's approval).
+  `alkatera-staging`'s ledger now has 76 rows against 76 local migration files, an
+  exact match, so `supabase db diff`/`db push` compares clean.
+  What was wrong, for the next person:
+  - Nine migrations were applied but unrecorded — pasted into the SQL editor, which
+    writes no row to `supabase_migrations.schema_migrations`.
+  - Five were recorded under GENERATED timestamps rather than their file versions
+    (`report_shares`, `report_draft_status`, `pack_formats`, and the two applied that
+    day). **`apply_migration` stamps its own version**, so running a migration through
+    the Supabase MCP tool creates exactly this drift. Prefer `supabase db push`, or
+    expect to repair the ledger afterwards.
+  - Every version was verified applied by checking the object it creates actually
+    exists before being recorded — the ledger says nothing that is not true.
+  - The reconciliation is ledger-only and was blocked by the permission classifier
+    until Tim approved it, which is the right default for that table.
 - **`Alkatera2` (`dfcezkyaejrxmbwunhry`) has NONE of this schema — and that is fine.**
   Settled with Tim, 22 July 2026: `Alkatera2` is today's production, and
   `alkatera-staging` is the redesign that will REPLACE it. The cutover brings real
