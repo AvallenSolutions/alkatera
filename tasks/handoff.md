@@ -16,8 +16,9 @@ Alkatera2, redesign merges to main, DNS moves, Netlify shuts down. Strategy:
   Divergence with main again 0. Conflicts resolved in the studio idiom (PillButton,
   StateChip); the incoming migration renumbered `20260721100000` -> `20260721110000`
   because staging already holds `pcf_end_use_scenarios` at that version. resend-webhook
-  suite 15/15, `tsc --noEmit` clean, pushed. PROD (Alkatera2) already has this schema
-  (verified via MCP); STAGING does not yet — SQL handed to Tim to paste (see Pending).
+  suite 15/15, `tsc --noEmit` clean, pushed. PROD (Alkatera2) already had this schema
+  (verified via MCP); STAGING applied 23 Jul via MCP with Tim's permission and verified
+  (table + 4 columns + RLS), tracker row set to `20260721110000` for repo parity.
 - **main merged into redesign** (`094cac4d`, 28 commits incl. parametric packaging).
   811 scoped tests, tsc, prod build green; packaging wizard walked in a browser
   (parametric rows in product_materials, no factor search). Divergence with main: 0.
@@ -93,10 +94,6 @@ Recalculate LCAs after) → start the Cellar checklist in `tasks/phase2-test-scr
   (PostgREST cannot setval); gated so it never runs where products already existed.
 
 ## Pending Tim actions
-- **Paste the `20260721110000_email_delivery_tracking` SQL into the STAGING SQL editor**
-  (`vwhdyqvlgjqmlzmsvaes`; block posted in the 23 Jul session chat, idempotent, includes
-  the tracker insert + verification query). Prod already has it; without it staging's
-  supplier pages still work but delivery states stay NULL.
 - Refresh staging; seed the demo org; walk `tasks/phase2-test-script.md`, adding one
   punch-list line per issue.
 - Staging Supabase Auth → URL Configuration → Add URL:
