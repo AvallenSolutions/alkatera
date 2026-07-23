@@ -10,7 +10,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
  *   Day 7  – Value prop reminder + Rosa highlight
  *
  * Triggered via pg_cron, GitHub Actions cron, or manual invocation.
- * Uses service role — no user JWT required.
+ * Uses service role, no user JWT required.
  */
 
 const corsHeaders = {
@@ -76,7 +76,7 @@ function emailLayout(siteUrl: string, content: string): string {
             <td style="background-color:#1a1a1a;padding:30px 40px;border-radius:0 0 12px 12px;text-align:center;">
               <p style="margin:0 0 10px 0;color:#888;font-size:14px;">alka<strong style="color:#888;">tera</strong> - Sustainability Platform</p>
               <p style="margin:0;color:#666;font-size:12px;">
-                <a href="${siteUrl}" style="color:#ccff00;text-decoration:none;">www.alkatera.com</a>
+                <a href="${siteUrl}" style="color:#F2F1EA;text-decoration:none;">www.alkatera.com</a>
               </p>
               <p style="margin:15px 0 0 0;color:#555;font-size:11px;">
                 You're receiving this because you signed up for alkatera. If you'd prefer not to receive these, you can ignore this email.
@@ -95,42 +95,40 @@ function ctaButton(href: string, label: string): string {
   return `<table width="100%" cellpadding="0" cellspacing="0" style="margin:30px 0;">
   <tr>
     <td align="center">
-      <a href="${href}" style="display:inline-block;background-color:#ccff00;color:#0a0a0a;padding:14px 32px;font-size:16px;font-weight:600;text-decoration:none;border-radius:8px;letter-spacing:0.5px;">${label}</a>
+      <a href="${href}" style="display:inline-block;background-color:#205E40;color:#F2F1EA;padding:14px 32px;font-size:16px;font-weight:600;text-decoration:none;border-radius:8px;letter-spacing:0.5px;">${label}</a>
     </td>
   </tr>
 </table>`;
 }
 
-function buildDay1Email(orgName: string, siteUrl: string): { subject: string; html: string } {
+function buildDay1Email(
+  orgName: string,
+  siteUrl: string,
+  estimateTonnes: number | null,
+): { subject: string; html: string } {
+  const numberBlock = estimateTonnes != null
+    ? `
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;">
+      <tr>
+        <td style="padding:24px;background-color:#F2F1EA;border:1px solid #D9D6CB;border-radius:8px;text-align:center;">
+          <p style="margin:0;color:#205E40;font-size:40px;font-weight:700;letter-spacing:-0.02em;">~${estimateTonnes.toLocaleString()}</p>
+          <p style="margin:6px 0 0 0;color:#6F6F68;font-size:13px;">tonnes CO2e a year, estimated from what we found</p>
+        </td>
+      </tr>
+    </table>`
+    : "";
+
   const content = `
-    <h2 style="margin:0 0 20px 0;color:#1a1a1a;font-size:24px;font-weight:600;">Welcome to alkatera! 🌱</h2>
-    <p style="margin:0 0 20px 0;color:#4a4a4a;font-size:16px;">Thanks for setting up <strong>${escapeHtml(orgName)}</strong> on alka<strong>tera</strong>. You're now part of a growing community of drinks producers taking sustainability seriously.</p>
-    <p style="margin:0 0 10px 0;color:#4a4a4a;font-size:16px;font-weight:600;">Here's how to get started in three easy steps:</p>
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;">
-      <tr>
-        <td style="padding:12px 16px;background-color:#f9fafb;border-radius:8px;margin-bottom:8px;">
-          <p style="margin:0;color:#1a1a1a;font-size:15px;"><strong style="color:#ccff00;font-size:18px;">1.</strong> <strong>Add a facility</strong> — Map your brewery, distillery, or warehouse so I can track your operational footprint.</p>
-        </td>
-      </tr>
-      <tr><td style="height:8px;"></td></tr>
-      <tr>
-        <td style="padding:12px 16px;background-color:#f9fafb;border-radius:8px;margin-bottom:8px;">
-          <p style="margin:0;color:#1a1a1a;font-size:15px;"><strong style="color:#ccff00;font-size:18px;">2.</strong> <strong>Create your first product</strong> — Build a lifecycle assessment and see your carbon footprint in minutes.</p>
-        </td>
-      </tr>
-      <tr><td style="height:8px;"></td></tr>
-      <tr>
-        <td style="padding:12px 16px;background-color:#f9fafb;border-radius:8px;">
-          <p style="margin:0;color:#1a1a1a;font-size:15px;"><strong style="color:#ccff00;font-size:18px;">3.</strong> <strong>Ask Rosa anything</strong> — Your AI sustainability companion is ready to help. Just type a question.</p>
-        </td>
-      </tr>
-    </table>
-    ${ctaButton(`${siteUrl}/dashboard`, "Go to Your Dashboard")}
-    <p style="margin:0;color:#888;font-size:14px;">Need help? Just reply to this email or chat with Rosa inside the app.</p>
+    <h2 style="margin:0 0 16px 0;color:#1a1a1a;font-size:24px;font-weight:600;">What we found in your house.</h2>
+    <p style="margin:0 0 8px 0;color:#4a4a4a;font-size:16px;">We read what <strong>${escapeHtml(orgName)}</strong> already publishes and turned it into a first sustainability picture. Here is where you stand today.</p>
+    ${numberBlock}
+    <p style="margin:0 0 20px 0;color:#4a4a4a;font-size:16px;">This is a starting point, not a verdict. Every real number you confirm from here makes it truer. Your desk shows you exactly where to start.</p>
+    ${ctaButton(`${siteUrl}/desk/`, "Go to your desk")}
+    <p style="margin:0;color:#888;font-size:14px;">Anything to add? Reply to this email, or ask Rosa inside the app.</p>
   `;
 
   return {
-    subject: "Welcome to alkatera — here's what to do first",
+    subject: "What we found in your house",
     html: emailLayout(siteUrl, content),
   };
 }
@@ -140,102 +138,90 @@ function buildDay3Email(
   siteUrl: string,
   counts: { facilities: number; products: number; suppliers: number }
 ): { subject: string; html: string } {
-  const tips: string[] = [];
+  // The single weakest room and its one action, in priority order. If nothing
+  // is missing, a quiet well-done rather than a made-up task.
+  let room: string;
+  let action: string;
+  let ctaHref: string;
+  let ctaLabel: string;
+  let subject: string;
 
   if (counts.facilities === 0) {
-    tips.push(
-      `<strong>Add your first facility</strong> — Facilities are the foundation of your Scope 1 &amp; 2 emissions. <a href="${siteUrl}/company/facilities" style="color:#ccff00;text-decoration:none;">Add one now →</a>`
-    );
-  }
-  if (counts.products === 0) {
-    tips.push(
-      `<strong>Create your first product</strong> — Products are at the heart of your sustainability story. <a href="${siteUrl}/products/new" style="color:#ccff00;text-decoration:none;">Create one now →</a>`
-    );
-  }
-  if (counts.suppliers === 0) {
-    tips.push(
-      `<strong>Add a supplier</strong> — Your supply chain contributes to Scope 3 emissions. <a href="${siteUrl}/suppliers" style="color:#ccff00;text-decoration:none;">Add one now →</a>`
-    );
-  }
-
-  // If they've done everything, congratulate them
-  if (tips.length === 0) {
-    tips.push(
-      `<strong>You're making great progress!</strong> Keep going by exploring your dashboard insights and asking Rosa for recommendations.`
-    );
-  }
-
-  // Determine best CTA
-  let ctaHref = `${siteUrl}/dashboard`;
-  let ctaLabel = "Go to Your Dashboard";
-  if (counts.facilities === 0) {
-    ctaHref = `${siteUrl}/company/facilities`;
-    ctaLabel = "Add Your First Facility";
+    room = "The workbench";
+    action = "Place your production site. One address gives us your grid and your country's factors, and lights the whole room.";
+    ctaHref = `${siteUrl}/company/facilities/`;
+    ctaLabel = "Place your facility";
+    subject = "One quiet room in your house";
   } else if (counts.products === 0) {
-    ctaHref = `${siteUrl}/products/new`;
-    ctaLabel = "Create Your First Product";
+    room = "The cellar";
+    action = "Add a product. Its recipe is where most of your footprint lives, so it moves your number more than anything else.";
+    ctaHref = `${siteUrl}/products/`;
+    ctaLabel = "Add a product";
+    subject = "One quiet room in your house";
   } else if (counts.suppliers === 0) {
-    ctaHref = `${siteUrl}/suppliers`;
-    ctaLabel = "Add Your First Supplier";
+    room = "The network";
+    action = "Add a supplier. Your supply chain carries the part of the footprint you cannot see from the inside.";
+    ctaHref = `${siteUrl}/suppliers/`;
+    ctaLabel = "Add a supplier";
+    subject = "One quiet room in your house";
+  } else {
+    room = "";
+    action = "Every room has something in it. The next move is to confirm a recipe or drop a real bill, so your estimate becomes a measurement.";
+    ctaHref = `${siteUrl}/desk/`;
+    ctaLabel = "Go to your desk";
+    subject = "Your house is taking shape";
   }
 
-  const tipsHtml = tips
-    .map(
-      (tip) =>
-        `<tr><td style="padding:12px 16px;background-color:#f9fafb;border-radius:8px;"><p style="margin:0;color:#1a1a1a;font-size:15px;">${tip}</p></td></tr><tr><td style="height:8px;"></td></tr>`
-    )
-    .join("");
+  const heading = room
+    ? `${room} is the quietest room in your house.`
+    : "Your house is taking shape.";
 
   const content = `
-    <h2 style="margin:0 0 20px 0;color:#1a1a1a;font-size:24px;font-weight:600;">Checking in 👋</h2>
-    <p style="margin:0 0 20px 0;color:#4a4a4a;font-size:16px;">Hi there! It's been a couple of days since you set up <strong>${escapeHtml(orgName)}</strong> on alka<strong>tera</strong>. Need a hand getting started?</p>
-    <p style="margin:0 0 10px 0;color:#4a4a4a;font-size:16px;font-weight:600;">Here's what I'd suggest next:</p>
+    <h2 style="margin:0 0 16px 0;color:#1a1a1a;font-size:24px;font-weight:600;">${heading}</h2>
+    <p style="margin:0 0 20px 0;color:#4a4a4a;font-size:16px;">A few days in with <strong>${escapeHtml(orgName)}</strong>. Here is the one thing worth doing next.</p>
     <table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;">
-      ${tipsHtml}
+      <tr>
+        <td style="padding:16px 18px;background-color:#F2F1EA;border:1px solid #D9D6CB;border-left:4px solid #205E40;border-radius:8px;">
+          <p style="margin:0;color:#1a1a1a;font-size:15px;">${action}</p>
+        </td>
+      </tr>
     </table>
     ${ctaButton(ctaHref, ctaLabel)}
-    <p style="margin:0;color:#888;font-size:14px;">Every step you take builds a clearer picture of your environmental impact. I'm here whenever you need me.</p>
+    <p style="margin:0;color:#888;font-size:14px;">Not sure where something goes? Ask Rosa. She will work it out.</p>
   `;
 
   return {
-    subject: "Checking in — need a hand getting started?",
+    subject,
     html: emailLayout(siteUrl, content),
   };
 }
 
-function buildDay7Email(orgName: string, siteUrl: string): { subject: string; html: string } {
+function buildDay7Email(
+  orgName: string,
+  siteUrl: string,
+  confirmedPct: number | null,
+): { subject: string; html: string } {
+  const confirmedLine = confirmedPct != null
+    ? `<strong>${confirmedPct}% of your footprint is confirmed</strong> so far. Every recipe you check and every real bill you drop moves that number up, and makes your reports stand on measurements rather than estimates.`
+    : `Right now your number rests on industry benchmarks. Confirming a recipe or dropping a real utility bill turns it from an estimate into a measurement, which is what a buyer or an auditor will want to see.`;
+
   const content = `
-    <h2 style="margin:0 0 20px 0;color:#1a1a1a;font-size:24px;font-weight:600;">One week in 🎉</h2>
-    <p style="margin:0 0 20px 0;color:#4a4a4a;font-size:16px;">It's been a week since <strong>${escapeHtml(orgName)}</strong> joined alka<strong>tera</strong>. Here's a reminder of what you can unlock:</p>
+    <h2 style="margin:0 0 16px 0;color:#1a1a1a;font-size:24px;font-weight:600;">A week in. Here is your number, and how to make it truer.</h2>
+    <p style="margin:0 0 20px 0;color:#4a4a4a;font-size:16px;">${escapeHtml(orgName)} has been on alka<strong>tera</strong> for a week. The house is furnished. The work now is turning estimates into evidence.</p>
     <table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;">
       <tr>
-        <td style="padding:16px;background-color:#f9fafb;border-radius:8px;border-left:4px solid #ccff00;">
-          <p style="margin:0 0 8px 0;color:#1a1a1a;font-size:16px;font-weight:600;">🌱 Rosa, your AI sustainability companion</p>
-          <p style="margin:0;color:#4a4a4a;font-size:14px;">Ask Rosa anything about your data, and she'll uncover insights, spot trends, and suggest practical next steps — all in natural language.</p>
-        </td>
-      </tr>
-      <tr><td style="height:12px;"></td></tr>
-      <tr>
-        <td style="padding:16px;background-color:#f9fafb;border-radius:8px;border-left:4px solid #ccff00;">
-          <p style="margin:0 0 8px 0;color:#1a1a1a;font-size:16px;font-weight:600;">📊 Vitality Score</p>
-          <p style="margin:0;color:#4a4a4a;font-size:14px;">Your single sustainability score across climate, water, circularity, and nature — benchmarked against your industry.</p>
-        </td>
-      </tr>
-      <tr><td style="height:12px;"></td></tr>
-      <tr>
-        <td style="padding:16px;background-color:#f9fafb;border-radius:8px;border-left:4px solid #ccff00;">
-          <p style="margin:0 0 8px 0;color:#1a1a1a;font-size:16px;font-weight:600;">📦 Product Lifecycle Assessments</p>
-          <p style="margin:0;color:#4a4a4a;font-size:14px;">Build full LCAs for your products and understand impact from raw ingredients through to packaging and distribution.</p>
+        <td style="padding:16px 18px;background-color:#F2F1EA;border:1px solid #D9D6CB;border-left:4px solid #205E40;border-radius:8px;">
+          <p style="margin:0;color:#1a1a1a;font-size:15px;">${confirmedLine}</p>
         </td>
       </tr>
     </table>
-    ${ctaButton(`${siteUrl}/rosa`, "Chat with Rosa")}
-    <hr style="border:none;border-top:1px solid #e5e5e5;margin:30px 0;">
-    <p style="margin:0;color:#888;font-size:14px;">If you're stuck or have questions, reply to this email or reach out to our support team. We're here to help you succeed.</p>
+    ${ctaButton(`${siteUrl}/desk/`, "Go to your desk")}
+    <hr style="border:none;border-top:1px solid #D9D6CB;margin:30px 0;">
+    <p style="margin:0;color:#888;font-size:14px;">Stuck on anything? Reply to this email, or ask Rosa. We would rather you asked than guessed.</p>
   `;
 
   return {
-    subject: "One week in — unlock the full power of alkatera",
+    subject: "A week in: your number, and how to make it truer",
     html: emailLayout(siteUrl, content),
   };
 }
@@ -342,7 +328,21 @@ Deno.serve(async (req: Request) => {
         let emailData: { subject: string; html: string };
 
         if (emailType === "day_1_welcome") {
-          emailData = buildDay1Email(owner.organization_name, siteUrl);
+          // The starter footprint estimate seeded at onboarding completion.
+          const { data: est } = await adminClient
+            .from("agent_exceptions")
+            .select("payload")
+            .eq("organization_id", owner.organization_id)
+            .eq("kind", "onboarding_estimate")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          const tonnes = est?.payload?.estimate_tonnes_co2e;
+          emailData = buildDay1Email(
+            owner.organization_name,
+            siteUrl,
+            typeof tonnes === "number" ? tonnes : null,
+          );
         } else if (emailType === "day_3_checkin") {
           // Fetch counts for personalised tips
           const [fac, prod, sup] = await Promise.all([
@@ -356,7 +356,7 @@ Deno.serve(async (req: Request) => {
             suppliers: sup.count ?? 0,
           });
         } else {
-          emailData = buildDay7Email(owner.organization_name, siteUrl);
+          emailData = buildDay7Email(owner.organization_name, siteUrl, null);
         }
 
         // Send via Resend
