@@ -1,19 +1,20 @@
 import { Metadata } from 'next';
-import { KnowledgePageClient, type KnowledgePost } from '@/marketing/components/KnowledgePageClient';
+import { KnowledgeClient, type KnowledgePost } from '@/marketing/knowledge/KnowledgeClient';
+import '@/marketing/shared/marketing.css';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 
 // ISR: keep the list fresh hourly without per-request rendering.
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: 'Knowledge | alkatera',
+  title: 'Knowledge · alkatera',
   description: 'Insights, guides, and perspectives on building a regenerative drinks brand. From carbon accounting to supply chain strategy.',
   alternates: {
     canonical: '/knowledge',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Knowledge | alkatera',
+    title: 'Knowledge · alkatera',
     description: 'Insights, guides, and perspectives on building a regenerative drinks brand. From carbon accounting to supply chain strategy.',
   },
 };
@@ -45,5 +46,5 @@ async function getPublishedPosts(): Promise<KnowledgePost[]> {
 
 export default async function KnowledgePage() {
   const initialPosts = await getPublishedPosts();
-  return <KnowledgePageClient initialPosts={initialPosts} />;
+  return <KnowledgeClient posts={initialPosts} />;
 }

@@ -28,7 +28,7 @@
  * content (z-0, content sits at z-[1]), pointer-events-none, aria-hidden.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { cn } from '@/lib/utils';
 import { GROWTH_PALETTE, STUDIO, STUDIO_EASE } from '@/components/studio/theme';
 import { rngFromString, smoothstep } from './prng';
@@ -57,6 +57,16 @@ interface GrowthFieldProps {
   season?: Season;
   /** Which half of the world the org lives in; flips the calendar. */
   hemisphere?: Hemisphere;
+  /**
+   * The app renders the forest as a fixed backdrop behind the rooms
+   * (the default). The marketing site instead sets fixed={false} to lay
+   * a forest strip inside the flow of the page, sized by `height`.
+   */
+  fixed?: boolean;
+  /** Height of the strip when fixed={false} (e.g. '48vh'). */
+  height?: string;
+  /** Style overrides; the marketing site uses this to drop the mist mask. */
+  style?: CSSProperties;
   className?: string;
 }
 
@@ -258,6 +268,9 @@ export function GrowthField({
   replayFrom,
   season,
   hemisphere,
+  fixed = true,
+  height,
+  style,
   className,
 }: GrowthFieldProps) {
   const population = useMemo(() => makePopulation(seed), [seed]);
@@ -356,15 +369,18 @@ export function GrowthField({
       ref={rootRef}
       aria-hidden
       className={cn(
-        'pointer-events-none fixed inset-x-0 bottom-12 z-0 h-[45vh] md:h-[70vh]',
+        'pointer-events-none',
+        fixed ? 'fixed inset-x-0 bottom-12 z-0 h-[45vh] md:h-[70vh]' : 'relative w-full',
         className,
       )}
       style={{
+        ...(fixed ? {} : { height: height ?? '48vh' }),
         // The mist: the canopy dissolves into the paper as it climbs, so
         // the ground stays rich while text higher up always reads clean.
         maskImage: 'linear-gradient(to top, black 38%, rgba(0,0,0,0.45) 62%, transparent 82%)',
         WebkitMaskImage:
           'linear-gradient(to top, black 38%, rgba(0,0,0,0.45) 62%, transparent 82%)',
+        ...style,
       }}
     >
       <svg

@@ -1,10 +1,11 @@
 import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
-import { HomePageClient } from '@/marketing/components/HomePageClient';
+import { HomeClient } from '@/marketing/home/HomeClient';
+import '@/marketing/shared/marketing.css';
 
 export const metadata: Metadata = {
-  title: 'alkatera | Sustainability, Distilled',
+  title: 'alkatera · Sustainability, Distilled',
   description: 'The single sustainability platform purpose-built for the drinks industry. Measure beyond carbon, defend against greenwashing, and turn ESG data into competitive advantage.',
   alternates: {
     canonical: '/',
@@ -32,5 +33,5 @@ export default async function Home() {
     redirect('/desk/');
   }
 
-  return <HomePageClient />;
+  return <HomeClient />;
 }

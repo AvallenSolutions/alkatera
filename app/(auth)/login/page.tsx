@@ -2,7 +2,8 @@
 
 import { useSearchParams } from "next/navigation"
 import { Suspense } from "react"
-import { AuthForm } from "@/components/auth/AuthForm"
+import { LoginClient } from "@/marketing/login/LoginClient"
+import "@/marketing/shared/marketing.css"
 
 function LoginContent() {
   const searchParams = useSearchParams()
@@ -15,7 +16,10 @@ function LoginContent() {
       ? rawReturn
       : null
 
-  return <AuthForm tier={tier} returnUrl={returnUrl} />
+  // Where to land after auth: an explicit returnUrl wins, then the tier flow.
+  const redirectTo = returnUrl ?? (tier ? `/settings?tier=${tier}` : undefined)
+
+  return <LoginClient redirectTo={redirectTo} />
 }
 
 export default function LoginPage() {
