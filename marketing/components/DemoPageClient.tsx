@@ -13,9 +13,23 @@ import {
   ShieldCheck,
   Leaf,
 } from 'lucide-react';
-import { Navigation } from '@/marketing/components/Navigation';
-import { Footer } from '@/marketing/components/Footer';
-import { Brand } from '@/components/shared/Brand';
+import {
+  SiteNav,
+  SiteFooter,
+  F_STATEMENT,
+  F_BODY,
+  F_MONO,
+  MONO_LABEL,
+} from '@/marketing/shared/chrome';
+
+// Studio ground tokens (the marketing palette, inlined like the rest of the site).
+const PAPER = '#ECEAE3';
+const CREAM = '#F2F1EA';
+const INK = '#1A1B1D';
+const FOREST = '#205E40';
+const DIM = '#6F6F68';
+const HAIR = '#D9D6CB';
+const STALE = '#BE123C';
 
 type DaySlot = { startISO: string; endISO: string; time: string };
 type DayGroup = { date: string; weekday: string; label: string; slots: DaySlot[] };
@@ -38,6 +52,19 @@ const COVER = [
     body: 'Purpose-built for distilleries, breweries, wineries and the brands they supply. No generic ESG bloat.',
   },
 ];
+
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  background: PAPER,
+  border: `1px solid ${HAIR}`,
+  borderRadius: 4,
+  padding: '11px 14px',
+  color: INK,
+  fontFamily: F_BODY,
+  fontSize: 14,
+  outline: 'none',
+  boxSizing: 'border-box',
+};
 
 function BookingWidget() {
   const [availability, setAvailability] = useState<Availability | null>(null);
@@ -103,21 +130,51 @@ function BookingWidget() {
       <motion.div
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="text-center py-12 px-6"
+        style={{ textAlign: 'center', padding: '48px 24px' }}
       >
-        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[#ccff00]/10 text-[#ccff00] mb-8">
-          <CheckCircle2 size={40} />
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 72,
+            height: 72,
+            borderRadius: 999,
+            background: 'rgba(32,94,64,0.1)',
+            color: FOREST,
+            marginBottom: 28,
+          }}
+        >
+          <CheckCircle2 size={38} />
         </div>
-        <h3 className="text-3xl font-serif text-white mb-3">You&apos;re booked in</h3>
-        <p className="text-gray-300 text-lg mb-2">{confirmation.when} (UK time)</p>
-        <p className="text-gray-500 font-mono text-xs uppercase tracking-widest mb-8">
+        <h3 style={{ fontFamily: F_STATEMENT, fontWeight: 700, fontSize: 28, color: INK, margin: '0 0 10px' }}>
+          You&apos;re booked in
+        </h3>
+        <p style={{ fontFamily: F_BODY, fontSize: 17, color: INK, margin: '0 0 6px' }}>
+          {confirmation.when} (UK time)
+        </p>
+        <p style={{ ...MONO_LABEL, color: DIM, margin: '0 0 28px' }}>
           A calendar invite is on its way to {email}
         </p>
         <a
           href={confirmation.joinUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 bg-[#ccff00] text-black font-mono uppercase tracking-widest text-sm px-8 py-4 hover:bg-white transition-colors"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            background: INK,
+            color: CREAM,
+            fontFamily: F_MONO,
+            fontWeight: 700,
+            fontSize: 13,
+            textTransform: 'uppercase',
+            letterSpacing: '0.14em',
+            padding: '14px 28px',
+            borderRadius: 999,
+            textDecoration: 'none',
+          }}
         >
           <Video size={18} /> Join link
         </a>
@@ -127,20 +184,24 @@ function BookingWidget() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-gray-500">
-        <Loader2 className="animate-spin mb-4 text-[#ccff00]" size={32} />
-        <p className="font-mono text-xs uppercase tracking-widest">Loading available times</p>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '96px 0', color: DIM }}>
+        <Loader2 className="animate-spin" style={{ marginBottom: 16, color: FOREST }} size={30} />
+        <p style={{ ...MONO_LABEL, color: DIM }}>Loading available times</p>
       </div>
     );
   }
 
   if (loadError) {
     return (
-      <div className="text-center py-24 px-6">
-        <p className="text-gray-400 mb-6">{loadError}</p>
+      <div style={{ textAlign: 'center', padding: '96px 24px' }}>
+        <p style={{ fontFamily: F_BODY, color: DIM, margin: '0 0 24px' }}>{loadError}</p>
         <a
           href="mailto:hello@alkatera.com?subject=Demo%20request"
-          className="inline-flex items-center gap-2 border border-[#ccff00] text-[#ccff00] font-mono uppercase tracking-widest text-xs px-6 py-3 hover:bg-[#ccff00] hover:text-black transition-colors"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8, border: `1px solid ${INK}`,
+            color: INK, fontFamily: F_MONO, fontWeight: 700, fontSize: 12, textTransform: 'uppercase',
+            letterSpacing: '0.14em', padding: '11px 22px', borderRadius: 999, textDecoration: 'none',
+          }}
         >
           Email us instead <ArrowRight size={16} />
         </a>
@@ -150,12 +211,20 @@ function BookingWidget() {
 
   if (!availability || availability.days.length === 0) {
     return (
-      <div className="text-center py-24 px-6">
-        <p className="text-gray-300 mb-2 text-lg font-serif">No slots open right now</p>
-        <p className="text-gray-500 mb-6 text-sm">New times open every day. Or reach out directly:</p>
+      <div style={{ textAlign: 'center', padding: '96px 24px' }}>
+        <p style={{ fontFamily: F_STATEMENT, fontWeight: 600, fontSize: 18, color: INK, margin: '0 0 6px' }}>
+          No slots open right now
+        </p>
+        <p style={{ fontFamily: F_BODY, fontSize: 14, color: DIM, margin: '0 0 24px' }}>
+          New times open every day. Or reach out directly:
+        </p>
         <a
           href="mailto:hello@alkatera.com?subject=Demo%20request"
-          className="inline-flex items-center gap-2 border border-[#ccff00] text-[#ccff00] font-mono uppercase tracking-widest text-xs px-6 py-3 hover:bg-[#ccff00] hover:text-black transition-colors"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8, border: `1px solid ${INK}`,
+            color: INK, fontFamily: F_MONO, fontWeight: 700, fontSize: 12, textTransform: 'uppercase',
+            letterSpacing: '0.14em', padding: '11px 22px', borderRadius: 999, textDecoration: 'none',
+          }}
         >
           Email us <ArrowRight size={16} />
         </a>
@@ -164,15 +233,15 @@ function BookingWidget() {
   }
 
   return (
-    <div className="grid md:grid-cols-2">
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
       {/* Left: date + time picker */}
-      <div className="p-8 md:p-10 border-b md:border-b-0 md:border-r border-white/10">
-        <div className="flex items-center gap-2 text-gray-500 font-mono text-[10px] uppercase tracking-widest mb-6">
+      <div style={{ padding: 36, borderBottom: `1px solid ${HAIR}` }} className="demo-picker">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: DIM, ...MONO_LABEL, marginBottom: 24 }}>
           <Clock size={14} /> 30 minutes &bull; {availability.timeZone.replace('_', ' ')} &bull; video call
         </div>
 
         {/* Day selector */}
-        <div className="flex gap-2 overflow-x-auto pb-3 mb-6 -mx-1 px-1">
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 12, marginBottom: 24 }}>
           {availability.days.map((d) => {
             const active = d.date === activeDate;
             return (
@@ -182,32 +251,34 @@ function BookingWidget() {
                   setActiveDate(d.date);
                   setSelected(null);
                 }}
-                className={`flex-shrink-0 text-center px-4 py-3 border transition-colors ${
-                  active
-                    ? 'border-[#ccff00] bg-[#ccff00]/10 text-white'
-                    : 'border-white/10 text-gray-400 hover:border-white/30'
-                }`}
+                style={{
+                  flexShrink: 0, textAlign: 'center', padding: '10px 16px', borderRadius: 4, cursor: 'pointer',
+                  background: active ? 'rgba(32,94,64,0.08)' : 'transparent',
+                  border: `1px solid ${active ? FOREST : HAIR}`,
+                  color: active ? INK : DIM,
+                }}
               >
-                <div className="font-mono text-[10px] uppercase tracking-widest">{d.weekday.slice(0, 3)}</div>
-                <div className="text-sm mt-1">{d.label}</div>
+                <div style={{ ...MONO_LABEL }}>{d.weekday.slice(0, 3)}</div>
+                <div style={{ fontFamily: F_BODY, fontSize: 14, marginTop: 4 }}>{d.label}</div>
               </button>
             );
           })}
         </div>
 
         {/* Slots */}
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: 8 }}>
           {activeDay?.slots.map((s) => {
             const active = selected?.startISO === s.startISO;
             return (
               <button
                 key={s.startISO}
                 onClick={() => setSelected(s)}
-                className={`py-3 text-sm font-mono border transition-colors ${
-                  active
-                    ? 'border-[#ccff00] bg-[#ccff00] text-black'
-                    : 'border-white/15 text-gray-200 hover:border-[#ccff00] hover:text-[#ccff00]'
-                }`}
+                style={{
+                  padding: '11px 0', fontFamily: F_MONO, fontSize: 13, borderRadius: 4, cursor: 'pointer',
+                  background: active ? FOREST : 'transparent',
+                  border: `1px solid ${active ? FOREST : HAIR}`,
+                  color: active ? CREAM : INK,
+                }}
               >
                 {s.time}
               </button>
@@ -217,7 +288,7 @@ function BookingWidget() {
       </div>
 
       {/* Right: details form */}
-      <div className="p-8 md:p-10">
+      <div style={{ padding: 36 }}>
         <AnimatePresence mode="wait">
           {!selected ? (
             <motion.div
@@ -225,12 +296,10 @@ function BookingWidget() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="h-full flex flex-col items-center justify-center text-center py-12"
+              style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '48px 0' }}
             >
-              <CalendarClock size={40} className="text-gray-700 mb-4" />
-              <p className="text-gray-500 font-mono text-xs uppercase tracking-widest">
-                Pick a time to continue
-              </p>
+              <CalendarClock size={38} style={{ color: HAIR, marginBottom: 16 }} />
+              <p style={{ ...MONO_LABEL, color: DIM }}>Pick a time to continue</p>
             </motion.div>
           ) : (
             <motion.form
@@ -240,48 +309,20 @@ function BookingWidget() {
               exit={{ opacity: 0, y: -12 }}
               onSubmit={handleSubmit}
             >
-              <p className="font-mono text-[10px] uppercase tracking-widest text-[#ccff00] mb-1">
-                Selected time
-              </p>
-              <p className="text-white text-lg mb-8">
+              <p style={{ ...MONO_LABEL, color: FOREST, margin: '0 0 4px' }}>Selected time</p>
+              <p style={{ fontFamily: F_STATEMENT, fontWeight: 600, fontSize: 18, color: INK, margin: '0 0 28px' }}>
                 {activeDay?.weekday}, {activeDay?.label} &bull; {selected.time}
               </p>
 
-              <div className="space-y-4">
-                <input
-                  type="text"
-                  required
-                  placeholder="Full name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-transparent border border-white/15 px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-[#ccff00] transition-colors"
-                />
-                <input
-                  type="email"
-                  required
-                  placeholder="Work email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-transparent border border-white/15 px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-[#ccff00] transition-colors"
-                />
-                <input
-                  type="text"
-                  placeholder="Company (optional)"
-                  value={company}
-                  onChange={(e) => setCompany(e.target.value)}
-                  className="w-full bg-transparent border border-white/15 px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-[#ccff00] transition-colors"
-                />
-                <textarea
-                  placeholder="Anything you'd like to focus on? (optional)"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
-                  className="w-full bg-transparent border border-white/15 px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-[#ccff00] transition-colors resize-none"
-                />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <input type="text" required placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
+                <input type="email" required placeholder="Work email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
+                <input type="text" placeholder="Company (optional)" value={company} onChange={(e) => setCompany(e.target.value)} style={inputStyle} />
+                <textarea placeholder="Anything you'd like to focus on? (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...inputStyle, resize: 'none' }} />
               </div>
 
               {submitError && (
-                <div className="mt-4 p-3 bg-red-500/10 border border-red-500/40 text-red-400 text-sm">
+                <div style={{ marginTop: 16, padding: 12, borderRadius: 4, background: 'rgba(190,18,60,0.08)', border: `1px solid ${STALE}`, color: STALE, fontFamily: F_BODY, fontSize: 14 }}>
                   {submitError}
                 </div>
               )}
@@ -289,16 +330,18 @@ function BookingWidget() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="mt-6 w-full bg-[#ccff00] text-black font-bold py-4 flex items-center justify-between px-6 hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed group"
+                className="mkt-btn"
+                style={{
+                  marginTop: 24, width: '100%', background: INK, color: CREAM, border: 'none',
+                  borderRadius: 999, padding: '15px 24px', display: 'flex', alignItems: 'center',
+                  justifyContent: 'space-between', cursor: submitting ? 'not-allowed' : 'pointer',
+                  opacity: submitting ? 0.5 : 1,
+                }}
               >
-                <span className="font-mono uppercase tracking-widest text-sm">
-                  {submitting ? 'Booking...' : 'Confirm booking'}
+                <span style={{ fontFamily: F_MONO, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', fontSize: 13 }}>
+                  {submitting ? 'Booking…' : 'Confirm booking'}
                 </span>
-                {submitting ? (
-                  <Loader2 className="animate-spin" size={20} />
-                ) : (
-                  <ArrowRight className="group-hover:translate-x-1 transition-transform" size={20} />
-                )}
+                {submitting ? <Loader2 className="animate-spin" size={20} /> : <ArrowRight size={20} />}
               </button>
             </motion.form>
           )}
@@ -310,27 +353,24 @@ function BookingWidget() {
 
 export function DemoPageClient() {
   return (
-    <div className="bg-[#050505] text-white min-h-screen">
-      <Navigation />
+    <div style={{ background: PAPER, color: INK, minHeight: '100vh' }}>
+      <SiteNav />
 
       {/* Hero */}
-      <section className="relative pt-40 pb-16 px-6 overflow-hidden">
-        <div
-          className="absolute inset-0 opacity-[0.15] pointer-events-none"
-          style={{
-            backgroundImage:
-              'linear-gradient(#222 1px, transparent 1px), linear-gradient(90deg, #222 1px, transparent 1px)',
-            backgroundSize: '48px 48px',
-          }}
-        />
-        <div className="relative max-w-4xl mx-auto text-center">
-          <p className="font-mono text-xs uppercase tracking-[0.3em] text-[#ccff00] mb-6">
+      <section style={{ position: 'relative', paddingTop: 148, paddingBottom: 56, paddingInline: 24, overflow: 'hidden' }}>
+        <div style={{ maxWidth: 880, margin: '0 auto', textAlign: 'center' }}>
+          <p style={{ fontFamily: F_MONO, fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.3em', color: FOREST, margin: '0 0 24px' }}>
             30-minute demo
           </p>
-          <h1 className="text-4xl md:text-6xl font-serif leading-tight mb-6">
-            See <Brand /> in <span className="italic text-[#ccff00]">action</span>
+          <h1 style={{ fontFamily: F_STATEMENT, fontWeight: 700, fontSize: 'clamp(40px, 6vw, 62px)', lineHeight: 1.05, letterSpacing: '-0.02em', color: INK, margin: '0 0 24px' }}>
+            See{' '}
+            <span>
+              <span style={{ fontWeight: 500 }}>alka</span>
+              <span style={{ fontWeight: 700 }}>tera</span>
+            </span>{' '}
+            in <span style={{ color: FOREST }}>action</span>
           </h1>
-          <p className="text-gray-400 text-lg max-w-2xl mx-auto leading-relaxed">
+          <p style={{ fontFamily: F_BODY, fontSize: 18, lineHeight: 1.6, color: DIM, maxWidth: 620, margin: '0 auto' }}>
             A focused half-hour with our team. No slides for the sake of slides. We&apos;ll show you the
             platform against your world and answer whatever you throw at us.
           </p>
@@ -338,34 +378,34 @@ export function DemoPageClient() {
       </section>
 
       {/* What we'll cover */}
-      <section className="px-6 pb-20">
-        <div className="max-w-5xl mx-auto grid md:grid-cols-3 gap-6">
+      <section style={{ paddingInline: 24, paddingBottom: 80 }}>
+        <div style={{ maxWidth: 1040, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 24 }}>
           {COVER.map((c) => (
-            <div key={c.title} className="border border-white/10 p-8 bg-white/[0.02]">
-              <c.icon size={24} className="text-[#ccff00] mb-5" />
-              <h3 className="font-serif text-xl mb-3">{c.title}</h3>
-              <p className="text-gray-400 text-sm leading-relaxed">{c.body}</p>
+            <div key={c.title} style={{ border: `1px solid ${HAIR}`, borderRadius: 6, padding: 32, background: CREAM }}>
+              <c.icon size={24} style={{ color: FOREST, marginBottom: 20 }} />
+              <h3 style={{ fontFamily: F_STATEMENT, fontWeight: 600, fontSize: 20, color: INK, margin: '0 0 12px' }}>{c.title}</h3>
+              <p style={{ fontFamily: F_BODY, fontSize: 14, lineHeight: 1.6, color: DIM, margin: 0 }}>{c.body}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* Booking widget */}
-      <section className="px-6 pb-16">
-        <div className="max-w-4xl mx-auto">
-          <div className="border border-white/10 bg-[#0a0a0a]">
+      <section style={{ paddingInline: 24, paddingBottom: 64 }}>
+        <div style={{ maxWidth: 880, margin: '0 auto' }}>
+          <div style={{ border: `1px solid ${HAIR}`, borderRadius: 6, background: CREAM, overflow: 'hidden' }}>
             <BookingWidget />
           </div>
-          <p className="text-center text-gray-600 text-xs font-mono uppercase tracking-widest mt-6">
+          <p style={{ textAlign: 'center', ...MONO_LABEL, color: DIM, marginTop: 24 }}>
             Prefer email? Reach us at{' '}
-            <a href="mailto:hello@alkatera.com" className="text-[#ccff00] hover:text-white">
+            <a href="mailto:hello@alkatera.com" style={{ color: FOREST, textDecoration: 'none' }}>
               hello@alkatera.com
             </a>
           </p>
         </div>
       </section>
 
-      <Footer />
+      <SiteFooter />
     </div>
   );
 }
