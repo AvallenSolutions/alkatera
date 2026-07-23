@@ -1,12 +1,12 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { Navigation } from '@/marketing/components/Navigation';
-import { Footer } from '@/marketing/components/Footer';
-import { Clock, Calendar, User, Tag, ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
-import { SocialShare } from '@/components/blog/SocialShare';
 import sanitizeHtml from 'sanitize-html';
+import { spaceGrotesk } from '@/marketing/shared/fonts';
+import { F_BODY, F_MONO, F_STATEMENT, SiteFooter, SiteNav } from '@/marketing/shared/chrome';
+import { CursorCreatures } from '@/marketing/shared/effects';
+import { flowerForSlug } from '@/marketing/knowledge/flowers';
+import '@/marketing/shared/marketing.css';
 
 interface BlogPost {
   id: string;
@@ -169,141 +169,128 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
     mainEntityOfPage: postUrl,
   };
 
+  const kickerParts = [
+    post.read_time,
+    publishedDate
+      ? publishedDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+      : null,
+    post.author_name,
+  ].filter(Boolean);
+
+  const shareText = encodeURIComponent(post.title);
+  const shareUrl = encodeURIComponent(postUrl);
+
+  const shareLinkStyle: React.CSSProperties = {
+    fontFamily: F_MONO,
+    fontWeight: 700,
+    fontSize: 9.5,
+    letterSpacing: '0.18em',
+    textTransform: 'uppercase',
+    color: '#6F6F68',
+    textDecoration: 'none',
+    borderBottom: '1px solid #D9D6CB',
+    paddingBottom: 3,
+  };
+
   return (
-    <div className="min-h-screen bg-[#050505] text-white relative">
+    <div className={`mkt-home ${spaceGrotesk.variable}`} style={{ background: '#ECEAE3', minHeight: '100vh' }}>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      {/* Fixed background layer */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <img
-          src="/images/forest.jpg"
-          alt=""
-          className="absolute inset-0 w-full h-full object-cover opacity-15 mix-blend-luminosity"
-        />
-        <div className="absolute inset-0 bg-[#050505]/80" />
-        <div className="absolute inset-0 opacity-10"
-          style={{
-            backgroundImage: 'linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px)',
-            backgroundSize: '80px 80px'
-          }}
-        />
-        {/* Static gradient blobs */}
-        <div className="absolute top-[20%] left-[10%] w-[500px] h-[500px] bg-[#ccff00] rounded-full opacity-[0.07] blur-[100px]" />
-        <div className="absolute bottom-[10%] right-[15%] w-[600px] h-[600px] bg-[#00ccff] rounded-full opacity-[0.07] blur-[100px]" />
-      </div>
+      <SiteNav active="knowledge" />
 
-      <div className="relative z-10">
-      <Navigation />
-
-      <main className="pt-32 pb-20">
-        <article className="max-w-4xl mx-auto px-6">
-          {/* Back Link */}
-          <Link
+      <main className="mkt-pad" style={{ padding: '140px 48px 90px', boxSizing: 'border-box' }}>
+        <article style={{ maxWidth: 800, margin: '0 auto' }}>
+          {/* Back to the library */}
+          <a
+            className="mkt-navlink"
             href="/knowledge"
-            className="inline-flex items-center gap-2 text-gray-400 hover:text-[#ccff00] transition-all duration-300 mb-12 font-mono text-sm uppercase tracking-widest group"
+            style={{
+              fontFamily: F_MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: '0.18em',
+              textTransform: 'uppercase', display: 'inline-block', marginBottom: 48,
+            }}
           >
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform duration-300" />
-            Back to Knowledge Hub
-          </Link>
+            ← Back to the library
+          </a>
 
           {/* Header */}
-          <header className="mb-16 space-y-8">
-            {/* Tags */}
+          <header style={{ marginBottom: 48, position: 'relative' }}>
+            {/* The article's pressed flower, from the library's meadow. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={flowerForSlug(post.slug)}
+              alt=""
+              aria-hidden="true"
+              style={{ position: 'absolute', right: 0, top: -8, height: 72, width: 'auto', opacity: 0.85 }}
+            />
+            {kickerParts.length > 0 && (
+              <p style={{ fontFamily: F_MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#6F6F68', margin: '0 0 20px', paddingRight: 90 }}>
+                {kickerParts.join(' · ')}
+              </p>
+            )}
+            <h1
+              style={{
+                fontFamily: F_STATEMENT, fontWeight: 700, fontSize: 'clamp(36px,5vw,64px)',
+                lineHeight: 1.0, letterSpacing: '-0.035em', color: '#1A1B1D', margin: '0 0 20px',
+              }}
+            >
+              {post.title}
+            </h1>
+            {post.excerpt && (
+              <p style={{ fontFamily: F_BODY, fontSize: 17, lineHeight: 1.6, color: '#6F6F68', margin: '0 0 22px', maxWidth: '58ch' }}>
+                {post.excerpt}
+              </p>
+            )}
             {post.tags.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {post.tags.map((tag, i) => (
+              <div
+                style={{
+                  display: 'flex', flexWrap: 'wrap', gap: 8, fontFamily: F_MONO, fontWeight: 700,
+                  fontSize: 9, letterSpacing: '0.16em', textTransform: 'uppercase',
+                }}
+              >
+                {post.tags.map((tag) => (
                   <span
-                    key={i}
-                    className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-[#ccff00]/10 border border-[#ccff00]/30 text-[#ccff00] font-mono text-xs uppercase tracking-widest rounded-md hover:bg-[#ccff00]/20 transition-colors duration-300"
+                    key={tag}
+                    style={{ padding: '5px 12px', borderRadius: 999, border: '1px solid #D9D6CB', color: '#6F6F68' }}
                   >
-                    <Tag className="w-3 h-3" />
                     {tag}
                   </span>
                 ))}
               </div>
             )}
-
-            {/* Title */}
-            <h1 className="text-5xl md:text-7xl font-serif leading-[1.1] tracking-tight bg-gradient-to-br from-white via-white to-gray-400 bg-clip-text text-transparent">
-              {post.title}
-            </h1>
-
-            {/* Excerpt */}
-            {post.excerpt && (
-              <p className="text-xl md:text-2xl text-gray-400 leading-relaxed max-w-3xl">
-                {post.excerpt}
-              </p>
-            )}
-
-            {/* Meta Info */}
-            <div className="flex flex-wrap items-center gap-6 text-sm text-gray-500 font-mono uppercase tracking-widest">
-              {post.author_name && (
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4" />
-                  {post.author_name}
-                </div>
-              )}
-              {publishedDate && (
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
-                  {publishedDate.toLocaleDateString('en-US', {
-                    month: 'long',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })}
-                </div>
-              )}
-              {post.read_time && (
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4" />
-                  {post.read_time}
-                </div>
-              )}
-            </div>
-
-            {/* Social Share */}
-            <SocialShare
-              url={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://alkatera.com'}/blog/${post.slug}`}
-              title={post.title}
-              description={post.excerpt}
-            />
           </header>
 
-          {/* Featured Image (only show if not a video post) */}
+          {/* Featured image (only when this is not a video post) */}
           {post.featured_image_url && post.content_type !== 'video' && (
-            <div className="mb-16 -mx-6 md:mx-0 group">
-              <div className="relative overflow-hidden rounded-none md:rounded-xl">
-                <img
-                  src={post.featured_image_url}
-                  alt={post.title}
-                  className="w-full h-auto transition-transform duration-700 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent opacity-50"></div>
-              </div>
-            </div>
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={post.featured_image_url}
+              alt={post.title}
+              style={{
+                width: '100%', height: 'auto', borderRadius: 6, border: '1px solid #D9D6CB',
+                marginBottom: 48,
+              }}
+            />
           )}
 
-          {/* Video Player */}
+          {/* Video player */}
           {post.content_type === 'video' && post.video_url && (
-            <div className="mb-16 -mx-6 md:mx-0">
+            <div style={{ marginBottom: 48 }}>
               {getYouTubeEmbedUrl(post.video_url) ? (
-                // YouTube Video
-                <div className="relative w-full pb-[56.25%] rounded-none md:rounded-xl overflow-hidden shadow-2xl border border-white/5">
+                <div style={{ position: 'relative', width: '100%', paddingBottom: '56.25%', borderRadius: 6, overflow: 'hidden', border: '1px solid #D9D6CB' }}>
                   <iframe
                     src={getYouTubeEmbedUrl(post.video_url)!}
                     title={post.title}
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
-                    className="absolute top-0 left-0 w-full h-full"
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }}
                   />
                 </div>
               ) : (
-                // Direct Video File
                 <video
                   controls
-                  className="w-full h-auto rounded-none md:rounded-xl bg-black shadow-2xl border border-white/5"
+                  style={{ width: '100%', height: 'auto', borderRadius: 6, background: '#1A1B1D', border: '1px solid #D9D6CB' }}
                   poster={post.featured_image_url}
                 >
                   <source src={post.video_url} type="video/mp4" />
@@ -318,23 +305,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
           {/* Content */}
           {post.content && (
             <div
-              className="prose prose-invert prose-lg md:prose-xl max-w-none
-                prose-headings:font-serif prose-headings:text-white prose-headings:tracking-tight
-                prose-h1:text-5xl prose-h1:leading-tight prose-h1:mb-6 prose-h1:mt-12
-                prose-h2:text-4xl prose-h2:leading-tight prose-h2:mb-4 prose-h2:mt-10
-                prose-h3:text-3xl prose-h3:leading-snug prose-h3:mb-3 prose-h3:mt-8
-                prose-p:text-gray-300 prose-p:leading-relaxed prose-p:mb-6
-                prose-a:text-[#ccff00] prose-a:no-underline prose-a:font-medium hover:prose-a:underline prose-a:transition-all
-                prose-strong:text-white prose-strong:font-semibold
-                prose-em:text-gray-200 prose-em:italic
-                prose-code:text-[#ccff00] prose-code:bg-[#ccff00]/10 prose-code:px-2 prose-code:py-1 prose-code:rounded prose-code:font-mono prose-code:text-base
-                prose-pre:bg-black/50 prose-pre:border prose-pre:border-white/10 prose-pre:rounded-xl prose-pre:p-6
-                prose-blockquote:border-l-4 prose-blockquote:border-l-[#ccff00] prose-blockquote:text-gray-300 prose-blockquote:italic prose-blockquote:pl-6 prose-blockquote:py-2
-                prose-img:rounded-xl prose-img:w-full prose-img:shadow-2xl prose-img:border prose-img:border-white/5
-                prose-ul:text-gray-300 prose-ul:space-y-2 prose-ol:text-gray-300 prose-ol:space-y-2
-                prose-li:marker:text-[#ccff00] prose-li:leading-relaxed
-                prose-hr:border-white/10 prose-hr:my-12
-                first:prose-p:text-xl first:prose-p:leading-relaxed"
+              className="mkt-article"
               dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.content, {
                 allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img', 'iframe', 'video', 'source', 'h1', 'h2']),
                 allowedAttributes: {
@@ -354,51 +325,51 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
             />
           )}
 
-          {/* Footer Tags & Share */}
-          <footer className="mt-20 pt-10 border-t border-white/10 space-y-8">
-            {/* Social Share */}
-            <div className="flex justify-center">
-              <SocialShare
-                url={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://alkatera.com'}/blog/${post.slug}`}
-                title={post.title}
-                description={post.excerpt}
-              />
-            </div>
-
-            {/* Tags */}
-            {post.tags.length > 0 && (
-              <div className="flex flex-wrap items-center justify-center gap-3 pb-4">
-                <span className="text-gray-500 font-mono text-xs uppercase tracking-widest">
-                  Tagged:
-                </span>
-                {post.tags.map((tag, i) => (
-                  <span
-                    key={i}
-                    className="px-4 py-2 bg-white/5 border border-white/10 text-gray-400 font-mono text-xs uppercase tracking-widest rounded-md hover:border-[#ccff00] hover:text-[#ccff00] hover:bg-[#ccff00]/5 transition-all duration-300 cursor-pointer"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
+          {/* Share row */}
+          <footer style={{ marginTop: 64, borderTop: '1px solid #D9D6CB', paddingTop: 26, display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '12px 24px' }}>
+            <span style={{ fontFamily: F_MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#1A1B1D' }}>
+              Pass it on
+            </span>
+            <a
+              href={`https://www.linkedin.com/sharing/share-offsite/?url=${shareUrl}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mkt-scanlink"
+              style={shareLinkStyle}
+            >
+              LinkedIn
+            </a>
+            <a
+              href={`https://twitter.com/intent/tweet?text=${shareText}&url=${shareUrl}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mkt-scanlink"
+              style={shareLinkStyle}
+            >
+              X
+            </a>
+            <a
+              href={`mailto:?subject=${shareText}&body=${shareUrl}`}
+              className="mkt-scanlink"
+              style={shareLinkStyle}
+            >
+              Email
+            </a>
           </footer>
         </article>
       </main>
 
-      <Footer />
+      <SiteFooter
+        platformLinksHref="/platform#modules"
+        companyLinks={[
+          { label: 'Manifesto', href: '/#manifesto' },
+          { label: "Buyer's Guide", href: '/best-sustainability-platform-drinks-industry' },
+          { label: 'Knowledge', href: '/knowledge' },
+          { label: 'Contact', href: '/contact' },
+        ]}
+      />
 
-      {/* Photo credit */}
-      <div className="text-center text-[10px] text-white/20 py-4">
-        Photo by{' '}
-        <a href="https://unsplash.com/@zmachacek" target="_blank" rel="noopener noreferrer" className="underline hover:text-white/40">
-          Zden&#283;k Mach&#225;&#269;ek
-        </a>
-        {' '}on{' '}
-        <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-white/40">
-          Unsplash
-        </a>
-      </div>
-      </div>
+      <CursorCreatures />
     </div>
   );
 }

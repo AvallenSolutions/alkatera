@@ -252,6 +252,14 @@ html {
   border-bottom-color: var(--fw-c);
 }
 
+/* The library's cards (Knowledge): a breath lighter under the pointer. */
+.mkt-card {
+  transition: background 0.2s;
+}
+.mkt-card:hover {
+  background: #f7f5ec !important;
+}
+
 /* The comparison table (Pricing): rows light up under the pointer, and
    the whole table scrolls sideways on small screens rather than folding. */
 .mkt-cmp-row:hover {
@@ -269,6 +277,152 @@ html {
 /* Cream in-page links on saturated grounds (Platform hero). */
 .mkt-cream-link:hover {
   border-bottom-color: #f2f1ea !important;
+}
+
+/* The article body (blog posts): the studio's reading voice. Content
+   arrives as sanitised HTML from blog_posts, so it is styled by tag. */
+.mkt-article {
+  font-family: var(--font-body), 'Inter', sans-serif;
+  font-size: 16px;
+  line-height: 1.7;
+  color: #1a1b1d;
+}
+.mkt-article > p:first-of-type {
+  font-size: 18px;
+  line-height: 1.65;
+}
+.mkt-article p {
+  margin: 0 0 22px;
+}
+.mkt-article h1,
+.mkt-article h2,
+.mkt-article h3,
+.mkt-article h4 {
+  font-family: var(--font-statement), 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #1a1b1d;
+  line-height: 1.05;
+}
+.mkt-article h1 {
+  font-size: 34px;
+  margin: 48px 0 18px;
+}
+.mkt-article h2 {
+  font-size: 29px;
+  margin: 44px 0 16px;
+}
+.mkt-article h3 {
+  font-size: 23px;
+  margin: 36px 0 12px;
+}
+.mkt-article h4 {
+  font-size: 18px;
+  margin: 30px 0 10px;
+}
+.mkt-article a {
+  color: #205e40;
+  text-decoration: underline;
+  text-decoration-color: rgba(32, 94, 64, 0.35);
+  text-underline-offset: 3px;
+}
+.mkt-article a:hover {
+  text-decoration-color: #205e40;
+}
+.mkt-article strong {
+  font-weight: 650;
+}
+.mkt-article blockquote {
+  border-left: 3px solid #205e40;
+  background: #f2f1ea;
+  border-radius: 0 6px 6px 0;
+  margin: 28px 0;
+  padding: 18px 24px;
+  font-style: italic;
+  color: #4a4b46;
+}
+.mkt-article blockquote p:last-child {
+  margin-bottom: 0;
+}
+.mkt-article ul,
+.mkt-article ol {
+  margin: 0 0 22px;
+  padding-left: 26px;
+}
+.mkt-article li {
+  margin-bottom: 8px;
+}
+.mkt-article li::marker {
+  color: #205e40;
+}
+.mkt-article img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  border: 1px solid #d9d6cb;
+  margin: 28px 0;
+}
+.mkt-article figure {
+  margin: 28px 0;
+}
+.mkt-article figcaption {
+  font-family: var(--font-data), 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6f6f68;
+  margin-top: 8px;
+}
+.mkt-article hr {
+  border: none;
+  border-top: 1px solid #d9d6cb;
+  margin: 44px 0;
+}
+.mkt-article code {
+  font-family: var(--font-data), 'JetBrains Mono', monospace;
+  font-size: 0.88em;
+  background: #f2f1ea;
+  border: 1px solid #d9d6cb;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.mkt-article pre {
+  background: #f2f1ea;
+  border: 1px solid #d9d6cb;
+  border-radius: 6px;
+  padding: 18px 22px;
+  overflow-x: auto;
+  margin: 0 0 22px;
+}
+.mkt-article pre code {
+  border: none;
+  background: none;
+  padding: 0;
+}
+.mkt-article iframe,
+.mkt-article video {
+  max-width: 100%;
+  border-radius: 6px;
+  margin: 28px 0;
+}
+.mkt-article table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 28px 0;
+  font-size: 14px;
+}
+.mkt-article th,
+.mkt-article td {
+  border-bottom: 1px solid #d9d6cb;
+  padding: 10px 12px;
+  text-align: left;
+}
+.mkt-article th {
+  font-family: var(--font-data), 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6f6f68;
 }
 
 /* The buttons wake gently. */
