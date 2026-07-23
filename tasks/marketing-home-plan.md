@@ -49,8 +49,19 @@ Deliberate decisions:
 - Old marketing/components/HomePageClient.tsx left in place (untouched) since Navigation/
   Footer are shared by other public pages; only app/page.tsx switched to the new client.
 
-Still open for other pages/sessions: Login.dc.html only; real newsletter, trial-signup +
-greenwash-scan endpoints; SEO structured data parity with the old home if wanted.
+Still open: real newsletter, trial-signup + greenwash-scan endpoints; SEO structured
+data parity with the old home if wanted. ALL FIVE DESIGN PAGES ARE NOW BUILT.
+
+## Login page (added 2026-07-23, commit 21e965b9)
+Login.dc.html ported to marketing/login/LoginClient.tsx at /login, wired to the REAL
+Supabase signInWithPassword (the design's mock success state now shows at the actual
+sign-in moment while the router redirects). Route keeps the returnUrl open-redirect
+guard and tier flow (?tier= lands at /settings?tier= after login). "Forgotten?" links
+the real /password-reset; "No account yet?" points at /pricing per the design (the old
+/signup route still serves direct signups; the old AuthForm/LoginForm/SignupForm remain
+for it). Verified against local Supabase: bad credentials show the mono error; a
+throwaway user (created + deleted via local admin API) got the green greeting card and
+landed in the app's create-organization flow.
 
 ## Knowledge page + blog restyle (added 2026-07-23, commit e83a5dc9)
 Knowledge.dc.html ported to marketing/knowledge/KnowledgeClient.tsx at /knowledge, fed by
