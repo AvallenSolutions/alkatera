@@ -116,6 +116,16 @@ function FromWebsiteTag() {
   )
 }
 
+/** The Companies House counterpart: a field whose value came from the UK
+ * register (legal name, incorporation year, country), not the scrape. */
+function FromCompaniesHouseTag() {
+  return (
+    <span className="shrink-0 font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-studio-forest">
+      From Companies House.
+    </span>
+  )
+}
+
 /**
  * The studio's fact-list rhythm, adapted for a form that mostly doesn't
  * need to be one: a mono label, then either a confirmed value (bold,
@@ -266,6 +276,18 @@ export function FastTrackSetupStep() {
   // the user has already typed.
   type AutofillableField = 'country' | 'foundingYear' | 'description' | 'logo' | 'beverageType'
   const [autofilledFromSite, setAutofilledFromSite] = useState<Set<AutofillableField>>(new Set())
+  // Fields whose value came from Companies House (the arrival flow's parallel
+  // lookup), tracked separately so the tag reads "From Companies House." not
+  // "From your website." A field is never in both sets.
+  const [fromCompaniesHouse, setFromCompaniesHouse] = useState<Set<AutofillableField>>(new Set())
+  // A field is "pre-filled" (collapses to a confirmed value, shows a source
+  // tag) if either source supplied it.
+  const isPrefilled = (field: AutofillableField) =>
+    autofilledFromSite.has(field) || fromCompaniesHouse.has(field)
+  // The right tag for a field: Companies House wins over the scrape when both
+  // could apply (it never should, but be deterministic), else the scrape tag.
+  const sourceTag = (field: AutofillableField): React.ReactNode =>
+    fromCompaniesHouse.has(field) ? <FromCompaniesHouseTag /> : autofilledFromSite.has(field) ? <FromWebsiteTag /> : undefined
   // Fields that were *just* autofilled, for a brief highlight/fade as the
   // value lands — separate from autofilledFromSite, which persists the
   // label until the user edits the field.
@@ -528,6 +550,12 @@ export function FastTrackSetupStep() {
       next.delete(key)
       return next
     })
+    setFromCompaniesHouse(prev => {
+      if (!prev.has(key)) return prev
+      const next = new Set(prev)
+      next.delete(key)
+      return next
+    })
     setHighlightedFields(prev => {
       if (!prev.has(key)) return prev
       const next = new Set(prev)
@@ -535,6 +563,47 @@ export function FastTrackSetupStep() {
       return next
     })
   }
+
+  // Consume the Companies House facts the website step stashed (they may land
+  // after this screen mounts, since the lookup runs in parallel). Only fills a
+  // field the user hasn't already got a value for, and only from the scrape's
+  // blind spots — the register is authoritative for the legal year/country.
+  const companiesHouse = state.personalization?.companiesHouse
+  useEffect(() => {
+    if (!companiesHouse) return
+    const filled: AutofillableField[] = []
+    if (!foundingYear && companiesHouse.incorporationYear) {
+      setFoundingYear(String(companiesHouse.incorporationYear))
+      filled.push('foundingYear')
+    }
+    if (!countryCode) {
+      const mapped = mapScrapedCountry(companiesHouse.registeredAddress?.country ?? companiesHouse.country)
+      if (mapped) {
+        setCountryCode(mapped)
+        filled.push('country')
+      }
+    }
+    if (!filled.length) return
+    setFromCompaniesHouse(prev => {
+      const next = new Set(prev)
+      filled.forEach(k => next.add(k))
+      return next
+    })
+    setHighlightedFields(prev => {
+      const next = new Set(prev)
+      filled.forEach(k => next.add(k))
+      return next
+    })
+    const t = setTimeout(() => {
+      setHighlightedFields(prev => {
+        const next = new Set(prev)
+        filled.forEach(k => next.delete(k))
+        return next
+      })
+    }, 1400)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companiesHouse])
 
   const isValid =
     companyName.trim().length > 0 && teamSize !== null && beverageType !== null && !websiteUrlError
@@ -771,11 +840,11 @@ export function FastTrackSetupStep() {
             <div>
               <FieldLabel
                 className="mb-1.5"
-                tag={autofilledFromSite.has('country') ? <FromWebsiteTag /> : undefined}
+                tag={sourceTag('country')}
               >
                 Country
               </FieldLabel>
-              {confirmMode && autofilledFromSite.has('country') && !editingFields.has('country') ? (
+              {confirmMode && isPrefilled('country') && !editingFields.has('country') ? (
                 <ConfirmedValue
                   value={COUNTRIES.find(c => c.value === countryCode)?.label ?? countryCode}
                   onEdit={() => beginEdit('country')}
@@ -792,11 +861,11 @@ export function FastTrackSetupStep() {
             <div>
               <FieldLabel
                 className="mb-1.5"
-                tag={autofilledFromSite.has('foundingYear') ? <FromWebsiteTag /> : undefined}
+                tag={sourceTag('foundingYear')}
               >
                 Year founded
               </FieldLabel>
-              {confirmMode && autofilledFromSite.has('foundingYear') && !editingFields.has('foundingYear') ? (
+              {confirmMode && isPrefilled('foundingYear') && !editingFields.has('foundingYear') ? (
                 <ConfirmedValue value={foundingYear} onEdit={() => beginEdit('foundingYear')} />
               ) : (
                 <Input

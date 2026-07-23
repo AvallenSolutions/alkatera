@@ -4,6 +4,8 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
 import { Eye, EyeOff, AlertCircle, CheckCircle2 } from "lucide-react"
+import { guessFromEmail } from "@/lib/enrich/domain"
+import { stashDomainGuess, clearDomainGuess } from "@/lib/enrich/arrival-handoff"
 
 export function SignupForm({ redirectTo }: { redirectTo?: string }) {
   const router = useRouter()
@@ -16,6 +18,21 @@ export function SignupForm({ redirectTo }: { redirectTo?: string }) {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
+  // The moment a work email is entered we recognise the company domain and
+  // hand it to the arrival ritual, so its first screen opens pre-filled. Pure
+  // and instant — no network here; the reading itself starts post-auth.
+  const [recognisedDomain, setRecognisedDomain] = useState<string | null>(null)
+
+  const handleEmailBlur = () => {
+    const guess = guessFromEmail(email)
+    if (guess && !guess.isConsumer) {
+      stashDomainGuess(guess)
+      setRecognisedDomain(guess.domain)
+    } else {
+      clearDomainGuess()
+      setRecognisedDomain(null)
+    }
+  }
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -181,10 +198,17 @@ export function SignupForm({ redirectTo }: { redirectTo?: string }) {
           placeholder="you@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          onBlur={handleEmailBlur}
           disabled={loading}
           required
           className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-[6px] text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#F2F1EA]/40 focus:border-[#F2F1EA]/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         />
+        {recognisedDomain && (
+          <p className="flex items-center gap-2 text-xs text-[#F2F1EA]/70">
+            <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0" />
+            {recognisedDomain} recognised. We will have your details ready inside.
+          </p>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -211,7 +235,7 @@ export function SignupForm({ redirectTo }: { redirectTo?: string }) {
           </button>
         </div>
         <p className="text-xs text-white/30">
-          Min 8 chars with uppercase, lowercase, and number
+          Min 10 chars with uppercase, lowercase, and number
         </p>
       </div>
 

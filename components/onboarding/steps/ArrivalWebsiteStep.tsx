@@ -1,9 +1,10 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useOnboarding } from '@/lib/onboarding'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
+import { readDomainGuess } from '@/lib/enrich/arrival-handoff'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Eyebrow, PillButton } from '@/components/studio'
@@ -70,11 +71,26 @@ export function ArrivalWebsiteStep() {
   const [companyName, setCompanyName] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [prefilled, setPrefilled] = useState(false)
   const submittedRef = useRef(false)
 
   // Compat: an in-flight 'arrival-welcome' user already has an org from the
   // old /create-organization detour — never create a second one.
   const alreadyHasOrg = !!currentOrganization
+
+  // Pre-fill the URL from the domain the signup form already recognised, so
+  // the front door usually opens with the answer in place (one tap, no
+  // typing). Client-only + guarded so there is no hydration mismatch; only
+  // fills an empty field, never fights the user.
+  useEffect(() => {
+    if (websiteUrl) return
+    const guess = readDomainGuess()
+    if (guess && !guess.isConsumer && guess.domain) {
+      setWebsiteUrl(guess.domain)
+      setPrefilled(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function createOrganizationSilently(name: string): Promise<void> {
     const { data: { session } } = await supabase.auth.getSession()
@@ -117,6 +133,39 @@ export function ArrivalWebsiteStep() {
     }
   }
 
+  /** Fire the Companies House lookup in parallel and stash whatever comes
+   * back into personalization, so arrival-confirm can show "From Companies
+   * House." facts. Never awaited and never blocks: a miss (or no API key)
+   * just means the confirm screen has one fewer pre-filled fact. */
+  function fireCompaniesHouse(name: string): void {
+    void (async () => {
+      try {
+        const res = await fetch(`/api/enrich/company?name=${encodeURIComponent(name)}`)
+        const body = await res.json().catch(() => ({}))
+        const p = body?.profile
+        if (!p?.companyNumber || !p?.name) return
+        updatePersonalization({
+          companiesHouse: {
+            companyNumber: p.companyNumber,
+            name: p.name,
+            incorporationYear: p.incorporationYear ?? undefined,
+            country: p.registeredAddress?.country ?? undefined,
+            registeredAddress: p.registeredAddress
+              ? {
+                  line1: p.registeredAddress.line1 ?? undefined,
+                  city: p.registeredAddress.city ?? undefined,
+                  postalCode: p.registeredAddress.postalCode ?? undefined,
+                  country: p.registeredAddress.country ?? undefined,
+                }
+              : undefined,
+          },
+        })
+      } catch (err) {
+        console.warn('[arrival-website] companies house lookup failed:', err)
+      }
+    })()
+  }
+
   const handleWebsiteSubmit = async () => {
     if (isSubmitting || submittedRef.current) return
     const trimmed = websiteUrl.trim()
@@ -128,10 +177,12 @@ export function ArrivalWebsiteStep() {
     setIsSubmitting(true)
     setError(null)
     try {
+      const derivedName = deriveNameFromDomain(trimmed)
       if (!alreadyHasOrg) {
-        await createOrganizationSilently(deriveNameFromDomain(trimmed))
+        await createOrganizationSilently(derivedName)
       }
       submittedRef.current = true
+      fireCompaniesHouse(derivedName)
       const jobId = await fireScrape(trimmed)
       updatePersonalization({ websiteUrl: trimmed, ...(jobId ? { scrapeJobId: jobId } : {}) })
       completeStep()
@@ -155,6 +206,7 @@ export function ArrivalWebsiteStep() {
         await createOrganizationSilently(trimmed)
       }
       submittedRef.current = true
+      fireCompaniesHouse(trimmed)
       completeStep()
     } catch (err) {
       setError(err instanceof Error ? err.message : "That didn't work. Try again.")
@@ -180,7 +232,7 @@ export function ArrivalWebsiteStep() {
               <Input
                 placeholder="www.yourcompany.com"
                 value={websiteUrl}
-                onChange={e => { setWebsiteUrl(e.target.value); setError(null) }}
+                onChange={e => { setWebsiteUrl(e.target.value); setError(null); setPrefilled(false) }}
                 onKeyDown={e => { if (e.key === 'Enter') handleWebsiteSubmit() }}
                 disabled={isSubmitting}
                 aria-invalid={!!error}
@@ -189,6 +241,11 @@ export function ArrivalWebsiteStep() {
               />
             </div>
             {error && <p className="text-xs text-studio-stale">{error}</p>}
+            {prefilled && !error && (
+              <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-studio-good">
+                From your email. Right?
+              </p>
+            )}
             <PillButton onClick={handleWebsiteSubmit} disabled={isSubmitting} variant="ink" size="md" className="w-full">
               {isSubmitting ? 'One moment…' : (<>Continue<ArrowRight className="h-4 w-4" /></>)}
             </PillButton>

@@ -279,6 +279,23 @@ export interface PersonalizationData {
   country?: string
   /** Year company was founded */
   foundingYear?: number
+  /**
+   * Registered-entity facts from Companies House (UK), fetched alongside the
+   * website scrape on the arrival flow. Shown as "From Companies House."
+   * confirmations; the registered address pre-fills the facility step.
+   */
+  companiesHouse?: {
+    companyNumber: string
+    name: string
+    incorporationYear?: number
+    country?: string
+    registeredAddress?: {
+      line1?: string
+      city?: string
+      postalCode?: string
+      country?: string
+    }
+  }
   /** Last estimated footprint in tonnes CO₂e/year. Set by the estimate step. */
   estimateTonnesCO2e?: number
   /** First sustainability target: % reduction from the estimate baseline. */
