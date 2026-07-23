@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useOnboarding } from '@/lib/onboarding'
+import { trackOnboarding } from '@/lib/onboarding/telemetry'
 import type { AnnualProductionBucket } from '@/lib/onboarding'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
@@ -255,6 +256,21 @@ export function ArrivalEstimateStep() {
   const displayTonnes = Math.round(estimateTonnes)
   const low = Math.round(estimateTonnes * 0.7)
   const high = Math.round(estimateTonnes * 1.3)
+
+  // Time to first number (spec §11): fire once the estimate first renders, so
+  // the server can measure signup → first-number from the event timestamps.
+  const firedFirstNumber = useRef(false)
+  useEffect(() => {
+    if (isLoading || firedFirstNumber.current || !currentOrganization) return
+    firedFirstNumber.current = true
+    trackOnboarding({
+      organizationId: currentOrganization.id,
+      flow: 'arrival',
+      step: 'arrival-estimate',
+      event: 'view',
+      meta: { metric: 'first_number', tonnes: displayTonnes, hasProducts },
+    })
+  }, [isLoading, currentOrganization, displayTonnes, hasProducts])
 
   const setVolume = (productId: string, field: Partial<ProductVolume>) => {
     setProductVolumes(prev => ({

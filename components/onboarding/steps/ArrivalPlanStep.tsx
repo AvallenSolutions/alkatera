@@ -7,6 +7,7 @@ import { useOrganization } from '@/lib/organizationContext'
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client'
 import { PRICING_TIERS, type TierKey } from '@/lib/stripe/pricing-tiers'
 import { recommendTier, buildRecommendationReason } from '@/lib/onboarding/tier-recommendation'
+import { trackOnboarding } from '@/lib/onboarding/telemetry'
 import { Eyebrow, BigNumber, PillButton } from '@/components/studio'
 import { RosaIntro } from './RosaIntro'
 import { TheWalk } from '../TheWalk'
@@ -137,6 +138,15 @@ export function ArrivalPlanStep() {
   }, [phase, subscriptionReady, currentOrganization?.id])
 
   async function startCheckout(body: Record<string, unknown>) {
+    // Card-step conversion (spec §11): checkout started. Paired with the
+    // '?arrival=complete' return, this gives the step-6 → paid conversion.
+    trackOnboarding({
+      organizationId: currentOrganization?.id,
+      flow: 'arrival',
+      step: 'arrival-plan',
+      event: 'complete',
+      meta: { metric: 'checkout_started', trial: body.trial === true, tier: body.tierName ?? null },
+    })
     const res = await fetch('/api/stripe/create-checkout-session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

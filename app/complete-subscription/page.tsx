@@ -66,7 +66,7 @@ function CompleteSubscriptionContent() {
             ? 'Welcome to alkatera. Add a facility and build your first LCA.'
             : `Welcome to the ${tierParam || ''} plan.`,
         })
-        router.push('/dashboard')
+        router.push('/desk/')
         return
       }
 
@@ -77,7 +77,7 @@ function CompleteSubscriptionContent() {
         toast.success('Payment received!', {
           description: 'Your subscription is being set up. You can access your dashboard shortly.',
         })
-        router.push('/dashboard')
+        router.push('/desk/')
       }
     }, 2000) // Poll every 2s to give webhook time
 
@@ -227,7 +227,7 @@ function CompleteSubscriptionContent() {
               <button
                 onClick={async () => {
                   if (mutate) await mutate()
-                  router.push('/dashboard')
+                  router.push('/desk/')
                 }}
                 className="mt-4 px-8 py-3 bg-[#F2F1EA] text-[#1A1B1D] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full hover:bg-white transition-colors"
               >

@@ -85,6 +85,13 @@ export interface OnboardingStepConfig {
   index: number
 }
 
+/**
+ * @deprecated The 14-step owner flow. Superseded by ARRIVAL_STEPS (the arrival
+ * ritual is the front door now). Kept only so in-flight users with an existing
+ * `onboarding_flow='owner'` state can finish the flow they started; new owners
+ * never get it. Do not extend — build on ARRIVAL_STEPS instead. Removal is a
+ * later cleanup once no in-flight owner states remain.
+ */
 export const ONBOARDING_STEPS: OnboardingStepConfig[] = [
   // Phase 1
   { id: 'welcome-screen', phase: 'welcome', title: 'Welcome', description: 'Welcome to Alkatera', skippable: false, index: 0 },
@@ -129,7 +136,13 @@ export const TOTAL_STEPS = ONBOARDING_STEPS.length
 export const TOTAL_MEMBER_STEPS = MEMBER_ONBOARDING_STEPS.length
 export const TOTAL_ADVISOR_STEPS = ADVISOR_ONBOARDING_STEPS.length
 
-/** Fast Track onboarding: 8-step path that populates real account data */
+/**
+ * @deprecated The 8-step Fast Track flow. Superseded by ARRIVAL_STEPS, which
+ * reuses several of this flow's step components (confirm/reveal/estimate) but
+ * is the canonical front door. Kept for in-flight `onboarding_flow='fast_track'`
+ * states only; new owners get the arrival ritual. Do not extend. Removal is a
+ * later cleanup once no in-flight fast-track states remain.
+ */
 export const FAST_TRACK_STEPS: OnboardingStepConfig[] = [
   { id: 'welcome-screen',        phase: 'welcome',        title: 'Welcome',         description: 'Welcome to alkatera',          skippable: false, index: 0 },
   { id: 'fast-track-setup',      phase: 'welcome',        title: 'Your Company',    description: 'Tell us about your business',  skippable: false, index: 1 },

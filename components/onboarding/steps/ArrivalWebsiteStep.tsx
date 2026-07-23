@@ -6,6 +6,7 @@ import type { BeverageType, AnnualProductionBucket } from '@/lib/onboarding'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
 import { readDomainGuess } from '@/lib/enrich/arrival-handoff'
+import { trackOnboarding } from '@/lib/onboarding/telemetry'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CountrySelect } from '@/components/shared/CountrySelect'
@@ -120,7 +121,7 @@ export function ArrivalWebsiteStep() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function createOrganizationSilently(name: string): Promise<void> {
+  async function createOrganizationSilently(name: string): Promise<string> {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) throw new Error('Please sign in again.')
     const apiUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-organization`
@@ -140,6 +141,7 @@ export function ArrivalWebsiteStep() {
     // org-appeared refetch doesn't reset our in-memory arrival progress.
     attachOrganizationId(result.organization.id)
     await mutate({ organization: result.organization, role: result.role, user: session.user })
+    return result.organization.id as string
   }
 
   /** Fire the same background crawl FastTrackSetupStep triggers, and hand
@@ -206,10 +208,19 @@ export function ArrivalWebsiteStep() {
     setError(null)
     try {
       const derivedName = deriveNameFromDomain(trimmed)
-      if (!alreadyHasOrg) {
-        await createOrganizationSilently(derivedName)
-      }
+      const orgId = alreadyHasOrg
+        ? currentOrganization?.id
+        : await createOrganizationSilently(derivedName)
       submittedRef.current = true
+      // Recognition rate (spec §11): did the user accept the URL we pre-filled
+      // from their email domain, or type/correct it themselves?
+      trackOnboarding({
+        organizationId: orgId,
+        flow: 'arrival',
+        step: 'arrival-website',
+        event: 'complete',
+        meta: { metric: 'recognition', prefilledAccepted: prefilled, path: 'website' },
+      })
       fireCompaniesHouse(derivedName)
       const jobId = await fireScrape(trimmed)
       updatePersonalization({ websiteUrl: trimmed, ...(jobId ? { scrapeJobId: jobId } : {}) })

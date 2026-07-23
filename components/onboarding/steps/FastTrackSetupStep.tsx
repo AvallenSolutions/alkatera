@@ -3,6 +3,7 @@
 import { useState, useRef, useMemo, useEffect } from 'react'
 import { useOnboarding } from '@/lib/onboarding'
 import type { BeverageType, CompanySize } from '@/lib/onboarding'
+import { trackOnboarding } from '@/lib/onboarding/telemetry'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
 import { Input } from '@/components/ui/input'
@@ -459,6 +460,14 @@ export function FastTrackSetupStep() {
                 ? { scrapedProducts: drafts, scrapedProductNames: drafts.map((d: { name: string }) => d.name) }
                 : {}),
             })
+            // Scrape success rate (spec §11).
+            trackOnboarding({
+              organizationId: currentOrganization?.id,
+              flow: onboardingFlow,
+              step: 'scrape',
+              event: 'integration_completed',
+              meta: { metric: 'scrape', products: drafts.length },
+            })
             return
           }
           if (data?.status === 'failed') {
@@ -466,6 +475,13 @@ export function FastTrackSetupStep() {
             setCrawlPhase('failed')
             setCrawlLabel("I couldn't read the site. You can fill things in by hand.")
             crawlSettleTimerRef.current = setTimeout(() => setCrawlPhase('idle'), 6000)
+            trackOnboarding({
+              organizationId: currentOrganization?.id,
+              flow: onboardingFlow,
+              step: 'scrape',
+              event: 'integration_failed',
+              meta: { metric: 'scrape', reason: 'failed' },
+            })
             return
           }
           // Still running — reflect the job's real phase in the status line.
