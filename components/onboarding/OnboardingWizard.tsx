@@ -57,6 +57,7 @@ import { FastTrackCompletionStep } from './steps/FastTrackCompletionStep'
 // referenced from in old telemetry/analytics.
 import { ArrivalWebsiteStep } from './steps/ArrivalWebsiteStep'
 import { ArrivalPersonaStep } from './steps/ArrivalPersonaStep'
+import { ArrivalFacilityStep } from './steps/ArrivalFacilityStep'
 import { ArrivalEstimateStep } from './steps/ArrivalEstimateStep'
 import { ArrivalPlanStep } from './steps/ArrivalPlanStep'
 
@@ -101,6 +102,7 @@ const STEP_COMPONENTS: Record<string, React.ComponentType> = {
   'arrival-persona': ArrivalPersonaStep,
   'arrival-confirm': FastTrackSetupStep,
   'arrival-reveal': FastTrackRevealStep,
+  'arrival-facility': ArrivalFacilityStep,
   'arrival-estimate': ArrivalEstimateStep,
   'arrival-plan': ArrivalPlanStep,
 }

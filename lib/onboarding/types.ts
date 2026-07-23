@@ -70,6 +70,7 @@ export type OnboardingStep =
   | 'arrival-company'
   | 'arrival-confirm'
   | 'arrival-reveal'
+  | 'arrival-facility'
   | 'arrival-estimate'
   | 'arrival-plan'
 
@@ -162,8 +163,9 @@ export const ARRIVAL_STEPS: OnboardingStepConfig[] = [
   { id: 'arrival-persona',  phase: 'welcome', title: 'You',           description: 'What you do here',             skippable: true,  index: 1 },
   { id: 'arrival-confirm',  phase: 'welcome', title: 'Your Company',  description: 'Confirm what we found',        skippable: true,  index: 2 },
   { id: 'arrival-reveal',   phase: 'welcome', title: 'Here You Are',  description: 'What we found on your website', skippable: true, index: 3 },
-  { id: 'arrival-estimate', phase: 'welcome', title: 'Your Forest',   description: 'Your instant estimate',        skippable: false, index: 4 },
-  { id: 'arrival-plan',     phase: 'welcome', title: 'Your Plan',     description: 'Start your trial',             skippable: false, index: 5 },
+  { id: 'arrival-facility', phase: 'welcome', title: 'Where You Make It', description: 'Your production site',      skippable: true,  index: 4 },
+  { id: 'arrival-estimate', phase: 'welcome', title: 'Your Forest',   description: 'Your instant estimate',        skippable: false, index: 5 },
+  { id: 'arrival-plan',     phase: 'welcome', title: 'Your Plan',     description: 'Start your trial',             skippable: false, index: 6 },
 ]
 
 export const TOTAL_ARRIVAL_STEPS = ARRIVAL_STEPS.length
@@ -296,6 +298,11 @@ export interface PersonalizationData {
       country?: string
     }
   }
+  /** The first facility, created in the arrival ritual's facility step. Lights
+   * the workbench room and gives the estimate step a real country grid factor. */
+  facilityId?: string
+  /** Facility country (human-readable label), for the estimate's grid factor. */
+  facilityCountry?: string
   /** Last estimated footprint in tonnes CO₂e/year. Set by the estimate step. */
   estimateTonnesCO2e?: number
   /** First sustainability target: % reduction from the estimate baseline. */

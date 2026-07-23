@@ -59,6 +59,7 @@ export function WarmthMeter() {
   const p = state.personalization ?? {}
 
   const hasProducts = (p.scrapedProducts?.length ?? p.scrapedProductNames?.length ?? 0) > 0
+  const hasFacility = !!p.facilityId
   const hasEstimate = p.estimateTonnesCO2e != null
   const hasCategory = (p.beverageTypes?.length ?? 0) > 0
 
@@ -67,7 +68,7 @@ export function WarmthMeter() {
   const rooms: MeterRoom[] = [
     { key: 'wiring', label: 'The wiring', colour: STUDIO.ink, shape: 'ring', lit: !!currentOrganization },
     { key: 'cellar', label: 'The cellar', colour: STUDIO.plum, shape: 'diamond', lit: hasProducts },
-    { key: 'workbench', label: 'The workbench', colour: STUDIO.cobalt, shape: 'triangle', lit: false },
+    { key: 'workbench', label: 'The workbench', colour: STUDIO.cobalt, shape: 'triangle', lit: hasFacility },
     { key: 'evidence', label: 'The evidence', colour: STUDIO.brick, shape: 'quarter', lit: hasEstimate },
     { key: 'network', label: 'The network', colour: STUDIO.ochre, shape: 'square', lit: false },
     { key: 'library', label: 'The library', colour: STUDIO.teal, shape: 'arch', lit: hasCategory },
