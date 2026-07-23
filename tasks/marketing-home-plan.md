@@ -49,6 +49,17 @@ Deliberate decisions:
 - Old marketing/components/HomePageClient.tsx left in place (untouched) since Navigation/
   Footer are shared by other public pages; only app/page.tsx switched to the new client.
 
-Still open for other pages/sessions: Platform.dc.html, Knowledge.dc.html, Login.dc.html,
+Still open for other pages/sessions: Knowledge.dc.html, Login.dc.html,
 Pricing.dc.html; real newsletter + greenwash-scan endpoints; SEO structured data parity
 with the old home if wanted.
+
+## Platform page (added 2026-07-23, commit c7bc20ca)
+Platform.dc.html ported to marketing/platform/PlatformClient.tsx, wired at /platform
+(FAQPage JSON-LD driven from marketing/platform/faq-data.ts). Shared chrome extracted to
+marketing/shared/ (chrome.tsx: SiteNav/SiteFooter/LeafMark/Wordmark + font/style tokens;
+effects.tsx: useReveal + CursorCreatures incl. the r-o-s-a run; marketing.css, was
+home.css). Home refactored onto the shared modules and re-verified in the browser.
+Browser-verified on /platform: hero + glass-box panel (number reroll + parallax), module
+grid over the dark intro, ESG columns, brain trust, frameworks wall, drinks cells/stats,
+FAQ accordion, CTA forest, footer. Old marketing/components/PlatformPageClient.tsx is now
+unreferenced (left in place, like the old HomePageClient).
