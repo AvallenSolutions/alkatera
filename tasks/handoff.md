@@ -59,12 +59,15 @@ before planning anything about background jobs.
    re-points every production function URL at the staging deployment, silently. Give staging a
    Branch-environment key pair, and confirm in the Inngest dashboard which environment `alkatera`
    is synced to. One dashboard look settles it.
-3. **Redesign's own migration duplicate.** `20260714200000` is shared by
-   `product_materials_ef_metadata` and `chemical_library_user_submissions`. Must be renumbered ON
-   that branch before any merge. Not fixable from main.
-4. **Merge main → redesign.** 22 commits main-only, 93 redesign-only, last shared history
-   2026-07-16. Do this only after 3. Expect real conflicts: main touches `netlify/functions/*`
-   which do not exist on redesign.
+3. ~~Redesign's own migration duplicate.~~ **ALREADY RESOLVED before this list was written:**
+   the local-dev squash (`7095a97b`, on redesign) moved `20260714200000_chemical_library_user_submissions.sql`
+   into `supabase/migrations_archive/`. No duplicate timestamps remain on either branch.
+4. ~~Merge main → redesign.~~ **DONE, twice.** The big merge happened 20 Jul (`094cac4d` on
+   redesign, 28 commits incl. parametric packaging, so the "silent LCA revert" cutover risk
+   below is closed). The last 3 straggler commits (email delivery visibility) merged 23 Jul
+   (`ff0fcbc2`); the incoming migration renumbered to `20260721110000` to clear
+   `pcf_end_use_scenarios` on staging. Divergence 0. Redesign's `tasks/handoff.md` is now the
+   live handoff; treat this file as historical.
 5. **The numbers-don't-change harness.** Extend `lib/__tests__/packaging-parametric-golden.test.ts`:
    snapshot prod's stored `aggregated_impacts` per completed PCF, assert redesign reproduces them.
    Obstacle: the calculator is browser-only, so this needs the pure maths extracted or the recalc
