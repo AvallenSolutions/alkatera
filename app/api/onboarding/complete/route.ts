@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import type { UserRole, PrimaryGoal } from '@/lib/onboarding/types'
+import { sweepAsks } from '@/lib/asks/generate'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -249,6 +250,18 @@ export async function POST(request: NextRequest) {
       if (error) console.error('[onboarding/complete] seed rows insert failed:', error)
     } else {
       results.seed_activity = 'skipped'
+    }
+
+    // Run the ask sweep now so the desk has real asks on the very first visit —
+    // above all the flagship-recipe ask over the arrival estimate, which would
+    // otherwise not appear until the next scheduled footprint run. Idempotent
+    // (dedupe_key), so it composes with that later run rather than duplicating.
+    try {
+      const sweep = await sweepAsks(service, organizationId)
+      results.ask_sweep = sweep.errors.length ? 'error' : 'ok'
+    } catch (err) {
+      results.ask_sweep = 'error'
+      console.error('[onboarding/complete] ask sweep failed:', err)
     }
 
     return NextResponse.json({ success: true, results, trackerId })

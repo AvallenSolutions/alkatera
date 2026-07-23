@@ -6,6 +6,7 @@ import {
   generatePlausibilityProductionRunAsks,
   generatePlausibilityPackagingAsks,
   generateGrowthSignalAsks,
+  generateFlagshipRecipeAsks,
   type ProxyMaterialRow,
   type HospitalityMealRow,
   type EstimatedActivityRow,
@@ -196,5 +197,41 @@ describe('generateGrowthSignalAsks', () => {
     expect(asks[0].payload.growth_signal_id).toBe('facility');
     expect(asks[0].payload.dedupe_key).toBe('growth_signal:facility');
     expect(asks[0].payload.href).toBe('/company/facilities/');
+  });
+});
+
+describe('generateFlagshipRecipeAsks', () => {
+  const row = (productId: string, productName: string, annualKgCo2e: number) => ({ productId, productName, annualKgCo2e });
+
+  it('emits one link ask for the biggest-footprint estimate product', () => {
+    const asks = generateFlagshipRecipeAsks([
+      row('p1', 'Avallen Calvados', 8000),
+      row('p2', 'Avallen Miniature', 2000),
+    ]);
+    expect(asks).toHaveLength(1);
+    expect(asks[0].payload.ask_type).toBe('flagship_recipe');
+    expect(asks[0].payload.answer_shape).toBe('link');
+    expect(asks[0].payload.href).toBe('/products/p1/recipe');
+    expect(asks[0].payload.dedupe_key).toBe('flagship_recipe:p1');
+    expect(asks[0].title).toContain('Avallen Calvados');
+    // 8000 / 10000 = 0.8 share, so it ranks by a real impact_share.
+    expect(asks[0].payload.impact_share).toBeCloseTo(0.8);
+    expect(asks[0].payload.priority_score).toBeCloseTo(0.8);
+  });
+
+  it('gives a lone product the full share', () => {
+    const asks = generateFlagshipRecipeAsks([row('only', 'Your Gin', 5000)]);
+    expect(asks[0].payload.impact_share).toBeCloseTo(1);
+  });
+
+  it('is empty with no estimate products', () => {
+    expect(generateFlagshipRecipeAsks([])).toEqual([]);
+  });
+
+  it('falls back to a null share when totals are zero, still leads via the tier', () => {
+    const asks = generateFlagshipRecipeAsks([row('p1', 'A', 0), row('p2', 'B', 0)]);
+    expect(asks[0].payload.impact_share).toBeNull();
+    // FALLBACK_IMPACT_TIER.flagship_recipe = 1 -> -0.01 (top of the fallbacks).
+    expect(asks[0].payload.priority_score).toBeCloseTo(-0.01);
   });
 });

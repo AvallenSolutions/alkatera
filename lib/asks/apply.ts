@@ -93,6 +93,8 @@ async function applyByAskType(
       return applyDossierDistribution(supabase, organizationId, payload, answer);
     case 'growth_signal':
       throw new Error('Growth-band asks resolve by going and adding the record — approve or defer, not answer.');
+    case 'flagship_recipe':
+      throw new Error('The flagship recipe ask resolves by opening the recipe — approve or defer, not answer.');
     default:
       throw new Error(`No answer handler for ask_type "${payload.ask_type}".`);
   }

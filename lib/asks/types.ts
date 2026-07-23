@@ -47,7 +47,11 @@ export type AskType =
   | 'dossier_gap_distribution'
   // Asked once per product that sells more than one way: the sales split is
   // what turns the headline from "the main route" into the weighted mix.
-  | 'dossier_sales_split';
+  | 'dossier_sales_split'
+  // Day-one: the product carrying most of the footprint is still an estimate.
+  // Confirming its recipe is the single biggest step from estimate to real, so
+  // it leads the queue on arrival. A link ask — the answer is opening the recipe.
+  | 'flagship_recipe';
 
 export interface AskTarget {
   table: string;

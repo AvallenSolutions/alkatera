@@ -329,6 +329,47 @@ export function generateGrowthSignalAsks(signals: Record<GrowthBandKey, GrowthSi
 }
 
 // ---------------------------------------------------------------------------
+// 3b. Flagship recipe — day-one, the biggest-footprint product is still an
+// estimate. Confirming its recipe is the single largest move from estimate to
+// real, so it leads the queue on arrival. One link ask for the top product;
+// once its recipe is confirmed it drops out of the estimate set and the sweep
+// auto-resolves this, promoting the next product if one remains.
+// ---------------------------------------------------------------------------
+
+export interface FlagshipProductRow {
+  productId: string;
+  productName: string;
+  /** Annual footprint of this product's estimate, kg CO2e. */
+  annualKgCo2e: number;
+}
+
+export function generateFlagshipRecipeAsks(rows: FlagshipProductRow[]): AskCandidate[] {
+  if (rows.length === 0) return [];
+  const total = rows.reduce((sum, r) => sum + (r.annualKgCo2e > 0 ? r.annualKgCo2e : 0), 0);
+  const flagship = rows.reduce((top, r) => (r.annualKgCo2e > top.annualKgCo2e ? r : top), rows[0]);
+  const impactShare = total > 0 ? Math.min(1, Math.max(0, flagship.annualKgCo2e / total)) : null;
+  return [
+    makeAsk(
+      'flagship_recipe',
+      `Confirm ${flagship.productName}'s recipe`,
+      `${flagship.productName} carries most of your footprint, and right now it is an estimate. ` +
+        `Confirming its recipe is the single biggest step from a rough number to a real one.`,
+      {
+        answer_shape: 'link',
+        current_value: null,
+        unit: null,
+        target: null,
+        dedupe_key: `flagship_recipe:${flagship.productId}`,
+        href: `/products/${flagship.productId}/recipe`,
+        product_name: flagship.productName,
+        facility_name: null,
+        impactShare,
+      },
+    ),
+  ];
+}
+
+// ---------------------------------------------------------------------------
 // 4. Dossier gaps — the two questions an LCA cannot answer for itself
 //
 // Both of these were steps in the compliance wizard, asked in ISO vocabulary
@@ -486,6 +527,7 @@ export interface AskIngredients {
   dossierBoundaries: DossierBoundaryRow[];
   dossierDistributions: DossierDistributionRow[];
   salesSplits: SalesSplitRow[];
+  flagshipProducts: FlagshipProductRow[];
 }
 
 /** Confirmed data_provenance values on facility_activity_entries — everything else is a draft-gap candidate. */
@@ -649,6 +691,40 @@ export async function gatherAskIngredients(db: any, organizationId: string): Pro
     netWeightG: m.net_weight_g != null ? Number(m.net_weight_g) : null,
   }));
 
+  // Flagship recipe: products whose footprint is still an estimate (no
+  // confirmed LCA yet), with their annual estimate kg — the biggest becomes the
+  // day-one ask. Any non-estimate PCF (a real or in-progress LCA) takes that
+  // product out of contention.
+  const flagshipProducts: FlagshipProductRow[] = [];
+  try {
+    const { data: pcfs } = await db
+      .from('product_carbon_footprints')
+      .select('product_id, product_name, status, aggregated_impacts')
+      .eq('organization_id', organizationId)
+      .limit(300);
+    if (pcfs) {
+      const movedOn = new Set<string>();
+      const estimates = new Map<string, { name: string; kg: number }>();
+      for (const pcf of pcfs as any[]) {
+        const pid = String(pcf.product_id);
+        if (pcf.status !== 'estimate') {
+          movedOn.add(pid);
+          continue;
+        }
+        const kg = Number(pcf.aggregated_impacts?.annual_production_kg_co2e ?? 0) || 0;
+        const name = pcf.product_name || productNameById.get(pid) || 'your product';
+        const prev = estimates.get(pid);
+        if (!prev || kg > prev.kg) estimates.set(pid, { name, kg });
+      }
+      for (const [pid, { name, kg }] of Array.from(estimates.entries())) {
+        if (movedOn.has(pid)) continue;
+        flagshipProducts.push({ productId: pid, productName: name, annualKgCo2e: kg });
+      }
+    }
+  } catch {
+    // A failed read just means no flagship ask this sweep.
+  }
+
   return {
     proxyMaterials,
     hospitalityMeals,
@@ -658,6 +734,7 @@ export async function gatherAskIngredients(db: any, organizationId: string): Pro
     growthSignals: computeGrowthSignals(growthIngredients as GrowthIngredients),
     impactByProduct,
     orgTotalEmissionsKg,
+    flagshipProducts,
     ...(await gatherDossierGaps(db, organizationId, productNameById)),
   };
 }
@@ -786,6 +863,7 @@ export function generateAllAsks(ingredients: AskIngredients): AskCandidate[] {
     ...generatePlausibilityProductionRunAsks(ingredients.flaggedRuns),
     ...generatePlausibilityPackagingAsks(ingredients.flaggedPackaging),
     ...generateGrowthSignalAsks(ingredients.growthSignals),
+    ...generateFlagshipRecipeAsks(ingredients.flagshipProducts),
     ...generateDossierBoundaryAsks(ingredients.dossierBoundaries),
     ...generateDossierDistributionAsks(ingredients.dossierDistributions),
     ...generateSalesSplitAsks(ingredients.salesSplits),

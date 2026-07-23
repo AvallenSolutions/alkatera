@@ -78,6 +78,10 @@ export const FALLBACK_IMPACT_TIER: Record<AskType, number> = {
   draft_gap_utility: 3,
   draft_gap_hospitality_quantities: 4,
   growth_signal: 5,
+  // Day-one flagship: usually carries a real impact_share (its footprint
+  // share), so this fallback only bites when the total is somehow zero — rank
+  // it top with the plausibility flags so it still leads on arrival.
+  flagship_recipe: 1,
 };
 
 /**
