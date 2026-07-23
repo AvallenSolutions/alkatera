@@ -49,9 +49,21 @@ Deliberate decisions:
 - Old marketing/components/HomePageClient.tsx left in place (untouched) since Navigation/
   Footer are shared by other public pages; only app/page.tsx switched to the new client.
 
-Still open for other pages/sessions: Knowledge.dc.html, Login.dc.html; real newsletter,
-trial-signup + greenwash-scan endpoints; SEO structured data parity with the old home
-if wanted.
+Still open for other pages/sessions: Login.dc.html only; real newsletter, trial-signup +
+greenwash-scan endpoints; SEO structured data parity with the old home if wanted.
+
+## Knowledge page + blog restyle (added 2026-07-23, commit e83a5dc9)
+Knowledge.dc.html ported to marketing/knowledge/KnowledgeClient.tsx at /knowledge, fed by
+the LIVE blog_posts Supabase query the old page used (kept ISR hourly) rather than the
+design's hand-laid card list; flowerForSlug() hashes each slug to a stable species SVG
+(marketing/knowledge/flowers.ts). Filter chips are the design's fixed tag set, matched
+case-insensitively. /blog/[slug] restyled from the dark #ccff00 theme to the studio paper
+(.mkt-article prose CSS in marketing.css); data fetch, metadata, JSON-LD and sanitize-html
+config untouched; SocialShare replaced with plain share anchors. Old KnowledgePageClient
+left unreferenced like the other legacy clients. Full species set now in
+public/assets/species/. Local verification: started Docker + the main repo's supabase
+stack and seeded all 12 production posts (scraped from alkatera.com) into local
+blog_posts; seed script in the session scratchpad (not committed).
 
 ## Pricing page (added 2026-07-23, commit 0ef2ffdf)
 Pricing.dc.html ported to marketing/pricing/PricingClient.tsx, wired at /pricing (the
