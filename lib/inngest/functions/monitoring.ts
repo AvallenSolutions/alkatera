@@ -7,6 +7,12 @@ import {
   type OpenLCADatabaseSource,
 } from '@/lib/openlca/client';
 import { checkCertExpiry, parseHostPort, type CertExpiry } from '@/lib/openlca/cert-expiry';
+import {
+  studioLayout,
+  studioParagraph,
+  studioNotice,
+  studioCallout,
+} from '@/lib/email/studio-layout';
 
 /**
  * OpenLCA TLS certificate expiry monitor (on Inngest).
@@ -75,8 +81,8 @@ export async function runCertChecks(): Promise<CertCheckResult[]> {
 }
 
 function statusLine(c: CertCheckResult): string {
-  if (!c.ok) return `${c.source} (${c.host}): could not read certificate — ${c.error}`;
-  if (c.expired) return `${c.source} (${c.host}): EXPIRED ${Math.abs(c.daysRemaining ?? 0)} day(s) ago — live search is DOWN`;
+  if (!c.ok) return `${c.source} (${c.host}): could not read certificate (${c.error})`;
+  if (c.expired) return `${c.source} (${c.host}): EXPIRED ${Math.abs(c.daysRemaining ?? 0)} day(s) ago, live search is DOWN`;
   return `${c.source} (${c.host}): expires in ${c.daysRemaining} day(s) on ${c.validTo}`;
 }
 
@@ -84,32 +90,34 @@ function buildEmail(alerting: CertCheckResult[]): { subject: string; html: strin
   const anyExpired = alerting.some((c) => c.expired || !c.ok);
   const minDays = Math.min(...alerting.map((c) => c.daysRemaining ?? -1));
   const subject = anyExpired
-    ? '🔴 OpenLCA TLS certificate EXPIRED — live LCA search is down'
-    : `⚠️ OpenLCA TLS certificate expiring in ${minDays} day(s)`;
+    ? 'OpenLCA TLS certificate EXPIRED: live LCA search is down'
+    : `OpenLCA TLS certificate expiring in ${minDays} day(s)`;
 
   const rows = alerting
-    .map((c) => `<li style="margin-bottom:6px">${statusLine(c)}</li>`)
+    .map((c) => `<li style="margin-bottom:6px;">${statusLine(c)}</li>`)
     .join('');
 
-  const html = `
-    <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px">
-      <h2 style="color:${anyExpired ? '#dc2626' : '#d97706'};margin:0 0 8px">
-        ${anyExpired ? 'OpenLCA certificate expired' : 'OpenLCA certificate expiring soon'}
-      </h2>
-      <p style="color:#374151;margin:0 0 12px">
-        The self-hosted OpenLCA server(s) backing the ecoinvent / Agribalyse
-        emission-factor search need attention:
-      </p>
-      <ul style="color:#111827;padding-left:18px">${rows}</ul>
-      <p style="color:#374151;margin:16px 0 4px"><strong>To renew (on the VPS):</strong></p>
-      <pre style="background:#f3f4f6;padding:12px;border-radius:6px;font-size:12px;overflow:auto">ssh ubuntu@&lt;openlca-vps&gt;
+  const html = studioLayout({
+    eyebrow: 'Platform monitoring',
+    content: [
+      studioParagraph(
+        'The self-hosted OpenLCA server(s) backing the ecoinvent / Agribalyse emission-factor search need attention:',
+      ),
+      studioNotice(
+        anyExpired ? 'danger' : 'attention',
+        anyExpired ? 'OpenLCA certificate expired' : 'OpenLCA certificate expiring soon',
+        `<ul style="margin:0;padding-left:18px;">${rows}</ul>`,
+      ),
+      studioCallout(
+        'To renew (on the VPS)',
+        `<pre style="margin:0;font-size:12px;overflow:auto;">ssh ubuntu@&lt;openlca-vps&gt;
 sudo certbot renew --force-renewal
-# renewal hooks stop/start openlca-nginx automatically</pre>
-      <p style="color:#6b7280;font-size:12px;margin-top:16px">
-        Sent by the alka<strong>tera</strong> OpenLCA cert monitor. If certs are
-        already valid again, you can ignore this — the next daily check will go quiet.
-      </p>
-    </div>`;
+# renewal hooks stop/start openlca-nginx automatically</pre>`,
+      ),
+    ].join(''),
+    footerNote:
+      'Sent by the alka<strong>tera</strong> OpenLCA cert monitor. If certs are already valid again, you can ignore this: the next daily check will go quiet.',
+  });
 
   return { subject, html };
 }

@@ -4,6 +4,13 @@ import { randomBytes } from 'node:crypto';
 import { rateLimit } from '@/lib/rate-limit';
 import { calendarConfigured, listBusy, createEvent } from '@/lib/calendar/infomaniak-caldav';
 import { DEMO_CONFIG, validateSlot } from '@/lib/calendar/demo-availability';
+import {
+  studioLayout,
+  studioParagraph,
+  studioFactTable,
+  escapeEmailHtml,
+  STUDIO,
+} from '@/lib/email/studio-layout';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,7 +104,7 @@ export async function POST(request: NextRequest) {
     const end = new Date(valid.endISO);
     const kmeetUrl = `https://kmeet.infomaniak.com/alkatera-demo-${randomBytes(4).toString('hex')}`;
 
-    const summary = `alkatera demo — ${name}${company ? ` (${company})` : ''}`;
+    const summary = `alkatera demo: ${name}${company ? ` (${company})` : ''}`;
     const descriptionLines = [
       `30-minute alkatera demo with ${name}.`,
       company ? `Company: ${company}` : '',
@@ -132,31 +139,40 @@ export async function POST(request: NextRequest) {
         contentType: 'text/calendar; method=REQUEST',
       };
 
-      const guestHtml = `
-        <div style="font-family: Arial, Helvetica, sans-serif; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #e0e0e0; padding: 40px; border: 1px solid #222;">
-          <h1 style="color: #ccff00; font-size: 16px; text-transform: uppercase; letter-spacing: 3px; margin: 0 0 24px;">Your demo is booked</h1>
-          <p style="color:#fff; font-size:15px; line-height:1.6;">Hi ${name.split(' ')[0]},</p>
-          <p style="color:#ccc; font-size:15px; line-height:1.6;">Thanks for booking a 30-minute demo with alka<strong>tera</strong>. Here are the details:</p>
-          <table style="width:100%; border-collapse:collapse; margin:24px 0;">
-            <tr><td style="padding:8px 0; color:#888; font-size:12px; text-transform:uppercase; letter-spacing:2px; width:110px;">When</td><td style="padding:8px 0; color:#fff; font-size:15px;">${when} (UK time)</td></tr>
-            <tr><td style="padding:8px 0; color:#888; font-size:12px; text-transform:uppercase; letter-spacing:2px;">Join</td><td style="padding:8px 0;"><a href="${kmeetUrl}" style="color:#ccff00;">${kmeetUrl}</a></td></tr>
-          </table>
-          <p style="color:#ccc; font-size:14px; line-height:1.6;">A calendar invitation is attached. If you need to move or cancel, just reply to this email.</p>
-          <p style="color:#666; font-size:12px; margin-top:32px;">alka<strong>tera</strong> — sustainability, distilled.</p>
-        </div>`;
+      const linkStyle = `color:${STUDIO.forest};text-decoration:none;`;
+      const joinLink = `<a href="${kmeetUrl}" style="${linkStyle}">${kmeetUrl}</a>`;
 
-      const teamHtml = `
-        <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #e0e0e0; padding: 40px; border: 1px solid #222;">
-          <h1 style="color:#ccff00; font-size:14px; text-transform:uppercase; letter-spacing:3px; margin:0 0 24px;">New demo booked</h1>
-          <table style="width:100%; border-collapse:collapse;">
-            <tr><td style="padding:8px 0; color:#888; font-size:11px; text-transform:uppercase; letter-spacing:2px; width:120px;">When</td><td style="padding:8px 0; color:#ccff00; font-size:14px;">${when} (UK)</td></tr>
-            <tr><td style="padding:8px 0; color:#888; font-size:11px; text-transform:uppercase; letter-spacing:2px;">Name</td><td style="padding:8px 0; color:#fff; font-size:14px;">${name}</td></tr>
-            <tr><td style="padding:8px 0; color:#888; font-size:11px; text-transform:uppercase; letter-spacing:2px;">Email</td><td style="padding:8px 0; color:#fff; font-size:14px;"><a href="mailto:${email}" style="color:#ccff00;">${email}</a></td></tr>
-            <tr><td style="padding:8px 0; color:#888; font-size:11px; text-transform:uppercase; letter-spacing:2px;">Company</td><td style="padding:8px 0; color:#fff; font-size:14px;">${company || 'Not provided'}</td></tr>
-            <tr><td style="padding:8px 0; color:#888; font-size:11px; text-transform:uppercase; letter-spacing:2px;">Join</td><td style="padding:8px 0;"><a href="${kmeetUrl}" style="color:#ccff00;">${kmeetUrl}</a></td></tr>
-            ${notes ? `<tr><td style="padding:8px 0; color:#888; font-size:11px; text-transform:uppercase; letter-spacing:2px; vertical-align:top;">Notes</td><td style="padding:8px 0; color:#fff; font-size:14px;">${notes.replace(/</g, '&lt;')}</td></tr>` : ''}
-          </table>
-        </div>`;
+      const guestHtml = studioLayout({
+        eyebrow: 'Demo booked',
+        content: [
+          studioParagraph(`Hi ${escapeEmailHtml(name.split(' ')[0])},`),
+          studioParagraph(
+            'Thanks for booking a 30-minute demo with alka<strong>tera</strong>. Here are the details:',
+          ),
+          studioFactTable([
+            ['When', `${escapeEmailHtml(when)} (UK time)`],
+            ['Join', joinLink],
+          ]),
+          studioParagraph(
+            'A calendar invitation is attached. If you need to move or cancel, just reply to this email.',
+          ),
+        ].join(''),
+        footerNote: 'You are receiving this because you booked a demo at alkatera.com.',
+      });
+
+      const teamRows: Array<[string, string]> = [
+        ['When', `${escapeEmailHtml(when)} (UK)`],
+        ['Name', escapeEmailHtml(name)],
+        ['Email', `<a href="mailto:${email}" style="${linkStyle}">${escapeEmailHtml(email)}</a>`],
+        ['Company', escapeEmailHtml(company) || 'Not provided'],
+        ['Join', joinLink],
+      ];
+      if (notes) teamRows.push(['Notes', escapeEmailHtml(notes)]);
+
+      const teamHtml = studioLayout({
+        eyebrow: 'New demo booked',
+        content: studioFactTable(teamRows),
+      });
 
       try {
         // resend.emails.send resolves with { data, error } and does NOT throw on
@@ -175,7 +191,7 @@ export async function POST(request: NextRequest) {
             from: FROM_EMAIL,
             to: [NOTIFY_EMAIL],
             replyTo: email,
-            subject: `New demo booked: ${name}${company ? ` (${company})` : ''} — ${when}`,
+            subject: `New demo booked: ${name}${company ? ` (${company})` : ''}, ${when}`,
             html: teamHtml,
             attachments: [icsAttachment],
           }),

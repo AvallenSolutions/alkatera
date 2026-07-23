@@ -85,10 +85,10 @@ function page(title: string, body: string): NextResponse {
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>${title} | alkatera</title>
 </head>
-<body style="margin:0;padding:48px 16px;background:#000;color:#e8e8e8;font-family:Arial,Helvetica,sans-serif;">
-  <div style="max-width:520px;margin:0 auto;text-align:center;">
-    <h1 style="color:#ccff00;font-family:'Courier New',monospace;font-size:14px;text-transform:uppercase;letter-spacing:3px;">${title}</h1>
-    <p style="font-size:15px;line-height:1.7;">${body}</p>
+<body style="margin:0;padding:48px 16px;background:#F2F1EA;color:#1A1B1D;font-family:Arial,Helvetica,sans-serif;">
+  <div style="max-width:600px;margin:0 auto;padding:40px;background:#ffffff;border:1px solid #D9D6CB;text-align:center;">
+    <h1 style="color:#205E40;font-family:'Courier New',monospace;font-size:14px;text-transform:uppercase;letter-spacing:3px;margin:0 0 16px 0;">${title}</h1>
+    <p style="color:#1A1B1D;font-size:15px;line-height:1.7;margin:0;">${body}</p>
   </div>
 </body>
 </html>`,

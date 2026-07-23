@@ -1,6 +1,7 @@
 import 'server-only';
 import { Resend } from 'resend';
 import { inngest } from '../client';
+import { studioLayout, studioParagraph, studioNotice, STUDIO } from '@/lib/email/studio-layout';
 
 /**
  * DNS + endpoint health monitor (on Inngest).
@@ -141,28 +142,29 @@ function buildAlertEmail(
   const parts: string[] = [];
   for (const f of dnsFailures) {
     const got = f.error ? `lookup failed (${f.error})` : f.answers.length ? `got ${f.answers.join(', ')}` : 'NO RECORD';
-    parts.push(`<li style="margin-bottom:6px"><strong>${f.type} ${f.name}</strong>: expected "${f.expect}", ${got}<br/><span style="color:#6b7280">Breaks: ${f.serves}</span></li>`);
+    parts.push(`<li style="margin-bottom:6px;"><strong>${f.type} ${f.name}</strong>: expected "${f.expect}", ${got}<br/><span style="color:${STUDIO.dim};">Breaks: ${f.serves}</span></li>`);
   }
   for (const f of endpointFailures) {
     const got = f.error ? `unreachable (${f.error})` : `HTTP ${f.status}`;
-    parts.push(`<li style="margin-bottom:6px"><strong>${f.url}</strong>: ${got}<br/><span style="color:#6b7280">Breaks: ${f.serves}</span></li>`);
+    parts.push(`<li style="margin-bottom:6px;"><strong>${f.url}</strong>: ${got}<br/><span style="color:${STUDIO.dim};">Breaks: ${f.serves}</span></li>`);
   }
 
-  const subject = `🔴 DNS/endpoint check failing: ${[...dnsFailures.map((f) => f.name), ...endpointFailures.map((f) => f.url)].join(', ').slice(0, 120)}`;
-  const html = `
-    <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px">
-      <h2 style="color:#dc2626;margin:0 0 8px">alkatera.com DNS / endpoint failure</h2>
-      <p style="color:#374151;margin:0 0 12px">
-        The hourly health check found problems. The canonical zone inventory is
-        <code>docs/dns-records.md</code>; fix the zone at manager.infomaniak.com
-        &rarr; Web &amp; Domains &rarr; alkatera.com &rarr; DNS zone.
-      </p>
-      <ul style="color:#111827;padding-left:18px">${parts.join('')}</ul>
-      <p style="color:#6b7280;font-size:12px;margin-top:16px">
-        Sent by the alka<strong>tera</strong> DNS health monitor. It alerts on every
-        failing hourly run until the problem is fixed.
-      </p>
-    </div>`;
+  const subject = `DNS/endpoint check failing: ${[...dnsFailures.map((f) => f.name), ...endpointFailures.map((f) => f.url)].join(', ').slice(0, 120)}`;
+  const html = studioLayout({
+    eyebrow: 'DNS health',
+    content: [
+      studioParagraph(
+        'The hourly health check found problems. The canonical zone inventory is <code>docs/dns-records.md</code>; fix the zone at manager.infomaniak.com &rarr; Web &amp; Domains &rarr; alkatera.com &rarr; DNS zone.',
+      ),
+      studioNotice(
+        'danger',
+        'alkatera.com DNS / endpoint failure',
+        `<ul style="margin:0;padding-left:18px;">${parts.join('')}</ul>`,
+      ),
+    ].join(''),
+    footerNote:
+      'Sent by the alka<strong>tera</strong> DNS health monitor. It alerts on every failing hourly run until the problem is fixed.',
+  });
   return { subject, html };
 }
 

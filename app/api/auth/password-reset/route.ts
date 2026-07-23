@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { rateLimit } from '@/lib/rate-limit'
+import {
+  studioLayout,
+  studioParagraph,
+  studioButton,
+  escapeEmailHtml,
+  STUDIO,
+} from '@/lib/email/studio-layout'
 
 // Next.js patches global fetch and, on this route pattern (no next/headers
 // call to auto-trigger dynamic mode), would otherwise cache these outbound
@@ -138,87 +145,21 @@ export async function POST(request: NextRequest) {
 }
 
 function buildPasswordResetEmail(firstName: string, resetLink: string, siteUrl: string): string {
-  const logoUrl = 'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png'
-
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Reset Your Password</title>
-    </head>
-    <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f5f5f5;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 40px 20px;">
-        <tr>
-          <td align="center">
-            <table width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%;">
-              <!-- Header -->
-              <tr>
-                <td style="background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%); padding: 30px 40px; border-radius: 12px 12px 0 0; text-align: center;">
-                  <img src="${logoUrl}" alt="alkatera" width="180" height="auto" style="display: block; margin: 0 auto 12px auto;" />
-                  <p style="margin: 0; color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 2px;">Sustainability, Distilled</p>
-                </td>
-              </tr>
-
-              <!-- Content -->
-              <tr>
-                <td style="background-color: #ffffff; padding: 40px; border-left: 1px solid #e5e5e5; border-right: 1px solid #e5e5e5;">
-                  <h2 style="margin: 0 0 20px 0; color: #1a1a1a; font-size: 24px; font-weight: 600;">Reset Your Password</h2>
-
-                  <p style="margin: 0 0 20px 0; color: #4a4a4a; font-size: 16px;">Hi ${escapeHtml(firstName)},</p>
-
-                  <p style="margin: 0 0 20px 0; color: #4a4a4a; font-size: 16px;">We received a request to reset the password for your alka<strong>tera</strong> account. Click the button below to choose a new password:</p>
-
-                  <!-- Button -->
-                  <table width="100%" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
-                    <tr>
-                      <td align="center">
-                        <a href="${resetLink}" style="display: inline-block; background-color: #1A1B1D; color: #F2F1EA; padding: 14px 32px; font-size: 16px; font-weight: 600; text-decoration: none; border-radius: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Reset Password</a>
-                      </td>
-                    </tr>
-                  </table>
-
-                  <p style="margin: 0 0 20px 0; color: #4a4a4a; font-size: 16px;">This link will expire in 24 hours for security reasons.</p>
-
-                  <p style="margin: 0 0 10px 0; color: #4a4a4a; font-size: 16px;">If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.</p>
-
-                  <!-- Divider -->
-                  <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
-
-                  <p style="margin: 0; color: #888; font-size: 14px;">If the button doesn't work, copy and paste this link into your browser:</p>
-                  <p style="margin: 10px 0 0 0; color: #666; font-size: 12px; word-break: break-all; background-color: #f5f5f5; padding: 12px; border-radius: 6px;">${resetLink}</p>
-                </td>
-              </tr>
-
-              <!-- Footer -->
-              <tr>
-                <td style="background-color: #1a1a1a; padding: 30px 40px; border-radius: 0 0 12px 12px; text-align: center;">
-                  <p style="margin: 0 0 10px 0; color: #888; font-size: 14px;">alka<strong style="color: #888;">tera</strong> - Sustainability Platform</p>
-                  <p style="margin: 0; color: #666; font-size: 12px;">
-                    <a href="${siteUrl}" style="color: #F2F1EA; text-decoration: none;">www.alkatera.com</a>
-                  </p>
-                  <p style="margin: 15px 0 0 0; color: #555; font-size: 11px;">
-                    This email was sent because a password reset was requested for this email address.<br>
-                    If you did not make this request, please ignore this email.
-                  </p>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-      </table>
-    </body>
-    </html>
-  `
-}
-
-function escapeHtml(text: string): string {
-  if (!text) return ''
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
+  return studioLayout({
+    eyebrow: 'Password reset',
+    content: [
+      studioParagraph(`Hi ${escapeEmailHtml(firstName)},`),
+      studioParagraph(
+        'We received a request to reset the password for your alka<strong>tera</strong> account. Click the button below to choose a new password:',
+      ),
+      studioButton(resetLink, 'Reset password'),
+      studioParagraph('This link will expire in 24 hours for security reasons.'),
+      studioParagraph(
+        "If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.",
+      ),
+      `<p style="color:${STUDIO.dim};font-size:12px;line-height:1.6;margin:24px 0 8px 0;">If the button doesn't work, copy and paste this link into your browser:</p>`,
+      `<div style="padding:12px 16px;background:${STUDIO.raisedPaper};border:1px solid ${STUDIO.hairline};color:${STUDIO.dim};font-size:12px;line-height:1.6;word-break:break-all;">${resetLink}</div>`,
+    ].join(''),
+    footerNote: `This email was sent because a password reset was requested for this email address. If you did not make this request, please ignore it. <a href="${siteUrl}" style="color:${STUDIO.forest};text-decoration:none;">www.alkatera.com</a>`,
+  })
 }

@@ -2,6 +2,15 @@
 // This function sends email notifications for feedback ticket events
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import {
+  escapeHtml,
+  studioButton,
+  studioCallout,
+  studioFactTable,
+  studioLayout,
+  studioNotice,
+  studioParagraph,
+} from "../_shared/studio-email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -145,17 +154,6 @@ function checkShouldSendEmail(eventType: string, prefs: any): boolean {
   }
 }
 
-// Simple HTML escape to prevent XSS
-function escapeHtml(text: string): string {
-  if (!text) return '';
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
 function buildEmailContent(
   ticket: TicketData,
   eventType: string,
@@ -175,138 +173,98 @@ function buildEmailContent(
   const safeDescription = escapeHtml(ticket.description);
   const safeCategory = escapeHtml(ticket.category);
   const safeMessageContent = message?.message ? escapeHtml(message.message) : '';
-
-  const baseStyles = `
-    <style>
-      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
-      .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-      .header { background: linear-gradient(135deg, #10B981, #14B8A6); color: white; padding: 20px; border-radius: 8px 8px 0 0; }
-      .content { background: #f9fafb; padding: 20px; border-radius: 0 0 8px 8px; border: 1px solid #e5e7eb; border-top: none; }
-      .button { display: inline-block; background: #10B981; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin: 16px 0; }
-      .footer { text-align: center; color: #6b7280; font-size: 12px; margin-top: 20px; }
-      .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; }
-      .badge-blue { background: #dbeafe; color: #1d4ed8; }
-      .badge-amber { background: #fef3c7; color: #b45309; }
-      .badge-green { background: #d1fae5; color: #047857; }
-      blockquote { border-left: 4px solid #10B981; padding-left: 16px; margin: 16px 0; color: #4b5563; }
-    </style>
-  `;
+  const categoryDisplay = categoryLabels[ticket.category] || safeCategory;
 
   switch (eventType) {
     case "ticket_created":
       return {
         subject: `Ticket Created: ${safeTitle}`,
-        html: `
-          ${baseStyles}
-          <div class="container">
-            <div class="header">
-              <h2 style="margin: 0;">Your ticket has been created</h2>
-            </div>
-            <div class="content">
-              <h3>${safeTitle}</h3>
-              <p><span class="badge badge-blue">${categoryLabels[ticket.category] || safeCategory}</span></p>
-              <p>${safeDescription}</p>
-              <p>We'll review your ticket and get back to you as soon as possible.</p>
-              <a href="${ticketUrl}" class="button">View Ticket</a>
-            </div>
-            <div class="footer">
-              <p>alka<strong>tera</strong> - Sustainability Platform</p>
-            </div>
-          </div>
-        `,
+        html: studioLayout({
+          eyebrow: "Product Feedback",
+          content: `
+            ${studioParagraph(`Your ticket has been created.`)}
+            ${studioFactTable([
+              ["Ticket", `<strong>${safeTitle}</strong>`],
+              ["Category", categoryDisplay],
+            ])}
+            ${studioCallout("What you told us", safeDescription)}
+            ${studioParagraph(`We'll review your ticket and get back to you as soon as possible.`)}
+            ${studioButton(ticketUrl, "View Ticket")}
+          `,
+        }),
       };
 
     case "ticket_updated":
       return {
         subject: `Ticket Updated: ${safeTitle}`,
-        html: `
-          ${baseStyles}
-          <div class="container">
-            <div class="header">
-              <h2 style="margin: 0;">Your ticket has been updated</h2>
-            </div>
-            <div class="content">
-              <h3>${safeTitle}</h3>
-              <p>
-                <span class="badge badge-${ticket.status === 'resolved' ? 'green' : 'amber'}">
-                  Status: ${ticket.status.replace('_', ' ').toUpperCase()}
-                </span>
-              </p>
-              <p>Your feedback ticket has been updated by our team.</p>
-              <a href="${ticketUrl}" class="button">View Ticket</a>
-            </div>
-            <div class="footer">
-              <p>alka<strong>tera</strong> - Sustainability Platform</p>
-            </div>
-          </div>
-        `,
+        html: studioLayout({
+          eyebrow: "Product Feedback",
+          content: `
+            ${studioParagraph(`Your feedback ticket has been updated by our team.`)}
+            ${studioFactTable([
+              ["Ticket", `<strong>${safeTitle}</strong>`],
+            ])}
+            ${studioNotice(
+              ticket.status === 'resolved' ? 'good' : 'attention',
+              `Status: ${escapeHtml(ticket.status.replace('_', ' ').toUpperCase())}`,
+              ticket.status === 'resolved'
+                ? `This ticket has been marked as resolved. If anything still isn't right, just reply and we'll pick it back up.`
+                : `Our team has moved this ticket along. Open it to see the latest.`,
+            )}
+            ${studioButton(ticketUrl, "View Ticket")}
+          `,
+        }),
       };
 
     case "admin_reply":
       return {
         subject: `New Reply: ${safeTitle}`,
-        html: `
-          ${baseStyles}
-          <div class="container">
-            <div class="header">
-              <h2 style="margin: 0;">You have a new reply</h2>
-            </div>
-            <div class="content">
-              <h3>${safeTitle}</h3>
-              <p>The alkatera support team has replied to your ticket:</p>
-              ${safeMessageContent ? `<blockquote>${safeMessageContent}</blockquote>` : ''}
-              <a href="${ticketUrl}" class="button">View Conversation</a>
-            </div>
-            <div class="footer">
-              <p>alka<strong>tera</strong> - Sustainability Platform</p>
-            </div>
-          </div>
-        `,
+        html: studioLayout({
+          eyebrow: "Product Feedback",
+          content: `
+            ${studioParagraph(`The alka<strong>tera</strong> support team has replied to your ticket.`)}
+            ${studioFactTable([
+              ["Ticket", `<strong>${safeTitle}</strong>`],
+            ])}
+            ${safeMessageContent ? studioCallout("Their reply", safeMessageContent) : ''}
+            ${studioButton(ticketUrl, "View Conversation")}
+          `,
+        }),
       };
 
     case "escalated":
       return {
         subject: `Ticket Escalated: ${safeTitle}`,
-        html: `
-          ${baseStyles}
-          <div class="container">
-            <div class="header" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
-              <h2 style="margin: 0;">Ticket Priority Escalated</h2>
-            </div>
-            <div class="content">
-              <h3>${safeTitle}</h3>
-              <p>
-                <span class="badge badge-amber">Priority: ${ticket.priority.toUpperCase()}</span>
-              </p>
-              <p>Your ticket has been escalated to ensure it gets the attention it needs.</p>
-              <a href="${ticketUrl}" class="button">View Ticket</a>
-            </div>
-            <div class="footer">
-              <p>alka<strong>tera</strong> - Sustainability Platform</p>
-            </div>
-          </div>
-        `,
+        html: studioLayout({
+          eyebrow: "Product Feedback",
+          content: `
+            ${studioParagraph(`Your ticket has been escalated to ensure it gets the attention it needs.`)}
+            ${studioFactTable([
+              ["Ticket", `<strong>${safeTitle}</strong>`],
+            ])}
+            ${studioNotice(
+              'attention',
+              `Priority: ${escapeHtml(ticket.priority.toUpperCase())}`,
+              `This ticket now carries a higher priority with our team.`,
+            )}
+            ${studioButton(ticketUrl, "View Ticket")}
+          `,
+        }),
       };
 
     default:
       return {
         subject: `Ticket Updated: ${safeTitle}`,
-        html: `
-          ${baseStyles}
-          <div class="container">
-            <div class="header">
-              <h2 style="margin: 0;">Ticket Update</h2>
-            </div>
-            <div class="content">
-              <h3>${safeTitle}</h3>
-              <p>There's an update on your ticket.</p>
-              <a href="${ticketUrl}" class="button">View Ticket</a>
-            </div>
-            <div class="footer">
-              <p>alka<strong>tera</strong> - Sustainability Platform</p>
-            </div>
-          </div>
-        `,
+        html: studioLayout({
+          eyebrow: "Product Feedback",
+          content: `
+            ${studioParagraph(`There's an update on your ticket.`)}
+            ${studioFactTable([
+              ["Ticket", `<strong>${safeTitle}</strong>`],
+            ])}
+            ${studioButton(ticketUrl, "View Ticket")}
+          `,
+        }),
       };
   }
 }

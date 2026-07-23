@@ -1,5 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import {
+  STUDIO,
+  escapeHtml,
+  studioButton,
+  studioLayout,
+} from "../_shared/studio-email.ts";
 
 /**
  * Onboarding Email Drip
@@ -19,9 +25,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const LOGO_URL =
-  "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png";
-
 type EmailType = "day_1_welcome" | "day_3_checkin" | "day_7_nudge";
 
 interface OrgOwner {
@@ -36,69 +39,8 @@ interface OrgOwner {
 // Email templates
 // ────────────────────────────────────────────────────────────────────────────
 
-function escapeHtml(text: string): string {
-  if (!text) return "";
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-function emailLayout(siteUrl: string, content: string): string {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;line-height:1.6;color:#333;background-color:#f5f5f5;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:40px 20px;">
-    <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
-          <!-- Header -->
-          <tr>
-            <td style="background:linear-gradient(135deg,#0a0a0a 0%,#1a1a1a 100%);padding:30px 40px;border-radius:12px 12px 0 0;text-align:center;">
-              <img src="${LOGO_URL}" alt="alkatera" width="180" height="auto" style="display:block;margin:0 auto 12px auto;" />
-              <p style="margin:0;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:2px;">Sustainability, Distilled</p>
-            </td>
-          </tr>
-          <!-- Content -->
-          <tr>
-            <td style="background-color:#ffffff;padding:40px;border-left:1px solid #e5e5e5;border-right:1px solid #e5e5e5;">
-              ${content}
-            </td>
-          </tr>
-          <!-- Footer -->
-          <tr>
-            <td style="background-color:#1a1a1a;padding:30px 40px;border-radius:0 0 12px 12px;text-align:center;">
-              <p style="margin:0 0 10px 0;color:#888;font-size:14px;">alka<strong style="color:#888;">tera</strong> - Sustainability Platform</p>
-              <p style="margin:0;color:#666;font-size:12px;">
-                <a href="${siteUrl}" style="color:#F2F1EA;text-decoration:none;">www.alkatera.com</a>
-              </p>
-              <p style="margin:15px 0 0 0;color:#555;font-size:11px;">
-                You're receiving this because you signed up for alkatera. If you'd prefer not to receive these, you can ignore this email.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-}
-
-function ctaButton(href: string, label: string): string {
-  return `<table width="100%" cellpadding="0" cellspacing="0" style="margin:30px 0;">
-  <tr>
-    <td align="center">
-      <a href="${href}" style="display:inline-block;background-color:#205E40;color:#F2F1EA;padding:14px 32px;font-size:16px;font-weight:600;text-decoration:none;border-radius:8px;letter-spacing:0.5px;">${label}</a>
-    </td>
-  </tr>
-</table>`;
+function dripFooterNote(siteUrl: string): string {
+  return `You're receiving this because you signed up for alka<strong>tera</strong>. If you'd prefer not to receive these, you can ignore this email. <a href="${siteUrl}" style="color:${STUDIO.forest};text-decoration:none;">www.alkatera.com</a>`;
 }
 
 function buildDay1Email(
@@ -110,26 +52,30 @@ function buildDay1Email(
     ? `
     <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;">
       <tr>
-        <td style="padding:24px;background-color:#F2F1EA;border:1px solid #D9D6CB;border-radius:8px;text-align:center;">
-          <p style="margin:0;color:#205E40;font-size:40px;font-weight:700;letter-spacing:-0.02em;">~${estimateTonnes.toLocaleString()}</p>
-          <p style="margin:6px 0 0 0;color:#6F6F68;font-size:13px;">tonnes CO2e a year, estimated from what we found</p>
+        <td style="padding:24px;background-color:${STUDIO.raisedPaper};border:1px solid ${STUDIO.hairline};border-radius:4px;text-align:center;">
+          <p style="margin:0;color:${STUDIO.forest};font-size:40px;font-weight:700;letter-spacing:-0.02em;">~${estimateTonnes.toLocaleString()}</p>
+          <p style="margin:6px 0 0 0;color:${STUDIO.dim};font-size:13px;">tonnes CO2e a year, estimated from what we found</p>
         </td>
       </tr>
     </table>`
     : "";
 
   const content = `
-    <h2 style="margin:0 0 16px 0;color:#1a1a1a;font-size:24px;font-weight:600;">What we found in your house.</h2>
-    <p style="margin:0 0 8px 0;color:#4a4a4a;font-size:16px;">We read what <strong>${escapeHtml(orgName)}</strong> already publishes and turned it into a first sustainability picture. Here is where you stand today.</p>
+    <h2 style="margin:0 0 16px 0;color:${STUDIO.ink};font-size:24px;font-weight:600;">What we found in your house.</h2>
+    <p style="margin:0 0 8px 0;color:${STUDIO.ink};font-size:16px;">We read what <strong>${escapeHtml(orgName)}</strong> already publishes and turned it into a first sustainability picture. Here is where you stand today.</p>
     ${numberBlock}
-    <p style="margin:0 0 20px 0;color:#4a4a4a;font-size:16px;">This is a starting point, not a verdict. Every real number you confirm from here makes it truer. Your desk shows you exactly where to start.</p>
-    ${ctaButton(`${siteUrl}/desk/`, "Go to your desk")}
-    <p style="margin:0;color:#888;font-size:14px;">Anything to add? Reply to this email, or ask Rosa inside the app.</p>
+    <p style="margin:0 0 20px 0;color:${STUDIO.ink};font-size:16px;">This is a starting point, not a verdict. Every real number you confirm from here makes it truer. Your desk shows you exactly where to start.</p>
+    ${studioButton(`${siteUrl}/desk/`, "Go to your desk")}
+    <p style="margin:0;color:${STUDIO.dim};font-size:14px;">Anything to add? Reply to this email, or ask Rosa inside the app.</p>
   `;
 
   return {
     subject: "What we found in your house",
-    html: emailLayout(siteUrl, content),
+    html: studioLayout({
+      eyebrow: "What we found",
+      content,
+      footerNote: dripFooterNote(siteUrl),
+    }),
   };
 }
 
@@ -177,22 +123,26 @@ function buildDay3Email(
     : "Your house is taking shape.";
 
   const content = `
-    <h2 style="margin:0 0 16px 0;color:#1a1a1a;font-size:24px;font-weight:600;">${heading}</h2>
-    <p style="margin:0 0 20px 0;color:#4a4a4a;font-size:16px;">A few days in with <strong>${escapeHtml(orgName)}</strong>. Here is the one thing worth doing next.</p>
+    <h2 style="margin:0 0 16px 0;color:${STUDIO.ink};font-size:24px;font-weight:600;">${heading}</h2>
+    <p style="margin:0 0 20px 0;color:${STUDIO.ink};font-size:16px;">A few days in with <strong>${escapeHtml(orgName)}</strong>. Here is the one thing worth doing next.</p>
     <table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;">
       <tr>
-        <td style="padding:16px 18px;background-color:#F2F1EA;border:1px solid #D9D6CB;border-left:4px solid #205E40;border-radius:8px;">
-          <p style="margin:0;color:#1a1a1a;font-size:15px;">${action}</p>
+        <td style="padding:16px 18px;background-color:${STUDIO.raisedPaper};border:1px solid ${STUDIO.hairline};border-left:2px solid ${STUDIO.forest};">
+          <p style="margin:0;color:${STUDIO.ink};font-size:15px;">${action}</p>
         </td>
       </tr>
     </table>
-    ${ctaButton(ctaHref, ctaLabel)}
-    <p style="margin:0;color:#888;font-size:14px;">Not sure where something goes? Ask Rosa. She will work it out.</p>
+    ${studioButton(ctaHref, ctaLabel)}
+    <p style="margin:0;color:${STUDIO.dim};font-size:14px;">Not sure where something goes? Ask Rosa. She will work it out.</p>
   `;
 
   return {
     subject,
-    html: emailLayout(siteUrl, content),
+    html: studioLayout({
+      eyebrow: "A few days in",
+      content,
+      footerNote: dripFooterNote(siteUrl),
+    }),
   };
 }
 
@@ -206,23 +156,27 @@ function buildDay7Email(
     : `Right now your number rests on industry benchmarks. Confirming a recipe or dropping a real utility bill turns it from an estimate into a measurement, which is what a buyer or an auditor will want to see.`;
 
   const content = `
-    <h2 style="margin:0 0 16px 0;color:#1a1a1a;font-size:24px;font-weight:600;">A week in. Here is your number, and how to make it truer.</h2>
-    <p style="margin:0 0 20px 0;color:#4a4a4a;font-size:16px;">${escapeHtml(orgName)} has been on alka<strong>tera</strong> for a week. The house is furnished. The work now is turning estimates into evidence.</p>
+    <h2 style="margin:0 0 16px 0;color:${STUDIO.ink};font-size:24px;font-weight:600;">A week in. Here is your number, and how to make it truer.</h2>
+    <p style="margin:0 0 20px 0;color:${STUDIO.ink};font-size:16px;">${escapeHtml(orgName)} has been on alka<strong>tera</strong> for a week. The house is furnished. The work now is turning estimates into evidence.</p>
     <table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;">
       <tr>
-        <td style="padding:16px 18px;background-color:#F2F1EA;border:1px solid #D9D6CB;border-left:4px solid #205E40;border-radius:8px;">
-          <p style="margin:0;color:#1a1a1a;font-size:15px;">${confirmedLine}</p>
+        <td style="padding:16px 18px;background-color:${STUDIO.raisedPaper};border:1px solid ${STUDIO.hairline};border-left:2px solid ${STUDIO.forest};">
+          <p style="margin:0;color:${STUDIO.ink};font-size:15px;">${confirmedLine}</p>
         </td>
       </tr>
     </table>
-    ${ctaButton(`${siteUrl}/desk/`, "Go to your desk")}
-    <hr style="border:none;border-top:1px solid #D9D6CB;margin:30px 0;">
-    <p style="margin:0;color:#888;font-size:14px;">Stuck on anything? Reply to this email, or ask Rosa. We would rather you asked than guessed.</p>
+    ${studioButton(`${siteUrl}/desk/`, "Go to your desk")}
+    <hr style="border:none;border-top:1px solid ${STUDIO.hairline};margin:30px 0;">
+    <p style="margin:0;color:${STUDIO.dim};font-size:14px;">Stuck on anything? Reply to this email, or ask Rosa. We would rather you asked than guessed.</p>
   `;
 
   return {
     subject: "A week in: your number, and how to make it truer",
-    html: emailLayout(siteUrl, content),
+    html: studioLayout({
+      eyebrow: "A week in",
+      content,
+      footerNote: dripFooterNote(siteUrl),
+    }),
   };
 }
 

@@ -4,6 +4,12 @@ import { Resend } from 'resend';
 import { inngest } from '../client';
 import { syncOrganisation } from '@/lib/xero/sync-service';
 import { findSupplierMatches } from '@/lib/xero/supplier-matcher';
+import {
+  studioLayout,
+  studioNotice,
+  studioFactTable,
+  escapeEmailHtml,
+} from '@/lib/email/studio-layout';
 
 /**
  * Xero scheduled sync, on Inngest. Replaces the synchronous loop in
@@ -102,20 +108,22 @@ export const xeroOrgSync = inngest.createFunction(
           from: 'alkatera Sync <alerts@mail.alkatera.com>',
           to: [alertEmail],
           subject: `Xero Sync: organisation ${organizationId} failed`,
-          html: `
-            <div style="font-family: 'Courier New', monospace; max-width: 700px; margin: 0 auto; background: #0a0a0a; color: #e0e0e0; padding: 40px; border: 1px solid #222;">
-              <div style="border-bottom: 1px solid #333; padding-bottom: 20px; margin-bottom: 30px;">
-                <h1 style="color: #ff6b6b; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">Xero Sync Alert</h1>
-              </div>
-              <p style="color: #ccc; font-size: 14px;">Scheduled sync failed after retries.</p>
-              <p style="color: #fff; font-size: 13px; font-family: monospace;">Organisation: ${organizationId}</p>
-              <p style="color: #ff6b6b; font-size: 13px;">${error.message}</p>
-              <p style="color: #888; font-size: 12px;">${new Date().toISOString()}</p>
-              <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #333; color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 2px;">
-                alkatera Scheduled Sync
-              </div>
-            </div>
-          `,
+          html: studioLayout({
+            eyebrow: 'Xero sync',
+            content: [
+              studioNotice(
+                'danger',
+                'Sync failed',
+                'Scheduled sync failed after retries.',
+              ),
+              studioFactTable([
+                ['Organisation', escapeEmailHtml(organizationId)],
+                ['Error', escapeEmailHtml(error.message)],
+                ['Time', new Date().toISOString()],
+              ]),
+            ].join(''),
+            footerNote: 'Sent by the alka<strong>tera</strong> scheduled sync.',
+          }),
         });
       } catch (emailError) {
         console.error('Failed to send Xero sync alert email:', emailError);
