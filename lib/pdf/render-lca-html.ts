@@ -12,7 +12,7 @@
  * one per design "page", with the design's own CONT. header pattern for
  * sections that overflow (long tables chunk across pages exactly the way the
  * design models continuation pages). The paper ground, cream panels, hairline
- * rules, mono eyebrows and Space Grotesk numbers follow the design verbatim.
+ * rules, mono eyebrows and Bricolage Grotesque numbers follow the design verbatim.
  *
  * Contents (design section rhythm — band colour in brackets):
  *   Cover [forest] · 01 Executive Summary [forest] · 02 Goal & Scope [cobalt]
@@ -1353,11 +1353,11 @@ export function renderLcaReportHtml(data: LCAReportData): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LCA Report · ${escapeHtml(data.meta.productName)}</title>
 
-  <!-- The studio's three voices: Space Grotesk speaks, Inter explains,
+  <!-- The studio's three voices: Bricolage Grotesque speaks, Inter explains,
        JetBrains Mono annotates. -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Bricolage+Grotesque:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
 
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }

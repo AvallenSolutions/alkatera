@@ -129,6 +129,53 @@ function drawAlkatera(pdf: PDF, x: number, y: number, fontSize: number, colour: 
   return totalWidth;
 }
 
+/**
+ * The brand leaf mark (veined leaf-drop), the vector twin of studio-kit's
+ * leafMark() drawn with jsPDF primitives so this PDF path carries the same
+ * mark as every HTML document. `size` is the mark's box height in mm; (x, y)
+ * is its top-left. Coordinates mirror the 48×48 SVG viewBox.
+ */
+function drawLeafMark(pdf: PDF, x: number, y: number, size: number, colour: { r: number; g: number; b: number }) {
+  const s = size / 48;
+  const px = (u: number) => x + u * s;
+  const py = (v: number) => y + v * s;
+  pdf.setDrawColor(colour.r, colour.g, colour.b);
+  pdf.setLineWidth(Math.max(0.2, 2.5 * s));
+  // Bulb (bottom circle, centre 24,29 r13) + apex spike to a point at (24,7).
+  pdf.circle(px(24), py(29), 13 * s, 'S');
+  pdf.line(px(24), py(7), px(13.5), py(22.5));
+  pdf.line(px(24), py(7), px(34.5), py(22.5));
+  // Stem + two veins.
+  pdf.line(px(24), py(14), px(24), py(41));
+  pdf.line(px(24), py(27), px(17), py(20));
+  pdf.line(px(24), py(27), px(31), py(20));
+}
+
+/**
+ * The full alkatera lockup: leaf mark + wordmark, one colour throughout. The
+ * jsPDF analogue of studio-kit's lockup(); pass WHITE on dark grounds, DARK on
+ * light. `height` is the wordmark point size; (x, y) is the text baseline.
+ */
+function drawLockup(pdf: PDF, x: number, y: number, height: number, colour: { r: number; g: number; b: number }, align?: 'center' | 'right'): number {
+  // Mark box roughly matches the cap height of the wordmark (pt → mm ≈ *0.35).
+  const markSize = height * 0.35;
+  const gap = markSize * 0.3;
+  pdf.setFontSize(height);
+  pdf.setFont('helvetica', 'normal');
+  const alkaWidth = pdf.getTextWidth('alka');
+  pdf.setFont('helvetica', 'bold');
+  const teraWidth = pdf.getTextWidth('tera');
+  const wordWidth = alkaWidth + teraWidth;
+  const totalWidth = markSize + gap + wordWidth;
+  let startX = x;
+  if (align === 'center') startX = x - totalWidth / 2;
+  else if (align === 'right') startX = x - totalWidth;
+  // Leaf sits so its box bottom aligns near the text baseline.
+  drawLeafMark(pdf, startX, y - markSize + markSize * 0.1, markSize, colour);
+  drawAlkatera(pdf, startX + markSize + gap, y, height, colour);
+  return totalWidth;
+}
+
 function drawHeader(pdf: PDF) {
   // Thin dark bar at top
   pdf.setFillColor(DARK.r, DARK.g, DARK.b);
@@ -511,10 +558,10 @@ export async function generateGreenwashPDF(result: AnalysisResult): Promise<void
   pdf.line(MARGIN, yPos, PAGE_WIDTH - MARGIN, yPos);
   yPos += 10;
 
-  // Horizontal logo (icon + "alkatera" text as single image)
-  // Original aspect ratio: 2008x462 = ~4.35:1
+  // Horizontal logo (leaf mark + "alkatera" wordmark as single image)
+  // Aspect ratio of the studio lockup: 206x64 = ~3.22:1
   const logoW = 50;
-  const logoH = logoW / 4.35;
+  const logoH = logoW / 3.22;
   try {
     pdf.addImage(ALKATERA_HORIZONTAL_LOGO_BASE64, 'PNG', MARGIN, yPos - 4, logoW, logoH);
   } catch {

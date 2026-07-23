@@ -60,7 +60,7 @@ export default function SupplierInvitePage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [signInPassword, setSignInPassword] = useState('');
 
-  const logoUrl = 'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png';
+  const logoUrl = '/logo-cream.svg';
 
   // Where to land the supplier after accepting. An ESG survey invitation deep-links
   // straight into the assessment; everything else lands on the portal home.

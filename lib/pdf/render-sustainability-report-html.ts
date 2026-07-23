@@ -26,7 +26,7 @@ import { resolveTheme, getThemeFontImport, type ReportTheme } from '@/lib/pdf/te
 import { resolveReportStyle } from '@/lib/pdf/templates/report-styles';
 import {
   INK, CREAM, PAPER, HAIR, DIM, GOOD, ATTN, STALE, MONO, SG, INTER,
-  onBand, wordmark, toneChip, notMeasuredTile, notMeasuredBlock,
+  onBand, wordmark, lockup, toneChip, notMeasuredTile, notMeasuredBlock,
 } from '@/lib/pdf/studio-kit';
 import {
   EMPTY_PEOPLE_CULTURE,
@@ -376,21 +376,20 @@ function getStorytellingTier(audience: string): 'full' | 'balanced' | 'data-firs
 // BRAND ELEMENTS
 // ============================================================================
 
-const ALKATERA_LOGO_URL = 'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png';
-
-/** Renders the organisation logo (falls back to alkatera logo if none set). */
-function orgLogo(config: { branding: { logo: string | null } }, height: number, _dark = true): string {
-  const logoUrl = config.branding.logo || ALKATERA_LOGO_URL;
-  const altText = config.branding.logo ? 'Organisation Logo' : 'alkatera';
+/** Renders the organisation logo (falls back to the alkatera lockup if none set). */
+function orgLogo(config: { branding: { logo: string | null } }, height: number, dark = true): string {
   // Org logos render as-is (no colour filter). They may be designed for light or dark backgrounds.
   // If the org uploads a dark logo used on a dark cover, they can fix it by uploading a lighter version.
-  return `<img src="${logoUrl}" alt="${altText}" style="height: ${height}px; width: auto; object-fit: contain;" />`;
+  if (config.branding.logo) {
+    return `<img src="${config.branding.logo}" alt="Organisation Logo" style="height: ${height}px; width: auto; object-fit: contain;" />`;
+  }
+  // The alkatera fallback: the design-system lockup, cream on dark grounds and ink on light.
+  return lockup(dark ? CREAM : INK, height);
 }
 
-/** @deprecated Use orgLogo() instead — this always renders the alkatera logo */
+/** @deprecated Use orgLogo() instead — this always renders the alkatera lockup */
 function alkateraLogo(height: number, dark = true): string {
-  const filter = dark ? '' : 'filter: brightness(0);';
-  return `<img src="${ALKATERA_LOGO_URL}" alt="alkatera" style="height: ${height}px; width: auto; object-fit: contain; ${filter}" />`;
+  return lockup(dark ? CREAM : INK, height);
 }
 
 /**
@@ -800,7 +799,7 @@ function renderCoverPage(config: ReportConfig, data: ReportData, theme?: ReportT
 
 function renderExecSummaryPage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
   const brandColor = getBrandColor(config);
-  const headingFont = theme?.headingFont ?? "'Space Grotesk', sans-serif";
+  const headingFont = theme?.headingFont ?? "'Bricolage Grotesque', sans-serif";
   const darkBg = theme?.pageDarkBackground ?? '#1A1B1D';
   const lightBg = theme?.pageBackground ?? '#ECEAE3';
   const textColor = theme?.textColor ?? '#1A1B1D';
@@ -937,7 +936,7 @@ function renderEmissionsPage(config: ReportConfig, data: ReportData, theme?: Rep
       <div style="display: flex; gap: 32px; margin-bottom: 28px; align-items: center;">
         <div style="width: 180px; height: 180px; border-radius: 50%; ${donutStyle} position: relative; flex-shrink: 0;">
           <div style="position: absolute; inset: 45px; background: ${theme?.pageBackground ?? '#ECEAE3'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
-            <span style="font-size: 12px; font-weight: 700; font-family: ${theme?.headingFont ?? "'Space Grotesk', sans-serif"}; color: ${theme?.textColor ?? '#1A1B1D'};">${formatNumber(total, 1)}</span>
+            <span style="font-size: 12px; font-weight: 700; font-family: ${theme?.headingFont ?? "'Bricolage Grotesque', sans-serif"}; color: ${theme?.textColor ?? '#1A1B1D'};">${formatNumber(total, 1)}</span>
             <span style="font-size: 8px; color: ${theme?.mutedTextColor ?? '#6F6F68'};">tCO&#8322;e</span>
           </div>
         </div>
@@ -1307,7 +1306,7 @@ function renderPeopleCulturePage(config: ReportConfig, data: ReportData, theme?:
       <div style="display: flex; gap: 24px; margin-bottom: 28px;">
         <div style="flex: 1; background: ${brandColor}; border-radius: 6px; padding: 28px; color: ${onBand(brandColor).fg};">
           <div style="font-size: 12px; font-family: 'JetBrains Mono', monospace; opacity: .75; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Overall Score</div>
-          <div style="font-size: 56px; font-family: ${theme?.headingFont ?? "'Space Grotesk', sans-serif"}; font-weight: 700;">${pc.overallScore}<span style="font-size: 20px; opacity: .7;">/100</span></div>
+          <div style="font-size: 56px; font-family: ${theme?.headingFont ?? "'Bricolage Grotesque', sans-serif"}; font-weight: 700;">${pc.overallScore}<span style="font-size: 20px; opacity: .7;">/100</span></div>
           <div style="font-size: 12px; opacity: .7; margin-top: 4px;">${pc.dataCompleteness.toFixed(0)}% data completeness</div>
         </div>
         <div style="flex: 1;">
@@ -1524,7 +1523,7 @@ function renderCommunityImpactPage(config: ReportConfig, data: ReportData, theme
       <div style="display: flex; gap: 24px; margin-bottom: 24px;">
         <div style="flex: 1; background: ${brandColor}; border-radius: 6px; padding: 28px; color: ${onBand(brandColor).fg};">
           <div style="font-size: 12px; font-family: 'JetBrains Mono', monospace; opacity: .75; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Community Score</div>
-          <div style="font-size: 56px; font-family: ${theme?.headingFont ?? "'Space Grotesk', sans-serif"}; font-weight: 700;">${ci.overallScore}<span style="font-size: 20px; opacity: .7;">/100</span></div>
+          <div style="font-size: 56px; font-family: ${theme?.headingFont ?? "'Bricolage Grotesque', sans-serif"}; font-weight: 700;">${ci.overallScore}<span style="font-size: 20px; opacity: .7;">/100</span></div>
           <div style="font-size: 12px; opacity: .7; margin-top: 4px;">${ci.dataCompleteness.toFixed(0)}% data completeness</div>
         </div>
         <div style="flex: 1;">
@@ -1940,7 +1939,7 @@ function renderCsrdGatingWarningPage(config: ReportConfig, theme?: ReportTheme):
         </div>
 
         <div>
-          <h3 style="font-size: 22px; font-family: ${theme?.headingFont ?? "'Space Grotesk', sans-serif"}; font-weight: 700; color: #B45309; margin-bottom: 12px;">
+          <h3 style="font-size: 22px; font-family: ${theme?.headingFont ?? "'Bricolage Grotesque', sans-serif"}; font-weight: 700; color: #B45309; margin-bottom: 12px;">
             Double-Materiality Assessment Incomplete
           </h3>
           <p style="font-size: 14px; color: #6F6F68; line-height: 1.7; max-width: 480px;">

@@ -45,7 +45,7 @@ const BAND_TONE: Record<CarbonBand, string> = {
 };
 
 const MONO = 'var(--font-data), "JetBrains Mono", monospace';
-const DISPLAY = 'var(--font-display), "Space Grotesk", sans-serif';
+const DISPLAY = 'var(--font-display), "Bricolage Grotesque", sans-serif';
 
 export default function PublicMenuPage() {
   const { slug } = useParams<{ slug: string }>();

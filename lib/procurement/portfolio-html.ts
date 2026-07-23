@@ -1,7 +1,5 @@
 import type { DashboardData } from './dashboard';
-
-const ALKATERA_LOGO =
-  'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png';
+import { lockup, INK } from '../pdf/studio-kit';
 
 export interface PortfolioPdfContext {
   /** Procurement org name (e.g. "Foodbuy"). */
@@ -88,6 +86,9 @@ export function renderProcurementPortfolioHtml(ctx: PortfolioPdfContext): string
 <head>
 <meta charset="utf-8" />
 <title>${esc(coverTitle)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700&display=swap" rel="stylesheet" />
 <style>
   ${baseCss(primary)}
 </style>
@@ -97,7 +98,7 @@ export function renderProcurementPortfolioHtml(ctx: PortfolioPdfContext): string
   <section class="cover">
     <div class="cover-stripe"></div>
     <div class="cover-header">
-      <img src="${ALKATERA_LOGO}" alt="alkatera" class="alk-logo" />
+      <span class="alk-logo">${lockup(INK, 30)}</span>
       ${procurementLogo}
     </div>
     <div class="cover-body">

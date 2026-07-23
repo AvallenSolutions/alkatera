@@ -9,6 +9,8 @@
  * Intended for use with PDFShift (A4, no page breaks).
  */
 
+import { lockup, INK } from './studio-kit';
+
 // ============================================================================
 // HELPERS
 // ============================================================================
@@ -55,8 +57,6 @@ export interface InvestorSummaryData {
   branding: { logo: string | null; primaryColor: string };
 }
 
-const ALKATERA_LOGO_URL = 'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png';
-
 // ============================================================================
 // RENDERER
 // ============================================================================
@@ -93,7 +93,7 @@ export function renderInvestorSummaryHtml(data: InvestorSummaryData): string {
   <title>Investor Summary — ${escapeHtml(data.organisationName)} ${data.reportYear}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@700&family=Fira+Code:wght@400;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@700&family=Fira+Code:wght@400;700&family=Bricolage+Grotesque:wght@500;600;700&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Inter', sans-serif; background: white; color: #1A1B1D; }
@@ -133,7 +133,7 @@ export function renderInvestorSummaryHtml(data: InvestorSummaryData): string {
     <div style="text-align: right;">
       ${data.branding.logo
         ? `<img src="${escapeHtml(data.branding.logo)}" style="height: 36px; object-fit: contain; margin-bottom: 8px;" />`
-        : `<img src="${ALKATERA_LOGO_URL}" style="height: 28px; object-fit: contain; margin-bottom: 8px;" />`}
+        : `<div style="margin-bottom: 8px;">${lockup(INK, 28)}</div>`}
       ${data.sbtiAligned ? `<div style="display:flex;justify-content:flex-end;">${badge('SBTi Aligned', primary, '#F2F1EA')}</div>` : ''}
     </div>
   </div>

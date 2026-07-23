@@ -1,10 +1,11 @@
-import { Space_Grotesk } from 'next/font/google';
+import { Bricolage_Grotesque } from 'next/font/google';
 
 /**
- * Space Grotesk speaks (statements, big numbers, card titles).
+ * Bricolage Grotesque speaks (statements, big numbers, card titles, the
+ * wordmark). It replaced Space Grotesk as the design system's statement voice.
  * Loaded app-wide from app/layout.tsx on the redesign branch.
  */
-export const spaceGrotesk = Space_Grotesk({
+export const spaceGrotesk = Bricolage_Grotesque({
   subsets: ['latin'],
   weight: ['500', '600', '700'],
   variable: '--font-display',

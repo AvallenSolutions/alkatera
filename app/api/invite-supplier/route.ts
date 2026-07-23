@@ -182,7 +182,7 @@ export async function POST(request: NextRequest) {
     if (resendApiKey) {
       try {
         const resend = new Resend(resendApiKey);
-        const logoUrl = 'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png';
+        const logoUrl = `${siteUrl}/logo.png`;
         const emailSubject = `${organizationName} has invited you to share sustainability data on alkatera`;
         const greetingName = contactPersonName || supplierName;
         const greeting = greetingName ? escapeHtml(greetingName) : null;

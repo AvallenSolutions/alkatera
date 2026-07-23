@@ -38,7 +38,7 @@ export default function SupplierRegisterPage() {
   const [signInEmail, setSignInEmail] = useState('');
   const [signInPassword, setSignInPassword] = useState('');
 
-  const logoUrl = 'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png';
+  const logoUrl = '/logo-cream.svg';
 
   const validatePassword = (pw: string) => {
     if (pw.length < 8) return 'Password must be at least 8 characters';

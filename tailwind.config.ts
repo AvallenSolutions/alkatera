@@ -17,7 +17,7 @@ const config: Config = {
         serif: ['var(--font-serif)', '"Playfair Display"', 'Georgia', 'serif'],
         sans: ['Inter', 'system-ui', 'sans-serif'],
         mono: ['var(--font-data)', 'Consolas', 'monospace'],
-        display: ['var(--font-display)', '"Space Grotesk"', 'sans-serif'],
+        display: ['var(--font-display)', '"Bricolage Grotesque"', 'sans-serif'],
       },
       transitionTimingFunction: {
         studio: 'cubic-bezier(0.2, 0.8, 0.2, 1)',

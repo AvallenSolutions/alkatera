@@ -22,7 +22,7 @@ const DIM = '#6F6F68';
 const INK = '#1A1B1D';
 const FOREST = '#205E40';
 
-const DISPLAY = 'var(--font-display), "Space Grotesk", system-ui, sans-serif';
+const DISPLAY = 'var(--font-display), "Bricolage Grotesque", system-ui, sans-serif';
 const MONO = 'var(--font-data), "JetBrains Mono", monospace';
 const BODY = 'var(--font-body), Inter, system-ui, sans-serif';
 

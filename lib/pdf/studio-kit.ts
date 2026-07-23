@@ -4,11 +4,11 @@
  * Extracted from the LCA report template (the first document to speak the
  * studio design language; see lib/pdf/render-lca-html.ts) so every PDF the
  * platform generates composes ONE design implementation: paper ground,
- * cream panels, hairline rules, mono eyebrows, Space Grotesk numbers,
+ * cream panels, hairline rules, mono eyebrows, Bricolage Grotesque numbers,
  * numbered colour bands, working-tone chips.
  *
  * Canon (design/studio-design-language.md + the Claude Design system):
- * - Space Grotesk speaks, Inter explains, JetBrains Mono annotates.
+ * - Bricolage Grotesque speaks, Inter explains, JetBrains Mono annotates.
  * - Panels are cream on paper with a 1px hairline, radius 6. No shadows.
  * - One saturated block per surface; text on colour is cream or ink only
  *   (ochre and other light brands always take ink — see onBand()).
@@ -36,7 +36,9 @@ export const ATTN = '#B45309';
 export const STALE = '#BE123C';
 
 export const MONO = `'JetBrains Mono',monospace`;
-export const SG = `'Space Grotesk',sans-serif`;
+// Bricolage Grotesque is the design system's statement voice (it replaced
+// Bricolage Grotesque). PDF templates load it from Google Fonts alongside Inter.
+export const SG = `'Bricolage Grotesque',sans-serif`;
 export const INTER = `'Inter',sans-serif`;
 
 /**
@@ -73,7 +75,7 @@ export function escapeHtml(str: string): string {
 
 /** The wordmark: lowercase, "alka" medium + "tera" bold. Never capitalised. */
 export function wordmark(size: number, color: string): string {
-  return `<span style="font-family:${SG};font-size:${size}px;color:${color}"><span style="font-weight:500">alka</span><span style="font-weight:700">tera</span></span>`;
+  return `<span style="font-family:${SG};font-size:${size}px;letter-spacing:-0.03em;color:${color}"><span style="font-weight:500">alka</span><span style="font-weight:700">tera</span></span>`;
 }
 
 /** The brand leaf mark (veined leaf-drop), single-weight, from the design. */
@@ -84,6 +86,18 @@ export function leafMark(stroke: string, style: string): string {
     <line x1="24" y1="27" x2="31" y2="20" stroke="${stroke}" stroke-width="2.4" stroke-linecap="round"></line>
     <line x1="24" y1="27" x2="17" y2="20" stroke="${stroke}" stroke-width="2.4" stroke-linecap="round"></line>
   </svg>`;
+}
+
+/**
+ * The full lockup: leaf mark + wordmark, horizontally aligned. One colour
+ * throughout, so pass INK on light grounds and CREAM on dark/colour ones
+ * (onBand(bg).fg resolves this automatically). This is the alkatera logo for
+ * every document; PDFShift renders the inline SVG and Bricolage Grotesque natively,
+ * so there is no raster asset to go stale.
+ */
+export function lockup(color: string, height = 30): string {
+  const mark = height * 1.05;
+  return `<span style="display:inline-flex;align-items:center;gap:${height * 0.32}px;line-height:1"><span style="display:inline-flex;width:${mark}px;height:${mark}px">${leafMark(color, `width:${mark}px;height:${mark}px`)}</span>${wordmark(height, color)}</span>`;
 }
 
 /** Mono caps snippet. The workhorse for eyebrows, labels and meta. */
@@ -287,5 +301,5 @@ export function notMeasuredBlock(title: string, hint?: string): string {
 export function studioFontLinks(): string {
   return `<link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />`;
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Bricolage+Grotesque:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />`;
 }

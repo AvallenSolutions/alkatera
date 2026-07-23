@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  /* Space Grotesk speaks: statements, headings, big numbers. Lora is
-     retired on the redesign branch; --font-display is set by next/font
+  /* Bricolage Grotesque speaks: statements, headings, big numbers, the
+     wordmark. It replaced Space Grotesk; --font-display is set by next/font
      in app/layout.tsx. */
   --font-heading: var(--font-display);
 }

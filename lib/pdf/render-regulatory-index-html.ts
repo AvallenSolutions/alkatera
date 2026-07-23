@@ -7,6 +7,8 @@
  * Used by POST /api/reports/[id]/regulatory-index
  */
 
+import { lockup, INK } from './studio-kit';
+
 // ============================================================================
 // HELPERS
 // ============================================================================
@@ -99,8 +101,6 @@ const STANDARD_LABELS: Record<string, string> = {
   'ghg-protocol': 'GHG Protocol',
 };
 
-const ALKATERA_LOGO_URL = 'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png';
-
 // ============================================================================
 // RENDERER
 // ============================================================================
@@ -168,7 +168,7 @@ export function renderRegulatoryIndexHtml(data: RegulatoryIndexData): string {
   <title>Regulatory Index — ${escapeHtml(data.organisationName)} ${data.reportYear}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;700&family=Bricolage+Grotesque:wght@500;600;700&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Inter', sans-serif; background: white; color: #1A1B1D; }
@@ -195,7 +195,7 @@ export function renderRegulatoryIndexHtml(data: RegulatoryIndexData): string {
     <div style="text-align: right;">
       ${data.branding.logo
         ? `<img src="${escapeHtml(data.branding.logo)}" style="height: 32px; object-fit: contain;" />`
-        : `<img src="${ALKATERA_LOGO_URL}" style="height: 24px; object-fit: contain;" />`}
+        : lockup(INK, 24)}
       ${data.dataQuality ? `
       <div style="margin-top: 8px; font-size: 11px; color: #6F6F68; text-align: right;">
         Data quality: <strong>${escapeHtml(tierLabel)}</strong>

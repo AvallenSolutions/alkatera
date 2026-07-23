@@ -5,8 +5,9 @@
 
 export const STUDIO = {
   ink: '#1A1B1D',
-  paper: '#F2F1EA',
-  raisedPaper: '#ffffff',
+  paper: '#ECEAE3',
+  cream: '#F2F1EA',
+  raisedPaper: '#ECEAE3',
   hairline: '#D9D6CB',
   forest: '#205E40',
   dim: '#6F6F68',
@@ -14,10 +15,12 @@ export const STUDIO = {
   danger: '#BE123C',
 } as const;
 
-export const STUDIO_LOGO_URL =
-  'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png';
-
 const MONO = "'Courier New', monospace";
+
+// The alkatera lockup, served as a raster from the app's own origin so email
+// clients (which cannot reliably render SVG or webfonts) show the real mark.
+// Callers pass their deployment's URL; this is the fallback.
+const DEFAULT_LOGO_URL = 'https://alkatera.com/logo.png';
 
 export function escapeEmailHtml(text: string): string {
   if (!text) return '';
@@ -29,7 +32,7 @@ export function escapeEmailHtml(text: string): string {
     .replace(/'/g, '&#039;');
 }
 
-/** The one email shell: centred logo, mono eyebrow title, content, quiet footer. */
+/** The one email shell: the alkatera logo, mono eyebrow title, content, quiet footer. */
 export function studioLayout(opts: {
   /** Short uppercase line under the logo, e.g. "Password Reset". */
   eyebrow: string;
@@ -37,7 +40,10 @@ export function studioLayout(opts: {
   content: string;
   /** Optional quiet line above the footer, e.g. why they received this. */
   footerNote?: string;
+  /** Absolute URL to the lockup PNG. Defaults to the production asset. */
+  logoUrl?: string;
 }): string {
+  const logoUrl = opts.logoUrl || DEFAULT_LOGO_URL;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -45,9 +51,9 @@ export function studioLayout(opts: {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body style="margin:0;padding:0;background:${STUDIO.paper};">
-  <div style="font-family:${MONO};max-width:600px;margin:0 auto;background:${STUDIO.paper};color:${STUDIO.ink};padding:40px;border:1px solid ${STUDIO.hairline};">
+  <div style="font-family:${MONO};max-width:600px;margin:0 auto;background:${STUDIO.cream};color:${STUDIO.ink};padding:40px;border:1px solid ${STUDIO.hairline};">
     <div style="border-bottom:1px solid ${STUDIO.hairline};padding-bottom:20px;margin-bottom:30px;text-align:center;">
-      <img src="${STUDIO_LOGO_URL}" alt="alkatera" width="160" height="auto" style="display:block;margin:0 auto 16px auto;" />
+      <img src="${logoUrl}" alt="alkatera" width="150" style="display:block;margin:0 auto 14px auto;border:0;outline:none;text-decoration:none;" />
       <h1 style="color:${STUDIO.forest};font-size:14px;text-transform:uppercase;letter-spacing:3px;margin:0;">${opts.eyebrow}</h1>
     </div>
     ${opts.content}
@@ -68,11 +74,11 @@ export function studioParagraph(html: string): string {
 /** The one CTA: ink slab, paper text, mono uppercase. */
 export function studioButton(href: string, label: string): string {
   return `<div style="margin:30px 0;text-align:center;">
-  <a href="${href}" style="display:inline-block;background:${STUDIO.ink};color:${STUDIO.paper};font-family:${MONO};font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:3px;padding:16px 32px;text-decoration:none;">${label}</a>
+  <a href="${href}" style="display:inline-block;background:${STUDIO.ink};color:${STUDIO.cream};font-family:${MONO};font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:3px;padding:16px 32px;text-decoration:none;">${label}</a>
 </div>`;
 }
 
-/** Raised white panel with a forest eyebrow, for supporting detail. */
+/** Inset paper panel with a forest eyebrow, for supporting detail. */
 export function studioCallout(heading: string, bodyHtml: string): string {
   return `<div style="margin:24px 0;padding:20px;background:${STUDIO.raisedPaper};border:1px solid ${STUDIO.hairline};border-radius:4px;">
   <p style="color:${STUDIO.forest};font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:2px;margin:0 0 12px 0;">${heading}</p>
@@ -82,7 +88,7 @@ export function studioCallout(heading: string, bodyHtml: string): string {
 
 /**
  * Tonal notice. Tone is carried by the left rule and heading colour only;
- * the panel stays quiet paper-white, never a coloured wash.
+ * the panel stays quiet inset paper, never a coloured wash.
  */
 export function studioNotice(
   tone: 'good' | 'attention' | 'danger',

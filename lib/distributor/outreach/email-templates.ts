@@ -1,7 +1,6 @@
 import { escapeHtml } from '@/lib/utils/escape-html';
 
-const LOGO_URL =
-  'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png';
+const LOGO_URL = 'https://alkatera.com/logo.png';
 
 const EMAIL_FROM = 'alkatera <sayhello@mail.alkatera.com>';
 
