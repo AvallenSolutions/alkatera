@@ -1,5 +1,5 @@
 # Handoff: alkatera v2 — Phase 2 testing on staging
-Updated: 2026-07-21 | Branch: merge/main-into-redesign-20260720 (pushes to redesign) | Worktree: `.claude/worktrees/inspiring-varahamihira-baadb0` | Dev port: 8897 (launch config "merge-verify", uncommitted)
+Updated: 2026-07-23 | Branch: redesign | Worktree: `.claude/worktrees/redesign`
 
 ## Goal
 alkatera v2 = redesign UI + Vercel hosting + the EXISTING Alkatera2 database. Customer
@@ -11,6 +11,13 @@ Alkatera2, redesign merges to main, DNS moves, Netlify shuts down. Strategy:
 `tasks/phase2-test-script.md`, sessions work the punch list at its foot.
 
 ## Done (verified)
+- **main re-merged into redesign** (`ff0fcbc2`, 23 Jul): the last 3 main-only commits
+  (Resend delivery webhook + unsubscribe route, jobs-diff doc, env budget bump).
+  Divergence with main again 0. Conflicts resolved in the studio idiom (PillButton,
+  StateChip); the incoming migration renumbered `20260721100000` -> `20260721110000`
+  because staging already holds `pcf_end_use_scenarios` at that version. resend-webhook
+  suite 15/15, `tsc --noEmit` clean, pushed. PROD (Alkatera2) already has this schema
+  (verified via MCP); STAGING does not yet — SQL handed to Tim to paste (see Pending).
 - **main merged into redesign** (`094cac4d`, 28 commits incl. parametric packaging).
   811 scoped tests, tsc, prod build green; packaging wizard walked in a browser
   (parametric rows in product_materials, no factor search). Divergence with main: 0.
@@ -86,6 +93,10 @@ Recalculate LCAs after) → start the Cellar checklist in `tasks/phase2-test-scr
   (PostgREST cannot setval); gated so it never runs where products already existed.
 
 ## Pending Tim actions
+- **Paste the `20260721110000_email_delivery_tracking` SQL into the STAGING SQL editor**
+  (`vwhdyqvlgjqmlzmsvaes`; block posted in the 23 Jul session chat, idempotent, includes
+  the tracker insert + verification query). Prod already has it; without it staging's
+  supplier pages still work but delivery states stay NULL.
 - Refresh staging; seed the demo org; walk `tasks/phase2-test-script.md`, adding one
   punch-list line per issue.
 - Staging Supabase Auth → URL Configuration → Add URL:
