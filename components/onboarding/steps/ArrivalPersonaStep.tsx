@@ -6,6 +6,7 @@ import type { PersonaChoice } from '@/lib/onboarding'
 import { Eyebrow } from '@/components/studio'
 import { cn } from '@/lib/utils'
 import { RosaIntro } from './RosaIntro'
+import { WorkingTicker } from '../WorkingTicker'
 
 const PERSONA_OPTIONS: { value: PersonaChoice; label: string; description: string }[] = [
   { value: 'operator', label: 'I run operations.', description: 'Day-to-day production, data and suppliers.' },
@@ -87,6 +88,9 @@ export function ArrivalPersonaStep() {
             I&apos;d rather not say
           </button>
         </div>
+
+        {/* What we're doing in the background while they answer. */}
+        <WorkingTicker />
       </div>
     </div>
   )

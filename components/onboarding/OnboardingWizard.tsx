@@ -9,6 +9,7 @@ import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import { X, ChevronLeft, Check, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { WarmthMeter } from './WarmthMeter'
 
 // Step components — owner flow
 import { WelcomeScreen } from './steps/WelcomeScreen'
@@ -332,9 +333,13 @@ export function OnboardingWizard() {
       )}
 
       {/* Step content */}
-      <div className="relative z-[1] max-w-2xl mx-auto py-8 px-4">
+      <div className={cn('relative z-[1] max-w-2xl mx-auto py-8 px-4', isArrivalFlow && 'pb-28')}>
         {CurrentStepComponent ? <CurrentStepComponent /> : null}
       </div>
+
+      {/* Warmth meter — the arrival ritual's honest progress spine, pinned at
+          the foot of every screen. Only the arrival flow gets it. */}
+      {isArrivalFlow && <WarmthMeter />}
     </div>
   )
 }
