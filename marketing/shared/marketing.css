@@ -252,6 +252,20 @@ html {
   border-bottom-color: var(--fw-c);
 }
 
+/* The comparison table (Pricing): rows light up under the pointer, and
+   the whole table scrolls sideways on small screens rather than folding. */
+.mkt-cmp-row:hover {
+  background: #f2f1ea;
+}
+@media (max-width: 760px) {
+  .mkt-cmp-scroll {
+    overflow-x: auto;
+  }
+  .mkt-cmp-inner {
+    min-width: 640px !important;
+  }
+}
+
 /* Cream in-page links on saturated grounds (Platform hero). */
 .mkt-cream-link:hover {
   border-bottom-color: #f2f1ea !important;

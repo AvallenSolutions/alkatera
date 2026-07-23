@@ -73,6 +73,7 @@ export function SiteNav({
   onLogoClick,
   onLeafClick,
   trialHref = '/pricing',
+  onTrialClick,
 }: {
   /** Which centre link renders in its lit, underlined state. */
   active?: NavPageKey;
@@ -81,6 +82,8 @@ export function SiteNav({
   /** The home page hangs the season easter egg off the leaf. */
   onLeafClick?: MouseEventHandler<HTMLSpanElement>;
   trialHref?: string;
+  /** Overrides trialHref; the Pricing page scrolls to its own #trial form. */
+  onTrialClick?: () => void;
 }) {
   const router = useRouter();
   return (
@@ -122,7 +125,7 @@ export function SiteNav({
           ),
         )}
       </div>
-      <MarketingButton size="sm" onClick={() => router.push(trialHref)}>
+      <MarketingButton size="sm" onClick={onTrialClick ?? (() => router.push(trialHref))}>
         Start free trial
       </MarketingButton>
     </nav>
@@ -142,11 +145,14 @@ export function SiteFooter({
     { label: 'Knowledge', href: '/knowledge' },
     { label: 'Contact', href: '/contact' },
   ],
+  onCta,
   id,
 }: {
   /** Where the Platform column's four links point (the Platform page uses #modules). */
   platformLinksHref?: string;
   companyLinks?: FooterLink[];
+  /** Overrides the Get Started button's default push to /pricing. */
+  onCta?: () => void;
   id?: string;
 }) {
   const router = useRouter();
@@ -199,7 +205,7 @@ export function SiteFooter({
           </div>
           <div>
             <p style={colHead}>Get Started</p>
-            <MarketingButton size="sm" onClick={() => router.push('/pricing')}>
+            <MarketingButton size="sm" onClick={onCta ?? (() => router.push('/pricing'))}>
               Start free trial
             </MarketingButton>
           </div>
