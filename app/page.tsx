@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { HomeClient } from '@/marketing/home/HomeClient';
-import '@/marketing/home/home.css';
+import '@/marketing/shared/marketing.css';
 
 export const metadata: Metadata = {
   title: 'alkatera · Sustainability, Distilled',

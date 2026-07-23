@@ -8,18 +8,25 @@
  * and Rosa easter eggs) are the design's own script re-homed as hooks.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { GrowthField } from '@/components/studio/growth/growth-field';
 import type { Season } from '@/components/studio/growth/season';
-import { MarketingButton } from './MarketingButton';
-import { spaceGrotesk } from './fonts';
+import { MarketingButton } from '../shared/MarketingButton';
+import { spaceGrotesk } from '../shared/fonts';
+import {
+  EASE,
+  F_BODY,
+  F_MONO,
+  F_STATEMENT,
+  KICKER,
+  LeafMark,
+  MONO_LABEL,
+  SiteFooter,
+  SiteNav,
+} from '../shared/chrome';
+import { CursorCreatures, useReveal } from '../shared/effects';
 import { SOIL_ART_SVG } from './soil-art';
-
-const F_STATEMENT = "var(--font-statement), 'Space Grotesk', sans-serif";
-const F_BODY = "var(--font-body), 'Inter', sans-serif";
-const F_MONO = "var(--font-data), 'JetBrains Mono', monospace";
-const EASE = 'cubic-bezier(0.2,0.8,0.2,1)';
 
 const FOREST_STYLE = { maskImage: 'none', WebkitMaskImage: 'none' } as const;
 
@@ -29,31 +36,6 @@ const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
-
-function LeafMark({ size, stroke }: { size: number; stroke: string }) {
-  return (
-    <svg viewBox="0 0 48 48" width={size} height={size} aria-hidden="true">
-      <path
-        d="M24 7 C 31 19 37 24 37 29 A 13 13 0 1 1 11 29 C 11 24 17 19 24 7 Z"
-        fill="none"
-        stroke={stroke}
-        strokeWidth="2.6"
-      />
-      <line x1="24" y1="14" x2="24" y2="41" stroke={stroke} strokeWidth="2.4" strokeLinecap="round" />
-      <line x1="24" y1="27" x2="31" y2="20" stroke={stroke} strokeWidth="2.4" strokeLinecap="round" />
-      <line x1="24" y1="27" x2="17" y2="20" stroke={stroke} strokeWidth="2.4" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function Wordmark({ fontSize }: { fontSize: number }) {
-  return (
-    <span style={{ fontFamily: F_STATEMENT, fontSize, color: '#1A1B1D' }}>
-      <span style={{ fontWeight: 500 }}>alka</span>
-      <span style={{ fontWeight: 700 }}>tera</span>
-    </span>
-  );
-}
 
 /* The four room posters. */
 const POSTERS = [
@@ -201,23 +183,12 @@ const SHELF_FRONT: [string, number][] = [
   ['wine-glass', 102], ['whisky-bottle', 126],
 ];
 
-const KICKER: React.CSSProperties = {
-  fontFamily: F_MONO,
-  fontWeight: 700,
-  fontSize: 10,
-  letterSpacing: '0.22em',
-  textTransform: 'uppercase',
-};
-
 export function HomeClient() {
   const router = useRouter();
   const rootRef = useRef<HTMLDivElement>(null);
-  const beeRef = useRef<HTMLImageElement>(null);
-  const butterflyRef = useRef<HTMLImageElement>(null);
   const newsInputRef = useRef<HTMLInputElement>(null);
 
   const [stat55, setStat55] = useState(0);
-  const [rosaRun, setRosaRun] = useState(false);
   const [seasonIdx, setSeasonIdx] = useState(0);
   const [seasonToast, setSeasonToast] = useState('');
   const [newsDone, setNewsDone] = useState(false);
@@ -233,27 +204,13 @@ export function HomeClient() {
     ? seasonOverride.toUpperCase()
     : `${MONTHS[now.getMonth()].toUpperCase()} ${now.getFullYear()}`;
 
-  /* Reveals, the poster marks, and the animated statistic. */
+  useReveal(rootRef);
+
+  /* The poster marks and the animated statistic. */
   useEffect(() => {
     reducedRef.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const root = rootRef.current;
     if (!root) return;
-
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (!e.isIntersecting) continue;
-          const el = e.target as HTMLElement;
-          const d = reducedRef.current
-            ? 0
-            : parseInt(el.getAttribute('data-reveal') || '0', 10) + 160;
-          setTimeout(() => el.classList.add('mkt-revealed'), d);
-          io.unobserve(el);
-        }
-      },
-      { threshold: 0.12, rootMargin: '0px 0px -4% 0px' },
-    );
-    root.querySelectorAll('[data-reveal]').forEach((el) => io.observe(el));
 
     const posterIo = new IntersectionObserver(
       (entries) => {
@@ -294,7 +251,6 @@ export function HomeClient() {
     if (stat) statIo.observe(stat);
 
     return () => {
-      io.disconnect();
       posterIo.disconnect();
       statIo.disconnect();
     };
@@ -365,73 +321,6 @@ export function HomeClient() {
     };
   }, []);
 
-  /* The residents: a bee and a butterfly keep the cursor company. */
-  useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2, seen: false };
-    const bee = { x: -60, y: 120, dx: 0 };
-    const fly = { x: window.innerWidth + 60, y: 200, dx: 0 };
-    const onMove = (e: MouseEvent) => {
-      mouse.x = e.clientX;
-      mouse.y = e.clientY;
-      mouse.seen = true;
-    };
-    window.addEventListener('mousemove', onMove, { passive: true });
-    let t = 0;
-    let raf = 0;
-    const loop = () => {
-      raf = requestAnimationFrame(loop);
-      t += 0.016;
-      if (!mouse.seen) return;
-      const bx = mouse.x + 34 + Math.sin(t * 2.1) * 10;
-      const by = mouse.y - 26 + Math.cos(t * 2.7) * 8;
-      bee.dx = bx - bee.x;
-      bee.x += bee.dx * 0.07;
-      bee.y += (by - bee.y) * 0.07;
-      const fx = mouse.x - 60 + Math.sin(t * 1.3) * 26;
-      const fy = mouse.y + 30 + Math.sin(t * 1.7) * 18;
-      fly.dx = fx - fly.x;
-      fly.x += fly.dx * 0.035;
-      fly.y += (fy - fly.y) * 0.035;
-      const be = beeRef.current;
-      const fe = butterflyRef.current;
-      if (be) {
-        be.style.opacity = '0.9';
-        be.style.transform = `translate(${bee.x - 15}px, ${bee.y - 15}px) scaleX(${bee.dx < 0 ? -1 : 1}) rotate(${Math.sin(t * 3) * 8}deg)`;
-      }
-      if (fe) {
-        fe.style.opacity = '0.85';
-        fe.style.transform = `translate(${fly.x - 13}px, ${fly.y - 13}px) scaleX(${fly.dx < 0 ? -1 : 1}) rotate(${Math.sin(t * 2.2) * 12}deg)`;
-      }
-    };
-    raf = requestAnimationFrame(loop);
-    return () => {
-      window.removeEventListener('mousemove', onMove);
-      cancelAnimationFrame(raf);
-    };
-  }, []);
-
-  /* Type r-o-s-a anywhere and she runs across the page. */
-  useEffect(() => {
-    let buf = '';
-    let running = false;
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
-      buf = (buf + (e.key || '')).slice(-8).toLowerCase();
-      if (buf.endsWith('rosa') && !running) {
-        running = true;
-        setRosaRun(true);
-        setTimeout(() => {
-          running = false;
-          setRosaRun(false);
-        }, 7200);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
-
   const goTo = useCallback((id: string) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -477,49 +366,14 @@ export function HomeClient() {
     }
   }, []);
 
-  const monoLabel = useMemo(
-    () => ({
-      fontFamily: F_MONO,
-      fontWeight: 700,
-      fontSize: 10,
-      letterSpacing: '0.18em',
-      textTransform: 'uppercase' as const,
-    }),
-    [],
-  );
-
   return (
     <div ref={rootRef} className={`mkt-home ${spaceGrotesk.variable}`}>
-      {/* ————— Nav ————— */}
-      <nav
-        style={{
-          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 80,
-          background: 'rgba(236,234,227,0.94)', borderBottom: '1px solid #D9D6CB',
-          height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '0 28px', boxSizing: 'border-box',
-        }}
-      >
-        <a
-          href="#top"
-          onClick={goTop}
-          style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', cursor: 'pointer' }}
-        >
-          <span onClick={cycleSeason} title="·" style={{ display: 'inline-flex', cursor: 'pointer' }}>
-            <LeafMark size={22} stroke="#205E40" />
-          </span>
-          <Wordmark fontSize={18} />
-        </a>
-        <div
-          className="mkt-nav-links"
-          style={{ display: 'flex', alignItems: 'center', gap: 26, ...monoLabel }}
-        >
-          <a className="mkt-navlink" href="/platform">Platform</a>
-          <a className="mkt-navlink" href="/pricing">Pricing</a>
-          <a className="mkt-navlink" href="/knowledge">Knowledge</a>
-          <a className="mkt-navlink" href="/login">Login</a>
-        </div>
-        <MarketingButton size="sm" onClick={goTrial}>Start free trial</MarketingButton>
-      </nav>
+      <SiteNav
+        logoHref="#top"
+        onLogoClick={goTop}
+        onLeafClick={cycleSeason}
+        trialHref="/pricing#trial"
+      />
 
       <main id="top">
         {/* ————— Hero ————— */}
@@ -572,7 +426,7 @@ export function HomeClient() {
               className="mkt-scanlink"
               href="#trial"
               style={{
-                display: 'inline-block', marginTop: 14, ...monoLabel, color: '#6F6F68',
+                display: 'inline-block', marginTop: 14, ...MONO_LABEL, color: '#6F6F68',
                 textDecoration: 'none', borderBottom: '1px solid #D9D6CB', paddingBottom: 3,
               }}
             >
@@ -1087,108 +941,10 @@ export function HomeClient() {
           </div>
         </section>
 
-        {/* ————— Footer ————— */}
-        <footer
-          id="knowledge"
-          className="mkt-pad"
-          style={{
-            background: '#F2F1EA', position: 'relative', zIndex: 2, borderTop: '1px solid #D9D6CB',
-            padding: '64px 48px 40px', boxSizing: 'border-box',
-          }}
-        >
-          <div style={{ maxWidth: 1184, margin: '0 auto' }}>
-            <div className="mkt-footer-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.4fr', gap: 40 }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                  <LeafMark size={20} stroke="#205E40" />
-                  <Wordmark fontSize={17} />
-                </div>
-                <p style={{ fontFamily: F_BODY, fontSize: 13, lineHeight: 1.55, color: '#6F6F68', maxWidth: '34ch', margin: '0 0 18px' }}>
-                  alka<strong>tera</strong> is a proud member of the Porto Protocol, committed to
-                  a more sustainable drinks industry.
-                </p>
-                <p style={{ fontFamily: F_MONO, fontSize: 10, letterSpacing: '0.08em', color: '#6F6F68', margin: 0 }}>
-                  © 2026 alkatera Ltd
-                </p>
-              </div>
-              <div>
-                <p style={{ fontFamily: F_MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#1A1B1D', margin: '0 0 14px' }}>
-                  Platform
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontFamily: F_BODY, fontSize: 13 }}>
-                  <a className="mkt-flink" href="/platform">Carbon Analytics</a>
-                  <a className="mkt-flink" href="/platform">Water Footprint</a>
-                  <a className="mkt-flink" href="/platform">Supply Chain</a>
-                  <a className="mkt-flink" href="/platform">Reporting</a>
-                </div>
-              </div>
-              <div>
-                <p style={{ fontFamily: F_MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#1A1B1D', margin: '0 0 14px' }}>
-                  Company
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontFamily: F_BODY, fontSize: 13 }}>
-                  <a className="mkt-flink" href="#manifesto">The Soil</a>
-                  <a className="mkt-flink" href="/best-sustainability-platform-drinks-industry">Buyer&apos;s Guide</a>
-                  <a className="mkt-flink" href="/knowledge">Knowledge</a>
-                  <a className="mkt-flink" href="/contact">Contact</a>
-                </div>
-              </div>
-              <div>
-                <p style={{ fontFamily: F_MONO, fontWeight: 700, fontSize: 9.5, letterSpacing: '0.2em', textTransform: 'uppercase', color: '#1A1B1D', margin: '0 0 14px' }}>
-                  Get Started
-                </p>
-                <MarketingButton size="sm" onClick={goPricing}>Start free trial</MarketingButton>
-              </div>
-            </div>
-            <div
-              style={{
-                borderTop: '1px solid #D9D6CB', marginTop: 44, paddingTop: 20, display: 'flex',
-                flexWrap: 'wrap', gap: '8px 28px', justifyContent: 'space-between',
-                fontFamily: F_MONO, fontSize: 9.5, letterSpacing: '0.06em', color: '#6F6F68',
-              }}
-            >
-              <span>
-                AVALLEN SOLUTIONS LTD T/A ALKATERA · COMPANY NO. 15905045 · STERLING HOUSE,
-                FULBOURNE ROAD, LONDON, E17 4EE
-              </span>
-              <span style={{ display: 'flex', gap: 18 }}>
-                <a className="mkt-flink" href="/terms">TERMS</a>
-                <a className="mkt-flink" href="/privacy">PRIVACY</a>
-                <a className="mkt-flink" href="/cookies">COOKIES</a>
-              </span>
-            </div>
-          </div>
-        </footer>
+        <SiteFooter id="knowledge" />
       </main>
 
-      {/* The cursor's company. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        ref={beeRef}
-        src="/assets/creatures/creature-bee0.svg"
-        alt=""
-        aria-hidden="true"
-        style={{ position: 'fixed', left: 0, top: 0, width: 30, zIndex: 85, pointerEvents: 'none', opacity: 0, willChange: 'transform' }}
-      />
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        ref={butterflyRef}
-        src="/assets/creatures/creature-butterfly0.svg"
-        alt=""
-        aria-hidden="true"
-        style={{ position: 'fixed', left: 0, top: 0, width: 26, zIndex: 85, pointerEvents: 'none', opacity: 0, willChange: 'transform' }}
-      />
-
-      {/* Type r-o-s-a: she runs the width of the page. */}
-      {rosaRun && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          data-anim=""
-          src="/assets/creatures/creature-rosa.svg"
-          alt="Rosa the goldendoodle"
-          style={{ position: 'fixed', bottom: 8, left: 0, width: 130, zIndex: 86, pointerEvents: 'none', animation: 'mkt-rosa-run 7s linear' }}
-        />
-      )}
+      <CursorCreatures />
 
       {/* The season toast (click the leaf). */}
       {seasonToast && (

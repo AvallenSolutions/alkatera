@@ -234,6 +234,29 @@ html {
   animation-iteration-count: infinite;
 }
 
+/* Framework names (Platform page): lift, tint and tilt on hover. Each
+   word carries its own hover colour and tilt as CSS variables. */
+.mkt-fw {
+  display: inline-block;
+  border-bottom: 3px solid transparent;
+  padding-bottom: 3px;
+  cursor: default;
+  transition:
+    color 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-bottom-color 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.mkt-fw:hover {
+  color: var(--fw-c) !important;
+  transform: translateY(-5px) rotate(var(--fw-r));
+  border-bottom-color: var(--fw-c);
+}
+
+/* Cream in-page links on saturated grounds (Platform hero). */
+.mkt-cream-link:hover {
+  border-bottom-color: #f2f1ea !important;
+}
+
 /* The buttons wake gently. */
 .mkt-btn {
   transition:
@@ -253,12 +276,16 @@ html {
   .mkt-nav-links {
     display: none !important;
   }
-  .mkt-soil-grid {
+  .mkt-soil-grid,
+  .mkt-grid-collapse {
     grid-template-columns: 1fr !important;
     align-items: start !important;
   }
   .mkt-footer-grid {
     grid-template-columns: 1fr 1fr !important;
+  }
+  .mkt-modules-grid {
+    grid-template-columns: 1fr !important;
   }
   .mkt-pad {
     padding-left: 24px !important;
