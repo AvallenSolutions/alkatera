@@ -20,6 +20,7 @@ import { UnreadRepliesBanner } from '@/components/feedback/UnreadRepliesBanner'
 import { IntegrationHealthBanner } from '@/components/layouts/IntegrationHealthBanner'
 import { OnboardingProvider, useOnboarding } from '@/lib/onboarding'
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard'
+import { AdvisorNoAccess } from '@/components/studio/advisor-no-access'
 import { SupplierOnboardingProvider } from '@/lib/supplier-onboarding'
 import { SupplierOnboardingWizard } from '@/components/supplier-onboarding/SupplierOnboardingWizard'
 import { RosaContextProvider } from '@/lib/rosa/RosaContextProvider'
@@ -104,11 +105,11 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
 
   const isSupplier = userRole === 'supplier' || user?.user_metadata?.is_supplier === true
   const isSupplierRoute = pathname?.startsWith('/supplier-portal')
-  // Advisors never create an organisation, so an org-less advisor keeps the
-  // legacy redirect (an edge case: normally advisors reach the app via an
-  // active advisor_organization_access row and never hit this branch at
-  // all). Everyone else org-less is a fresh owner about to walk the arrival
-  // ritual, mounted directly below rather than redirected.
+  // Advisors never create an organisation: an org-less advisor (all client
+  // access revoked or the invite never accepted) gets the in-place
+  // AdvisorNoAccess screen. Everyone else org-less is a fresh owner about
+  // to walk the arrival ritual, mounted directly below rather than
+  // redirected.
   const isAdvisorRole = userRole === 'advisor'
   // The payment gate (below) must not bounce a freshly-created 'pending' org
   // out of the arrival ritual — the trial/plan choice is now the ritual's
@@ -142,17 +143,15 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
 
     // No organization → the arrival ritual mounts full-screen below and owns
     // org creation itself (never for suppliers — they don't need one).
-    // Advisors are the one org-less case that still needs the legacy page.
+    // Org-less advisors get the in-place AdvisorNoAccess screen below —
+    // there is no page to redirect to any more.
     if (requireOrganization && !currentOrganization && !isSupplier) {
-      if (isAdvisorRole) {
-        router.push('/create-organization')
-      }
       return
     }
 
     // Payment gate (skip for suppliers — already returned above)
     if (!subscriptionLoading && currentOrganization) {
-      const isAllowedPage = pathname?.startsWith('/settings') || pathname?.startsWith('/create-organization') || pathname?.startsWith('/complete-subscription') || pathname?.startsWith('/contact') || pathname?.startsWith('/suspended')
+      const isAllowedPage = pathname?.startsWith('/settings') || pathname?.startsWith('/complete-subscription') || pathname?.startsWith('/contact') || pathname?.startsWith('/suspended')
       if (isAllowedPage) return
 
       if (subscriptionStatus === 'past_due') return
@@ -218,9 +217,9 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
   }
 
   if (requireOrganization && !currentOrganization) {
-    // Advisor edge case — the redirect effect above is sending them to
-    // /create-organization; render nothing while that happens.
-    if (isAdvisorRole) return null
+    // Advisor edge case — an advisor with no client access has no org to
+    // open and never creates one; show the quiet no-access screen in place.
+    if (isAdvisorRole) return <AdvisorNoAccess />
     // The front door itself: no room shell, no dark-glass form, no blank
     // flash. OnboardingContext's pre-org branch has already seeded local
     // arrival state, so the wizard renders arrival-website immediately.

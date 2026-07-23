@@ -50,6 +50,15 @@ const nextConfig = {
         destination: '/knowledge',
         permanent: true,
       },
+      {
+        // The standalone create-organisation page is gone: the arrival
+        // ritual owns org creation, mounted by AppLayout the moment an
+        // org-less owner lands anywhere in the app. Old bookmarks arrive
+        // at the desk, where that mount happens.
+        source: '/create-organization',
+        destination: '/desk/',
+        permanent: true,
+      },
     ];
   },
   experimental: {

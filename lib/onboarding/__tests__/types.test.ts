@@ -1,220 +1,175 @@
 import { describe, it, expect } from 'vitest'
 import {
-  ONBOARDING_STEPS,
-  TOTAL_STEPS,
-  PHASE_CONFIG,
-  INITIAL_ONBOARDING_STATE,
+  ARRIVAL_STEPS,
+  MEMBER_ONBOARDING_STEPS,
+  ADVISOR_ONBOARDING_STEPS,
+  INITIAL_ARRIVAL_STATE,
+  INITIAL_MEMBER_ONBOARDING_STATE,
+  INITIAL_ADVISOR_ONBOARDING_STATE,
+  getStepsForFlow,
+  getInitialStateForFlow,
   getStepConfig,
-  getPhaseSteps,
   getNextStep,
   getPreviousStep,
   getProgressPercentage,
-  isPhaseComplete,
-  type OnboardingStep,
-  type OnboardingPhase,
 } from '../types'
+import type { OnboardingFlow, OnboardingStepConfig } from '../types'
 
+/**
+ * The arrival ritual is the only first-run flow for owners; members and
+ * advisors get their short orientations. The legacy 'owner' and 'fast_track'
+ * labels must keep resolving (old saved rows, including production rows at
+ * cutover) but always onto the arrival shape.
+ */
 describe('Onboarding Types & Utilities', () => {
-  describe('ONBOARDING_STEPS', () => {
-    it('should have 14 total steps', () => {
-      expect(ONBOARDING_STEPS).toHaveLength(14)
-      expect(TOTAL_STEPS).toBe(14)
-    })
+  const FLOWS: { flow: OnboardingFlow; steps: OnboardingStepConfig[]; first: string; last: string }[] = [
+    { flow: 'arrival', steps: ARRIVAL_STEPS, first: 'arrival-website', last: 'arrival-plan' },
+    { flow: 'member', steps: MEMBER_ONBOARDING_STEPS, first: 'member-welcome', last: 'member-completion' },
+    { flow: 'advisor', steps: ADVISOR_ONBOARDING_STEPS, first: 'advisor-welcome', last: 'advisor-completion' },
+  ]
 
-    it('should have consecutive indices starting from 0', () => {
-      ONBOARDING_STEPS.forEach((step, i) => {
+  describe.each(FLOWS)('$flow flow steps', ({ steps, first, last }) => {
+    it('has consecutive indices starting from 0', () => {
+      steps.forEach((step, i) => {
         expect(step.index).toBe(i)
       })
     })
 
-    it('should have unique step IDs', () => {
-      const ids = ONBOARDING_STEPS.map(s => s.id)
+    it('has unique step IDs', () => {
+      const ids = steps.map(s => s.id)
       expect(new Set(ids).size).toBe(ids.length)
     })
 
-    it('should cover all 5 phases', () => {
-      const phases = new Set(ONBOARDING_STEPS.map(s => s.phase))
-      expect(phases.size).toBe(5)
-      expect(phases.has('welcome')).toBe(true)
-      expect(phases.has('quick-wins')).toBe(true)
-      expect(phases.has('core-setup')).toBe(true)
-      expect(phases.has('first-insights')).toBe(true)
-      expect(phases.has('power-features')).toBe(true)
+    it('starts and ends where the flow says it does', () => {
+      expect(steps[0].id).toBe(first)
+      expect(steps[steps.length - 1].id).toBe(last)
     })
 
-    it('should have phases in sequential order', () => {
-      const phaseOrder: OnboardingPhase[] = ['welcome', 'quick-wins', 'core-setup', 'first-insights', 'power-features']
-      let lastPhaseIndex = -1
-      for (const step of ONBOARDING_STEPS) {
-        const phaseIndex = phaseOrder.indexOf(step.phase)
-        expect(phaseIndex).toBeGreaterThanOrEqual(lastPhaseIndex)
-        lastPhaseIndex = phaseIndex
+    it('never lets the first or last step be skipped', () => {
+      expect(steps[0].skippable).toBe(false)
+      expect(steps[steps.length - 1].skippable).toBe(false)
+    })
+
+    it('gives every step a title and description', () => {
+      for (const step of steps) {
+        expect(step.title.length).toBeGreaterThan(0)
+        expect(step.description.length).toBeGreaterThan(0)
       }
     })
   })
 
-  describe('PHASE_CONFIG', () => {
-    it('should have configuration for all 5 phases', () => {
-      expect(Object.keys(PHASE_CONFIG)).toHaveLength(5)
+  describe('the arrival ritual shape', () => {
+    it('is the 7-screen ritual from the arrival-front-door plan', () => {
+      expect(ARRIVAL_STEPS.map(s => s.id)).toEqual([
+        'arrival-website',
+        'arrival-persona',
+        'arrival-confirm',
+        'arrival-reveal',
+        'arrival-facility',
+        'arrival-estimate',
+        'arrival-plan',
+      ])
     })
 
-    it('should have label, duration, and color for each phase', () => {
-      for (const [, config] of Object.entries(PHASE_CONFIG)) {
-        expect(config.label).toBeTruthy()
-        expect(config.duration).toBeTruthy()
-        expect(config.color).toBeTruthy()
-      }
+    it('opens org creation (arrival-website) unskippably', () => {
+      expect(getStepConfig('arrival-website').skippable).toBe(false)
     })
   })
 
-  describe('INITIAL_ONBOARDING_STATE', () => {
-    it('should start with welcome-screen step', () => {
-      expect(INITIAL_ONBOARDING_STATE.currentStep).toBe('welcome-screen')
+  describe('getStepsForFlow', () => {
+    it('returns each surviving flow its own steps', () => {
+      expect(getStepsForFlow('arrival')).toBe(ARRIVAL_STEPS)
+      expect(getStepsForFlow('member')).toBe(MEMBER_ONBOARDING_STEPS)
+      expect(getStepsForFlow('advisor')).toBe(ADVISOR_ONBOARDING_STEPS)
     })
 
-    it('should not be completed or dismissed', () => {
-      expect(INITIAL_ONBOARDING_STATE.completed).toBe(false)
-      expect(INITIAL_ONBOARDING_STATE.dismissed).toBe(false)
+    it('routes the legacy owner and fast_track labels onto the arrival steps', () => {
+      expect(getStepsForFlow('owner')).toBe(ARRIVAL_STEPS)
+      expect(getStepsForFlow('fast_track')).toBe(ARRIVAL_STEPS)
+    })
+  })
+
+  describe('getInitialStateForFlow', () => {
+    it('returns each surviving flow its own initial state', () => {
+      expect(getInitialStateForFlow('arrival').currentStep).toBe('arrival-website')
+      expect(getInitialStateForFlow('member').currentStep).toBe('member-welcome')
+      expect(getInitialStateForFlow('advisor').currentStep).toBe('advisor-welcome')
     })
 
-    it('should have empty completed steps', () => {
-      expect(INITIAL_ONBOARDING_STATE.completedSteps).toEqual([])
+    it('routes the legacy labels onto the arrival initial state', () => {
+      expect(getInitialStateForFlow('owner').currentStep).toBe('arrival-website')
+      expect(getInitialStateForFlow('fast_track').currentStep).toBe('arrival-website')
     })
 
-    it('should have empty personalization data', () => {
-      expect(INITIAL_ONBOARDING_STATE.personalization).toEqual({})
+    it('starts every flow fresh', () => {
+      for (const initial of [INITIAL_ARRIVAL_STATE, INITIAL_MEMBER_ONBOARDING_STATE, INITIAL_ADVISOR_ONBOARDING_STATE]) {
+        expect(initial.completed).toBe(false)
+        expect(initial.dismissed).toBe(false)
+        expect(initial.completedSteps).toEqual([])
+        expect(initial.personalization).toEqual({})
+      }
     })
   })
 
   describe('getStepConfig', () => {
-    it('should return correct config for welcome-screen', () => {
-      const config = getStepConfig('welcome-screen')
-      expect(config.id).toBe('welcome-screen')
-      expect(config.phase).toBe('welcome')
-      expect(config.index).toBe(0)
-      expect(config.skippable).toBe(false)
+    it('finds arrival, member and advisor steps', () => {
+      expect(getStepConfig('arrival-persona').id).toBe('arrival-persona')
+      expect(getStepConfig('member-platform-tour').id).toBe('member-platform-tour')
+      expect(getStepConfig('advisor-capabilities').id).toBe('advisor-capabilities')
     })
 
-    it('should return correct config for company-basics (skippable)', () => {
-      const config = getStepConfig('company-basics')
-      expect(config.skippable).toBe(true)
-      expect(config.phase).toBe('welcome')
-    })
-
-    it('should return correct config for completion step', () => {
-      const config = getStepConfig('completion')
-      expect(config.index).toBe(13)
-      expect(config.phase).toBe('power-features')
+    it('lands legacy owner/fast-track ids on the arrival opener (never renders — those states are retired as completed on load)', () => {
+      expect(getStepConfig('welcome-screen').id).toBe('arrival-website')
+      expect(getStepConfig('fast-track-setup').id).toBe('arrival-website')
     })
   })
 
-  describe('getPhaseSteps', () => {
-    it('should return 4 steps for welcome phase', () => {
-      const steps = getPhaseSteps('welcome')
-      expect(steps).toHaveLength(4)
-      expect(steps.map(s => s.id)).toEqual([
-        'welcome-screen', 'meet-rosa', 'personalization', 'company-basics'
-      ])
-    })
-
-    it('should return 3 steps for quick-wins phase', () => {
-      const steps = getPhaseSteps('quick-wins')
-      expect(steps).toHaveLength(3)
-    })
-
-    it('should return 3 steps for core-setup phase', () => {
-      const steps = getPhaseSteps('core-setup')
-      expect(steps).toHaveLength(3)
-    })
-
-    it('should return 1 step for first-insights phase', () => {
-      const steps = getPhaseSteps('first-insights')
-      expect(steps).toHaveLength(1)
-    })
-
-    it('should return 3 steps for power-features phase', () => {
-      const steps = getPhaseSteps('power-features')
-      expect(steps).toHaveLength(3)
-    })
-  })
-
-  describe('getNextStep', () => {
-    it('should return meet-rosa after welcome-screen', () => {
-      expect(getNextStep('welcome-screen')).toBe('meet-rosa')
-    })
-
-    it('should return null after completion (last step)', () => {
-      expect(getNextStep('completion')).toBeNull()
-    })
-
-    it('should correctly traverse all steps', () => {
-      let step: OnboardingStep | null = 'welcome-screen'
-      const visited: OnboardingStep[] = [step]
+  describe('navigation', () => {
+    it('traverses the arrival ritual end to end', () => {
+      let step: ReturnType<typeof getNextStep> = 'arrival-website'
+      const visited: string[] = [step]
       while (step) {
-        step = getNextStep(step)
+        step = getNextStep(step, 'arrival')
         if (step) visited.push(step)
       }
-      expect(visited).toHaveLength(14)
-      expect(visited[0]).toBe('welcome-screen')
-      expect(visited[visited.length - 1]).toBe('completion')
-    })
-  })
-
-  describe('getPreviousStep', () => {
-    it('should return null before welcome-screen (first step)', () => {
-      expect(getPreviousStep('welcome-screen')).toBeNull()
+      expect(visited).toEqual(ARRIVAL_STEPS.map(s => s.id))
     })
 
-    it('should return welcome-screen before meet-rosa', () => {
-      expect(getPreviousStep('meet-rosa')).toBe('welcome-screen')
+    it('is bidirectional within a flow', () => {
+      for (const { flow, steps } of FLOWS) {
+        for (const step of steps.slice(0, -1)) {
+          const next = getNextStep(step.id, flow)
+          expect(next).not.toBeNull()
+          expect(getPreviousStep(next!, flow)).toBe(step.id)
+        }
+      }
     })
 
-    it('should return invite-team before completion', () => {
-      expect(getPreviousStep('completion')).toBe('invite-team')
+    it('returns null past either end', () => {
+      expect(getPreviousStep('arrival-website', 'arrival')).toBeNull()
+      expect(getNextStep('arrival-plan', 'arrival')).toBeNull()
+    })
+
+    it('defaults its flow to arrival', () => {
+      expect(getNextStep('arrival-website')).toBe('arrival-persona')
     })
   })
 
   describe('getProgressPercentage', () => {
-    it('should return ~7% for welcome-screen (step 1 of 14)', () => {
-      expect(getProgressPercentage('welcome-screen')).toBe(7)
-    })
-
-    it('should return 100% for completion (step 14 of 14)', () => {
-      expect(getProgressPercentage('completion')).toBe(100)
-    })
-
-    it('should return ~50% for mid-step', () => {
-      const mid = getProgressPercentage('facilities-setup') // index 7 → (8/14)*100 = 57
-      expect(mid).toBeGreaterThan(50)
-      expect(mid).toBeLessThan(60)
-    })
-
-    it('should always return values between 1 and 100', () => {
-      for (const step of ONBOARDING_STEPS) {
-        const pct = getProgressPercentage(step.id)
-        expect(pct).toBeGreaterThanOrEqual(1)
-        expect(pct).toBeLessThanOrEqual(100)
+    it('reaches 100% on the last step of each flow', () => {
+      for (const { flow, steps } of FLOWS) {
+        expect(getProgressPercentage(steps[steps.length - 1].id, flow)).toBe(100)
       }
     })
-  })
 
-  describe('isPhaseComplete', () => {
-    it('should return false when no steps completed', () => {
-      expect(isPhaseComplete('welcome', [])).toBe(false)
-    })
-
-    it('should return false when only some steps completed', () => {
-      expect(isPhaseComplete('welcome', ['welcome-screen', 'meet-rosa'])).toBe(false)
-    })
-
-    it('should return true when all welcome phase steps completed', () => {
-      expect(
-        isPhaseComplete('welcome', ['welcome-screen', 'meet-rosa', 'personalization', 'company-basics'])
-      ).toBe(true)
-    })
-
-    it('should return true for first-insights phase with single step completed', () => {
-      expect(isPhaseComplete('first-insights', ['foundation-complete'])).toBe(true)
+    it('always returns values between 1 and 100 across every flow', () => {
+      for (const { flow, steps } of FLOWS) {
+        for (const step of steps) {
+          const p = getProgressPercentage(step.id, flow)
+          expect(p).toBeGreaterThanOrEqual(1)
+          expect(p).toBeLessThanOrEqual(100)
+        }
+      }
     })
   })
 })

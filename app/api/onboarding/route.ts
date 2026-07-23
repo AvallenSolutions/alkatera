@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { INITIAL_ONBOARDING_STATE, INITIAL_MEMBER_ONBOARDING_STATE, INITIAL_FAST_TRACK_STATE, INITIAL_ADVISOR_ONBOARDING_STATE, INITIAL_ARRIVAL_STATE } from '@/lib/onboarding/types'
+import { INITIAL_MEMBER_ONBOARDING_STATE, INITIAL_ADVISOR_ONBOARDING_STATE, INITIAL_ARRIVAL_STATE } from '@/lib/onboarding/types'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -115,34 +115,29 @@ export async function GET(request: NextRequest) {
           .eq('organization_id', organizationId)
 
         if ((productCount ?? 0) > 0 || (facilityCount ?? 0) > 0) {
-          // Org already has data — mark onboarding as completed and persist it.
-          // We keep the historical 'owner' flow label for these pre-existing
-          // accounts since the wizard is already considered done.
+          // Org already has data — mark onboarding as completed and persist
+          // it under the arrival label. (Historic rows may still say 'owner'
+          // or 'fast_track'; the context retires those as completed on load.)
           const completedState = {
-            ...INITIAL_ONBOARDING_STATE,
+            ...INITIAL_ARRIVAL_STATE,
             completed: true,
             completedAt: new Date().toISOString(),
-            currentStep: 'completion' as const,
+            currentStep: 'arrival-plan' as const,
           }
           await supabase.from('onboarding_state').upsert(
             {
               organization_id: organizationId,
               user_id: user.id,
-              onboarding_flow: 'owner',
+              onboarding_flow: 'arrival',
               state: completedState,
               updated_at: new Date().toISOString(),
             },
             { onConflict: 'organization_id,user_id' }
           )
-          return NextResponse.json({ state: completedState, flow: 'owner' })
+          return NextResponse.json({ state: completedState, flow: 'arrival' })
         }
 
-        // Fresh owner — the arrival ritual (5 screens, studio language) is
-        // now the canonical first-run flow. Both the 14-step owner flow and
-        // the older 8-step fast-track flow remain available only for
-        // in-flight users (already-saved onboarding_state rows with that
-        // onboarding_flow continue on their path; this branch only fires for
-        // brand-new orgs with no saved row at all).
+        // Fresh owner — the arrival ritual is the only first-run flow.
         return NextResponse.json({
           state: { ...INITIAL_ARRIVAL_STATE, startedAt: new Date().toISOString() },
           flow: 'arrival',
@@ -166,7 +161,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       state: data.state,
-      flow: data.onboarding_flow || (isOwner ? 'owner' : isAdvisor ? 'advisor' : 'member'),
+      flow: data.onboarding_flow || (isOwner ? 'arrival' : isAdvisor ? 'advisor' : 'member'),
     })
   } catch (err) {
     console.error('Onboarding GET error:', err)

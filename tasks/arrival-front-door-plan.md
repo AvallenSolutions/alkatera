@@ -46,3 +46,26 @@ Login (org-less) → arrival mounts full-screen immediately (no redirect, no bla
 - OnboardingContext refetch race when the org appears mid-flow (mitigated by write-through + not resetting in-memory step).
 - Stripe webhook lag after checkout return: treat `?arrival=complete` return as provisional success while status flips (the gate already tolerates `trial`).
 - In-flight 5-step arrival users on staging/local: compat mapping in step 3.
+
+## Completion note (2026-07-23)
+
+The ritual is now the ONLY first-run flow, per Tim's decision:
+- The legacy 14-step owner flow and 8-step fast-track flow are deleted
+  (arrays, phase chrome, 20 step/dialog component files). Their flow labels
+  and step ids survive as compat literals only; OnboardingContext retires any
+  saved legacy state as completed on load (verified live: a planted in-flight
+  'owner'/'roadmap' row produced no wizard and fell to the unchanged
+  complete-subscription safety net).
+- /create-organization is deleted outright; next.config redirects it (308) to
+  /desk/, where AppLayout mounts the arrival for org-less owners.
+- The org-less ADVISOR edge no longer redirects (which had become a loop);
+  AppLayout renders the new components/studio/advisor-no-access.tsx in place.
+- Fresh-org click-through DONE locally end to end: login → arrival mounts
+  full-screen (1 of 7) → website step silently created the org via the edge
+  function (subscription 'pending', owner membership) → persona → confirm
+  (scrape fallback to hand-fill, as designed without local LLM keys) →
+  reveal + paint-my-house → facility (skip path) → estimate (volume →
+  benchmark estimate) → the plan step rendered with the Seed pick and trial
+  promises. Stripe checkout itself still needs the staging walk (no test
+  keys locally). Local note: `supabase functions serve --no-verify-jwt` must
+  be running for the org-creation edge function.

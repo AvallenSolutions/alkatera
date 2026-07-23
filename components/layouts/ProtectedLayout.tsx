@@ -56,7 +56,8 @@ export function ProtectedLayout({ children, requireOrganization = true }: Protec
   }
 
   if (requireOrganization && !currentOrganization) {
-    router.push('/create-organization')
+    // The arrival ritual (mounted by AppLayout on /desk/) owns org creation.
+    router.push('/desk/')
     return null
   }
 

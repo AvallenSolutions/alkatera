@@ -51,7 +51,7 @@ function SignupContent() {
             </div>
           </div>
 
-          {/* Signup Form — defaults to /create-organization */}
+          {/* Signup Form — lands on /desk/, where the arrival ritual takes over */}
           <SignupForm />
 
           {/* Existing user link */}

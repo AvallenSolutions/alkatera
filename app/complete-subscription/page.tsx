@@ -105,7 +105,7 @@ function CompleteSubscriptionContent() {
   async function handleStartTrial() {
     if (!currentOrganization) {
       toast.error('No organisation found. Please try again.')
-      router.push('/create-organization')
+      router.push('/desk/')
       return
     }
 
@@ -150,7 +150,7 @@ function CompleteSubscriptionContent() {
     if (!currentOrganization) {
       console.error('[CompleteSubscription] No current organization!')
       toast.error('No organisation found. Please try again.')
-      router.push('/create-organization')
+      router.push('/desk/')
       return
     }
 

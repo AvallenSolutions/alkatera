@@ -31,7 +31,6 @@ const DISALLOW = [
   '/reporting/',
   '/password-reset',
   '/update-password',
-  '/create-organization',
   '/complete-subscription',
   '/suspended',
   '/debug-auth', // dev-only auth debug page, never for search

@@ -258,7 +258,6 @@ const ROOM_PREFIXES: Array<[prefix: string, room: PlatformRoomKey]> = [
   ['/dependencies', 'wiring'],
   ['/admin', 'wiring'],
   ['/dev', 'wiring'],
-  ['/create-organization', 'wiring'],
   ['/complete-subscription', 'wiring'],
 ];
 

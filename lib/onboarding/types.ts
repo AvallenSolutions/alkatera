@@ -1,12 +1,16 @@
 /**
  * Onboarding Wizard Types
  *
- * Defines the five-phase onboarding journey for new Alkatera users.
- * Based on the ALKATERA_ONBOARDING_PLAN_2026.md specification.
+ * The arrival ritual (ARRIVAL_STEPS) is the one and only first-run flow for
+ * new owners: it owns org creation, the website scrape, the estimate and the
+ * plan step (see tasks/arrival-front-door-plan.md). Invited members and
+ * external advisors get their own short orientation flows.
  *
- * Owner flow: Full 14-step onboarding (create org, add data, etc.)
- * Member flow: Streamlined 6-step onboarding (welcome, learn platform)
- * Fast track flow: 5-step "see your footprint in 10 min" path
+ * The legacy 14-step owner flow and 8-step fast-track flow are GONE. Their
+ * flow labels and step ids survive only as compat literals so saved
+ * onboarding_state rows (including production rows arriving at cutover)
+ * still type-check; the OnboardingContext load path retires any such state
+ * as completed the moment it is read.
  */
 
 import type { PlatformRoomKey } from '@/components/studio/platform-rooms'
@@ -85,34 +89,10 @@ export interface OnboardingStepConfig {
   index: number
 }
 
-/**
- * @deprecated The 14-step owner flow. Superseded by ARRIVAL_STEPS (the arrival
- * ritual is the front door now). Kept only so in-flight users with an existing
- * `onboarding_flow='owner'` state can finish the flow they started; new owners
- * never get it. Do not extend — build on ARRIVAL_STEPS instead. Removal is a
- * later cleanup once no in-flight owner states remain.
- */
-export const ONBOARDING_STEPS: OnboardingStepConfig[] = [
-  // Phase 1
-  { id: 'welcome-screen', phase: 'welcome', title: 'Welcome', description: 'Welcome to Alkatera', skippable: false, index: 0 },
-  { id: 'meet-rosa', phase: 'welcome', title: 'Meet Rosa', description: 'Your sustainability guide', skippable: false, index: 1 },
-  { id: 'personalization', phase: 'welcome', title: 'Personalization', description: 'Tell us about yourself', skippable: false, index: 2 },
-  { id: 'company-basics', phase: 'welcome', title: 'Company Details', description: 'Add your company info', skippable: true, index: 3 },
-  // Phase 2
-  { id: 'roadmap', phase: 'quick-wins', title: 'Your Roadmap', description: 'Your sustainability journey', skippable: false, index: 4 },
-  { id: 'preview-dashboard', phase: 'quick-wins', title: 'Preview', description: 'See your future dashboard', skippable: true, index: 5 },
-  { id: 'first-product', phase: 'quick-wins', title: 'First Product', description: 'Add your first product', skippable: true, index: 6 },
-  // Phase 3
-  { id: 'facilities-setup', phase: 'core-setup', title: 'Facilities', description: 'Map your operations', skippable: true, index: 7 },
-  { id: 'core-metrics', phase: 'core-setup', title: 'Metrics', description: 'What will you track?', skippable: true, index: 8 },
-  { id: 'data-entry-method', phase: 'core-setup', title: 'Data Entry', description: 'Choose how to add data', skippable: true, index: 9 },
-  // Phase 4
-  { id: 'foundation-complete', phase: 'first-insights', title: 'Insights', description: 'Your progress so far', skippable: false, index: 10 },
-  // Phase 5
-  { id: 'feature-showcase', phase: 'power-features', title: 'Features', description: 'Unlock capabilities', skippable: false, index: 11 },
-  { id: 'invite-team', phase: 'power-features', title: 'Team', description: 'Invite colleagues', skippable: true, index: 12 },
-  { id: 'completion', phase: 'power-features', title: 'Complete', description: 'You did it!', skippable: false, index: 13 },
-]
+// The 14-step owner flow lived here. Removed 2026-07-23: the arrival ritual
+// is the only first-run flow for owners. The owner step ids remain in the
+// OnboardingStep union (above) purely so legacy saved states parse.
+
 
 /** Member onboarding: streamlined 6-step flow for invited team members */
 export const MEMBER_ONBOARDING_STEPS: OnboardingStepConfig[] = [
@@ -132,33 +112,9 @@ export const ADVISOR_ONBOARDING_STEPS: OnboardingStepConfig[] = [
   { id: 'advisor-completion', phase: 'quick-wins', title: 'Complete', description: 'Ready to advise', skippable: false, index: 3 },
 ]
 
-export const TOTAL_STEPS = ONBOARDING_STEPS.length
-export const TOTAL_MEMBER_STEPS = MEMBER_ONBOARDING_STEPS.length
-export const TOTAL_ADVISOR_STEPS = ADVISOR_ONBOARDING_STEPS.length
-
-/**
- * @deprecated The 8-step Fast Track flow. Superseded by ARRIVAL_STEPS, which
- * reuses several of this flow's step components (confirm/reveal/estimate) but
- * is the canonical front door. Kept for in-flight `onboarding_flow='fast_track'`
- * states only; new owners get the arrival ritual. Do not extend. Removal is a
- * later cleanup once no in-flight fast-track states remain.
- */
-export const FAST_TRACK_STEPS: OnboardingStepConfig[] = [
-  { id: 'welcome-screen',        phase: 'welcome',        title: 'Welcome',         description: 'Welcome to alkatera',          skippable: false, index: 0 },
-  { id: 'fast-track-setup',      phase: 'welcome',        title: 'Your Company',    description: 'Tell us about your business',  skippable: false, index: 1 },
-  { id: 'fast-track-reveal',     phase: 'welcome',        title: 'Here You Are',    description: 'What we found on your website', skippable: true, index: 2 },
-  { id: 'fast-track-import',     phase: 'quick-wins',     title: 'Bring Your Data', description: 'Connect or import what you have', skippable: true, index: 3 },
-  { id: 'fast-track-products',   phase: 'quick-wins',     title: 'Your Products',   description: 'Add or refine products',       skippable: true,  index: 4 },
-  { id: 'fast-track-facility',   phase: 'quick-wins',     title: 'Your Facility',   description: 'Where you produce',            skippable: true,  index: 5 },
-  { id: 'fast-track-estimate',   phase: 'first-insights', title: 'Your Footprint',  description: 'Your instant estimate',        skippable: false, index: 6 },
-  { id: 'fast-track-target',     phase: 'first-insights', title: 'Your Target',     description: 'Set a reduction goal',         skippable: true,  index: 7 },
-  { id: 'fast-track-completion', phase: 'power-features', title: 'All Set',         description: 'Next steps to improve',        skippable: false, index: 8 },
-]
-
-export const TOTAL_FAST_TRACK_STEPS = FAST_TRACK_STEPS.length
-
-/** Phases shown in the fast track top bar */
-export const FAST_TRACK_PHASES: OnboardingPhase[] = ['welcome', 'quick-wins', 'first-insights', 'power-features']
+// The 8-step fast-track flow lived here. Removed 2026-07-23 along with the
+// owner flow; ArrivalWebsiteStep/ArrivalEstimateStep and the arrival-confirm/
+// arrival-reveal aliases carry forward the pieces of it the ritual reuses.
 
 /**
  * Arrival onboarding: the 6-screen studio-language ritual that is now the
@@ -183,19 +139,10 @@ export const ARRIVAL_STEPS: OnboardingStepConfig[] = [
 
 export const TOTAL_ARRIVAL_STEPS = ARRIVAL_STEPS.length
 
-export const PHASE_CONFIG: Record<OnboardingPhase, { label: string; duration: string; color: string }> = {
-  'welcome': { label: 'Welcome & Orientation', duration: '~3 min', color: 'lime' },
-  'quick-wins': { label: 'Quick Wins', duration: '~5 min', color: 'cyan' },
-  'core-setup': { label: 'Core Data Setup', duration: '~8 min', color: 'purple' },
-  'first-insights': { label: 'First Insights', duration: '~2 min', color: 'emerald' },
-  'power-features': { label: 'Power Features', duration: '~2 min', color: 'lime' },
-}
-
-/** Phases used in the member onboarding flow */
-export const MEMBER_PHASES: OnboardingPhase[] = ['welcome', 'quick-wins']
-
-/** Phases used in the advisor onboarding flow */
-export const ADVISOR_PHASES: OnboardingPhase[] = ['welcome', 'quick-wins']
+// PHASE_CONFIG and the per-flow phase lists are gone with the owner and
+// fast-track flows: every surviving flow renders the quiet mono step counter,
+// so the wizard no longer draws a phase bar. OnboardingPhase itself stays --
+// step configs still carry a phase label.
 
 export type UserRole =
   | 'sustainability_manager'
@@ -378,40 +325,10 @@ export interface RoomOnboardingState {
   checklistDismissed?: boolean
 }
 
-export const INITIAL_ONBOARDING_STATE: OnboardingState = {
-  completed: false,
-  dismissed: false,
-  currentStep: 'welcome-screen',
-  completedSteps: [],
-  personalization: {},
-  dashboardGuideCompleted: false,
-  searchGuideCompleted: false,
-  productGuideCompleted: false,
-  emissionsGuideCompleted: false,
-  emissionsGuideDismissed: false,
-  recipeSidebarTourCompleted: false,
-  factorInfoHintCompleted: false,
-}
-
 export const INITIAL_MEMBER_ONBOARDING_STATE: OnboardingState = {
   completed: false,
   dismissed: false,
   currentStep: 'member-welcome',
-  completedSteps: [],
-  personalization: {},
-  dashboardGuideCompleted: false,
-  searchGuideCompleted: false,
-  productGuideCompleted: false,
-  emissionsGuideCompleted: false,
-  emissionsGuideDismissed: false,
-  recipeSidebarTourCompleted: false,
-  factorInfoHintCompleted: false,
-}
-
-export const INITIAL_FAST_TRACK_STATE: OnboardingState = {
-  completed: false,
-  dismissed: false,
-  currentStep: 'welcome-screen',
   completedSteps: [],
   personalization: {},
   dashboardGuideCompleted: false,
@@ -460,43 +377,34 @@ export const INITIAL_ADVISOR_ONBOARDING_STATE: OnboardingState = {
 /** Get the steps array for the given flow */
 export function getStepsForFlow(flow: OnboardingFlow): OnboardingStepConfig[] {
   if (flow === 'member') return MEMBER_ONBOARDING_STEPS
-  if (flow === 'fast_track') return FAST_TRACK_STEPS
   if (flow === 'advisor') return ADVISOR_ONBOARDING_STEPS
-  if (flow === 'arrival') return ARRIVAL_STEPS
-  return ONBOARDING_STEPS
+  // 'arrival' -- and the legacy 'owner' / 'fast_track' labels, whose saved
+  // states are retired as completed on load and never step again.
+  return ARRIVAL_STEPS
 }
 
 /** Get the initial state for the given flow */
 export function getInitialStateForFlow(flow: OnboardingFlow): OnboardingState {
   if (flow === 'member') return { ...INITIAL_MEMBER_ONBOARDING_STATE }
-  if (flow === 'fast_track') return { ...INITIAL_FAST_TRACK_STATE }
   if (flow === 'advisor') return { ...INITIAL_ADVISOR_ONBOARDING_STATE }
-  if (flow === 'arrival') return { ...INITIAL_ARRIVAL_STATE }
-  return { ...INITIAL_ONBOARDING_STATE }
+  return { ...INITIAL_ARRIVAL_STATE }
 }
 
 /** Get step config — searches all step arrays */
 export function getStepConfig(step: OnboardingStep): OnboardingStepConfig {
-  const ownerStep = ONBOARDING_STEPS.find(s => s.id === step)
-  if (ownerStep) return ownerStep
   const memberStep = MEMBER_ONBOARDING_STEPS.find(s => s.id === step)
   if (memberStep) return memberStep
-  const fastTrackStep = FAST_TRACK_STEPS.find(s => s.id === step)
-  if (fastTrackStep) return fastTrackStep
   const advisorStep = ADVISOR_ONBOARDING_STEPS.find(s => s.id === step)
   if (advisorStep) return advisorStep
   const arrivalStep = ARRIVAL_STEPS.find(s => s.id === step)
   if (arrivalStep) return arrivalStep
-  // Fallback — should never happen
-  return ONBOARDING_STEPS[0]
-}
-
-export function getPhaseSteps(phase: OnboardingPhase): OnboardingStepConfig[] {
-  return ONBOARDING_STEPS.filter(s => s.phase === phase)
+  // Legacy owner/fast-track ids from old saved states land here; those
+  // states are retired as completed on load, so this config never renders.
+  return ARRIVAL_STEPS[0]
 }
 
 /** Get next step within the given flow */
-export function getNextStep(currentStep: OnboardingStep, flow: OnboardingFlow = 'owner'): OnboardingStep | null {
+export function getNextStep(currentStep: OnboardingStep, flow: OnboardingFlow = 'arrival'): OnboardingStep | null {
   const steps = getStepsForFlow(flow)
   const idx = steps.findIndex(s => s.id === currentStep)
   if (idx === -1) return null
@@ -505,7 +413,7 @@ export function getNextStep(currentStep: OnboardingStep, flow: OnboardingFlow = 
 }
 
 /** Get previous step within the given flow */
-export function getPreviousStep(currentStep: OnboardingStep, flow: OnboardingFlow = 'owner'): OnboardingStep | null {
+export function getPreviousStep(currentStep: OnboardingStep, flow: OnboardingFlow = 'arrival'): OnboardingStep | null {
   const steps = getStepsForFlow(flow)
   const idx = steps.findIndex(s => s.id === currentStep)
   if (idx <= 0) return null
@@ -514,14 +422,9 @@ export function getPreviousStep(currentStep: OnboardingStep, flow: OnboardingFlo
 }
 
 /** Get progress percentage within the given flow */
-export function getProgressPercentage(currentStep: OnboardingStep, flow: OnboardingFlow = 'owner'): number {
+export function getProgressPercentage(currentStep: OnboardingStep, flow: OnboardingFlow = 'arrival'): number {
   const steps = getStepsForFlow(flow)
   const idx = steps.findIndex(s => s.id === currentStep)
   if (idx === -1) return 0
   return Math.round(((idx + 1) / steps.length) * 100)
-}
-
-export function isPhaseComplete(phase: OnboardingPhase, completedSteps: OnboardingStep[]): boolean {
-  const phaseSteps = getPhaseSteps(phase)
-  return phaseSteps.every(s => completedSteps.includes(s.id))
 }

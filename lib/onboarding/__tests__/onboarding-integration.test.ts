@@ -1,229 +1,128 @@
 import { describe, it, expect } from 'vitest'
 import {
-  ONBOARDING_STEPS,
-  INITIAL_ONBOARDING_STATE,
+  ARRIVAL_STEPS,
+  INITIAL_ARRIVAL_STATE,
+  getInitialStateForFlow,
+  getStepsForFlow,
   getStepConfig,
   getNextStep,
   getPreviousStep,
   getProgressPercentage,
-  isPhaseComplete,
-  getPhaseSteps,
+  type OnboardingFlow,
   type OnboardingState,
   type OnboardingStep,
 } from '../types'
 
 /**
- * Integration-level tests that verify the onboarding flow logic works correctly
- * when simulating a user walking through all steps.
+ * Integration-level tests that simulate a user walking the flows end to end.
+ * The arrival ritual is the only first-run flow for owners; member and
+ * advisor orientations walk the same machinery.
  */
 describe('Onboarding Flow Integration', () => {
-  describe('Full wizard walkthrough', () => {
-    it('should be possible to complete the entire wizard sequentially', () => {
-      let state: OnboardingState = { ...INITIAL_ONBOARDING_STATE }
-      let stepsWalked = 0
-      const maxSteps = 20 // Safety limit
+  const walk = (flow: OnboardingFlow) => {
+    let state: OnboardingState = { ...getInitialStateForFlow(flow) }
+    let stepsWalked = 0
+    const maxSteps = 20 // Safety limit
 
-      while (!state.completed && stepsWalked < maxSteps) {
-        const config = getStepConfig(state.currentStep)
-        expect(config).toBeTruthy()
+    while (!state.completed && stepsWalked < maxSteps) {
+      const config = getStepConfig(state.currentStep)
+      expect(config).toBeTruthy()
 
-        // "Complete" the step
-        state = {
-          ...state,
-          completedSteps: state.completedSteps.includes(state.currentStep)
-            ? state.completedSteps
-            : [...state.completedSteps, state.currentStep],
-        }
-
-        const next = getNextStep(state.currentStep)
-        if (next) {
-          state = { ...state, currentStep: next }
-        } else {
-          // Last step reached
-          state = { ...state, completed: true, completedAt: new Date().toISOString() }
-        }
-        stepsWalked++
+      state = {
+        ...state,
+        completedSteps: state.completedSteps.includes(state.currentStep)
+          ? state.completedSteps
+          : [...state.completedSteps, state.currentStep],
       }
 
+      const next = getNextStep(state.currentStep, flow)
+      if (next) {
+        state = { ...state, currentStep: next }
+      } else {
+        state = { ...state, completed: true, completedAt: new Date().toISOString() }
+      }
+      stepsWalked++
+    }
+
+    return { state, stepsWalked }
+  }
+
+  describe('Full walkthroughs', () => {
+    it('completes the arrival ritual sequentially in exactly its 7 steps', () => {
+      const { state, stepsWalked } = walk('arrival')
       expect(state.completed).toBe(true)
-      expect(stepsWalked).toBe(14) // Exactly 14 steps
-      expect(state.completedSteps).toHaveLength(14)
+      expect(stepsWalked).toBe(ARRIVAL_STEPS.length)
+      expect(state.completedSteps).toHaveLength(ARRIVAL_STEPS.length)
     })
 
-    it('should be possible to skip skippable steps', () => {
-      let state: OnboardingState = { ...INITIAL_ONBOARDING_STATE }
-      let stepsWalked = 0
-      const skippedSteps: OnboardingStep[] = []
-
-      while (!state.completed && stepsWalked < 20) {
-        const config = getStepConfig(state.currentStep)
-
-        if (config.skippable) {
-          // Skip this step (don't add to completedSteps)
-          skippedSteps.push(state.currentStep)
-        } else {
-          // Complete the step
-          state = {
-            ...state,
-            completedSteps: [...state.completedSteps, state.currentStep],
-          }
-        }
-
-        const next = getNextStep(state.currentStep)
-        if (next) {
-          state = { ...state, currentStep: next }
-        } else {
-          state = { ...state, completed: true }
-        }
-        stepsWalked++
+    it('completes the member and advisor orientations sequentially', () => {
+      for (const flow of ['member', 'advisor'] as const) {
+        const { state, stepsWalked } = walk(flow)
+        expect(state.completed).toBe(true)
+        expect(stepsWalked).toBe(getStepsForFlow(flow).length)
       }
+    })
 
+    it('walks a legacy-labelled flow as the arrival ritual', () => {
+      const { state, stepsWalked } = walk('owner')
       expect(state.completed).toBe(true)
-      // Should have skipped some steps
-      expect(skippedSteps.length).toBeGreaterThan(0)
-      // Skipped steps should all be skippable
-      for (const s of skippedSteps) {
-        expect(getStepConfig(s).skippable).toBe(true)
-      }
-      // Completed steps count should be less than total
-      expect(state.completedSteps.length).toBeLessThan(14)
+      expect(stepsWalked).toBe(ARRIVAL_STEPS.length)
+      expect(state.completedSteps[0]).toBe('arrival-website')
     })
   })
 
-  describe('Phase completion tracking', () => {
-    it('should track when welcome phase is complete', () => {
-      const completedSteps: OnboardingStep[] = [
-        'welcome-screen', 'meet-rosa', 'personalization', 'company-basics'
-      ]
-      expect(isPhaseComplete('welcome', completedSteps)).toBe(true)
-      expect(isPhaseComplete('quick-wins', completedSteps)).toBe(false)
-    })
-
-    it('should track progressive phase completion', () => {
-      const allSteps: OnboardingStep[] = ONBOARDING_STEPS.map(s => s.id)
-      const phases = ['welcome', 'quick-wins', 'core-setup', 'first-insights', 'power-features'] as const
-
-      // Complete steps one by one and check phase completion
-      const completed: OnboardingStep[] = []
-      for (const step of allSteps) {
-        completed.push(step)
-
-        // Check which phases are now complete
-        for (const phase of phases) {
-          const phaseSteps = getPhaseSteps(phase)
-          const shouldBeComplete = phaseSteps.every(s => completed.includes(s.id))
-          expect(isPhaseComplete(phase, completed)).toBe(shouldBeComplete)
-        }
+  describe('Skippable steps', () => {
+    it('lets the arrival ritual skip everything it marks skippable', () => {
+      const skippable = ARRIVAL_STEPS.filter(s => s.skippable).map(s => s.id)
+      // Everything between the opener and the estimate/plan close is optional.
+      expect(skippable).toEqual(['arrival-persona', 'arrival-confirm', 'arrival-reveal', 'arrival-facility'])
+      // Skipping still reaches the end.
+      let step: OnboardingStep | null = 'arrival-website'
+      let hops = 0
+      while (step && hops < 20) {
+        step = getNextStep(step, 'arrival')
+        hops++
       }
+      expect(hops).toBe(ARRIVAL_STEPS.length)
     })
   })
 
   describe('Progress calculation', () => {
-    it('should show monotonically increasing progress as steps advance', () => {
-      let prevProgress = 0
-      let step: OnboardingStep | null = 'welcome-screen'
-
-      while (step) {
-        const progress = getProgressPercentage(step)
-        expect(progress).toBeGreaterThanOrEqual(prevProgress)
-        prevProgress = progress
-        step = getNextStep(step)
+    it('shows monotonically increasing progress as arrival steps advance', () => {
+      let last = 0
+      for (const step of ARRIVAL_STEPS) {
+        const p = getProgressPercentage(step.id, 'arrival')
+        expect(p).toBeGreaterThan(last)
+        last = p
       }
-    })
-
-    it('should reach 100% at the completion step', () => {
-      expect(getProgressPercentage('completion')).toBe(100)
+      expect(last).toBe(100)
     })
   })
 
   describe('Navigation bidirectional', () => {
-    it('going next then previous should return to the same step', () => {
-      for (const step of ONBOARDING_STEPS) {
-        if (step.index === 0 || step.index === ONBOARDING_STEPS.length - 1) continue
-
-        const next = getNextStep(step.id)
-        if (next) {
-          const backToOriginal = getPreviousStep(next)
-          expect(backToOriginal).toBe(step.id)
-        }
+    it('going next then previous returns to the same step', () => {
+      for (const step of ARRIVAL_STEPS.slice(0, -1)) {
+        const next = getNextStep(step.id, 'arrival')!
+        expect(getPreviousStep(next, 'arrival')).toBe(step.id)
       }
-    })
-
-    it('going previous then next should return to the same step', () => {
-      for (const step of ONBOARDING_STEPS) {
-        if (step.index === 0) continue
-
-        const prev = getPreviousStep(step.id)
-        if (prev) {
-          const backToOriginal = getNextStep(prev)
-          expect(backToOriginal).toBe(step.id)
-        }
-      }
-    })
-  })
-
-  describe('Step configuration completeness', () => {
-    it('all steps should have title and description', () => {
-      for (const step of ONBOARDING_STEPS) {
-        expect(step.title).toBeTruthy()
-        expect(step.title.length).toBeGreaterThan(0)
-        expect(step.description).toBeTruthy()
-        expect(step.description.length).toBeGreaterThan(0)
-      }
-    })
-
-    it('first and last steps should not be skippable', () => {
-      expect(getStepConfig('welcome-screen').skippable).toBe(false)
-      expect(getStepConfig('completion').skippable).toBe(false)
-    })
-
-    it('personalization step should not be skippable', () => {
-      expect(getStepConfig('personalization').skippable).toBe(false)
-    })
-
-    it('company-basics, first-product, facilities-setup should be skippable', () => {
-      expect(getStepConfig('company-basics').skippable).toBe(true)
-      expect(getStepConfig('first-product').skippable).toBe(true)
-      expect(getStepConfig('facilities-setup').skippable).toBe(true)
     })
   })
 
   describe('Dismiss/resume flow', () => {
     it('dismissed state should prevent onboarding from showing', () => {
-      const state: OnboardingState = {
-        ...INITIAL_ONBOARDING_STATE,
-        dismissed: true,
-        currentStep: 'personalization',
-      }
-      // The context checks !completed && !dismissed
-      expect(state.completed || state.dismissed).toBe(true)
+      const state: OnboardingState = { ...INITIAL_ARRIVAL_STATE, dismissed: true }
+      const shouldShow = !state.completed && !state.dismissed
+      expect(shouldShow).toBe(false)
     })
 
-    it('should be possible to resume from a saved step', () => {
-      const savedState: OnboardingState = {
-        completed: false,
-        dismissed: false,
-        currentStep: 'facilities-setup',
-        completedSteps: ['welcome-screen', 'meet-rosa', 'personalization', 'company-basics', 'roadmap', 'preview-dashboard', 'first-product'],
-        personalization: {
-          role: 'sustainability_manager',
-          beverageTypes: ['spirits'],
-          companySize: '11-50',
-          primaryGoals: ['track_emissions', 'reduce_impact'],
-        },
-        startedAt: '2026-02-01T10:00:00Z',
+    it('resumes from a saved mid-ritual step', () => {
+      const state: OnboardingState = {
+        ...INITIAL_ARRIVAL_STATE,
+        currentStep: 'arrival-facility',
+        completedSteps: ['arrival-website', 'arrival-persona', 'arrival-confirm', 'arrival-reveal'],
       }
-
-      // Should be at facilities-setup
-      expect(savedState.currentStep).toBe('facilities-setup')
-      expect(getStepConfig(savedState.currentStep).phase).toBe('core-setup')
-
-      // Progress should reflect current position
-      const progress = getProgressPercentage(savedState.currentStep)
-      expect(progress).toBeGreaterThan(50)
-
-      // Next step should be core-metrics
-      expect(getNextStep(savedState.currentStep)).toBe('core-metrics')
+      expect(getStepConfig(state.currentStep).id).toBe('arrival-facility')
+      expect(getNextStep(state.currentStep, 'arrival')).toBe('arrival-estimate')
     })
   })
 })

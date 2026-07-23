@@ -9,7 +9,6 @@ import {
   OnboardingState,
   OnboardingStep,
   PersonalizationData,
-  INITIAL_ONBOARDING_STATE,
   INITIAL_MEMBER_ONBOARDING_STATE,
   INITIAL_ARRIVAL_STATE,
   getNextStep,
@@ -17,7 +16,6 @@ import {
   getStepConfig,
   getProgressPercentage,
   getInitialStateForFlow,
-  FAST_TRACK_STEPS,
   ARRIVAL_STEPS,
 } from './types'
 import { trackOnboarding } from './telemetry'
@@ -79,8 +77,6 @@ interface OnboardingContextType {
   dismissRoomChecklist: (room: PlatformRoomKey) => void
   /** Dismiss a coachmark by id (components/studio/coachmark.tsx) */
   dismissCoachmark: (id: string) => void
-  /** Switch to a different onboarding flow and reinitialise steps */
-  setFlow: (flow: OnboardingFlow) => void
   /** Reset onboarding (for testing) */
   resetOnboarding: () => void
   /**
@@ -96,7 +92,7 @@ interface OnboardingContextType {
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined)
 
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<OnboardingState>(INITIAL_ONBOARDING_STATE)
+  const [state, setState] = useState<OnboardingState>(INITIAL_ARRIVAL_STATE)
   const [isLoading, setIsLoading] = useState(true)
   const [onboardingFlow, setOnboardingFlow] = useState<OnboardingFlow>('arrival')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -228,17 +224,23 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         if (res.ok) {
           const data = await res.json()
           // Set the flow from the API response
-          const serverFlow: OnboardingFlow = data.flow || (isAdvisor ? 'advisor' : isOwner ? 'arrival' : 'member')
+          // Legacy flow labels ('owner' 14-step, 'fast_track' 8-step) are
+          // retired: their saved states never step again. Any such row --
+          // including production rows arriving at cutover -- is treated as
+          // completed under the arrival label; the desk's migration
+          // orientation (desk-welcome) is the reorientation surface now.
+          const rawFlow: string | null = data.flow || null
+          const isLegacyFlow = rawFlow === 'owner' || rawFlow === 'fast_track'
+          const serverFlow: OnboardingFlow = isLegacyFlow
+            ? 'arrival'
+            : (rawFlow as OnboardingFlow) || (isAdvisor ? 'advisor' : isOwner ? 'arrival' : 'member')
           setOnboardingFlow(serverFlow)
 
           if (data.state) {
             // Replay any updates the user made while we were fetching
             let merged = data.state as OnboardingState
-            // Migration: the 'connect-tools' step was removed from the owner
-            // flow. If a user's saved state still points at it, advance them
-            // to 'first-product' so the wizard doesn't render a blank step.
-            if ((merged.currentStep as string) === 'connect-tools') {
-              merged = { ...merged, currentStep: 'first-product' }
+            if (isLegacyFlow && !merged.completed) {
+              merged = { ...merged, completed: true, completedAt: merged.completedAt ?? new Date().toISOString() }
             }
             // Compat: the arrival ritual's old 'arrival-welcome' (a single
             // continue button) and 'arrival-company' steps were retired when
@@ -385,12 +387,10 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     // Use the appropriate completion step for the flow
     const completionStep =
       flowRef.current === 'member' ? 'member-completion' :
-      flowRef.current === 'fast_track' ? 'fast-track-completion' :
       flowRef.current === 'advisor' ? 'advisor-completion' :
       // arrival-plan (the trial/plan step) doubles as the "forest has
       // started" close — it's the last screen in the ritual.
-      flowRef.current === 'arrival' ? 'arrival-plan' :
-      'completion'
+      'arrival-plan'
     const completedState: OnboardingState = {
       ...state,
       completed: true,
@@ -514,27 +514,9 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     }))
   }, [updateState])
 
-  const setFlow = useCallback((flow: OnboardingFlow) => {
-    setOnboardingFlow(flow)
-    flowRef.current = flow
-    // Reinitialise to the first step of the new flow, preserving personalization
-    setState(prev => {
-      const newState: OnboardingState = {
-        ...getInitialStateForFlow(flow),
-        personalization: prev.personalization,
-        startedAt: prev.startedAt,
-        // Advance past welcome-screen since it triggered this switch
-        currentStep: flow === 'fast_track'
-          ? (FAST_TRACK_STEPS[1]?.id ?? 'fast-track-setup')
-          : flow === 'arrival'
-          ? (ARRIVAL_STEPS[1]?.id ?? 'arrival-persona')
-          : (flow === 'member' ? 'member-welcome' : 'meet-rosa'),
-        completedSteps: ['welcome-screen'],
-      }
-      saveState(newState)
-      return newState
-    })
-  }, [saveState])
+  // setFlow is gone: the welcome screen that offered a flow switch went with
+  // the owner and fast-track flows. The flow is decided by the API (or the
+  // pre-org arrival branch) and never changes mid-ritual.
 
   const resetOnboarding = useCallback(() => {
     sessionDismissedRef.current = false
@@ -596,7 +578,6 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         markRoomIntroSeen,
         dismissRoomChecklist,
         dismissCoachmark,
-        setFlow,
         resetOnboarding,
         attachOrganizationId,
       }}
