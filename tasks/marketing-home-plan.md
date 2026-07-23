@@ -49,9 +49,22 @@ Deliberate decisions:
 - Old marketing/components/HomePageClient.tsx left in place (untouched) since Navigation/
   Footer are shared by other public pages; only app/page.tsx switched to the new client.
 
-Still open for other pages/sessions: Knowledge.dc.html, Login.dc.html,
-Pricing.dc.html; real newsletter + greenwash-scan endpoints; SEO structured data parity
-with the old home if wanted.
+Still open for other pages/sessions: Knowledge.dc.html, Login.dc.html; real newsletter,
+trial-signup + greenwash-scan endpoints; SEO structured data parity with the old home
+if wanted.
+
+## Pricing page (added 2026-07-23, commit 0ef2ffdf)
+Pricing.dc.html ported to marketing/pricing/PricingClient.tsx, wired at /pricing (the
+route Home and Platform were already linking to). Design correction requested by Tim:
+Blossom's plan icon is now a FLOWER (species poppy) instead of the design's hawthorn
+tree, so the plans read seed → flower → canopy. First tried the oxeye daisy but its
+cream petals are invisible on the cream card, hence the poppy. Species SVGs added to
+public/assets/species/ (seed head, poppy, oak, plus daisy + campion for the Knowledge
+page later). SiteNav/SiteFooter gained onTrialClick/onCta overrides so this page's CTAs
+scroll to #trial in-page. Trial form is client-side only (design parity), same as the
+home newsletter: needs a real endpoint before go-live. Browser-verified: hero, plan
+cards (badge, struck prices, poppy), sticky-header comparison table with hover rows,
+trial section, footer.
 
 ## Platform page (added 2026-07-23, commit c7bc20ca)
 Platform.dc.html ported to marketing/platform/PlatformClient.tsx, wired at /platform
