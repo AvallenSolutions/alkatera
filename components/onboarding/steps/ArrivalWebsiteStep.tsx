@@ -2,13 +2,36 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useOnboarding } from '@/lib/onboarding'
+import type { BeverageType, AnnualProductionBucket } from '@/lib/onboarding'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
 import { readDomainGuess } from '@/lib/enrich/arrival-handoff'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { CountrySelect } from '@/components/shared/CountrySelect'
+import { COUNTRIES } from '@/lib/countries'
 import { Eyebrow, PillButton } from '@/components/studio'
 import { ArrowRight, Globe } from 'lucide-react'
+import { cn } from '@/lib/utils'
+
+/** The no-website archetype tiles. Each drink type selects a benchmark
+ * category (the same names ArrivalEstimateStep maps to) so the estimate is
+ * real, not a placeholder. */
+const DRINK_OPTIONS: { value: BeverageType; label: string }[] = [
+  { value: 'spirits', label: 'Spirits' },
+  { value: 'beer', label: 'Beer' },
+  { value: 'cider', label: 'Cider' },
+  { value: 'wine', label: 'Wine' },
+  { value: 'rtd', label: 'Ready to drink' },
+  { value: 'non_alcoholic', label: 'Soft drinks' },
+]
+
+const VOLUME_OPTIONS: { value: AnnualProductionBucket; label: string; sublabel: string }[] = [
+  { value: '<10k', label: 'A few thousand bottles', sublabel: 'Micro / craft' },
+  { value: '10k-100k', label: 'Tens of thousands', sublabel: 'Small producer' },
+  { value: '100k-1M', label: 'Hundreds of thousands', sublabel: 'Regional brand' },
+  { value: '1M+', label: 'Millions', sublabel: 'Large producer' },
+]
 
 /**
  * Screen 1 of 6: the front door itself. One question — "Where can we find
@@ -73,6 +96,11 @@ export function ArrivalWebsiteStep() {
   const [error, setError] = useState<string | null>(null)
   const [prefilled, setPrefilled] = useState(false)
   const submittedRef = useRef(false)
+  // The no-website path is a three-tap archetype flow (name + country → drink →
+  // volume) so the desk arrives benchmark-warm instead of sparse.
+  const [nameStep, setNameStep] = useState<'name' | 'drink' | 'volume'>('name')
+  const [countryCode, setCountryCode] = useState('')
+  const [drinkType, setDrinkType] = useState<BeverageType | null>(null)
 
   // Compat: an in-flight 'arrival-welcome' user already has an org from the
   // old /create-organization detour — never create a second one.
@@ -192,13 +220,26 @@ export function ArrivalWebsiteStep() {
     }
   }
 
-  const handleNoWebsiteSubmit = async () => {
+  const handleNameNext = () => {
+    if (!companyName.trim()) { setError('Enter your company name.'); return }
+    if (!countryCode) { setError('Where are you based?'); return }
+    setError(null)
+    setNameStep('drink')
+  }
+
+  const selectDrink = (value: BeverageType) => {
+    setDrinkType(value)
+    setError(null)
+    setNameStep('volume')
+  }
+
+  /** Final archetype step: create the org and seed the benchmark inputs
+   * (drink category, country, volume bucket) so the confirm screen reads warm
+   * and the estimate step's benchmark path produces a real number — no scrape,
+   * no products to seed, everything provenance 'estimated'. */
+  const selectVolume = async (bucket: AnnualProductionBucket) => {
     if (isSubmitting || submittedRef.current) return
     const trimmed = companyName.trim()
-    if (!trimmed) {
-      setError('Enter your company name.')
-      return
-    }
     setIsSubmitting(true)
     setError(null)
     try {
@@ -207,6 +248,12 @@ export function ArrivalWebsiteStep() {
       }
       submittedRef.current = true
       fireCompaniesHouse(trimmed)
+      const countryLabel = COUNTRIES.find(c => c.value === countryCode)?.label
+      updatePersonalization({
+        ...(drinkType ? { beverageTypes: [drinkType] } : {}),
+        ...(countryLabel ? { country: countryLabel } : {}),
+        annualProductionBucket: bucket,
+      })
       completeStep()
     } catch (err) {
       setError(err instanceof Error ? err.message : "That didn't work. Try again.")
@@ -260,29 +307,92 @@ export function ArrivalWebsiteStep() {
           </div>
         ) : (
           <div className="space-y-3 text-left">
-            <Label className="text-sm font-medium text-foreground">What is your company called?</Label>
-            <Input
-              placeholder='e.g., "Oxford Artisan Distillery"'
-              value={companyName}
-              onChange={e => { setCompanyName(e.target.value); setError(null) }}
-              onKeyDown={e => { if (e.key === 'Enter') handleNoWebsiteSubmit() }}
-              disabled={isSubmitting}
-              aria-invalid={!!error}
-              className="h-11"
-              autoFocus
-            />
-            {error && <p className="text-xs text-studio-stale">{error}</p>}
-            <PillButton onClick={handleNoWebsiteSubmit} disabled={isSubmitting} variant="ink" size="md" className="w-full">
-              {isSubmitting ? 'One moment…' : (<>Continue<ArrowRight className="h-4 w-4" /></>)}
-            </PillButton>
-            <button
-              type="button"
-              onClick={() => { setMode('website'); setError(null) }}
-              disabled={isSubmitting}
-              className="block w-full text-center font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground transition-opacity duration-150 ease-studio hover:text-foreground disabled:opacity-50"
-            >
-              Actually, I do have a website.
-            </button>
+            {nameStep === 'name' && (
+              <>
+                <Label className="text-sm font-medium text-foreground">What is your company called?</Label>
+                <Input
+                  placeholder='e.g., "Oxford Artisan Distillery"'
+                  value={companyName}
+                  onChange={e => { setCompanyName(e.target.value); setError(null) }}
+                  onKeyDown={e => { if (e.key === 'Enter') handleNameNext() }}
+                  disabled={isSubmitting}
+                  aria-invalid={!!error}
+                  className="h-11"
+                  autoFocus
+                />
+                <Label className="text-sm font-medium text-foreground">Where are you based?</Label>
+                <CountrySelect value={countryCode} onChange={code => { setCountryCode(code); setError(null) }} placeholder="Select country" />
+                {error && <p className="text-xs text-studio-stale">{error}</p>}
+                <PillButton onClick={handleNameNext} disabled={isSubmitting} variant="ink" size="md" className="w-full">
+                  Continue<ArrowRight className="h-4 w-4" />
+                </PillButton>
+                <button
+                  type="button"
+                  onClick={() => { setMode('website'); setError(null) }}
+                  disabled={isSubmitting}
+                  className="block w-full text-center font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground transition-opacity duration-150 ease-studio hover:text-foreground disabled:opacity-50"
+                >
+                  Actually, I do have a website.
+                </button>
+              </>
+            )}
+
+            {nameStep === 'drink' && (
+              <>
+                <p className="text-center font-display text-lg font-bold tracking-tight text-foreground">What do you make?</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {DRINK_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => selectDrink(opt.value)}
+                      className="rounded-[6px] border border-studio-hairline bg-studio-cream p-4 text-center text-sm font-semibold text-foreground transition-colors hover:border-studio-ink/25 hover:bg-secondary"
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setNameStep('name'); setError(null) }}
+                  className="block w-full text-center font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground transition-opacity duration-150 ease-studio hover:text-foreground"
+                >
+                  Back
+                </button>
+              </>
+            )}
+
+            {nameStep === 'volume' && (
+              <>
+                <p className="text-center font-display text-lg font-bold tracking-tight text-foreground">Roughly how much a year?</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {VOLUME_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={() => selectVolume(opt.value)}
+                      className={cn(
+                        'flex flex-col gap-0.5 rounded-[6px] border border-studio-hairline bg-studio-cream p-3 text-left transition-colors hover:border-studio-ink/25 hover:bg-secondary disabled:opacity-60',
+                      )}
+                    >
+                      <span className="text-sm font-semibold text-foreground">{opt.label}</span>
+                      <span className="text-xs text-muted-foreground">{opt.sublabel}</span>
+                    </button>
+                  ))}
+                </div>
+                {error && <p className="text-xs text-studio-stale">{error}</p>}
+                {isSubmitting && <p className="text-center font-mono text-[11px] uppercase tracking-[0.16em] text-studio-dim">One moment…</p>}
+                <button
+                  type="button"
+                  onClick={() => { setNameStep('drink'); setError(null) }}
+                  disabled={isSubmitting}
+                  className="block w-full text-center font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground transition-opacity duration-150 ease-studio hover:text-foreground disabled:opacity-50"
+                >
+                  Back
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>

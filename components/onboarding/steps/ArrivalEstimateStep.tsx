@@ -91,12 +91,39 @@ function volumeToLitres(volume: number, unit: ProductionUnit, product: OrgProduc
   }
 }
 
+/**
+ * A first sprout of the forest, on the very screen the number lands — so the
+ * aha (growth is visible) happens before the card ask on the next step. Purely
+ * decorative and self-contained (deterministic heights, no data, no desk
+ * dependency); the full growth field lives on the desk. Motion-safe.
+ */
+function SproutStrip({ count = 9 }: { count?: number }) {
+  return (
+    <div className="relative mt-4 h-16 overflow-hidden border-b border-studio-ink/40" aria-hidden="true">
+      {Array.from({ length: count }).map((_, i) => {
+        const left = 4 + (92 * i) / (count - 1)
+        const height = 18 + ((i * 37) % 40)
+        return (
+          <div
+            key={i}
+            className="absolute bottom-0 w-[3px] origin-bottom rounded-t-full bg-studio-forest motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-6"
+            style={{ left: `${left}%`, height: `${height}px`, animationDelay: `${i * 80}ms`, animationDuration: '700ms' }}
+          >
+            <span className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 bg-studio-forest" style={{ borderRadius: '50% 50% 50% 0' }} />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export function ArrivalEstimateStep() {
   const { completeStep, state, updatePersonalization } = useOnboarding()
   const { currentOrganization } = useOrganization()
 
   const beverageType = state.personalization?.beverageTypes?.[0] ?? null
   const beverageLabel = beverageType ? BEVERAGE_LABELS[beverageType] ?? 'Drinks' : 'Drinks'
+  const facilityCountry = state.personalization?.facilityCountry ?? null
 
   const [products, setProducts] = useState<OrgProduct[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -293,7 +320,7 @@ export function ArrivalEstimateStep() {
           packaging_complete: false,
           production_complete: false,
           aggregated_impacts: {
-            methodology_note: `Industry-benchmark estimate. Source: ${getBenchmarkForCategory(product.product_category).sourceName} (${getBenchmarkForCategory(product.product_category).sourceYear}). Refine with real ingredient and production data.`,
+            methodology_note: `Industry-benchmark estimate. Source: ${getBenchmarkForCategory(product.product_category).sourceName} (${getBenchmarkForCategory(product.product_category).sourceYear}).${facilityCountry ? ` Production site: ${facilityCountry}.` : ''} Refine with real ingredient and production data.`,
             annual_production_litres: litres,
             annual_production_kg_co2e: totalKg,
             climate_change_gwp100: totalPerUnit,
@@ -431,6 +458,15 @@ export function ArrivalEstimateStep() {
             </>
           )}
         </div>
+
+        {!isLoading && (
+          <>
+            <SproutStrip />
+            <p className="text-center text-xs text-muted-foreground">
+              Most of this sits in your ingredients and your packaging. The cellar knows more.
+            </p>
+          </>
+        )}
 
         <PillButton onClick={handleContinue} disabled={isSaving} variant="ink" size="md" className="w-full">
           {isSaving ? 'Saving…' : (<>Continue<ArrowRight className="w-4 h-4" /></>)}
