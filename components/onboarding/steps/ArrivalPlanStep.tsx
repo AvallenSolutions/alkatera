@@ -6,9 +6,10 @@ import { useOnboarding } from '@/lib/onboarding'
 import { useOrganization } from '@/lib/organizationContext'
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client'
 import { PRICING_TIERS, type TierKey } from '@/lib/stripe/pricing-tiers'
+import { recommendTier, buildRecommendationReason } from '@/lib/onboarding/tier-recommendation'
 import { Eyebrow, BigNumber, PillButton } from '@/components/studio'
 import { RosaIntro } from './RosaIntro'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type BillingInterval = 'monthly' | 'annual'
@@ -19,6 +20,13 @@ type Phase = 'plan' | 'checking' | 'forest'
 function arrivalCompleteFromUrl(): boolean {
   if (typeof window === 'undefined') return false
   return new URLSearchParams(window.location.search).get('arrival') === 'complete'
+}
+
+/** "21 August 2026" — the exact date the trial converts, so the card can
+ * promise a reminder against a real date, not a vague "later". */
+function trialEndLabel(): string {
+  const end = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+  return end.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 /**
@@ -55,6 +63,16 @@ export function ArrivalPlanStep() {
   const finishedRef = useRef(false)
 
   const displayTonnes = state.personalization?.estimateTonnesCO2e ?? 0
+
+  // Recommendation, computed from what the ritual already captured.
+  const productCount = state.personalization?.scrapedProducts?.length
+    ?? state.personalization?.scrapedProductNames?.length ?? 0
+  const hasFacility = !!state.personalization?.facilityId
+  const teamSize = state.personalization?.companySize
+  const recommendedTier = recommendTier({ productCount, teamSize })
+  const recommendedName = PRICING_TIERS.find(t => t.tierKey === recommendedTier)?.name ?? 'Seed'
+  const recommendReason = buildRecommendationReason({ productCount, hasFacility, teamSize, tierName: recommendedName })
+  const trialEnds = trialEndLabel()
 
   useEffect(() => {
     if (phase !== 'checking' || !currentOrganization?.id) return
@@ -202,19 +220,36 @@ export function ArrivalPlanStep() {
 
         {checkoutError && <p className="text-center text-xs text-studio-stale">{checkoutError}</p>}
 
-        <div className="rounded-[6px] border border-studio-forest/40 bg-studio-cream p-6 text-center space-y-3">
-          <PillButton onClick={handleStartTrial} disabled={!!processingTier} variant="ink" size="md" className="px-8">
-            {processingTier === 'trial' ? 'Starting trial…' : 'Start free trial'}
-          </PillButton>
-          <p className="text-xs text-studio-dim max-w-sm mx-auto">
-            30 days free. No automatic charge. Choose a plan whenever you are ready.
-          </p>
+        <div className="rounded-[6px] border border-studio-forest/40 bg-studio-cream p-6 space-y-4">
+          <div className="text-center">
+            <PillButton onClick={handleStartTrial} disabled={!!processingTier} variant="ink" size="md" className="px-8">
+              {processingTier === 'trial' ? 'Starting trial…' : 'Start your 30 days'}
+            </PillButton>
+          </div>
+          <div className="mx-auto max-w-sm space-y-1.5 text-left">
+            {[
+              'Your card will not be charged automatically. Ever.',
+              `We will remind you before your trial ends on ${trialEnds}.`,
+              'If you stop, your data stays readable. Nothing is deleted.',
+            ].map(line => (
+              <p key={line} className="flex items-start gap-2 text-xs text-studio-dim">
+                <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-studio-forest" />
+                {line}
+              </p>
+            ))}
+          </div>
         </div>
 
         <div className="flex items-center gap-4">
           <div className="flex-1 h-px bg-studio-hairline" />
           <span className="font-mono text-[10px] uppercase tracking-widest text-studio-dim">Or choose a plan now</span>
           <div className="flex-1 h-px bg-studio-hairline" />
+        </div>
+
+        {/* Our recommendation, from what the ritual already knows. */}
+        <div className="flex items-start gap-3 rounded-[6px] border border-studio-hairline border-l-[3px] border-l-studio-forest bg-studio-cream px-4 py-3">
+          <span className="mt-0.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-studio-forest whitespace-nowrap">Our pick</span>
+          <p className="text-[13px] text-foreground">{recommendReason}</p>
         </div>
 
         <div className="flex items-center justify-center gap-2">
@@ -244,6 +279,7 @@ export function ArrivalPlanStep() {
           {PRICING_TIERS.map(tier => {
             const isProcessing = processingTier === tier.tierKey
             const price = billingInterval === 'monthly' ? tier.monthly : tier.annual
+            const isRecommended = tier.tierKey === recommendedTier
             return (
               <button
                 key={tier.tierKey}
@@ -251,27 +287,34 @@ export function ArrivalPlanStep() {
                 onClick={() => handleSelectPlan(tier.tierKey)}
                 disabled={!!processingTier}
                 className={cn(
-                  'w-full flex items-center gap-4 p-4 rounded-[6px] border text-left transition-colors disabled:opacity-60',
-                  tier.highlight ? 'border-studio-forest bg-secondary' : 'border-studio-hairline bg-card hover:border-studio-ink/25 hover:bg-secondary',
+                  'w-full flex flex-col gap-3 p-4 rounded-[6px] border text-left transition-colors disabled:opacity-60',
+                  isRecommended ? 'border-studio-forest bg-secondary' : 'border-studio-hairline bg-card hover:border-studio-ink/25 hover:bg-secondary',
                 )}
               >
-                <tier.icon className={cn('w-6 h-6 shrink-0', tier.highlight ? 'text-studio-forest' : 'text-studio-dim')} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-2">
-                    <p className="font-display font-bold text-foreground">{tier.name}</p>
-                    {tier.highlight && (
-                      <span className="font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-studio-forest">Recommended</span>
-                    )}
+                <div className="flex items-center gap-4">
+                  <tier.icon className={cn('w-6 h-6 shrink-0', isRecommended ? 'text-studio-forest' : 'text-studio-dim')} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2">
+                      <p className="font-display font-bold text-foreground">{tier.name}</p>
+                      {isRecommended && (
+                        <span className="font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-studio-forest">Recommended for you</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">{tier.tagline}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">{tier.tagline}</p>
+                  <div className="text-right shrink-0">
+                    <p className="font-display font-bold text-foreground tabular-nums">
+                      £{price.founder.toLocaleString()}<span className="text-xs text-muted-foreground font-normal">/{billingInterval === 'monthly' ? 'mo' : 'yr'}</span>
+                    </p>
+                    <p className="font-mono text-[10px] uppercase tracking-wide text-studio-dim">
+                      {isProcessing ? 'Processing…' : 'Select'}
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right shrink-0">
-                  <p className="font-display font-bold text-foreground tabular-nums">
-                    £{price.founder.toLocaleString()}<span className="text-xs text-muted-foreground font-normal">/{billingInterval === 'monthly' ? 'mo' : 'yr'}</span>
-                  </p>
-                  <p className="font-mono text-[10px] uppercase tracking-wide text-studio-dim">
-                    {isProcessing ? 'Processing…' : 'Select'}
-                  </p>
+                <div className="flex flex-wrap gap-x-3 gap-y-1 pl-10">
+                  {tier.limits.map(limit => (
+                    <span key={limit} className="font-mono text-[10px] tracking-[0.04em] text-studio-dim">{limit}</span>
+                  ))}
                 </div>
               </button>
             )
