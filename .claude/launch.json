@@ -28,6 +28,13 @@
       "runtimeArgs": ["-c", "cd /Users/timej/Documents/GitHub/alkatera && export PATH=/usr/local/bin:$PATH && pnpm dev --port 8888"],
       "port": 8888,
       "autoPort": false
+    },
+    {
+      "name": "redesign",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "cd /Users/timej/Documents/GitHub/alkatera/.claude/worktrees/redesign && export PATH=/usr/local/bin:$PATH && export NEXT_DIST_DIR=.next-8896 && pnpm dev --port 8896"],
+      "port": 8896,
+      "autoPort": false
     }
   ]
 }

@@ -164,3 +164,50 @@ Plan approved by Tim; full plan at ~/.claude/plans/validated-drifting-feather.md
   seed data (local staging_emission_factors is nearly empty) and an intermittent tool
   outage; the calculation path itself is covered by the full-flow calculator/aggregator
   suites (mocked Supabase) plus the golden tests.
+
+---
+
+# Onboarding UX/UI overnight design (2026-07-22)
+
+Brief from Tim: design a world-class first-run flow, signup through payment, desk
+arrival, first facility, first product. Capture maximum data without intrusion; every
+room warm by desk-time; the user learns to navigate the house.
+
+- [x] Map the redesign's existing arrival ritual, desk, rooms, give door, provenance, ask queue
+- [x] Map the production journey on main (signup, Stripe setup-mode trial, Fast Track wizard, facility/product creation, capture assists)
+- [x] Research external best practice (Superhuman, Clay, Attio, Mercury, Vanta/Drata, Greenly/Watershed, trial benchmarks)
+- [x] Write the design specification: `tasks/onboarding-uxui-spec.md`
+- [x] Build + browser-verify the clickable prototype: `tasks/prototypes/first-hour-prototype.html`
+      (17 screens, studio design language, embedded Space Grotesk, per-screen design notes
+      via the Notes toggle or the N key)
+- [x] Publish the prototype as a private artifact for review
+
+## Review
+The spec proposes "The First Hour" in four acts: the doorstep (signup with domain
+enrichment), the threshold (the existing 6-step arrival ritual plus a new facility step,
+a warmth meter, a working ticker, Companies House, a rebuilt no-website path), the walk
+(six room cards replacing both the post-payment spinner and the fragile DeskWelcome
+popover tour), and the desk (First Week card, flagship-recipe Ask of the Day, provenance
+scoreboard). Twelve changes, all riding on existing machinery; implementation map in
+spec section 10, open decisions for Tim in section 12.
+
+Prerequisites before any build: the arrival + Stripe checkout has never been walked
+end-to-end on staging with a real card (needs a TEST-mode webhook endpoint), and live
+Rosa plus paint-my-house are unverified in a true cold signup.
+
+## Round 1 feedback (2026-07-23, applied)
+- [x] Walk cards explain each room's contents (purpose + what-lives-here + tabs + "Already inside")
+- [x] New pre-walk slide teaching the house navigation concept
+- [x] Agreement page: fuller tier cards + recommended plan computed from captured data
+- [x] Reveal: logo + palette from the website, not the label
+- [ ] Point 5 of Tim's feedback was cut off; awaiting the fifth change
+
+## Build plan
+- [x] Phased implementation plan written: `tasks/onboarding-build-plan.md`
+      (7 phases, ~3 weeks; Phase 0 = staging Stripe TEST webhook + baseline cold
+      signup + Tim's 5 decisions; no DB migrations required; redesign branch only)
+
+## Next (needs Tim)
+- [ ] Approve the build plan + decide the five open questions (spec section 12 / plan 0.3)
+- [ ] Provide the missing point 5 from round-1 feedback
+- [ ] If approved: start Phase 0/1 in the redesign worktree
