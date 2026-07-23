@@ -28,7 +28,7 @@ export function AdvisorNoAccess() {
           <p className="mb-5 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-forest">
             alkatera·OS
           </p>
-          <h1 className="mb-3 font-statement text-3xl font-bold tracking-tight text-foreground">
+          <h1 className="mb-3 font-display text-3xl font-bold tracking-tight text-foreground">
             No studio access yet.
           </h1>
           <p className="mb-6 text-sm leading-relaxed text-muted-foreground">

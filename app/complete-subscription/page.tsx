@@ -9,9 +9,20 @@ import { toast } from 'sonner'
 import { useOrganization } from '@/lib/organizationContext'
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client'
 import { PRICING_TIERS as tiers } from '@/lib/stripe/pricing-tiers'
-import Image from 'next/image'
 
 type BillingInterval = 'monthly' | 'annual'
+
+/** The studio leaf, for the header and the faint corner watermark. */
+function LeafMark({ size, className }: { size: number; className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" width={size} height={size} aria-hidden="true" className={className}>
+      <path d="M24 7 C 31 19 37 24 37 29 A 13 13 0 1 1 11 29 C 11 24 17 19 24 7 Z" fill="none" stroke="currentColor" strokeWidth="2.6" />
+      <line x1="24" y1="14" x2="24" y2="41" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+      <line x1="24" y1="27" x2="31" y2="20" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+      <line x1="24" y1="27" x2="17" y2="20" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+    </svg>
+  )
+}
 
 function CompleteSubscriptionContent() {
   const router = useRouter()
@@ -201,40 +212,34 @@ function CompleteSubscriptionContent() {
   // Show success/processing state after payment
   if (isPaymentSuccess) {
     return (
-      <div className="relative min-h-screen">
-        <Image
-          src="/images/starry-night-bg.jpg"
-          alt="Starry night sky"
-          fill
-          className="object-cover"
-          priority
-          quality={85}
-        />
-        <div className="absolute inset-0 bg-black/60" />
-        <div className="relative z-10 min-h-screen flex items-center justify-center">
-          <div className="flex flex-col items-center gap-6 text-center px-4">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/10 border border-white/20">
-              <CheckCircle2 className="h-10 w-10 text-[#F2F1EA]" />
-            </div>
-            <h1 className="text-3xl font-display font-bold tracking-tight text-[#F2F1EA]">{isTrialParam ? "You're all set." : 'Payment received.'}</h1>
-            <p className="text-lg text-white/70 max-w-md">
-              {isTrialParam
-                ? 'Setting up your free trial...'
-                : `Setting up your ${tierParam ? tierParam.charAt(0).toUpperCase() + tierParam.slice(1) : ''} subscription...`}
-            </p>
-            <p className="text-sm text-white/40">This should only take a moment.</p>
-            {showContinueButton && (
-              <button
-                onClick={async () => {
-                  if (mutate) await mutate()
-                  router.push('/desk/')
-                }}
-                className="mt-4 px-8 py-3 bg-[#F2F1EA] text-[#1A1B1D] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full hover:bg-white transition-colors"
-              >
-                Continue to dashboard
-              </button>
-            )}
+      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-studio-paper px-6">
+        <LeafMark size={560} className="pointer-events-none absolute -bottom-36 -right-36 text-studio-ink opacity-[0.08]" />
+        <div className="relative w-full max-w-md rounded-[6px] border border-studio-hairline bg-studio-cream p-10 text-center">
+          <div className="mx-auto mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full border border-studio-forest/40">
+            <CheckCircle2 className="h-8 w-8 text-studio-forest" />
           </div>
+          <h1 className="mb-3 font-display text-3xl font-bold tracking-tight text-studio-ink">
+            {isTrialParam ? "You're all set." : 'Payment received.'}
+          </h1>
+          <p className="mb-2 text-sm leading-relaxed text-studio-dim">
+            {isTrialParam
+              ? 'Setting up your free trial...'
+              : `Setting up your ${tierParam ? tierParam.charAt(0).toUpperCase() + tierParam.slice(1) : ''} subscription...`}
+          </p>
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+            This should only take a moment
+          </p>
+          {showContinueButton && (
+            <button
+              onClick={async () => {
+                if (mutate) await mutate()
+                router.push('/desk/')
+              }}
+              className="mt-6 rounded-full bg-studio-ink px-8 py-3 font-mono text-xs font-bold uppercase tracking-[0.22em] text-studio-cream transition-colors hover:bg-studio-ink/90"
+            >
+              Continue to the studio
+            </button>
+          )}
         </div>
       </div>
     )
@@ -242,58 +247,49 @@ function CompleteSubscriptionContent() {
 
   if (isOrgLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#1A1B1D]">
-        <p className="font-mono text-sm uppercase tracking-[0.22em] text-[#F2F1EA]/70">Loading...</p>
+      <div className="flex min-h-screen items-center justify-center bg-studio-paper">
+        <p className="font-mono text-xs font-bold uppercase tracking-[0.22em] text-studio-dim">Loading…</p>
       </div>
     )
   }
 
   return (
-    <div className="relative min-h-screen">
-      <Image
-        src="/images/starry-night-bg.jpg"
-        alt="Starry night sky"
-        fill
-        className="object-cover"
-        priority
-        quality={85}
-      />
-      <div className="absolute inset-0 bg-black/70" />
+    <div className="relative min-h-screen overflow-hidden bg-studio-paper">
+      <LeafMark size={560} className="pointer-events-none absolute -bottom-36 -right-36 text-studio-ink opacity-[0.08]" />
 
-      <div className="relative z-10 container mx-auto px-6 md:px-20 py-12 max-w-7xl">
-        {/* Logo */}
-        <div className="flex justify-center mb-6">
-          <Link href="/">
-            <img
-              src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png"
-              alt="alkatera"
-              className="h-10 md:h-14 w-auto object-contain mix-blend-screen brightness-125 contrast-150"
-              style={{ mixBlendMode: 'screen' }}
-            />
+      <div className="relative z-10 container mx-auto max-w-6xl px-6 py-12 md:px-12">
+        {/* The mark */}
+        <div className="mb-8 flex justify-center">
+          <Link href="/" className="flex items-center gap-2.5 no-underline">
+            <LeafMark size={22} className="text-studio-forest" />
+            <span className="font-display text-lg text-studio-ink">
+              <span className="font-medium">alka</span>
+              <span className="font-bold">tera</span>
+            </span>
           </Link>
         </div>
 
         {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="font-display font-medium tracking-tight text-4xl md:text-6xl lg:text-7xl text-[#F2F1EA] mb-4">
+        <div className="mb-12 text-center">
+          <h1 className="mb-4 font-display text-4xl font-medium tracking-tight text-studio-ink md:text-6xl">
             Welcome to alka<span className="font-bold">tera</span>.
           </h1>
-          <p className="text-lg text-white/70 max-w-2xl mx-auto">
-            Your organisation <strong className="text-white">{currentOrganization?.name}</strong> has been created.
-            Choose a plan below to start your sustainability journey.
+          <p className="mx-auto max-w-2xl text-base leading-relaxed text-studio-dim">
+            Your organisation <strong className="font-semibold text-studio-ink">{currentOrganization?.name}</strong> has
+            been created. Choose a plan below to start your sustainability journey.
           </p>
         </div>
 
-        {/* Free Trial Hero — primary path for new orgs */}
-        <div className="relative z-10 max-w-3xl mx-auto mb-12">
-          <div className="border border-[#F2F1EA]/60 bg-white/5 rounded-[6px] p-8 text-center backdrop-blur-md">
-            <p className="font-mono text-[#F2F1EA]/80 text-[10px] tracking-[0.22em] uppercase font-bold mb-4">
+        {/* Free trial hero — the primary path for new orgs */}
+        <div className="mx-auto mb-12 max-w-3xl">
+          <div className="rounded-[6px] border border-studio-hairline bg-studio-cream p-8 text-center">
+            <p className="mb-4 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
               Not ready to commit?
             </p>
-            <h2 className="font-display font-bold tracking-tight text-3xl md:text-4xl text-[#F2F1EA] mb-3">
+            <h2 className="mb-3 font-display text-3xl font-bold tracking-tight text-studio-ink md:text-4xl">
               Start your 30-day free trial.
             </h2>
-            <p className="text-white/70 text-sm md:text-base max-w-xl mx-auto mb-6 leading-relaxed">
+            <p className="mx-auto mb-6 max-w-xl text-sm leading-relaxed text-studio-dim md:text-base">
               Add a facility, build a product LCA and explore the platform. We ask for a card to keep
               things secure, but you won&apos;t be charged anything automatically. Choose a plan
               whenever you&apos;re ready.
@@ -301,58 +297,50 @@ function CompleteSubscriptionContent() {
             <button
               onClick={handleStartTrial}
               disabled={processingCheckout}
-              className="px-10 py-4 bg-[#F2F1EA] text-[#1A1B1D] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full hover:bg-white transition-colors disabled:opacity-50"
+              className="rounded-full bg-studio-ink px-10 py-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-studio-cream transition-colors hover:bg-studio-ink/90 disabled:opacity-50"
             >
-              {processingTier === 'trial' ? 'Starting trial...' : 'Start free trial'}
+              {processingTier === 'trial' ? 'Starting trial…' : 'Start free trial'}
             </button>
-            <p className="text-white/40 text-[11px] mt-4">
+            <p className="mt-4 text-[11px] text-studio-dim">
               30 days free. No automatic charge. Your card stays on file so choosing a plan later is one click.
             </p>
           </div>
-          <div className="flex items-center gap-4 mt-10">
-            <div className="flex-1 h-px bg-white/10" />
-            <span className="font-mono text-[10px] uppercase tracking-widest text-white/40">
+          <div className="mt-10 flex items-center gap-4">
+            <div className="h-px flex-1 bg-studio-hairline" />
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-studio-dim">
               Or choose a plan now
             </span>
-            <div className="flex-1 h-px bg-white/10" />
+            <div className="h-px flex-1 bg-studio-hairline" />
           </div>
         </div>
 
-        {/* Billing Toggle */}
-        <div className="flex items-center justify-center gap-3 mb-8">
-          <button
-            onClick={() => setBillingInterval('monthly')}
-            className={cn(
-              "font-mono text-xs uppercase tracking-widest px-5 py-2.5 rounded-full transition-all",
-              billingInterval === 'monthly'
-                ? "bg-[#F2F1EA] text-[#1A1B1D] font-bold"
-                : "border border-white/20 text-white/50 hover:text-white hover:border-white/40"
-            )}
-          >
-            Monthly
-          </button>
-          <button
-            onClick={() => setBillingInterval('annual')}
-            className={cn(
-              "font-mono text-xs uppercase tracking-widest px-5 py-2.5 rounded-full transition-all",
-              billingInterval === 'annual'
-                ? "bg-[#F2F1EA] text-[#1A1B1D] font-bold"
-                : "border border-white/20 text-white/50 hover:text-white hover:border-white/40"
-            )}
-          >
-            Annual
-          </button>
+        {/* Billing toggle */}
+        <div className="mb-8 flex items-center justify-center gap-3">
+          {(['monthly', 'annual'] as const).map((interval) => (
+            <button
+              key={interval}
+              onClick={() => setBillingInterval(interval)}
+              className={cn(
+                'rounded-full px-5 py-2.5 font-mono text-xs font-bold uppercase tracking-[0.18em] transition-all',
+                billingInterval === interval
+                  ? 'bg-studio-ink text-studio-cream'
+                  : 'border border-studio-hairline text-studio-dim hover:border-studio-ink hover:text-studio-ink'
+              )}
+            >
+              {interval}
+            </button>
+          ))}
         </div>
 
         {/* Founding partner note */}
-        <div className="flex justify-center mb-8">
-          <span className="font-mono font-bold text-[#F2F1EA]/80 text-xs tracking-[0.22em] uppercase">
-            Founding partner pricing: limited availability
+        <div className="mb-10 flex justify-center">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-ochre-ink">
+            Founding partner pricing · Limited availability
           </span>
         </div>
 
-        {/* Plans Grid */}
-        <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch mb-12">
+        {/* Plans */}
+        <div className="mb-12 grid grid-cols-1 items-stretch gap-5 md:grid-cols-3">
           {tiers.map((tier, idx) => {
             const isProcessing = processingTier === tier.tierKey
 
@@ -360,86 +348,65 @@ function CompleteSubscriptionContent() {
               <div
                 key={idx}
                 className={cn(
-                  "border p-8 flex flex-col transition-all duration-500 group relative rounded-[6px] backdrop-blur-md",
+                  'relative flex flex-col rounded-[6px] bg-studio-cream p-8',
                   tier.highlight
-                    ? "border-[#F2F1EA]/60 bg-white/10 md:-translate-y-4"
-                    : "border-white/10 bg-white/5 hover:border-white/30"
+                    ? 'border-[1.5px] border-studio-ink'
+                    : 'border border-studio-hairline'
                 )}
               >
                 {tier.highlight && (
-                  <div className="absolute top-0 right-0 bg-[#F2F1EA] text-[#1A1B1D] text-[10px] font-mono font-bold uppercase px-3 py-1 tracking-[0.22em] rounded-tr-[6px] rounded-bl-[6px]">
+                  <p className="absolute -top-2.5 left-7 rounded-full bg-studio-ink px-2.5 py-0.5 font-mono text-[8.5px] font-bold uppercase tracking-[0.2em] text-studio-cream">
                     Recommended
-                  </div>
+                  </p>
                 )}
 
-                <div className="flex items-center justify-between mb-4">
-                  <h4
-                    className={cn(
-                      "font-display font-bold tracking-tight text-3xl",
-                      tier.highlight ? "text-[#F2F1EA]" : "text-white"
-                    )}
-                  >
+                <div className="mb-4 flex items-center justify-between">
+                  <h4 className="font-display text-3xl font-bold tracking-tight text-studio-ink">
                     {tier.name}
                   </h4>
-                  <tier.icon className={tier.highlight ? "text-[#F2F1EA]" : "text-white/40"} />
+                  <tier.icon className={tier.highlight ? 'text-studio-forest' : 'text-studio-dim'} />
                 </div>
 
                 <div className="mb-6">
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-white/40 text-lg line-through font-display">
-                      £{billingInterval === 'monthly' ? tier.monthly.original : tier.annual.original.toLocaleString()}
-                    </span>
+                  <div className="mb-1 flex items-baseline gap-2">
                     <span
-                      className={cn(
-                        "font-display font-bold tracking-tight text-4xl tabular-nums",
-                        tier.highlight ? "text-[#F2F1EA]" : "text-white"
-                      )}
+                      className="font-display text-4xl font-bold tabular-nums tracking-tight text-studio-ink"
                     >
                       £{billingInterval === 'monthly' ? tier.monthly.founder : tier.annual.founder.toLocaleString()}
                     </span>
-                    <span className="text-white/40 text-sm">/{billingInterval === 'monthly' ? 'mo' : 'yr'}</span>
+                    <span className="font-display text-lg text-studio-dim line-through">
+                      £{billingInterval === 'monthly' ? tier.monthly.original : tier.annual.original.toLocaleString()}
+                    </span>
+                    <span className="text-sm text-studio-dim">/{billingInterval === 'monthly' ? 'mo' : 'yr'}</span>
                   </div>
                   <div className="mb-3">
-                    <span className="font-mono text-[#F2F1EA]/80 text-[10px] tracking-[0.22em] uppercase font-bold">
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-ochre-ink">
                       Save £{billingInterval === 'monthly'
                         ? tier.monthly.saving
                         : tier.annual.saving.toLocaleString()}{billingInterval === 'monthly' ? '/mo' : '/yr'}
                     </span>
                   </div>
-                  <p className="text-white/60 text-sm leading-relaxed">{tier.tagline}</p>
+                  <p className="text-sm leading-relaxed text-studio-dim">{tier.tagline}</p>
                 </div>
 
                 {/* Limits */}
-                <div className="grid grid-cols-2 gap-2 mb-8 p-4 bg-white/5 rounded">
+                <div className="mb-8 grid grid-cols-2 gap-2 rounded-[4px] bg-studio-paper p-4">
                   {tier.limits.map((limit, lIdx) => (
-                    <div
-                      key={lIdx}
-                      className="font-mono text-[10px] uppercase tracking-wider text-white/50"
-                    >
+                    <div key={lIdx} className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-studio-dim">
                       {limit}
                     </div>
                   ))}
                 </div>
 
-                <ul className="space-y-3 mb-12 flex-1">
+                <ul className="mb-10 flex-1 space-y-3">
                   {tier.features.map((feat, fIdx) => (
-                    <li key={fIdx} className="flex items-start gap-3 text-sm group/item">
-                      <div
-                        className={cn(
-                          "w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 transition-colors",
-                          tier.highlight
-                            ? "bg-[#F2F1EA]"
-                            : "bg-white/40 group-hover/item:bg-white"
-                        )}
-                      />
+                    <li key={fIdx} className="flex items-start gap-3 text-sm">
+                      <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-studio-forest" />
                       <span
                         className={cn(
-                          "leading-relaxed transition-colors",
-                          tier.highlight
-                            ? "text-white"
-                            : "text-white/60 group-hover/item:text-white",
-                          feat.startsWith("Everything") &&
-                            "font-display font-medium text-white/90 border-b border-white/10 pb-1 w-full"
+                          'leading-relaxed text-studio-ink',
+                          feat.startsWith('Everything') &&
+                            'w-full border-b border-studio-hairline pb-1 font-semibold'
                         )}
                       >
                         {feat}
@@ -452,47 +419,28 @@ function CompleteSubscriptionContent() {
                   onClick={() => handleSelectPlan(tier.tierKey)}
                   disabled={processingCheckout}
                   className={cn(
-                    "w-full py-5 font-mono uppercase text-xs tracking-[0.22em] font-bold transition-colors duration-200 text-center block rounded-full disabled:opacity-50",
+                    'block w-full rounded-full py-4 text-center font-mono text-xs font-bold uppercase tracking-[0.22em] transition-colors disabled:opacity-50',
                     tier.highlight
-                      ? "bg-[#F2F1EA] text-[#1A1B1D] hover:bg-white"
-                      : "border border-[#F2F1EA]/40 text-[#F2F1EA] hover:border-[#F2F1EA]"
+                      ? 'bg-studio-ink text-studio-cream hover:bg-studio-ink/90'
+                      : 'border border-studio-ink text-studio-ink hover:bg-studio-ink/5'
                   )}
                 >
-                  {isProcessing ? "Processing..." : "Get Started"}
+                  {isProcessing ? 'Processing…' : 'Get started'}
                 </button>
               </div>
             )
           })}
         </div>
 
-        {/* Footer Note */}
-        <div className="text-center text-sm text-white/40">
+        {/* Footer note */}
+        <div className="text-center text-sm text-studio-dim">
           <p>All plans include a 14-day money-back guarantee. Cancel anytime.</p>
           <p className="mt-2">
-            Questions? <a href="/contact" className="text-[#F2F1EA] underline underline-offset-4 hover:text-white">Contact our team</a>
+            Questions?{' '}
+            <a href="/contact" className="font-medium text-studio-forest underline underline-offset-4">
+              Contact our team
+            </a>
           </p>
-        </div>
-
-        {/* Photo Credit */}
-        <div className="text-center mt-8 text-[10px] text-white/20">
-          Photo by{' '}
-          <a
-            href="https://unsplash.com/@beyzaayurtkuran"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:text-white/40"
-          >
-            Beyza Yurtkuran
-          </a>
-          {' '}on{' '}
-          <a
-            href="https://unsplash.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:text-white/40"
-          >
-            Unsplash
-          </a>
         </div>
       </div>
     </div>
@@ -502,8 +450,8 @@ function CompleteSubscriptionContent() {
 export default function CompleteSubscriptionPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-[#1A1B1D]">
-        <p className="font-mono text-sm uppercase tracking-[0.22em] text-[#F2F1EA]/70">Loading...</p>
+      <div className="flex min-h-screen items-center justify-center bg-studio-paper">
+        <p className="font-mono text-xs font-bold uppercase tracking-[0.22em] text-studio-dim">Loading…</p>
       </div>
     }>
       <CompleteSubscriptionContent />
