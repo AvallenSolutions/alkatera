@@ -1,0 +1,194 @@
+'use client'
+
+import { useCallback, useEffect, useState } from 'react'
+import { useOnboarding } from '@/lib/onboarding'
+import { STUDIO, type MarkShape } from '@/components/studio/theme'
+import { cn } from '@/lib/utils'
+
+/**
+ * The walk: the post-checkout orientation that teaches the house by walking it,
+ * room by room, each card carrying that room's OWN real data. It does three
+ * jobs at once — teaches the (unconventional) navigation model, proves the
+ * "lights on in every room" promise, and covers the Stripe webhook wait
+ * invisibly (six rooms at a human pace is ~a minute, well past webhook lag).
+ *
+ * One explainer screen names the concept, then six full-screen room cards.
+ * Auto-advances (tap or → to skip; ← to go back); calls onDone after the last
+ * room, where the parent shows the planting moment.
+ */
+
+const AUTO_MS = 8000
+
+interface WalkRoom {
+  key: string
+  name: string
+  purpose: string
+  colour: string
+  onDark: boolean // paper text on a dark ground; ochre wants ink text
+  shape: MarkShape
+  tabs: string
+}
+
+const WALK_ROOMS: WalkRoom[] = [
+  { key: 'cellar', name: 'The cellar', purpose: 'What we make.', colour: STUDIO.plum, onDark: true, shape: 'diamond', tabs: 'Products · Liquids · Packs · Ingredients · LCAs' },
+  { key: 'workbench', name: 'The workbench', purpose: 'What we measure.', colour: STUDIO.cobalt, onDark: true, shape: 'triangle', tabs: 'Facilities · Emissions · Spend · Uploads' },
+  { key: 'evidence', name: 'The evidence', purpose: 'What we can prove.', colour: STUDIO.brick, onDark: true, shape: 'quarter', tabs: 'Reports · Certifications · Targets' },
+  { key: 'network', name: 'The network', purpose: "Who we're talking to.", colour: STUDIO.ochre, onDark: false, shape: 'square', tabs: 'Suppliers · Messages · Experts' },
+  { key: 'library', name: 'The library', purpose: 'What we know.', colour: STUDIO.teal, onDark: true, shape: 'arch', tabs: 'Knowledge · Guides · Wiki' },
+  { key: 'today', name: 'Today', purpose: 'The day ahead.', colour: STUDIO.forest, onDark: true, shape: 'circle', tabs: 'The brief · Pulse · The ask queue' },
+]
+
+/** The seven-room index shown on the explainer screen. */
+const EXPLAINER_ROOMS: { name: string; colour: string; shape: MarkShape; desc: string }[] = [
+  { name: 'The cellar', colour: STUDIO.plum, shape: 'diamond', desc: 'What you make: products, recipes, packaging and each one’s footprint.' },
+  { name: 'The workbench', colour: STUDIO.cobalt, shape: 'triangle', desc: 'What you measure: your sites, energy, water, waste and spend.' },
+  { name: 'The evidence', colour: STUDIO.brick, shape: 'quarter', desc: 'What you can prove: reports, certifications and targets.' },
+  { name: 'The network', colour: STUDIO.ochre, shape: 'square', desc: 'Who you talk to: suppliers, messages and expert help.' },
+  { name: 'The library', colour: STUDIO.teal, shape: 'arch', desc: 'What we know: plain-language guides for your industry.' },
+  { name: 'Today', colour: STUDIO.forest, shape: 'circle', desc: 'The day ahead: Rosa’s brief of what needs you.' },
+  { name: 'The wiring', colour: STUDIO.ink, shape: 'ring', desc: 'Behind the walls: settings, billing and your team.' },
+]
+
+/** Mark paths, matching components/studio/mark.tsx geometry. */
+function markPath(shape: MarkShape, fill: string) {
+  switch (shape) {
+    case 'circle': return <circle cx="50" cy="50" r="50" fill={fill} />
+    case 'triangle': return <polygon points="50,2 98,98 2,98" fill={fill} />
+    case 'square': return <rect x="18" y="18" width="64" height="64" fill={fill} transform="rotate(14 50 50)" />
+    case 'quarter': return <path d="M 0 100 A 100 100 0 0 1 100 0 L 100 100 Z" fill={fill} />
+    case 'diamond': return <polygon points="50,2 98,50 50,98 2,50" fill={fill} />
+    case 'arch': return <path d="M 10 100 L 10 50 A 40 40 0 0 1 90 50 L 90 100 Z" fill={fill} />
+    case 'ring': return <circle cx="50" cy="50" r="36" fill="none" stroke={fill} strokeWidth="24" />
+  }
+}
+
+export function TheWalk({ onDone }: { onDone: () => void }) {
+  const { state } = useOnboarding()
+  const p = state.personalization ?? {}
+
+  const productCount = p.scrapedProducts?.length ?? p.scrapedProductNames?.length ?? 0
+  const tonnes = p.estimateTonnesCO2e ?? null
+  const facilityCountry = p.facilityCountry ?? null
+  const fromWebsite = !!p.websiteUrl
+
+  const dataLine = useCallback((key: string): string => {
+    switch (key) {
+      case 'cellar':
+        return productCount > 0
+          ? `${productCount} product${productCount === 1 ? '' : 's'}, drafted from your ${fromWebsite ? 'website' : 'answers'}.`
+          : 'Your products and their footprints live here.'
+      case 'workbench':
+        return facilityCountry
+          ? `Your production site in ${facilityCountry} is on the bench.`
+          : 'Your sites and what they use live here.'
+      case 'evidence':
+        return tonnes != null
+          ? `Your first estimate is on the table: about ${tonnes.toLocaleString()} t CO₂e.`
+          : 'Confirm your data and it becomes reportable proof.'
+      case 'network':
+        return 'Your suppliers, and the asks that fill the gaps you can’t fill alone.'
+      case 'library':
+        return 'Plain-language guides for your industry are already on the shelf.'
+      case 'today':
+        return 'Rosa has your first few things ready for tomorrow morning.'
+      default:
+        return ''
+    }
+  }, [productCount, tonnes, facilityCountry, fromWebsite])
+
+  // index 0 = explainer, 1..6 = room cards
+  const [index, setIndex] = useState(0)
+  const total = WALK_ROOMS.length + 1
+
+  const advance = useCallback(() => {
+    setIndex(i => {
+      if (i + 1 >= total) { onDone(); return i }
+      return i + 1
+    })
+  }, [total, onDone])
+
+  const back = useCallback(() => setIndex(i => Math.max(0, i - 1)), [])
+
+  // Auto-advance.
+  useEffect(() => {
+    const t = setTimeout(advance, AUTO_MS)
+    return () => clearTimeout(t)
+  }, [index, advance])
+
+  // Keyboard.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' || e.key === 'Enter') advance()
+      if (e.key === 'ArrowLeft') back()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [advance, back])
+
+  if (index === 0) {
+    return (
+      <div
+        className="fixed inset-0 z-[70] flex flex-col items-center justify-center overflow-y-auto bg-studio-cream px-6 py-12 text-center motion-safe:animate-in motion-safe:fade-in motion-safe:duration-500"
+        onClick={advance}
+        role="button"
+        tabIndex={0}
+        aria-label="Continue the walk"
+      >
+        <div className="w-full max-w-2xl space-y-6">
+          <p className="font-mono text-[10.5px] font-bold uppercase tracking-[0.2em] text-studio-dim">How alkatera works</p>
+          <h1 className="font-display text-[clamp(1.75rem,5vw,2.75rem)] font-bold leading-[1.05] tracking-[-0.02em] text-foreground">
+            This is a house, not a dashboard.
+          </h1>
+          <p className="mx-auto max-w-md text-sm text-muted-foreground">
+            Everything you do lives in one of seven rooms, and every room keeps its colour, so you always know where you are. The desk is the hall: you can see into every room, and Rosa can fetch anything from any of them. Let&apos;s take the walk.
+          </p>
+          <div className="grid gap-2 text-left sm:grid-cols-2">
+            {EXPLAINER_ROOMS.map(room => (
+              <div key={room.name} className="flex items-start gap-3 rounded-[6px] border border-studio-hairline bg-white/40 p-3">
+                <svg width="18" height="18" viewBox="0 0 100 100" className="mt-0.5 shrink-0" aria-hidden="true">{markPath(room.shape, room.colour)}</svg>
+                <div>
+                  <div className="font-display text-[13px] font-semibold text-foreground">{room.name}</div>
+                  <div className="text-[11.5px] leading-snug text-muted-foreground">{room.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">Tap to walk through</p>
+        </div>
+      </div>
+    )
+  }
+
+  const room = WALK_ROOMS[index - 1]
+  const textColour = room.onDark ? STUDIO.paper : STUDIO.ochreInk
+
+  return (
+    <div
+      key={room.key}
+      className="fixed inset-0 z-[70] flex flex-col items-center justify-center overflow-y-auto px-6 py-12 text-center motion-safe:animate-in motion-safe:fade-in motion-safe:duration-500"
+      style={{ backgroundColor: room.colour, color: textColour }}
+      onClick={advance}
+      role="button"
+      tabIndex={0}
+      aria-label={`${room.name}. Tap to continue.`}
+    >
+      <div className="flex w-full max-w-md flex-col items-center space-y-5">
+        <p className="font-mono text-[10.5px] uppercase tracking-[0.22em] opacity-75">The walk · {index} of {WALK_ROOMS.length}</p>
+        <svg width="72" height="72" viewBox="0 0 100 100" aria-hidden="true" className="motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-700">
+          {markPath(room.shape, textColour)}
+        </svg>
+        <h1 className="font-display text-[clamp(2rem,6vw,3.25rem)] font-bold leading-none tracking-[-0.02em]">{room.name}</h1>
+        <p className="font-display text-lg font-medium opacity-90">{room.purpose}</p>
+        <p className="max-w-sm text-sm opacity-90">{room.purpose === '' ? '' : dataLine(room.key)}</p>
+        <div className="rounded-[6px] border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.14em] opacity-80" style={{ borderColor: textColour }}>
+          In this room · {room.tabs}
+        </div>
+      </div>
+      <div className="pointer-events-none absolute bottom-6 left-0 right-0 flex justify-center gap-1.5" aria-hidden="true">
+        {WALK_ROOMS.map((_, i) => (
+          <span key={i} className={cn('h-1.5 w-1.5 rounded-full', i === index - 1 ? 'opacity-100' : 'opacity-40')} style={{ backgroundColor: textColour }} />
+        ))}
+      </div>
+    </div>
+  )
+}

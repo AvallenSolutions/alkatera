@@ -158,17 +158,12 @@ export function DeskWelcome() {
       // shouldShowOnboarding changes.
       return;
     }
-    // Wizard is closed (or was never open this visit) and the intro hasn't
-    // been seen — decide to show it, once, for good.
+    // Wizard is closed and the intro hasn't been seen. The arrival walk now
+    // teaches the house room by room, so we no longer auto-open the welcome
+    // band (that was double orientation). Decide 'closed' and offer a quiet
+    // "Show me around" re-run instead (rendered below) — the tour stays one
+    // tap away without popping in the user's face.
     setDecided(true);
-    setPhase('welcome');
-    trackOnboarding({
-      organizationId: currentOrganization?.id,
-      flow: 'room_checklist',
-      step: 'desk',
-      event: 'view',
-      meta: { kind: 'desk_welcome_seen' },
-    });
   }, [isLoading, decided, introSeen, shouldShowOnboarding, currentOrganization?.id]);
 
   // ---- Floating tour card position ----------------------------------
@@ -327,7 +322,23 @@ export function DeskWelcome() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [phase, order.length, finish]);
 
-  if (isLoading || !decided || phase === 'closed') return null;
+  if (isLoading || !decided) return null;
+
+  // Demoted from an auto-opening band to a quiet, always-available re-run: the
+  // arrival walk already taught the rooms, so the tour is offered, not forced.
+  if (phase === 'closed') {
+    return (
+      <div className="mb-2 flex justify-end">
+        <button
+          type="button"
+          onClick={() => { setStep(0); setPhase('tour'); }}
+          className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim underline-offset-2 transition-colors hover:text-foreground hover:underline"
+        >
+          Show me around
+        </button>
+      </div>
+    );
+  }
 
   if (phase === 'welcome') {
     return (

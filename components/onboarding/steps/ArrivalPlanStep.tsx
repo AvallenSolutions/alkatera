@@ -9,11 +9,12 @@ import { PRICING_TIERS, type TierKey } from '@/lib/stripe/pricing-tiers'
 import { recommendTier, buildRecommendationReason } from '@/lib/onboarding/tier-recommendation'
 import { Eyebrow, BigNumber, PillButton } from '@/components/studio'
 import { RosaIntro } from './RosaIntro'
+import { TheWalk } from '../TheWalk'
 import { ArrowRight, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type BillingInterval = 'monthly' | 'annual'
-type Phase = 'plan' | 'checking' | 'forest'
+type Phase = 'plan' | 'walk' | 'forest'
 
 /** Read once at mount — never re-derived, so cleaning the query string later
  * (via history.replaceState, not a Next navigation) can't flip this back. */
@@ -55,12 +56,17 @@ export function ArrivalPlanStep() {
   const { currentOrganization } = useOrganization()
   const router = useRouter()
 
-  const [phase, setPhase] = useState<Phase>(() => (arrivalCompleteFromUrl() ? 'checking' : 'plan'))
+  const [phase, setPhase] = useState<Phase>(() => (arrivalCompleteFromUrl() ? 'walk' : 'plan'))
   const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly')
   const [processingTier, setProcessingTier] = useState<string | null>(null)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
   const [launching, setLaunching] = useState(false)
-  const finishedRef = useRef(false)
+  // Set once the Stripe webhook has flipped the org to trial/active. The walk
+  // covers the wait; "Go to your desk" only unlocks once this is true, so a
+  // just-paid user is never bounced to /complete-subscription by the payment
+  // gate (which stops tolerating 'pending' the moment onboarding completes).
+  const [subscriptionReady, setSubscriptionReady] = useState(false)
+  const seededRef = useRef(false)
 
   const displayTonnes = state.personalization?.estimateTonnesCO2e ?? 0
 
@@ -74,17 +80,22 @@ export function ArrivalPlanStep() {
   const recommendReason = buildRecommendationReason({ productCount, hasFacility, teamSize, tierName: recommendedName })
   const trialEnds = trialEndLabel()
 
+  // Poll the org's subscription_status through the return (walk + forest),
+  // seed day-one Rosa once the webhook lands, and mark the trial ready. Runs
+  // concurrently with the walk so the wait is invisible; keeps polling until
+  // confirmed (up to ~4 min) rather than declaring success on a short timeout,
+  // because "Go to your desk" is gated on this and we must not leave 'pending'.
   useEffect(() => {
-    if (phase !== 'checking' || !currentOrganization?.id) return
+    if (phase === 'plan' || subscriptionReady || !currentOrganization?.id) return
     const orgId = currentOrganization.id
     const supabase = getSupabaseBrowserClient()
     let cancelled = false
     let pollCount = 0
-    const maxPolls = 30 // ~60s, matching /complete-subscription's own poll budget
+    const maxPolls = 120 // ~4 min: generous, since the walk hides it entirely
 
-    const finish = async () => {
-      if (finishedRef.current) return
-      finishedRef.current = true
+    const markReady = async () => {
+      if (seededRef.current) return
+      seededRef.current = true
       try {
         await fetch('/api/onboarding/complete', {
           method: 'POST',
@@ -97,10 +108,10 @@ export function ArrivalPlanStep() {
       // Strip '?arrival=complete' without a navigation (that would remount
       // this component) — a reload from the forest screen should stay put.
       window.history.replaceState({}, '', '/desk/')
-      if (!cancelled) setPhase('forest')
+      if (!cancelled) setSubscriptionReady(true)
     }
 
-    const interval = setInterval(async () => {
+    const tick = async () => {
       pollCount++
       const { data } = await supabase
         .from('organizations')
@@ -110,18 +121,20 @@ export function ArrivalPlanStep() {
       const status = data?.subscription_status
       if (status === 'trial' || status === 'active') {
         clearInterval(interval)
-        finish()
+        markReady()
       } else if (pollCount >= maxPolls) {
-        // Webhook lag past a minute — the plan choice is already committed
-        // on Stripe's side; treat this as a provisional success rather than
-        // leaving the user stuck on a spinner (see plan Risks).
+        // Webhook truly never landed (misconfig). Unlock provisionally rather
+        // than trap the user forever — the plan choice is committed on Stripe's
+        // side. This is the only path that can still land on 'pending'.
         clearInterval(interval)
-        finish()
+        markReady()
       }
-    }, 2000)
+    }
 
+    const interval = setInterval(tick, 2000)
+    tick()
     return () => { cancelled = true; clearInterval(interval) }
-  }, [phase, currentOrganization?.id])
+  }, [phase, subscriptionReady, currentOrganization?.id])
 
   async function startCheckout(body: Record<string, unknown>) {
     const res = await fetch('/api/stripe/create-checkout-session', {
@@ -166,12 +179,8 @@ export function ArrivalPlanStep() {
     router.push('/desk/')
   }
 
-  if (phase === 'checking') {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[65vh] px-4 text-center animate-in fade-in duration-500">
-        <p className="font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-studio-dim">Setting things up&hellip;</p>
-      </div>
-    )
+  if (phase === 'walk') {
+    return <TheWalk onDone={() => setPhase('forest')} />
   }
 
   if (phase === 'forest') {
@@ -196,10 +205,16 @@ export function ArrivalPlanStep() {
             Every real number you add from here grows it further. Your desk will show you where to start.
           </p>
 
-          <PillButton onClick={handleGoToDesk} disabled={launching} variant="ink" size="md" className="px-6">
-            {launching ? 'Loading…' : 'Go to your desk'}
-            {!launching && <ArrowRight className="h-4 w-4" />}
-          </PillButton>
+          {subscriptionReady ? (
+            <PillButton onClick={handleGoToDesk} disabled={launching} variant="ink" size="md" className="px-6">
+              {launching ? 'Loading…' : 'Go to your desk'}
+              {!launching && <ArrowRight className="h-4 w-4" />}
+            </PillButton>
+          ) : (
+            <p className="font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-studio-dim" aria-live="polite">
+              Finishing your setup&hellip;
+            </p>
+          )}
         </div>
       </div>
     )
