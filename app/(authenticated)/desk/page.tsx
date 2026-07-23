@@ -6,6 +6,8 @@ import { BreathingGrid } from '@/components/studio/breathing-grid';
 import { PosterBlock } from '@/components/studio/poster-block';
 import { Statement } from '@/components/studio/statement';
 import { DeskPriorities } from '@/components/studio/desk-priorities';
+import { FirstWeekCard } from '@/components/studio/first-week-card';
+import { ProvenanceScore } from '@/components/studio/provenance-score';
 import { DeskWelcome } from '@/components/studio/desk-welcome';
 import { GiveDoor } from '@/components/studio/give-door';
 import {
@@ -154,16 +156,23 @@ export default function DeskPage() {
       {/* pb-48: the forest's stage. Open paper at the page foot so the
           ground layer (grasses, flowers, understory) is always on show. */}
       <div className="relative z-[1] space-y-8 pb-48">
-      <Statement
-        eyebrow="THE DESK"
-        headline={`${greeting()}${firstName ? `, ${firstName}` : ''}.`}
-      />
+      <div className="space-y-2">
+        <Statement
+          eyebrow="THE DESK"
+          headline={`${greeting()}${firstName ? `, ${firstName}` : ''}.`}
+        />
+        {/* The long-term scoreboard: how much of the footprint is confirmed. */}
+        <ProvenanceScore />
+      </div>
 
       {/* First desk visit only: a slim welcome + optional room walkthrough. */}
       <DeskWelcome />
 
       {/* What needs you today: Rosa's top priorities, quiet on paper. */}
       <DeskPriorities />
+
+      {/* The first seven days: a named checklist that auto-ticks and retires. */}
+      <FirstWeekCard />
 
       {/* Give us anything: the one gesture that hands data over from here. */}
       <GiveDoor hint="Anything at all. We will work out where it goes." />
