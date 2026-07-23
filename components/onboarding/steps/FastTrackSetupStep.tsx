@@ -7,7 +7,7 @@ import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowRight, Globe, Upload, X } from 'lucide-react'
+import { ArrowRight, Globe, Upload, X, FileUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CountrySelect } from '@/components/shared/CountrySelect'
 import { COUNTRIES } from '@/lib/countries'
@@ -944,17 +944,25 @@ export function FastTrackSetupStep() {
           )}
         </PillButton>
 
-        {/* Migration engine v1 (data-revolution plan, Pillar 2b): a quiet door
-            for brands arriving with a prior consultant LCA, B Corp report or
+        {/* Migration engine v1 (data-revolution plan, Pillar 2b): the door for
+            brands arriving with a prior consultant LCA, B Corp report or
             CDP/EcoVadis response — routes through the normal Smart Upload
-            pipeline, same as every other document. */}
+            pipeline, same as every other document. Promoted from a quiet link
+            to a real drop target: for a switcher this is the single biggest
+            head-start, so it earns the space. */}
         <UniversalDropzone
           trigger={
             <button
               type="button"
-              className="block w-full text-center font-mono text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted-foreground transition-colors duration-150 ease-studio hover:text-foreground"
+              className="block w-full rounded-[6px] border border-dashed border-studio-hairline bg-studio-cream/60 p-4 text-left transition-colors duration-150 ease-studio hover:border-studio-ink/30 hover:bg-secondary"
             >
-              Already have a sustainability report? Drop it here.
+              <span className="flex items-center gap-2 font-display text-sm font-semibold text-foreground">
+                <FileUp className="h-4 w-4 shrink-0 text-studio-cobalt" />
+                Already measured before?
+              </span>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Drop a sustainability report, a B Corp submission or a consultant&apos;s LCA. We will read it and carry your numbers over.
+              </span>
             </button>
           }
         />
