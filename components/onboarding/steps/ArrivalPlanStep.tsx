@@ -53,7 +53,7 @@ function trialEndLabel(): string {
  * overlay) before the reveal ever rendered.
  */
 export function ArrivalPlanStep() {
-  const { state, completeOnboarding } = useOnboarding()
+  const { state, completeOnboarding, markRoomIntroSeen } = useOnboarding()
   const { currentOrganization } = useOrganization()
   const router = useRouter()
 
@@ -190,7 +190,16 @@ export function ArrivalPlanStep() {
   }
 
   if (phase === 'walk') {
-    return <TheWalk onDone={() => setPhase('forest')} />
+    return (
+      <TheWalk
+        onDone={() => {
+          // The new signup has now seen the walk in the ritual, so the desk's
+          // own first-visit walk (DeskArrivalWalk) stays quiet for them.
+          markRoomIntroSeen('desk')
+          setPhase('forest')
+        }}
+      />
+    )
   }
 
   if (phase === 'forest') {

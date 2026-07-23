@@ -8,7 +8,7 @@ import { Statement } from '@/components/studio/statement';
 import { DeskPriorities } from '@/components/studio/desk-priorities';
 import { FirstWeekCard } from '@/components/studio/first-week-card';
 import { ProvenanceScore } from '@/components/studio/provenance-score';
-import { DeskWelcome } from '@/components/studio/desk-welcome';
+import { DeskArrivalWalk } from '@/components/studio/desk-arrival-walk';
 import { GiveDoor } from '@/components/studio/give-door';
 import {
   PLATFORM_ROOMS,
@@ -165,8 +165,9 @@ export default function DeskPage() {
         <ProvenanceScore />
       </div>
 
-      {/* First desk visit only: a slim welcome + optional room walkthrough. */}
-      <DeskWelcome />
+      {/* First desk visit: the walk (auto for migrated users the ritual didn't
+          catch; a quiet "Show me around" re-run once seen). */}
+      <DeskArrivalWalk />
 
       {/* What needs you today: Rosa's top priorities, quiet on paper. */}
       <DeskPriorities />
