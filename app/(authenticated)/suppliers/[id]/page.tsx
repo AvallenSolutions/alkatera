@@ -103,9 +103,18 @@ export default function SupplierDetailPage() {
     products,
     esgAssessment,
     esgInvitationStatus,
+    esgInvitationEmailStatus,
+    esgInvitationEmailError,
     loading,
     error,
   } = useOrganizationSupplierDetail(orgSupplierId);
+
+  // A bounced or rejected invitation must not read as "awaiting completion".
+  // The supplier never got it, and the brand needs to chase another way.
+  const esgEmailUndelivered =
+    esgInvitationEmailStatus === "bounced" ||
+    esgInvitationEmailStatus === "failed" ||
+    esgInvitationEmailStatus === "suppressed";
 
   const [esgSurveyOpen, setEsgSurveyOpen] = useState(false);
 
@@ -508,6 +517,20 @@ export default function SupplierDetailPage() {
                 );
               })}
             </div>
+          </div>
+        ) : esgEmailUndelivered ? (
+          <div className="space-y-4">
+            <p className="max-w-xl text-sm text-studio-stale">
+              Survey email didn&apos;t reach them. We sent the invitation but the
+              supplier&apos;s mail server rejected it, so they never received it.
+              Check the address is right, or ask them for a better contact.
+            </p>
+            {esgInvitationEmailError && (
+              <p className="max-w-xl font-mono text-xs text-studio-dim">{esgInvitationEmailError}</p>
+            )}
+            <PillButton variant="outline" onClick={() => setEsgSurveyOpen(true)}>
+              Try a different address
+            </PillButton>
           </div>
         ) : esgInvitationStatus === "pending" || esgInvitationStatus === "accepted" ? (
           <div className="space-y-4">

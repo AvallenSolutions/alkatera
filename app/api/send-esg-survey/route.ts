@@ -82,6 +82,30 @@ export async function POST(request: NextRequest) {
     const denied = await denyReadOnlyAdvisor(adminClient as any, user, organizationId);
     if (denied) return denied;
 
+    // Respect a previous one-click unsubscribe. Tell the brand rather than
+    // failing quietly: they need to know to chase this supplier another way,
+    // and re-mailing someone who opted out is what damages sending reputation
+    // in the first place.
+    const { data: optedOut } = await adminClient
+      .from('supplier_invitations')
+      .select('id')
+      .eq('organization_id', organizationId)
+      .eq('supplier_email', normalisedEmail)
+      .eq('email_status', 'unsubscribed')
+      .limit(1)
+      .maybeSingle();
+
+    if (optedOut) {
+      return NextResponse.json(
+        {
+          error:
+            'This contact has unsubscribed from survey emails. Copy the invitation link and send it to them directly instead.',
+          unsubscribed: true,
+        },
+        { status: 409 },
+      );
+    }
+
     // Org + inviter details for the email
     const { data: orgData } = await adminClient
       .from('organizations')
@@ -228,11 +252,18 @@ export async function POST(request: NextRequest) {
     // 4. Send the survey email via Resend
     const resendApiKey = process.env.RESEND_API_KEY;
     let emailSent = false;
+    let emailError: string | null = null;
+    let emailProviderId: string | null = null;
 
     if (resendApiKey) {
       try {
         const resend = new Resend(resendApiKey);
-        const logoUrl = 'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png';
+        // Serve the logo from our own domain. Loading it from a raw
+        // *.supabase.co storage hostname is a spam signal: the asset domain
+        // has no relationship to the sending domain or to any brand named in
+        // the message.
+        const logoUrl = `${siteUrl}/logo.png`;
+        const unsubscribeUrl = `${siteUrl}/api/email/unsubscribe?token=${invitation.invitation_token}`;
         const emailSubject = `${organizationName} has invited you to complete a sustainability survey on alkatera`;
         const greetingName = contactPersonName || supplierName;
         const greeting = greetingName ? escapeHtml(greetingName) : null;
@@ -324,32 +355,75 @@ export async function POST(request: NextRequest) {
 </body>
 </html>`;
 
-        // Do not CC the inviter: they're often signed in to the main app, and
-        // opening their own copy of the link could disrupt their session. The
-        // supplier's replies still reach them via replyTo, and we keep an
-        // internal copy on hello@alkatera.com.
-        const ccList = ['hello@alkatera.com'];
+        // Show the brand the supplier actually recognises while keeping the
+        // From address on our DMARC-aligned sending domain. Three different
+        // identities in one message (our From, the inviter's Reply-To, a third
+        // company throughout the body) is the exact shape of a phishing
+        // attempt and filters score it that way. "X via alkatera" is the same
+        // pattern Google Groups uses. The display name is quoted, so strip the
+        // characters that could terminate the quoted string or inject a header.
+        const fromDisplayName = `${organizationName} via alkatera`
+          .replace(/[\\"]/g, '')
+          .replace(/[\r\n]+/g, ' ')
+          .trim();
 
-        await resend.emails.send({
-          from: 'alkatera <sayhello@mail.alkatera.com>',
-          to: [supplierEmail],
-          cc: ccList,
+        // No CC to hello@alkatera.com any more: it exposed an internal address
+        // to every one of the customer's suppliers, and a third-party CC on a
+        // one-to-one message is one more oddity for a filter to weigh. The
+        // send is recorded on the invitation row instead.
+        const { data: sendResult, error: sendError } = await resend.emails.send({
+          from: `"${fromDisplayName}" <sayhello@mail.alkatera.com>`,
+          to: [normalisedEmail],
           replyTo: user.email || 'hello@alkatera.com',
           subject: emailSubject,
           html: emailHtml,
+          headers: {
+            // RFC 8058 one-click unsubscribe. Gmail and Yahoo have expected
+            // this on bulk-shaped mail since February 2024 and treat its
+            // absence as a negative reputation signal.
+            'List-Unsubscribe': `<${unsubscribeUrl}>, <mailto:unsubscribe@alkatera.com?subject=Unsubscribe>`,
+            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+          },
         });
 
-        emailSent = true;
-      } catch (emailError) {
-        console.error('Failed to send survey email:', emailError);
+        // The Resend SDK resolves with { data, error } and does NOT throw on
+        // an API error. The previous version awaited this call and discarded
+        // the result, so every provider-side failure was reported to the user
+        // as a success.
+        if (sendError) {
+          console.error('Resend rejected survey email:', sendError);
+          emailError = sendError.message || 'The email provider rejected the message';
+        } else {
+          emailSent = true;
+          emailProviderId = sendResult?.id ?? null;
+        }
+      } catch (err: any) {
+        console.error('Failed to send survey email:', err);
+        emailError = err?.message || 'Could not reach the email provider';
       }
     } else {
-      console.warn('RESEND_API_KEY not configured — email not sent');
+      console.warn('RESEND_API_KEY not configured, email not sent');
+      emailError = 'Email sending is not configured on this environment';
     }
+
+    // Record the attempt on the invitation. email_provider_id is what
+    // /api/webhooks/resend later matches a bounce against, so without it a
+    // delivery failure could never be attributed back to this invitation.
+    await adminClient
+      .from('supplier_invitations')
+      .update({
+        email_provider_id: emailProviderId,
+        email_status: emailSent ? 'sent' : 'failed',
+        email_status_at: new Date().toISOString(),
+        email_error: emailError,
+      })
+      .eq('id', invitation.id);
 
     return NextResponse.json({
       success: true,
-      message: 'Survey sent successfully',
+      message: emailSent
+        ? 'Survey sent successfully'
+        : 'Survey created, but the email could not be sent',
       supplier_id: supplierId,
       invitation: {
         id: invitation.id,
@@ -358,6 +432,7 @@ export async function POST(request: NextRequest) {
         expires_at: invitation.expires_at,
       },
       email_sent: emailSent,
+      email_error: emailError,
     });
   } catch (error) {
     console.error('Unexpected error in send-esg-survey:', error);
