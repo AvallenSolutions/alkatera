@@ -68,12 +68,48 @@ before planning anything about background jobs.
    (`ff0fcbc2`); the incoming migration renumbered to `20260721110000` to clear
    `pcf_end_use_scenarios` on staging. Divergence 0. Redesign's `tasks/handoff.md` is now the
    live handoff; treat this file as historical.
-5. **The numbers-don't-change harness.** Extend `lib/__tests__/packaging-parametric-golden.test.ts`:
-   snapshot prod's stored `aggregated_impacts` per completed PCF, assert redesign reproduces them.
-   Obstacle: the calculator is browser-only, so this needs the pure maths extracted or the recalc
-   tool driven headlessly. This is what makes a cutover provable rather than hopeful.
+5. ~~The numbers-don't-change harness.~~ **BUILT 2026-07-24, and REDESIGN REPRODUCES MAIN
+   EXACTLY.** Three new files, meant to stay byte-identical on both branches:
+   `lib/__tests__/lca-aggregator-golden.test.ts`, `lib/__tests__/fixtures/lca-golden-cases.ts`,
+   `lib/__tests__/support/aggregator-harness.ts`. 8 tests, 4 boundary cases (gate / grave /
+   shelf-chilled / grave-with-loss). Copied to the redesign worktree and run there: **8/8 pass
+   with the numbers unchanged.**
+   - **The stated obstacle was wrong.** The calculator is NOT browser-only: there is no
+     window/document/localStorage anywhere in `lib/product-lca-calculator.ts`, only a single
+     `getSupabaseBrowserClient()` call, and `aggregateProductImpacts` — which is what actually
+     produces `aggregated_impacts` — already takes its client as an argument. It needed a
+     client, not a browser. No maths extraction and no headless browser were required.
+   - Proven by MUTATION on both branches, not by going green: scaling distribution by the loss
+     multiplier, dropping the shelf-boundary retail-chilling branch, and a 0.1% packaging drift
+     each fail (the last fails 4 tests). Mutating **redesign's own**
+     `lib/lca/downstream-stages.ts` also fails, which is how we know its pass was real and not
+     vacuous. All mutations reverted; both worktrees clean.
+   - Redesign's reorder (downstream stages computed BEFORE the product-loss block, where main
+     computed them after) is behaviour-preserving: the loss block only scales scalar running
+     totals and never touches `materials`, and both branches add downstream results after
+     scaling. There is now a test that pins this rather than an argument that asserts it.
+   - **Coverage limit, read before trusting it:** the harness starts from already-resolved
+     material rows, so it locks the AGGREGATOR. It does not cover factor resolution in
+     `product-lca-calculator.ts` (124 changed lines) or `impact-waterfall-resolver.ts` (72).
+     Those remain unproven and are the natural next extension.
 
 ## Gotchas and decisions
+- **Cutover + the pending recalc together WILL move UK orgs' end-of-life numbers.** Found while
+  building the harness. `main` hardcodes `region: 'eu'` in `EndOfLifeStep.tsx`; `redesign`
+  derives it via the new `eolRegionForCountry(organizationCountry)`. Both orgs that matter for
+  the pending all-orgs recalc are UK (**Happy Curations**, **London Botanical Drinks/Everleaf**),
+  so on redesign they default to the UK waste profile instead of the EU one. Measured on the
+  golden bottle: **end-of-life +41.8%** (0.00170 → 0.00241 kg CO2e), **headline total +0.14%**.
+  Big at the stage level, small at the headline. Stored PCFs do NOT change on their own — this
+  only bites when something recalculates. It is arguably a correctness FIX (a UK distillery
+  should not carry EU recycling rates), so the action is to expect it and tell Clair, not to
+  revert it. The harness passes an explicit region, so it does not catch this by design.
+- **A failed freight-factor lookup silently zeroes distribution.**
+  `calculateTransportEmissions` throws when the `staging_emission_factors` row is missing, and
+  `calculateDistributionEmissions` catches PER LEG and books 0 with only a `console.warn`. So a
+  missing factor on staging looks like a plausibly small footprint, not an error. This is
+  exactly what happened inside the harness before the factor row was fixtured. Worth checking
+  `staging_emission_factors` on the staging Supabase before reading any staging LCA number.
 - **I assumed the hosting platform twice and was wrong both times.** First I audited Netlify
   exhaustively and concluded "no deployment exists"; it was on Vercel. Then the Vercel API 404'd
   and I inferred the project lived elsewhere; it does not. VERIFY the platform before planning
@@ -111,6 +147,9 @@ before planning anything about background jobs.
   Warn Clair first: packaging goes UP, EPR tonnage down ~24x on shared cases, and she may have
   published those numbers.
 - **Click `/admin/demo-seed` → Seed Drinks Co demo** on prod to load the new breadth data.
+- **Warn Clair about the UK end-of-life shift too**, not just the packaging/EPR move already
+  listed above. Same conversation, one more number: EoL rises ~42% for UK products once they
+  are recalculated on redesign. See the first bullet under Gotchas.
 - **Delete the `gaia-query` edge function** in the Supabase dashboard (Edge Functions → gaia-query
   → Delete). Removed from the repo and from CI, but still deployed and served.
 - Migrations: the EPR one is APPLIED to prod. Nothing else pending there.
