@@ -67,3 +67,7 @@ Knowledge Bank - */
 .claude/worktrees/
 scripts/eval-out/
 .env*
+
+# Local LCA database downloads (ecoinvent .zolca libraries, ~9 GB).
+# Never belongs in git; sat untracked and unignored until 24 Jul 2026.
+OpenLCA/
