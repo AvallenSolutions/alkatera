@@ -8,7 +8,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useOrganization } from '@/lib/organizationContext'
 import { useRealtimeRefresh } from '@/lib/rosa/useRealtimeRefresh'
 import { VitalityRing } from './VitalityRing'
-import { EsgPillarCards } from './EsgPillarCards'
 import { ScoreExplainer, type CalculationInputs } from './ScoreExplainer'
 import { Eyebrow } from '@/components/studio/eyebrow'
 import type { VitalityComposite, ScoreBand } from '@/lib/vitality/composite'
@@ -192,11 +191,6 @@ export function EsgVitalityScoreHero({
   }
 
   const { composite, trend, trend_delta, read } = data
-  const sparklines = {
-    e: trend.map(p => p.e),
-    s: trend.map(p => p.s),
-    g: trend.map(p => p.g),
-  }
   const delta = trend_delta?.delta_points ?? null
   const DeltaIcon = delta === null ? TrendingUp : delta >= 0 ? TrendingUp : TrendingDown
 
@@ -292,16 +286,11 @@ export function EsgVitalityScoreHero({
         </div>
       ) : null}
 
-      {/* Pillar breakdown. */}
-      <div className="border-t border-border pt-6">
-        <Eyebrow className="mb-3">Pillar breakdown</Eyebrow>
-        <EsgPillarCards
-          e={composite.e}
-          s={composite.s}
-          g={composite.g}
-          sparklines={sparklines}
-        />
-      </div>
+      {/* The pillar breakdown used to sit here, repeating as three boxed cards
+          the same nine numbers the page then showed again as four expandable
+          pillar cards. It now lives once, in the page body, as three hairline
+          sections — see components/vitality/VitalityAxisSections.tsx. The hero
+          keeps what only it can say: the ring, the verdict, Rosa's read. */}
 
       {/* Weights: a quiet footer line. */}
       <div className="flex items-center justify-between border-t border-border pt-4 text-xs text-muted-foreground">

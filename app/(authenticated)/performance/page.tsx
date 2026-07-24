@@ -12,7 +12,6 @@ import { PillButton } from '@/components/studio/pill-button';
 import { useCompanyMetrics, CompanyMetrics } from '@/hooks/data/useCompanyMetrics';
 import { useCompanyFootprint } from '@/hooks/data/useCompanyFootprint';
 import { useWasteMetrics } from '@/hooks/data/useWasteMetrics';
-import { useVitalityBenchmarks } from '@/hooks/data/useVitalityBenchmarks';
 import { useFacilityWaterData } from '@/hooks/data/useFacilityWaterData';
 import { useOrganization } from '@/lib/organizationContext';
 import { usePersistedYear, useLatestDataYear } from '@/hooks/usePersistedYear';
@@ -25,7 +24,6 @@ import type {
 } from '@/hooks/data/useScope3GranularData';
 
 import { supabase } from '@/lib/supabaseClient';
-import { calculateVitalityScores } from '@/components/vitality/VitalityScoreHero';
 import { EsgVitalityScoreHero } from '@/components/vitality/EsgVitalityScoreHero';
 import { Eyebrow } from '@/components/studio/eyebrow';
 import type { VitalityComposite } from '@/lib/vitality/composite';
@@ -42,7 +40,8 @@ import type {
   CircularityScoreBreakdown,
   NatureScoreBreakdown,
 } from '@/lib/vitality/environmental';
-import { PillarCard, PillarGrid, PerformanceSummary } from '@/components/vitality/PillarCard';
+import { PerformanceSummary } from '@/components/vitality/PillarCard';
+import { VitalityAxisSections, type AxisFacts } from '@/components/vitality/VitalityAxisSections';
 // Round 3 (auto-research): these deep-dive / sheet panels render only inside an
 // expanded pillar or an opened sheet, so their recharts-heavy bundles shouldn't
 // sit in /performance's First Load JS. Lazy-load them.
@@ -523,7 +522,6 @@ export default function PerformancePage() {
   const hookResult = useCompanyMetrics(selectedYear);
   const { footprint: footprintData, loading: footprintLoading, refetch: refetchFootprint } = useCompanyFootprint(selectedYear);
   const { metrics: wasteMetrics, loading: wasteLoading } = useWasteMetrics(selectedYear);
-  const { getBenchmarkForPillar } = useVitalityBenchmarks();
   const {
     companyOverview: waterCompanyOverview,
     facilitySummaries: waterFacilitySummaries,
@@ -689,30 +687,6 @@ export default function PerformancePage() {
   const circularityBreakdown: CircularityScoreBreakdown | null = vitalityComposite?.e.circularity_breakdown ?? null;
   const natureBreakdown: NatureScoreBreakdown | null = vitalityComposite?.e.nature_breakdown ?? null;
 
-  const vitalityScores = useMemo(() => {
-    // Check if we have actual product data (not just zeros)
-    const hasProductData = metrics?.total_products_assessed !== undefined &&
-                           metrics.total_products_assessed > 0;
-    // Check if we have actual waste data
-    const hasWasteData = wasteMetrics !== null && wasteMetrics !== undefined;
-
-    // All four environmental sub-scores now come from /api/vitality/composite
-    // so /rosa/ and /performance/ agree. We pass nothing to the local
-    // calculator (it would otherwise re-derive nature client-side, which is
-    // exactly the parity bug the redesign kills).
-    const local = calculateVitalityScores({
-      hasProductData,
-      hasWasteData,
-    });
-    return {
-      ...local,
-      climate: climateBreakdown?.score ?? null,
-      water: waterBreakdown?.score ?? null,
-      circularity: circularityBreakdown?.score ?? null,
-      nature: natureBreakdown?.score ?? null,
-    };
-  }, [metrics, wasteMetrics, climateBreakdown, waterBreakdown, circularityBreakdown, natureBreakdown]);
-
   const scoreCalculationInputs = useMemo(() => ({
     climate: {
       // Old per-LCA-count fields kept for the explainer's existing layout
@@ -824,16 +798,36 @@ export default function PerformancePage() {
 
   const totalLandUse = landUseItems.reduce((sum, item) => sum + item.totalFootprint, 0) || landUse;
 
-  const formatValue = (value: number): string => {
-    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-    if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
-    if (value < 0.1 && value > 0) return value.toExponential(1);
-    return value.toFixed(1);
-  };
-
   const togglePillar = (pillar: string) => {
     setExpandedPillar(expandedPillar === pillar ? null : pillar);
   };
+
+  /**
+   * Plain-language figures for the axis rows. "673 t CO2e", not "673 TCO2EQ";
+   * "18,700 m² a year", not "m2a crop eq". The precise unit belongs on the
+   * axis page beside its methodology note, where someone has asked for it.
+   *
+   * An axis with no honest figure is left out rather than given a dash: the
+   * row falls back to "Nothing yet" only when there is genuinely no score.
+   */
+  const axisFacts: AxisFacts = useMemo(() => {
+    const facts: AxisFacts = {};
+    const round = (n: number) => Math.round(n).toLocaleString('en-GB');
+
+    if (totalCO2 > 0) facts.climate = `${round(totalCO2 / 1000)} t CO2e`;
+    if (waterScarcityImpact > 0) facts.water = `${round(waterScarcityImpact)} m³`;
+    if (circularityRate > 0) facts.circularity = `${circularityRate.toFixed(0)}% recycled`;
+    if (totalLandUse > 0) facts.nature = `${round(totalLandUse)} m² a year`;
+
+    const achieved = dedupedCertifications.filter(
+      (c) => (c.status ?? '').toLowerCase() === 'certified',
+    ).length;
+    if (dedupedCertifications.length > 0) {
+      facts.certifications = `${achieved} of ${dedupedCertifications.length} achieved`;
+    }
+
+    return facts;
+  }, [totalCO2, waterScarcityImpact, circularityRate, totalLandUse, dedupedCertifications]);
 
   if (loading) {
     return (
@@ -903,17 +897,23 @@ export default function PerformancePage() {
 
       <FlagThresholdBanner />
 
-      {/* Four Pillars - Expandable Cards */}
-      <PillarGrid>
-        <PillarCard
-          pillar="climate"
-          score={vitalityScores.climate}
-          value={totalCO2 > 0 ? formatValue(totalCO2 / 1000) : '--'}
-          unit="tCO2eq"
-          benchmark={getBenchmarkForPillar('climate')}
-          expanded={expandedPillar === 'climate'}
-          onToggle={() => togglePillar('climate')}
-        >
+      {/* The nine axes. One list, three sections, every axis at the same
+          standing — replaces the hero's boxed pillar breakdown AND the four
+          expandable pillar cards that repeated it. Selecting an environmental
+          axis opens its detail below; at step 3 of the plan these become
+          links to /performance/[axis]/ and the in-place detail goes. */}
+      <VitalityAxisSections
+        composite={vitalityComposite}
+        facts={axisFacts}
+        selectableAxes={['climate', 'water', 'circularity', 'nature']}
+        onSelectAxis={(axis) => togglePillar(axis)}
+      />
+
+      {/* The selected axis, in full. No card, no second score: the row above
+          already said the number, and this is the detail behind it. */}
+      {expandedPillar === 'climate' ? (
+        <section className="border-t border-border pt-6">
+          <Eyebrow className="mb-3">Climate · in full</Eyebrow>
           <CarbonDeepDive
             scopeBreakdown={scopeBreakdown}
             totalCO2={totalCO2}
@@ -940,17 +940,12 @@ export default function PerformancePage() {
             View full analysis
             <ArrowRight className="h-4 w-4" />
           </PillButton>
-        </PillarCard>
+        </section>
+      ) : null}
 
-        <PillarCard
-          pillar="water"
-          score={vitalityScores.water}
-          value={waterScarcityImpact > 0 ? formatValue(waterScarcityImpact) : '--'}
-          unit="m3 world eq"
-          benchmark={getBenchmarkForPillar('water')}
-          expanded={expandedPillar === 'water'}
-          onToggle={() => togglePillar('water')}
-        >
+      {expandedPillar === 'water' ? (
+        <section className="border-t border-border pt-6">
+          <Eyebrow className="mb-3">Water · in full</Eyebrow>
           <WaterDeepDive
             facilityWaterRisks={facilityWaterRisks}
             facilitySummaries={waterFacilitySummaries}
@@ -970,17 +965,12 @@ export default function PerformancePage() {
             View full analysis
             <ArrowRight className="h-4 w-4" />
           </PillButton>
-        </PillarCard>
+        </section>
+      ) : null}
 
-        <PillarCard
-          pillar="circularity"
-          score={vitalityScores.circularity}
-          value={circularityRate > 0 ? circularityRate.toFixed(0) : '--'}
-          unit="%"
-          benchmark={getBenchmarkForPillar('circularity')}
-          expanded={expandedPillar === 'circularity'}
-          onToggle={() => togglePillar('circularity')}
-        >
+      {expandedPillar === 'circularity' ? (
+        <section className="border-t border-border pt-6">
+          <Eyebrow className="mb-3">Circularity · in full</Eyebrow>
           <WasteDeepDive
             wasteMetrics={wasteMetrics}
             loading={wasteLoading}
@@ -994,17 +984,12 @@ export default function PerformancePage() {
             View full analysis
             <ArrowRight className="h-4 w-4" />
           </PillButton>
-        </PillarCard>
+        </section>
+      ) : null}
 
-        <PillarCard
-          pillar="nature"
-          score={vitalityScores.nature}
-          value={landUse > 0 ? formatValue(landUse) : '--'}
-          unit="m2a crop eq"
-          benchmark={getBenchmarkForPillar('nature')}
-          expanded={expandedPillar === 'nature'}
-          onToggle={() => togglePillar('nature')}
-        >
+      {expandedPillar === 'nature' ? (
+        <section className="border-t border-border pt-6">
+          <Eyebrow className="mb-3">Nature · in full</Eyebrow>
           <NatureDeepDive natureMetrics={natureMetrics} />
           <PillButton
             variant="ghost"
@@ -1015,8 +1000,8 @@ export default function PerformancePage() {
             View full analysis
             <ArrowRight className="h-4 w-4" />
           </PillButton>
-        </PillarCard>
-      </PillarGrid>
+        </section>
+      ) : null}
 
       {/* Performance Summary - Strengths & Improvements */}
       <PerformanceSummary
