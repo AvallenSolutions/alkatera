@@ -1,16 +1,70 @@
 /**
  * Industry emissions benchmarks by product category (kg CO2e per litre).
  *
- * These benchmarks represent lifecycle emissions including raw materials,
- * production, packaging, and distribution. Values are mid-range estimates
- * from published industry studies.
+ * ⚠️ THESE FIGURES ARE UNDER REVIEW AND SEVERAL ARE NOT SUPPORTED BY THE
+ * SOURCE THEY CITE. Do not treat any row as audit-ready, and do not let any
+ * of it reach a customer-facing claim, until the `sourceSupportsValue` flag
+ * below reads 'yes'.
  *
- * Sources are cited per category group so users can verify the data.
+ * This header used to assert that every figure "represents lifecycle
+ * emissions including raw materials, production, packaging, and
+ * distribution". Anne Jones traced every citation on 24 July 2026 and that
+ * sentence was false for most of the table: one row cites an operational
+ * facility study, two carry unit or boundary errors inside the number
+ * itself, and several are roughly right by accident. It was also the exact
+ * sentence an auditor would have quoted back at us.
+ *
+ * So boundary and functional unit are now REQUIRED per row rather than
+ * asserted once at the top, and each row records honestly whether its cited
+ * source actually supports its value. A new benchmark cannot be added
+ * without stating what it measures.
+ *
+ * Full findings and the repair plan: tasks/benchmark-answers-anne-jones.md.
+ *
+ * Known and NOT yet fixed (values deliberately unchanged pending Tim's call,
+ * because every edit here moves live customer scores):
+ *   - Spirits 3.0 is a per-750ml-BOTTLE figure mislabelled per litre; the
+ *     per-litre equivalent is 3.7-4.0. It also derives from aged American
+ *     whiskey, so gin and rum (most of our customers) score ~90 regardless.
+ *   - Beer & Cider 0.85 cites an operational study that publishes no
+ *     absolute figures at all. Plausible as an all-format average, but a
+ *     glass-packing craft brewer really sits at 1.3-1.9 and is scored 10-25.
+ *   - Non-Alcoholic 0.35 sends juice, dairy and plant milks to a fizzy-drink
+ *     benchmark; those sub-categories should read "no benchmark".
+ *   - DEFAULT_BENCHMARK 1.0 is an internal assumption dressed as a source.
+ *
+ * SEPARATELY, and bigger: nothing adjusts this denominator for the
+ * numerator's system boundary, which fails ISO 14044's same-boundary
+ * requirement for comparison. See the answers doc, Question 2.
  */
 
+/** What lifecycle stages a benchmark figure actually covers. */
+export type BenchmarkBoundary =
+  | 'cradle-to-gate'
+  | 'cradle-to-grave'
+  | 'cradle-to-distillation'
+  | 'operational-scope-1-2'
+  | 'mixed-or-unknown';
+
+/**
+ * Does the cited source actually support this number?
+ *   'yes'         traced and confirmed
+ *   'approximate' right magnitude, but the citation does not state it
+ *   'no'          the source does not support the value; needs replacing
+ */
+export type SourceSupport = 'yes' | 'approximate' | 'no';
+
 export interface IndustryBenchmark {
-  /** kg CO2e per litre (lifecycle) */
+  /** kg CO2e per litre. See `boundary` — this is NOT lifecycle for every row. */
   kgCO2ePerLitre: number;
+  /** What the cited source's figure actually covers. Required: no defaults. */
+  boundary: BenchmarkBoundary;
+  /** The source's own functional unit, before any conversion we did to reach per-litre. */
+  functionalUnit: string;
+  /** Whether the citation supports the value. Anything but 'yes' must not be shown as fact. */
+  sourceSupportsValue: SourceSupport;
+  /** When not 'yes', what is wrong and what would fix it. */
+  caveat?: string;
   /** Human-readable source name */
   sourceName: string;
   /** Clickable URL to the source document */
@@ -62,30 +116,55 @@ export const PRODUCT_TYPE_OPTIONS = [
 const GROUP_BENCHMARKS: Record<string, IndustryBenchmark> = {
   Spirits: {
     kgCO2ePerLitre: 3.0,
+    boundary: 'cradle-to-grave',
+    functionalUnit: '750 ml bottle (NOT per litre)',
+    sourceSupportsValue: 'no',
+    caveat:
+      'Source is BIER 2012 (not 2023); the IBD attribution appears spurious. It gives 2.745 kg/750ml (column) and 2.971 (pot) — 3.0 is the per-BOTTLE pot figure mislabelled per litre. Per-litre equivalent is 3.7-4.0. Also derives from aged American whiskey, so unaged gin/rum score ~90 regardless. Needs an aged/unaged split.',
     sourceName: 'BIER / Institute of Brewing & Distilling',
     sourceUrl: 'https://www.bieroundtable.com/wp-content/uploads/49d7a0_7643fd3fae5d4daf939cd5373389e4e0.pdf',
     sourceYear: 2023,
   },
   'Beer & Cider': {
     kgCO2ePerLitre: 0.85,
+    boundary: 'operational-scope-1-2',
+    functionalUnit: 'facility, percentage improvement only',
+    sourceSupportsValue: 'no',
+    caveat:
+      'The cited study is facility scope 1+2 and publishes NO absolute per-litre figures; facility beverage emissions are tens of grams per litre. 0.85 is plausible as an all-format lifecycle average (BIER 2012 via Oregon DEQ: returnable glass 0.42, steel can 0.64, alu can 0.90, single-use glass 1.05) but a glass-packing craft brewer is 1.3-1.9 and gets scored 10-25. Re-cite to BIER 2012 and resolve by format.',
     sourceName: 'BIER 2023 Benchmarking Study',
     sourceUrl: 'https://www.bieroundtable.com/news/bier-issues-results-2023-water-energy-ghg-benchmarking-study/',
     sourceYear: 2023,
   },
   Wine: {
     kgCO2ePerLitre: 1.6,
+    boundary: 'mixed-or-unknown',
+    functionalUnit: 'varies across reviewed studies',
+    sourceSupportsValue: 'approximate',
+    caveat:
+      'The cited review spans mixed boundaries and publishes no headline figure. 1.6 sits between cradle-to-gate literature (1.1-1.5) and Rugani cradle-to-grave (~2.9/l). Defensible as a mid-range, not citable to this paper.',
     sourceName: 'ScienceDirect – Wine Carbon Footprint Review',
     sourceUrl: 'https://www.sciencedirect.com/science/article/pii/S2772801322000173',
     sourceYear: 2022,
   },
   'Ready-to-Drink & Cocktails': {
     kgCO2ePerLitre: 0.55,
+    boundary: 'cradle-to-grave',
+    functionalUnit: 'North American aluminium can scenario',
+    sourceSupportsValue: 'approximate',
+    caveat:
+      'BIER 2012 (not 2023). 0.55 is the NA aluminium-can scenario only; the EU 1.5l PET scenario in the same study is ~0.17 — a threefold packaging dependence hidden by one number. Contains no alcohol: a 5% ABV product adds only ~0.08-0.13. Fine for a CANNED RTD as a labelled proxy; wrong for a bottled one.',
     sourceName: 'BIER Carbonated Soft Drinks Study (RTD proxy)',
     sourceUrl: 'https://www.bieroundtable.com/wp-content/uploads/49d7a0_7a5cfa72d8e74c04be5aeb81f38b136b.pdf',
     sourceYear: 2023,
   },
   'Non-Alcoholic': {
     kgCO2ePerLitre: 0.35,
+    boundary: 'cradle-to-grave',
+    functionalUnit: 'unclear — matches no figure in either cited study',
+    sourceSupportsValue: 'no',
+    caveat:
+      'Matches nothing in either source (can 0.55, PET 0.17, water 0.11-0.17); appears interpolated. Worse, this category also receives juice (0.7-1.1), dairy (1.3-1.9) and plant milks (0.4-1.0), which are 2-4x this. Those sub-categories must read NO BENCHMARK; keep ~0.35 only for CSDs, seltzers and mixers.',
     sourceName: 'BIER Carbonated Soft Drinks / Bottled Water Study',
     sourceUrl: 'https://www.bieroundtable.com/wp-content/uploads/49d7a0_7a5cfa72d8e74c04be5aeb81f38b136b.pdf',
     sourceYear: 2023,
@@ -98,42 +177,75 @@ const GROUP_BENCHMARKS: Record<string, IndustryBenchmark> = {
 const CATEGORY_OVERRIDES: Record<string, IndustryBenchmark> = {
   Whisky: {
     kgCO2ePerLitre: 3.8,
+    boundary: 'cradle-to-distillation',
+    functionalUnit: '1 litre of PURE ALCOHOL, no maturation/packaging/distribution',
+    sourceSupportsValue: 'no',
+    caveat:
+      'Wrong on both boundary and unit: the cited study is ~2.6 kg/LPA to end of distillation, which at 40% ABV implies ~1.0 kg/l of unpackaged liquid. 3.8 is coincidentally near-right for PACKAGED whisky cradle-to-gate (JIB single malt 2.83 kg/70cl = 4.04/l; BIER 2012 3.7-4.0). Right number, wrong citation.',
     sourceName: 'MDPI – Scottish Malt Whisky GHG Study',
     sourceUrl: 'https://www.mdpi.com/2071-1050/10/5/1473',
     sourceYear: 2018,
   },
   Bourbon: {
     kgCO2ePerLitre: 3.8,
+    boundary: 'cradle-to-distillation',
+    functionalUnit: '1 litre of PURE ALCOHOL, no maturation/packaging/distribution',
+    sourceSupportsValue: 'no',
+    caveat:
+      'Wrong on both boundary and unit: the cited study is ~2.6 kg/LPA to end of distillation, which at 40% ABV implies ~1.0 kg/l of unpackaged liquid. 3.8 is coincidentally near-right for PACKAGED whisky cradle-to-gate (JIB single malt 2.83 kg/70cl = 4.04/l; BIER 2012 3.7-4.0). Right number, wrong citation.',
     sourceName: 'MDPI – Scottish Malt Whisky GHG Study',
     sourceUrl: 'https://www.mdpi.com/2071-1050/10/5/1473',
     sourceYear: 2018,
   },
   'Rye Whiskey': {
     kgCO2ePerLitre: 3.8,
+    boundary: 'cradle-to-distillation',
+    functionalUnit: '1 litre of PURE ALCOHOL, no maturation/packaging/distribution',
+    sourceSupportsValue: 'no',
+    caveat:
+      'Wrong on both boundary and unit: the cited study is ~2.6 kg/LPA to end of distillation, which at 40% ABV implies ~1.0 kg/l of unpackaged liquid. 3.8 is coincidentally near-right for PACKAGED whisky cradle-to-gate (JIB single malt 2.83 kg/70cl = 4.04/l; BIER 2012 3.7-4.0). Right number, wrong citation.',
     sourceName: 'MDPI – Scottish Malt Whisky GHG Study',
     sourceUrl: 'https://www.mdpi.com/2071-1050/10/5/1473',
     sourceYear: 2018,
   },
   'Sparkling Wine': {
     kgCO2ePerLitre: 2.0,
+    boundary: 'cradle-to-gate',
+    functionalUnit: 'winery gate; the paper does not study sparkling wine',
+    sourceSupportsValue: 'no',
+    caveat:
+      'The cited paper is about eco-innovative wastewater treatment in wine generally. 2.0 is inside the real range — MDPI Applied Sciences systematic review gives 0.9-1.9 kg/bottle (~1.2-2.5/l), packaging 55-60% of total — so re-cite to that review.',
     sourceName: 'Nature – Eco-innovation & Wine Carbon Footprint',
     sourceUrl: 'https://www.nature.com/articles/s43247-024-01766-0',
     sourceYear: 2024,
   },
   'Still Water': {
     kgCO2ePerLitre: 0.15,
+    boundary: 'cradle-to-grave',
+    functionalUnit: 'unclear — the cited page hosts two incompatible studies',
+    sourceSupportsValue: 'approximate',
+    caveat:
+      'The IBWA page hosts an operational benchmarking study (~0.022/l) AND a packaging LCA publishing no numbers. Neither supports 0.15. BIER 2012 bottled water (cradle-to-grave) gives 0.11-0.17, so this is accidentally in range — re-cite to BIER 2012.',
     sourceName: 'IBWA Environmental Footprint Study',
     sourceUrl: 'https://bottledwater.org/environmental-footprint/',
     sourceYear: 2021,
   },
   'Sparkling Water': {
     kgCO2ePerLitre: 0.20,
+    boundary: 'cradle-to-grave',
+    functionalUnit: 'unclear — the cited page hosts two incompatible studies',
+    sourceSupportsValue: 'no',
+    caveat: 'Unsourced. Neither study behind the cited page supports 0.20.',
     sourceName: 'IBWA Environmental Footprint Study',
     sourceUrl: 'https://bottledwater.org/environmental-footprint/',
     sourceYear: 2021,
   },
   'Energy Drink': {
     kgCO2ePerLitre: 0.55,
+    boundary: 'cradle-to-grave',
+    functionalUnit: 'North American aluminium can scenario',
+    sourceSupportsValue: 'approximate',
+    caveat: 'BIER 2012 (not 2023), and the can scenario specifically; the PET scenario is ~0.17.',
     sourceName: 'BIER Carbonated Soft Drinks Study',
     sourceUrl: 'https://www.bieroundtable.com/wp-content/uploads/49d7a0_7a5cfa72d8e74c04be5aeb81f38b136b.pdf',
     sourceYear: 2023,
@@ -143,6 +255,11 @@ const CATEGORY_OVERRIDES: Record<string, IndustryBenchmark> = {
 /** Default benchmark used when no category is available */
 const DEFAULT_BENCHMARK: IndustryBenchmark = {
   kgCO2ePerLitre: 1.0,
+  boundary: 'mixed-or-unknown',
+  functionalUnit: 'none — no such published figure exists',
+  sourceSupportsValue: 'no',
+  caveat:
+    'INTERNAL ASSUMPTION DRESSED AS A SOURCE. No BIER "beverage industry average" of 1.0 kg/l exists, and the URL points at the operational benchmarking page. An uncategorised product should be UNSCORED, not scored against an invented number.',
   sourceName: 'BIER Beverage Industry Average',
   sourceUrl: 'https://www.bieroundtable.com/work/benchmarking/',
   sourceYear: 2023,

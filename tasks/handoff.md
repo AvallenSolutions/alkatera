@@ -169,7 +169,17 @@ Only after both, and only if asked:
     the column, seeds it from the dying beta flags, then strips them.
   - `supabase/migrations/20260724110000_tier_features_single_source.sql` —
     regenerated tier features; canopy 65 → 69.
-- **Anne Jones questions — written up and ready to send**:
+- **ANNE JONES HAS ANSWERED** (`tasks/benchmark-answers-anne-jones.md`, the
+  source record — do not edit it). Headline: **not one of the 13 benchmark rows
+  is supported by the source it cites** (9 'no', 4 'approximate', 0 'yes'), and
+  the boundary mismatch fails ISO 14044 outright rather than being a judgement
+  call. `lib/industry-benchmarks.ts` now records boundary, functional unit and
+  source-support per row so this cannot hide again; **no values changed** —
+  those move live customer scores and need Tim. Revised 11-step order is in
+  `tasks/vitality-redesign-plan.md`. Two things needing Tim specifically:
+  archive the BIER PDFs (several now 404, surviving only on Wix's CDN), and
+  approve the value corrections.
+- ~~Anne Jones questions — written up and ready to send~~ (sent, answered):
   `tasks/benchmark-questions-anne-jones.md`. Twelve questions in four groups,
   self-contained (she needs no code access). The two that matter:
   (a) are the benchmark figures lifecycle or operational — the BIER 2023 rows

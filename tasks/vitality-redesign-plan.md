@@ -266,6 +266,46 @@ reaches customers.
 Steps 1–3 are the ones that change how the page feels. 4 is the bulk of the
 line count. 5 is new surface area. 6–7 are tidy-up.
 
+### Anne Jones's verdict on the benchmarks (24 July) — read `tasks/benchmark-answers-anne-jones.md`
+
+She traced every citation. **Not one of the 13 benchmark rows is supported by
+the source it cites** (`sourceSupportsValue` is now recorded per row: 9 'no',
+4 'approximate', 0 'yes'). Two rows carry errors inside the number itself:
+
+- **Spirits 3.0** is a per-750ml-BOTTLE figure mislabelled per litre. Per-litre
+  is 3.7-4.0. And it derives from aged American whiskey, so our gin and rum
+  customers score ~90 whatever they do. Needs an aged/unaged split.
+- **Whisky 3.8** cites a cradle-to-DISTILLATION study measured per litre of
+  pure alcohol (~1.0 kg/l of liquid). Right number, wrong citation.
+- **Beer & Cider 0.85** cites an operational study that publishes no absolute
+  figures at all. Our glass arithmetic was confirmed: a glass-packing craft
+  brewer is really 1.3-1.9 kg/l and gets scored **10 to 25**.
+- **Non-Alcoholic 0.35** sends juice (0.7-1.1), dairy (1.3-1.9) and plant milks
+  to a fizzy-drink benchmark. Those sub-categories must read "no benchmark".
+- **DEFAULT_BENCHMARK 1.0** is an internal assumption dressed as a source.
+
+On Question 2 she is unambiguous: a ratio whose numerator boundary varies while
+the denominator is fixed **fails ISO 14044's same-boundary requirement**. Not a
+judgement call.
+
+Two corrections to our own assumptions:
+
+- **Per-unit vs per-litre is already fine in the maths.** The benchmark is
+  built as `kgCO2ePerLitre × unit_size_l` and the ratio is per-unit over
+  per-unit, so unit size cancels: the ratio IS a per-litre comparison. The
+  format-shift fear was unfounded FOR THE SCORE. What is misleading is the
+  per-unit figure as a displayed KPI. (The `?? 1.0` fallback is still a real
+  bug — it breaks exactly this cancellation, by 4× on a 250ml can.)
+- The fix for Questions 2, 3 and 4 is **one fix**: a stage-and-format-resolved
+  benchmark simultaneously solves the boundary mismatch, the tier-gating
+  incentive, the craft-brewer misrepresentation and most of the uncertainty
+  band. We already hold the strongest part (parametric packaging) in-house.
+
+Done on 24 Jul: `lib/industry-benchmarks.ts` now REQUIRES `boundary`,
+`functionalUnit` and `sourceSupportsValue` per row, populated from her audit,
+so this class of error cannot hide again. **No values were changed** — every
+edit there moves live customer scores and needs Tim's go.
+
 ### The scoring work, in order (separate stream, do NOT bundle with the visual redesign)
 
 The advisor's sequence, which is deliberately not the order it feels natural to
@@ -273,20 +313,48 @@ tackle. Trust it: the labelling fix is urgent and cheap, the intensity trend is
 blocked on a data-model change, and the benchmark audit could invalidate
 everything downstream of it.
 
+Merged with Anne's suggested order. Steps 1-4 are "now", and none of them
+needs a decision from anyone.
+
 1. **Stop the false label.** Rename `yoy_sub` to what it measures (production
    volume and mix change) or suppress the component until it can be computed
-   from year-vintaged data. Before the denominator work, before the curves,
-   before anything. It is a substantiation problem, not a polish item.
-2. **Remove the `?? 1.0` unit-size fallback**, replace with an ask.
-3. **Audit the five benchmark citations for boundary.** The Anne Jones
-   conversation. If the BIER figures are operational, every ratio is wrong.
-4. **Year-vintaged PCFs** with constant-method restatement. Only then can the
-   trend component measure intensity, at constant base-year mix, with LMDI
-   behind the headline sentence.
-5. **Re-anchor the curves** on one named rate; 0% scores no better than 50;
-   move the intensity 100 anchor off zero; weight 70/30 level-over-trend.
-6. Decide whether absolute leaves the score entirely (recommended) and becomes
-   the outcome + the Targets driver.
+   from year-vintaged data. It is a substantiation problem, not a polish item.
+2. **Remove the `?? 1.0` unit-size fallback.** Anne is firmer than we were:
+   products with no declared unit size should be **excluded** from the
+   intensity calculation, not defaulted. Same for the 1.0 kg/l
+   DEFAULT_BENCHMARK — uncategorised should mean unscored.
+3. **Archive the BIER PDFs.** Several 404 on bieroundtable.com after a site
+   restructure and survive only on Wix's CDN. If they vanish we lose the only
+   defensible source for four rows. *(Tim's call — downloading files.)*
+4. **Mark the unsupportable rows "no benchmark"** rather than showing a number
+   we cannot defend: the Non-Alcoholic sub-categories (juice, dairy, plant
+   milk, coffee, kombucha, syrups) and anything on the default fallback.
+5. **Correct the citations, and the two wrong values** — Spirits to 3.7-4.0 or
+   split aged/unaged; Whisky re-cited to JIB/BIER; Beer re-cited to BIER 2012
+   with a format caveat; Sparkling to the Applied Sciences review; water to
+   BIER 2012. *(Changes live scores — needs Tim's go.)*
+6. **Normalise scoring to cradle-to-gate** as the same-sprint interim: truncate
+   the numerator to gate stages, show deeper stages unscored. Kills the
+   tier-gating perversity. Note gate INCLUDES packaging manufacture, which is
+   the large packaging term, so little signal is lost.
+7. **Flatten the curve, add the uncertainty band** — flat at 70 across the
+   band, movement only beyond ~±25-30% of midpoint. Indicative bands are in
+   the answers doc; label them assembled literature ranges, not constants.
+8. **Year-vintaged PCFs** with constant-method restatement. Only then can the
+   trend component measure intensity, at constant base-year mix, with LMDI.
+9. **Re-anchor the trend curve** on one named rate; 0% scores no better than
+   50; move the intensity 100 anchor off zero; weight 70/30 level-over-trend.
+10. **The stage-and-format-resolved benchmark** — the real fix. Category liquid
+    reference plus a modelled pack reference from our parametric packaging
+    model. Pull the beer and wine PEFCR Section 7.1 values to anchor those two
+    cradle-to-grave (the accessible copies truncate before that table).
+11. Decide whether absolute leaves the score entirely (recommended) and becomes
+    the outcome + the Targets driver.
+
+**Before any consumer-facing use**, separately: EmpCo 2024/825 from 27 Sept
+2026, and specifically the offsetting-claim ban against our "climate-positive"
+100 anchor — check whether `climate_change_gwp100` can ever include purchased
+offsets. If it can, a customer surfacing that score walks into the ban.
 
 **Mandatory on export**, whenever a climate figure leaves the platform: the
 boundary, the metric and its denominator, and the volume decomposition, in the
