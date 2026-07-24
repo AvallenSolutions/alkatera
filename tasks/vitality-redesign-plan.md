@@ -256,34 +256,30 @@ reaches customers.
 2. **The nine-axis profile** component, in `components/vitality/`.
 3. **The axis route** `/performance/[axis]/` + move the four deep-dives onto
    it; delete the four sheets and the in-card expansion.
-4. **Restyle the heavy files.** PARTLY DONE, 24 July.
-   - **CircularitySheet is gone**, not restyled: step 3 made all four sheets
-     unreachable, so CircularitySheet (694 lines / 98 markers), WaterImpactSheet,
-     NatureImpactSheet, CategoryDetailsSheet and CarbonBreakdownSheet were
-     deleted outright — 1,413 lines. The two types CarbonBreakdownSheet
-     happened to declare moved to `components/vitality/carbon-breakdown-types.ts`.
-   - **NatureDeepDive DONE**: 314 → 230 lines, 58 markers → 0. It is the
-     worked template for the remaining three — tinted category cards become
-     hairline sections, `Card`/`CardHeader`/`CardTitle` become `Eyebrow`,
-     `Badge` becomes `StateChip`, and per-subject hues go entirely: tone means
-     state, never subject.
-   - **REMAINING**, measured 24 July:
+4. **Restyle the heavy files.** DONE, 24 July.
+   - **The four sheets were deleted, not restyled**: step 3 made them
+     unreachable, so CircularitySheet (694 lines / 98 markers, on this list),
+     WaterImpactSheet, NatureImpactSheet, CategoryDetailsSheet and
+     CarbonBreakdownSheet went — 1,413 lines.
+   - **All six remaining bodies are at zero markers**: CarbonDeepDive
+     (243→0), WasteDeepDive (233→0), WaterDeepDive (202→0),
+     Scope3CategoryBreakdown (127→0), CategoryContributionChart (58→0),
+     NatureDeepDive (58→0). Plus the nested pieces the axis pages pull in:
+     RelatableMetric, FacilityWaterRiskMap, WaterConsumptionChart,
+     WaterIntensityComparisonChart.
+   - **Two new kit pieces came out of it**: `components/studio/section-tabs`
+     (state-driven sibling of MonoTabs, replacing shadcn's filled pill bar)
+     and `components/studio/notice` (a working-tone rule, replacing the
+     tinted banner that said one thing five times over).
+   - **Three index-keyed colour maps retired**: fifteen hues for the fifteen
+     Scope 3 categories, ten gradients cycled by position, and per-category
+     hues in the nature grid. None encoded anything the row's own label did
+     not already say.
+   - **Charts kept colour, panels did not.** Recharts takes hex, so series
+     colours map onto the studio palette (forest / teal / ochre ink / dim)
+     rather than being stripped: distinguishing one series from another is a
+     job colour can honestly do.
 
-     | File | Lines | Markers |
-     |---|---|---|
-     | `CarbonDeepDive.tsx` | 1,131 | 243 |
-     | `WaterDeepDive.tsx` | 1,157 | 202 |
-     | `WasteDeepDive.tsx` | 839 | 233 |
-     | `Scope3CategoryBreakdown.tsx` | 640 | 127 |
-
-     3,767 lines and 805 markers. The dominant patterns are shadcn
-     `Card`/`CardHeader`/`CardTitle`/`CardContent` (386 across the four),
-     `Badge` (59) and raw `text-blue-900` / `bg-amber-50`-style utilities.
-     Scope3's are mostly tinted stat tiles — a label `<p>` over a value `<p>`
-     inside a coloured card — which is `BigNumber` in the studio system.
-
-     These render live customer figures, so they want a file-at-a-time rewrite
-     with a browser check after each, not a scripted sweep.
 5. **Social + Governance axis pages** (currently unreachable from here).
 6. Hotspots and methodology to plain sections; retire the collapsibles.
 7. Plain-language units; retire the bare `<select>` for the studio's own control.
