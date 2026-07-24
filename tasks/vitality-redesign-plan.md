@@ -256,9 +256,34 @@ reaches customers.
 2. **The nine-axis profile** component, in `components/vitality/`.
 3. **The axis route** `/performance/[axis]/` + move the four deep-dives onto
    it; delete the four sheets and the in-card expansion.
-4. **Restyle the five heavy files** (Carbon, Waste, Water, Circularity,
-   Scope3) as they land on the axis pages, rather than in place — otherwise
-   they get restyled twice.
+4. **Restyle the heavy files.** PARTLY DONE, 24 July.
+   - **CircularitySheet is gone**, not restyled: step 3 made all four sheets
+     unreachable, so CircularitySheet (694 lines / 98 markers), WaterImpactSheet,
+     NatureImpactSheet, CategoryDetailsSheet and CarbonBreakdownSheet were
+     deleted outright — 1,413 lines. The two types CarbonBreakdownSheet
+     happened to declare moved to `components/vitality/carbon-breakdown-types.ts`.
+   - **NatureDeepDive DONE**: 314 → 230 lines, 58 markers → 0. It is the
+     worked template for the remaining three — tinted category cards become
+     hairline sections, `Card`/`CardHeader`/`CardTitle` become `Eyebrow`,
+     `Badge` becomes `StateChip`, and per-subject hues go entirely: tone means
+     state, never subject.
+   - **REMAINING**, measured 24 July:
+
+     | File | Lines | Markers |
+     |---|---|---|
+     | `CarbonDeepDive.tsx` | 1,131 | 243 |
+     | `WaterDeepDive.tsx` | 1,157 | 202 |
+     | `WasteDeepDive.tsx` | 839 | 233 |
+     | `Scope3CategoryBreakdown.tsx` | 640 | 127 |
+
+     3,767 lines and 805 markers. The dominant patterns are shadcn
+     `Card`/`CardHeader`/`CardTitle`/`CardContent` (386 across the four),
+     `Badge` (59) and raw `text-blue-900` / `bg-amber-50`-style utilities.
+     Scope3's are mostly tinted stat tiles — a label `<p>` over a value `<p>`
+     inside a coloured card — which is `BigNumber` in the studio system.
+
+     These render live customer figures, so they want a file-at-a-time rewrite
+     with a browser check after each, not a scripted sweep.
 5. **Social + Governance axis pages** (currently unreachable from here).
 6. Hotspots and methodology to plain sections; retire the collapsibles.
 7. Plain-language units; retire the bare `<select>` for the studio's own control.
