@@ -24,6 +24,12 @@ import { MultipackPackagingSection } from "@/components/products/MultipackPackag
 import { FacilitiesTab } from "@/components/products/FacilitiesTab";
 import { SettingsTab } from "@/components/products/SettingsTab";
 import { EditProductForm } from "@/components/products/EditProductForm";
+import { ProductSetupPanel } from "@/components/products/ProductSetupPanel";
+import { CoachmarkSequence } from "@/components/studio/coachmark-sequence";
+import { PRODUCT_WALK_STEPS, walkRosaPrompt } from "@/lib/product-page-walk";
+import { useOnboarding } from "@/lib/onboarding/OnboardingContext";
+import { useRosaContext, useRosaPageContext } from "@/lib/rosa/RosaContextProvider";
+import { trackOnboarding } from "@/lib/onboarding/telemetry";
 import { useProductData } from "@/hooks/data/useProductData";
 import { deleteProduct } from "@/lib/products/delete-product";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
@@ -139,6 +145,11 @@ export default function ProductDashboardPage() {
   // Bumped when something on this page invalidates the stored footprint, so the
   // staleness banner remounts and re-checks rather than waiting for a refocus.
   const [stalenessKey, setStalenessKey] = useState(0);
+  const [walking, setWalking] = useState(false);
+
+  const { state: onboardingState, isLoading: onboardingLoading, markProductGuideCompleted } =
+    useOnboarding();
+  const { askRosa } = useRosaContext();
 
   const footprint = latestPcf?.aggregated_impacts?.climate_change_gwp100;
   const boundary = latestPcf?.system_boundary ?? (product as any)?.system_boundary ?? null;
@@ -168,6 +179,49 @@ export default function ProductDashboardPage() {
     }, 900);
     return () => window.clearTimeout(settle);
   }, [loading, searchParams, currentOrganization]);
+
+  // The walk runs itself once for a new user, then never again unprompted
+  // (Tim's call). It is quiet enough to auto-run: anchored callouts over a page
+  // that stays readable, skippable in one tap. `productGuideCompleted` is the
+  // old spotlight tour's flag, reused, so anyone who saw or skipped that is
+  // never walked again and no backfill is needed.
+  const walkOffered = useRef(false);
+  useEffect(() => {
+    if (loading || onboardingLoading || walkOffered.current) return;
+    if (onboardingState.productGuideCompleted) return;
+    walkOffered.current = true;
+    // Let the sections mount so every anchor exists before the first step.
+    const start = window.setTimeout(() => setWalking(true), 900);
+    return () => window.clearTimeout(start);
+  }, [loading, onboardingLoading, onboardingState.productGuideCompleted]);
+
+  const endWalk = useCallback(() => {
+    setWalking(false);
+    if (!onboardingState.productGuideCompleted) markProductGuideCompleted();
+  }, [onboardingState.productGuideCompleted, markProductGuideCompleted]);
+
+  // So ⌘/ and the panel's ask both land in a conversation that already knows
+  // which product is on screen and what is still missing from it.
+  useRosaPageContext(
+    product
+      ? {
+          id: 'product-hub',
+          label: `Product: ${product.name}`,
+          priority: 8,
+          data: {
+            product_id: productId,
+            name: product.name,
+            category: product.product_category,
+            ingredient_count: ingredients.length,
+            packaging_count: packaging.length,
+            footprint_kg_co2e_per_unit: latestPcf?.aggregated_impacts?.climate_change_gwp100 ?? null,
+            lca_status: latestPcf?.status ?? null,
+            recipe_out_of_date: recipeStale,
+            passport_published: product.passport_enabled ?? false,
+          },
+        }
+      : null,
+  );
 
   // "Open" rather than "Create": a product with a recipe already has an
   // estimated footprint, so there is nothing to create, only something to look
@@ -327,7 +381,28 @@ export default function ProductDashboardPage() {
           >
             Edit details
           </button>
+          <button
+            type="button"
+            onClick={() => setWalking(true)}
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground transition-colors duration-150 ease-studio hover:text-foreground"
+          >
+            Show me this page
+          </button>
         </div>
+      </div>
+
+      <div className="mt-8">
+        <ProductSetupPanel
+          organizationId={currentOrganization?.id}
+          productId={productId}
+          productName={product.name}
+          hasIngredients={ingredients.length > 0}
+          hasPackaging={packaging.length > 0}
+          hasFacility={Boolean(product.annual_production_volume)}
+          hasFootprint={footprint != null}
+          passportEnabled={product.passport_enabled ?? false}
+          isMultipack={product.is_multipack ?? false}
+        />
       </div>
 
       <div className="mt-8">
@@ -416,6 +491,31 @@ export default function ProductDashboardPage() {
           />
         </section>
       </div>
+
+      <CoachmarkSequence
+        steps={PRODUCT_WALK_STEPS.map((step, i) =>
+          i === PRODUCT_WALK_STEPS.length - 1
+            ? {
+                ...step,
+                action: {
+                  label: 'Ask Rosa.',
+                  onSelect: () => askRosa(walkRosaPrompt(product.name)),
+                },
+              }
+            : step,
+        )}
+        active={walking}
+        onDone={endWalk}
+        onStep={(i) =>
+          trackOnboarding({
+            organizationId: currentOrganization?.id,
+            flow: 'product_walk',
+            step: 'product',
+            event: 'view',
+            meta: { kind: 'product_walk_step', index: i },
+          })
+        }
+      />
 
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">

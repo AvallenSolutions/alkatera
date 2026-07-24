@@ -13,7 +13,7 @@
  * the page, e.g. FactorInfoHint) don't fit the wrap-your-children model here.
  */
 
-import { type ReactNode } from 'react';
+import { forwardRef, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { useOnboarding } from '@/lib/onboarding/OnboardingContext';
 import { Eyebrow } from './eyebrow';
@@ -32,6 +32,11 @@ interface CoachmarkBodyProps {
   /** Defaults to 'tooltip'; pass 'dialog' for a portal-anchored hint with its own aria-label. */
   role?: 'tooltip' | 'dialog';
   ariaLabel?: string;
+  /**
+   * Replaces the single dismiss control. A sequence needs Back, Skip and Next
+   * in the same mono register; everything else keeps the one quiet dismiss.
+   */
+  footer?: ReactNode;
 }
 
 /**
@@ -40,18 +45,23 @@ interface CoachmarkBodyProps {
  * placement (inline `absolute`, or a portal anchored to a rect elsewhere
  * in the DOM) its situation needs.
  */
-export function CoachmarkBody({
-  title,
-  body,
-  onDismiss,
-  dismissLabel = 'Got it.',
-  className,
-  style,
-  role = 'tooltip',
-  ariaLabel,
-}: CoachmarkBodyProps) {
+export const CoachmarkBody = forwardRef<HTMLDivElement, CoachmarkBodyProps>(function CoachmarkBody(
+  {
+    title,
+    body,
+    onDismiss,
+    dismissLabel = 'Got it.',
+    className,
+    style,
+    role = 'tooltip',
+    ariaLabel,
+    footer,
+  },
+  ref,
+) {
   return (
     <div
+      ref={ref}
       role={role}
       aria-label={ariaLabel}
       style={style}
@@ -66,16 +76,18 @@ export function CoachmarkBody({
         </Eyebrow>
       ) : null}
       <p className="text-xs leading-relaxed text-foreground">{body}</p>
-      <button
-        type="button"
-        onClick={onDismiss}
-        className="mt-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim hover:text-foreground"
-      >
-        {dismissLabel}
-      </button>
+      {footer ?? (
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="mt-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim hover:text-foreground"
+        >
+          {dismissLabel}
+        </button>
+      )}
     </div>
   );
-}
+});
 
 interface CoachmarkProps {
   /** Unique id — the key under state.coachmarks that remembers the dismissal. */

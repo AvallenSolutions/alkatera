@@ -27,7 +27,7 @@ import { RecipeModePicker } from "@/components/products/RecipeModePicker";
 import { RecipeToolbar } from "@/components/products/RecipeToolbar";
 import { IngredientRow } from "@/components/products/IngredientRow";
 import { PackagingRow } from "@/components/products/PackagingRow";
-import { RecipeSidebarTour, type TourStep } from "@/components/products/RecipeSidebarTour";
+import { CoachmarkBody } from "@/components/studio/coachmark";
 import { RecipeStalenessBanner } from "@/components/products/RecipeStalenessBanner";
 import { RecipeStarterDialog } from "@/components/products/RecipeStarterDialog";
 import { IngredientComposer } from "@/components/products/IngredientComposer";
@@ -87,12 +87,17 @@ export function RecipeEditorPanel({
   const [showChecklist, setShowChecklist] = useState<boolean>(false);
   const [showPackagingChecklist, setShowPackagingChecklist] = useState<boolean>(false);
 
-  // First-run tour: drives which tab the first ingredient row shows + anchors a
-  // sequence of popovers to Basics → Source → Logistics → Save.
-  const { state: onboardingState, isLoading: onboardingLoading } = useOnboarding();
-  const tourEligible =
+  // First run: one quiet callout saying how a row is filled in, rather than the
+  // four-step popover tour that used to darken the whole editor behind a scrim
+  // and drive the first row's tabs from outside. `recipeSidebarTourCompleted`
+  // is that tour's flag, reused, so anyone who already saw it is left alone.
+  const {
+    state: onboardingState,
+    isLoading: onboardingLoading,
+    markRecipeSidebarTourCompleted,
+  } = useOnboarding();
+  const showRowHint =
     !onboardingLoading && !onboardingState.recipeSidebarTourCompleted && activeTab === "ingredients";
-  const [tourStep, setTourStep] = useState<TourStep>("basics");
   const [initialBomFile, setInitialBomFile] = useState<File | null>(null);
   const [initialBomItems, setInitialBomItems] = useState<ExtractedBOMItem[] | null>(null);
 
@@ -669,12 +674,7 @@ export function RecipeEditorPanel({
 
               <div className="space-y-2">
                 {ingredientForms.map((ingredient, index) => {
-                  const tourActiveOnRow =
-                    tourEligible && index === 0 && tourStep !== "save" && tourStep !== "done";
-                  const controlledTabForRow =
-                    tourActiveOnRow && (tourStep === "basics" || tourStep === "source" || tourStep === "logistics")
-                      ? tourStep
-                      : undefined;
+                  const controlledTabForRow = undefined;
                   return (
                     <IngredientRow
                       key={ingredient.tempId}
@@ -695,19 +695,22 @@ export function RecipeEditorPanel({
                       productUnitSizeUnit={product?.unit_size_unit ?? null}
                       productCategory={productCategory ?? null}
                       productionStages={productionStages}
-                      forceExpanded={tourEligible && index === 0}
-                      enableTourAnchors={tourEligible && index === 0}
+                      forceExpanded={showRowHint && index === 0}
+                      enableTourAnchors={false}
                       controlledTab={controlledTabForRow}
                     />
                   );
                 })}
               </div>
 
-              <RecipeSidebarTour
-                active={tourEligible}
-                step={tourStep}
-                onStepChange={setTourStep}
-              />
+              {showRowHint && ingredientForms.length > 0 && (
+                <CoachmarkBody
+                  title="Filling a row in"
+                  body="Work top to bottom. What it is, then where it comes from, then how it travels. The dots on each tab show what is still missing."
+                  onDismiss={markRecipeSidebarTourCompleted}
+                  className="w-full max-w-md"
+                />
+              )}
 
               <div className="flex items-center gap-3 pt-4 border-t border-border">
                 <PillButton
