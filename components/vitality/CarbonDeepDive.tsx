@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart3, Leaf, Package, FlaskConical, AlertCircle, CheckCircle2, Info, Globe } from 'lucide-react';
 import { ScopeBreakdown } from '@/hooks/data/useCompanyMetrics';
 import { RelatableMetric } from '@/components/shared/RelatableMetric';
-import { MaterialBreakdownItem, GHGBreakdown } from './CarbonBreakdownSheet';
+import type { MaterialBreakdownItem, GHGBreakdown } from './carbon-breakdown-types';
 import { LifecycleStageBreakdown, FacilityEmissionsBreakdown } from '@/hooks/data/useCompanyMetrics';
 import { Scope3CategoryBreakdown } from './Scope3CategoryBreakdown';
 import {

@@ -2,6 +2,7 @@
 
 import { Eyebrow } from '@/components/studio/eyebrow';
 import { FactList, type FactRowItem } from '@/components/studio/fact-list';
+import { AXIS_ROUTE } from '@/app/(authenticated)/performance/[axis]/axis-config';
 import type {
   EnvironmentalSubScores,
   GovernanceSubScores,
@@ -62,7 +63,7 @@ function axisRows(
       // no headline figure says nothing rather than inventing one.
       hint: scored ? facts[axis] : 'Nothing yet',
       value: scored ? String(Math.round(value as number)) : '—',
-      href: linked.has(axis) ? `/performance/${axis}/` : undefined,
+      href: linked.has(axis) ? `/performance/${AXIS_ROUTE[axis] ?? axis}/` : undefined,
     };
   });
 }

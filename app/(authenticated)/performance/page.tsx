@@ -40,6 +40,8 @@ import type {
 } from '@/lib/vitality/environmental';
 import { PerformanceSummary } from '@/components/vitality/PillarCard';
 import { VitalityAxisSections, type AxisFacts } from '@/components/vitality/VitalityAxisSections';
+import { FactList } from '@/components/studio/fact-list';
+import { YearPicker } from '@/components/studio/year-picker';
 import { VitalityAxisProfile } from '@/components/vitality/VitalityAxisProfile';
 // Round 3 (auto-research): these deep-dive / sheet panels render only inside an
 // expanded pillar or an opened sheet, so their recharts-heavy bundles shouldn't
@@ -48,11 +50,6 @@ const CarbonDeepDive = dynamic(() => import('@/components/vitality/CarbonDeepDiv
 const WaterDeepDive = dynamic(() => import('@/components/vitality/WaterDeepDive').then((m) => m.WaterDeepDive), { ssr: false });
 const WasteDeepDive = dynamic(() => import('@/components/vitality/WasteDeepDive').then((m) => m.WasteDeepDive), { ssr: false });
 const NatureDeepDive = dynamic(() => import('@/components/vitality/NatureDeepDive').then((m) => m.NatureDeepDive), { ssr: false });
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 import type { NatureMetrics } from '@/hooks/data/useCompanyMetrics';
 import type { ScopeBreakdown } from '@/lib/vitality/scope3-transform';
 
@@ -241,8 +238,6 @@ export default function PerformancePage() {
   } = useAxisData(selectedYear);
 
 
-  const [showHotspots, setShowHotspots] = useState(true);
-  const [showCompliance, setShowCompliance] = useState(false);
 
   // The Vitality composite is fetched exactly once for this surface, by the
   // EsgVitalityScoreHero at the top of the page. It hands the loaded composite
@@ -501,35 +496,26 @@ export default function PerformancePage() {
           page (Carbon / Water / Circularity / Nature DeepDive sections). */}
       <EsgVitalityScoreHero onComposite={setVitalityComposite} />
 
-      {/* Action bar — a quiet year selector, no emerald border, no icon */}
-      <div className="flex items-center gap-4">
-        <select
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-          className="rounded-[6px] border border-border bg-transparent px-3 py-1.5 text-sm font-medium text-foreground hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-room-accent"
-        >
-          {AVAILABLE_YEARS.map((year) => (
-            <option key={year} value={year}>
-              {year} Data
-            </option>
-          ))}
-        </select>
+      {/* The reporting year: mono years on a hairline, not a browser dropdown. */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <YearPicker years={AVAILABLE_YEARS} value={selectedYear} onChange={setSelectedYear} />
         {metrics?.total_products_assessed && metrics.total_products_assessed > 0 ? (
           <span className="text-sm text-muted-foreground">
-            Based on {metrics.total_products_assessed} assessed product{metrics.total_products_assessed !== 1 ? 's' : ''}
+            Based on {metrics.total_products_assessed} assessed product
+            {metrics.total_products_assessed !== 1 ? 's' : ''}
           </span>
         ) : null}
       </div>
 
       {error && (
-        <div className="rounded-[6px] border border-border bg-card p-5">
+        <div className="border-t border-border pt-5">
           <Eyebrow tone="inherit" className="mb-2 text-studio-stale">Could not load metrics</Eyebrow>
           <p className="text-sm text-muted-foreground">{error}</p>
         </div>
       )}
 
       {!loading && metrics && metrics.total_products_assessed === 0 && (
-        <div className="rounded-[6px] border border-border bg-card p-5">
+        <div className="border-t border-border pt-5">
           <Eyebrow className="mb-2">Get started</Eyebrow>
           <p className="text-sm text-muted-foreground">
             Complete product LCAs to see your Company Vitality metrics. The platform
@@ -551,7 +537,11 @@ export default function PerformancePage() {
       <VitalityAxisSections
         composite={vitalityComposite}
         facts={axisFacts}
-        linkedAxes={['climate', 'water', 'circularity', 'nature']}
+        linkedAxes={[
+          'climate', 'water', 'circularity', 'nature',
+          'community', 'people_culture', 'supplier_esg',
+          'governance', 'certifications',
+        ]}
       />
 
       {/* Performance Summary - Strengths & Improvements */}
@@ -560,224 +550,136 @@ export default function PerformancePage() {
         improvements={improvements}
       />
 
-      {/* Collapsible: Material Hotspots */}
-      <Collapsible open={showHotspots} onOpenChange={setShowHotspots}>
-        <div className="rounded-[6px] border border-border bg-card">
-          <CollapsibleTrigger asChild>
-            <button className="flex w-full items-center justify-between gap-3 p-5 text-left transition-colors hover:bg-secondary/40">
-              <div className="min-w-0">
-                <Eyebrow>Impact hotspots</Eyebrow>
-                <p className="mt-1.5 text-sm text-muted-foreground">
-                  Top {topMaterialHotspots.length} materials driving {
-                    topMaterialHotspots.reduce((sum, m) => sum + m.percentage, 0).toFixed(0)
-                  }% of your material emissions
-                </p>
-              </div>
-              {showHotspots ? (
-                <ChevronUp className="h-5 w-5 shrink-0 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground" />
-              )}
-            </button>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="border-t border-border p-5">
-              {topMaterialHotspots.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No material hotspots identified yet. Complete product LCAs to see your top
-                  contributing materials.
-                </p>
-              ) : (
-                <ul className="divide-y divide-border">
-                  {topMaterialHotspots.map((item, idx) => {
-                    const tone: 'stale' | 'attention' | 'good' =
-                      item.severity === 'high' ? 'stale' : item.severity === 'medium' ? 'attention' : 'good';
-                    return (
-                      <li key={idx} className="flex items-center gap-4 py-3">
-                        <span className="w-6 shrink-0 font-mono text-xs font-bold tabular-nums text-muted-foreground">
-                          {idx + 1}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-display text-sm font-semibold text-foreground">
-                            {item.label}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {(item.value / 1000).toFixed(2)} tCO2eq
-                          </p>
-                        </div>
-                        <span className="shrink-0 font-display text-lg font-bold tabular-nums text-foreground">
-                          {item.percentage.toFixed(0)}
-                          <span className="ml-0.5 font-mono text-[10px] font-bold text-muted-foreground">%</span>
-                        </span>
-                        <StateChip tone={tone} className="shrink-0">{item.severity}</StateChip>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          </CollapsibleContent>
+      {/* Impact hotspots: fact rows on hairlines. Was a collapsible inside a
+          boxed card — two layers of chrome around a list, and the methodology
+          one was shut by default so nobody read it. */}
+      <section className="border-t border-border pt-6">
+        <div className="mb-1 flex items-baseline justify-between gap-4">
+          <Eyebrow>Impact hotspots</Eyebrow>
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+            {topMaterialHotspots.reduce((sum, m) => sum + m.percentage, 0).toFixed(0)}% of material emissions
+          </span>
         </div>
-      </Collapsible>
+        {topMaterialHotspots.length === 0 ? (
+          <p className="mt-2 text-sm text-muted-foreground">
+            No material hotspots identified yet. Complete product LCAs to see your top
+            contributing materials.
+          </p>
+        ) : (
+          <FactList
+            items={topMaterialHotspots.map((item, idx) => ({
+              id: String(idx),
+              title: item.label,
+              hint: `${(item.value / 1000).toFixed(2)} t CO2e`,
+              chip: {
+                tone: (item.severity === 'high'
+                  ? 'stale'
+                  : item.severity === 'medium'
+                    ? 'attention'
+                    : 'good') as 'stale' | 'attention' | 'good',
+                label: item.severity,
+              },
+              value: item.percentage.toFixed(0),
+              unit: '%',
+            }))}
+          />
+        )}
+      </section>
 
-      {/* Collapsible: Methodology & Reporting */}
-      <Collapsible open={showCompliance} onOpenChange={setShowCompliance}>
-        <div className="rounded-[6px] border border-border bg-card">
-          <CollapsibleTrigger asChild>
-            <button className="flex w-full items-center justify-between gap-3 p-5 text-left transition-colors hover:bg-secondary/40">
-              <div className="min-w-0">
-                <Eyebrow>Methodology &amp; reporting</Eyebrow>
-                <p className="mt-1.5 text-sm text-muted-foreground">
-                  {(() => {
-                    const total = dedupedCertifications.length;
-                    const achieved = dedupedCertifications.filter(c => c.status === 'achieved' || c.status === 'certified').length;
-                    const inProgress = dedupedCertifications.filter(c => c.status === 'in_progress').length;
-                    if (total === 0) {
-                      return `${metrics?.csrd_compliant_percentage || 0}% CSRD-aligned LCAs · No certifications logged`;
-                    }
-                    return `${achieved} of ${total} certifications achieved · ${inProgress} in progress`;
-                  })()}
-                </p>
-              </div>
-              {showCompliance ? (
-                <ChevronUp className="h-5 w-5 shrink-0 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground" />
-              )}
-            </button>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="space-y-6 border-t border-border p-5">
-              {/* Headline figures */}
-              <div className="flex flex-wrap gap-x-12 gap-y-4">
-                <BigNumber
-                  value={metrics?.total_products_assessed || 0}
-                  label="Products assessed"
-                />
-                <span
-                  className="cursor-help"
-                  title="Reflects LCA-level CSRD alignment only. Full CSRD reporting also requires social disclosures (S1-S4), governance disclosures (G1), value-chain analysis, and a double-materiality assessment."
-                >
-                  <BigNumber
-                    value={`${metrics?.csrd_compliant_percentage || 0}%`}
-                    label="CSRD-aligned LCAs"
-                  />
-                </span>
-              </div>
-
-              {/* Methodology used by the platform */}
-              <div>
-                <Eyebrow tone="dim" className="mb-2">Methodology applied</Eyebrow>
-                <p className="mb-1 text-xs text-muted-foreground">
-                  Calculations follow these international standards and methods. These are the methodologies alka<strong>tera</strong> uses, not certifications your organisation has achieved.
-                </p>
-                <div className="divide-y divide-border">
-                  <MethodologyRow
-                    name="ISO 14044:2006"
-                    summary="Life Cycle Assessment principles and requirements"
-                  />
-                  <MethodologyRow
-                    name="GHG Protocol Corporate Standard"
-                    summary="Scope 1, 2, and 3 emissions accounting"
-                  />
-                  <MethodologyRow
-                    name="ReCiPe 2016 (H) / EU PEF v3"
-                    summary="Impact assessment method (climate, water, land, biodiversity)"
-                  />
-                  <MethodologyRow
-                    name="TNFD LEAP"
-                    summary="Nature-related dependency and impact framework"
-                  />
-                </div>
-              </div>
-
-              {/* Org's actual certifications */}
-              <div>
-                <Eyebrow tone="dim" className="mb-2">Your certifications</Eyebrow>
-                {dedupedCertifications.length === 0 ? (
-                  <p className="text-xs italic text-muted-foreground">
-                    No certifications logged yet. Open Compliance, Certifications to add ones you hold or are progressing.
-                  </p>
-                ) : (
-                  <ul className="divide-y divide-border">
-                    {dedupedCertifications
-                      .slice()
-                      .sort((a, b) => {
-                        const rank = (s: string | null) =>
-                          s === 'achieved' || s === 'certified'
-                            ? 0
-                            : s === 'in_progress'
-                              ? 1
-                              : 2;
-                        return rank(a.status) - rank(b.status);
-                      })
-                      .map(cert => {
-                        const name =
-                          cert.certification_frameworks?.framework_name ?? 'Certification';
-                        const status = cert.status;
-                        const statusLabel =
-                          status === 'achieved' || status === 'certified'
-                            ? 'Achieved'
-                            : status === 'in_progress'
-                              ? 'In progress'
-                              : status === 'not_started'
-                                ? 'Not started'
-                                : status === 'expired'
-                                  ? 'Expired'
-                                  : (status ?? 'Unknown');
-                        const statusTone: 'good' | 'hold' | 'stale' | 'quiet' =
-                          status === 'achieved' || status === 'certified'
-                            ? 'good'
-                            : status === 'in_progress'
-                              ? 'hold'
-                              : status === 'expired'
-                                ? 'stale'
-                                : 'quiet';
-                        const targetSuffix = cert.target_date
-                          ? `target ${new Date(cert.target_date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`
-                          : cert.certified_date
-                            ? `since ${new Date(cert.certified_date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`
-                            : '';
-                        return (
-                          <li
-                            key={cert.id}
-                            className="flex items-center justify-between gap-3 py-2.5"
-                          >
-                            <div className="min-w-0">
-                              <div className="truncate font-display text-sm font-semibold text-foreground">{name}</div>
-                              {cert.certification_frameworks?.category ? (
-                                <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                                  {cert.certification_frameworks.category}
-                                </div>
-                              ) : null}
-                            </div>
-                            <div className="ml-3 shrink-0 text-right">
-                              <StateChip tone={statusTone}>{statusLabel}</StateChip>
-                              {targetSuffix ? (
-                                <div className="mt-1 font-mono text-[10px] text-muted-foreground">
-                                  {targetSuffix}
-                                </div>
-                              ) : null}
-                            </div>
-                          </li>
-                        );
-                      })}
-                  </ul>
-                )}
-              </div>
-
-              <PillButton href="/reports/sustainability" variant="ink" className="w-full">
-                Generate sustainability report
-                <ArrowRight className="h-4 w-4" />
-              </PillButton>
-            </div>
-          </CollapsibleContent>
+      {/* Methodology and certifications: one quiet foot section, per the plan. */}
+      <section className="border-t border-border pt-6">
+        <Eyebrow>Methodology &amp; reporting</Eyebrow>
+        <div className="mt-4 flex flex-wrap gap-x-12 gap-y-4">
+          <BigNumber value={metrics?.total_products_assessed || 0} label="Products assessed" />
+          <span
+            className="cursor-help"
+            title="Reflects LCA-level CSRD alignment only. Full CSRD reporting also requires social disclosures (S1-S4), governance disclosures (G1), value-chain analysis, and a double-materiality assessment."
+          >
+            <BigNumber
+              value={`${metrics?.csrd_compliant_percentage || 0}%`}
+              label="CSRD-aligned LCAs"
+            />
+          </span>
         </div>
-      </Collapsible>
+
+        <div className="mt-6">
+          <Eyebrow tone="dim" className="mb-2">Methodology applied</Eyebrow>
+          <p className="mb-1 text-xs text-muted-foreground">
+            Calculations follow these international standards and methods. These are the
+            methodologies alka<strong>tera</strong> uses, not certifications your organisation has
+            achieved.
+          </p>
+          <div className="divide-y divide-border">
+            <MethodologyRow name="ISO 14044:2006" summary="Life Cycle Assessment principles and requirements" />
+            <MethodologyRow name="GHG Protocol Corporate Standard" summary="Scope 1, 2, and 3 emissions accounting" />
+            <MethodologyRow name="ReCiPe 2016 (H) / EU PEF v3" summary="Impact assessment method (climate, water, land, biodiversity)" />
+            <MethodologyRow name="TNFD LEAP" summary="Nature-related dependency and impact framework" />
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <Eyebrow tone="dim" className="mb-2">Your certifications</Eyebrow>
+          {dedupedCertifications.length === 0 ? (
+            <p className="text-xs italic text-muted-foreground">
+              No certifications logged yet. Open Compliance, Certifications to add ones you hold or
+              are progressing.
+            </p>
+          ) : (
+            <FactList
+              items={dedupedCertifications
+                .slice()
+                .sort((a, b) => {
+                  const rank = (st: string | null) =>
+                    st === 'achieved' || st === 'certified' ? 0 : st === 'in_progress' ? 1 : 2;
+                  return rank(a.status) - rank(b.status);
+                })
+                .map(cert => {
+                  const status = cert.status;
+                  const statusLabel =
+                    status === 'achieved' || status === 'certified'
+                      ? 'Achieved'
+                      : status === 'in_progress'
+                        ? 'In progress'
+                        : status === 'not_started'
+                          ? 'Not started'
+                          : status === 'expired'
+                            ? 'Expired'
+                            : (status ?? 'Unknown');
+                  const tone: 'good' | 'hold' | 'stale' | 'quiet' =
+                    status === 'achieved' || status === 'certified'
+                      ? 'good'
+                      : status === 'in_progress'
+                        ? 'hold'
+                        : status === 'expired'
+                          ? 'stale'
+                          : 'quiet';
+                  return {
+                    id: cert.id,
+                    title: cert.certification_frameworks?.framework_name ?? 'Certification',
+                    hint: cert.certification_frameworks?.category ?? undefined,
+                    chip: { tone, label: statusLabel },
+                    meta: cert.target_date
+                      ? `target ${new Date(cert.target_date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`
+                      : cert.certified_date
+                        ? `since ${new Date(cert.certified_date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`
+                        : undefined,
+                  };
+                })}
+            />
+          )}
+        </div>
+
+        <div className="mt-6">
+          <PillButton href="/reports/sustainability" variant="ink">
+            Generate sustainability report
+            <ArrowRight className="h-4 w-4" />
+          </PillButton>
+        </div>
+      </section>
 
       {/* Methodology Note */}
       {!loading && metrics && metrics.total_products_assessed > 0 && (
-        <div className="rounded-[6px] border border-border bg-card p-5">
+        <div className="border-t border-border pt-5">
           <Eyebrow tone="dim" className="mb-2">Calculation methodology</Eyebrow>
           <p className="text-sm text-muted-foreground">
             Company Vitality aggregates impacts following GHG Protocol Corporate Standard and ISO 14064-1.

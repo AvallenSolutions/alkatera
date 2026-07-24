@@ -16,6 +16,7 @@ import type { VitalityComposite } from '@/lib/vitality/composite';
 import type { ClimateScoreBreakdown } from '@/lib/vitality/environmental';
 import { AXES, axisBreakdown, isAxisSlug, type AxisSlug } from './axis-config';
 import { ClimateProgressTable, ScoreBuildUp } from './climate-sections';
+import { PillarMeasures, governanceMeasures, socialMeasures } from './pillar-sections';
 
 // The deep-dives are recharts-heavy; they were lazy-loaded on /performance/ for
 // the same reason and stay lazy here.
@@ -68,7 +69,8 @@ function Axis({ slug }: { slug: AxisSlug }) {
     void loadComposite();
   }, [loadComposite]);
 
-  const breakdown = axisBreakdown(composite, slug);
+  const isPillar = slug === 'social' || slug === 'governance';
+  const breakdown = axisBreakdown(composite, slug) as any;
   const score = breakdown?.score ?? null;
 
   const headlineFigure = axisHeadline(slug, data);
@@ -112,17 +114,24 @@ function Axis({ slug }: { slug: AxisSlug }) {
         </>
       ) : null}
 
-      <section>
-        <Eyebrow className="mb-1">The full breakdown</Eyebrow>
-        <p className="mb-4 text-sm text-muted-foreground">
-          On the page, rather than inside a sheet on top of it.
-        </p>
-        {data.loading ? (
-          <Skeleton className="h-64 rounded-[6px]" />
-        ) : (
-          <AxisBody slug={slug} data={data} year={selectedYear} />
-        )}
-      </section>
+      {isPillar ? (
+        <PillarMeasures
+          measures={slug === 'social' ? socialMeasures(breakdown) : governanceMeasures(breakdown)}
+          score={score}
+        />
+      ) : (
+        <section>
+          <Eyebrow className="mb-1">The full breakdown</Eyebrow>
+          <p className="mb-4 text-sm text-muted-foreground">
+            On the page, rather than inside a sheet on top of it.
+          </p>
+          {data.loading ? (
+            <Skeleton className="h-64 rounded-[6px]" />
+          ) : (
+            <AxisBody slug={slug} data={data} year={selectedYear} />
+          )}
+        </section>
+      )}
 
       <section className="border-t border-studio-hairline pt-5">
         <Eyebrow tone="dim" className="mb-2">
@@ -158,6 +167,10 @@ function axisHeadline(slug: AxisSlug, data: ReturnType<typeof useAxisData>): str
       return data.circularityRate > 0 ? `${data.circularityRate.toFixed(0)}% diverted` : null;
     case 'nature':
       return data.landUse > 0 ? `${round(data.landUse)} m² a year` : null;
+    // The pillar pages are made of sub-scores, not of one measured quantity.
+    case 'social':
+    case 'governance':
+      return null;
   }
 }
 
@@ -208,5 +221,7 @@ function AxisBody({
       return <WasteDeepDive wasteMetrics={data.wasteMetrics} loading={data.wasteLoading} />;
     case 'nature':
       return <NatureDeepDive natureMetrics={data.natureMetrics} />;
+    default:
+      return null;
   }
 }

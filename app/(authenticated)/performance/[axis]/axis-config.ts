@@ -7,13 +7,24 @@ import type {
 import type { VitalityComposite } from '@/lib/vitality/composite';
 
 /**
- * The four environmental axes that have a page of their own.
- *
- * Social and Governance axes are listed on /performance/ but have no route
- * yet — they have no deep-dive body to show. `isAxisSlug` is what stops a
- * vitality row linking somewhere that would 404.
+ * Every axis surface: the four environmental ones, plus a page per pillar for
+ * Social and Governance. `isAxisSlug` is what stops a vitality row linking
+ * somewhere that would 404.
  */
-export const AXIS_SLUGS = ['climate', 'water', 'circularity', 'nature'] as const;
+export const AXIS_SLUGS = [
+  'climate',
+  'water',
+  'circularity',
+  'nature',
+  // The two pillar pages. Social and Governance have no per-axis deep-dive
+  // body to show, so each pillar gets one page covering its axes rather than
+  // three near-empty ones. They were unreachable from the vitality page
+  // entirely until now, which is what made the page argue against its own
+  // headline: it said People & culture was dragging the score, then offered
+  // nowhere to go and do something about it.
+  'social',
+  'governance',
+] as const;
 
 export type AxisSlug = (typeof AXIS_SLUGS)[number];
 
@@ -38,6 +49,19 @@ export interface AxisDefinition {
   /** One paragraph, plain language, on how the score is reached. */
   methodology: string;
 }
+
+/** Which page a vitality row goes to. Several axes share a pillar page. */
+export const AXIS_ROUTE: Record<string, AxisSlug> = {
+  climate: 'climate',
+  water: 'water',
+  circularity: 'circularity',
+  nature: 'nature',
+  community: 'social',
+  people_culture: 'social',
+  supplier_esg: 'social',
+  governance: 'governance',
+  certifications: 'governance',
+};
 
 export const AXES: Record<AxisSlug, AxisDefinition> = {
   climate: {
@@ -84,6 +108,30 @@ export const AXES: Record<AxisSlug, AxisDefinition> = {
       'crop-equivalent square metres per year. Land-use change and biodiversity pressure are ' +
       'reported separately and are not netted against it.',
   },
+  social: {
+    slug: 'social',
+    noun: 'people',
+    eyebrow: 'THE EVIDENCE · THE PEOPLE',
+    posterEyebrow: 'THE PEOPLE PILLAR',
+    preciseUnit: 'score 0-100',
+    methodology:
+      'Four measures: your workforce (pay, turnover, diversity actions), community contribution, ' +
+      'how much of your supply chain has been assessed for social risk, and the change on last ' +
+      'year. Each measure carries the weight shown against it. A measure you have no data for ' +
+      'still counts against you at its weight; the year-on-year measure drops to zero weight ' +
+      'until there is a prior year to compare with.',
+  },
+  governance: {
+    slug: 'governance',
+    noun: 'governance',
+    eyebrow: 'THE EVIDENCE · THE GOVERNANCE',
+    posterEyebrow: 'THE GOVERNANCE PILLAR',
+    preciseUnit: 'score 0-100',
+    methodology:
+      'Three measures: your governance practices (policy, stakeholder engagement, board, ethics ' +
+      'and transparency), progress against the certifications you are pursuing, and the change on ' +
+      'last year.',
+  },
 };
 
 /** The breakdown object for an axis, out of the composite the page already has. */
@@ -99,6 +147,10 @@ export function axisBreakdown(
   if (!composite) return null;
   const e = composite.e as any;
   switch (slug) {
+    case 'social':
+      return (composite.s as any).social_breakdown ?? null;
+    case 'governance':
+      return (composite.g as any).governance_breakdown ?? null;
     case 'climate':
       return e.climate_breakdown ?? null;
     case 'water':
