@@ -66,7 +66,17 @@ export interface ForestSvgOptions {
   caption?: { brand: string; user?: string | null; date: string };
 }
 
-const SANS = `ui-sans-serif, system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif`;
+/**
+ * The headline wears the studio's display face.
+ *
+ * The generic stack behind it is deliberate and stays: this file is downloaded
+ * and opened outside the app — in Preview, in a deck, in someone else's
+ * browser — where a webfont the page loaded is not available. Naming
+ * Bricolage Grotesque first means anyone who has it (every machine in the
+ * studio) sees the real wordmark, and everyone else falls back to a grotesque
+ * of the same character rather than to nothing.
+ */
+const DISPLAY = `'Bricolage Grotesque', ui-sans-serif, system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif`;
 const MONO = `ui-monospace, SFMono-Regular, Menlo, monospace`;
 
 export function buildForestSvg({ seed, score, season, rosa, caption }: ForestSvgOptions): string {
@@ -81,7 +91,7 @@ export function buildForestSvg({ seed, score, season, rosa, caption }: ForestSvg
   // the provenance line beneath in quiet mono.
   if (caption) {
     parts.push(
-      `<text x="64" y="104" font-family="${esc(SANS)}" font-size="46" font-weight="600" fill="${STUDIO.ink}">${esc(caption.brand)}</text>`,
+      `<text x="64" y="104" font-family="${esc(DISPLAY)}" font-size="46" font-weight="600" fill="${STUDIO.ink}">${esc(caption.brand)}</text>`,
     );
     const provenance = `GROWN FROM OUR DATA · ${score} OF 100 · ${caption.date.toUpperCase()}`;
     parts.push(
