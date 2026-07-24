@@ -119,6 +119,32 @@ Rules:
 - **The big number:** display bold, tabular; the label beneath in mono caps at 70%. Never a number
   without its label.
 - **Stage bar:** opacity = probability (e.g. NOT APPROACHED → CONTACTED → FOLLOWED UP → WON).
+
+## Charts
+
+The room inks are **not** the chart palette. Validated as a categorical set
+they fail: forest, teal and plum drop below the chroma floor (they read grey at
+mark scale) and teal↔plum measure ΔE 1.8 under deuteranopia. They are built to
+be deep behind cream text, which is the opposite of what a 2px mark needs.
+
+`CHART` in `components/studio/theme.ts` is the single source. Each series slot
+is the nearest passing step in the same studio hue family, validated against
+the paper surface for lightness, chroma, CVD separation, normal-vision
+separation and contrast. Light only — next-themes is forced light.
+
+- **Assign in fixed order, never cycled.** A sixth series folds into "Other" or
+  becomes small multiples. A generated hue is never correct.
+- **Colour follows the entity, not its rank.** Filtering a series out must not
+  repaint the survivors.
+- **Brick and ochre are never adjacent** — ΔE 12.3 in normal vision.
+- **Match the encoding to the job.** Identity takes `CHART.series`; magnitude
+  and anything ordinal (the waste hierarchy, for one) takes `CHART.sequential`,
+  one hue light to dark; state takes the reserved working tones, which are
+  never borrowed as a series colour; a reference or benchmark line takes
+  `CHART.reference` so it cannot be read as data.
+- **Text wears text tokens**, never the series colour. A coloured mark beside a
+  label carries the identity.
+
 - **State chips:** mono, no pills. States are typographic: small bold mono in a working tone. No
   badge pills, no backgrounds; the word and its colour are enough.
 
