@@ -108,7 +108,7 @@ moved out of `app/` before committing so it does not ship as a live route.
 Only after both, and only if asked:
 3. Walk the arrival ritual on a fresh org to exercise `arrival-modules`, and
    click `WorksWithPanel` in Settings (both untested, see above).
-4. Commit. None of this session's 89 changed files are committed.
+4. Commit. (Done: the session is committed through e1baa55d.)
 
 ## Other live streams — CONTEXT ONLY, do not start here
 - `tasks/phase2-staging-handoff.md` — Phase 2 staging test punch list. Still
@@ -191,6 +191,20 @@ Only after both, and only if asked:
   TIER-GATED, a customer who upgrades and switches on end-of-life makes their
   own intensity score worse for doing more thorough work. Fix that regardless
   of what Anne says.
+- **Benchmark sources are archived** at `docs/benchmark-sources/` (9 PDFs,
+  ~9 MB). Two were ALREADY DEAD: BIER bottled water (404 on bieroundtable,
+  recovered from Wix's CDN) and the Oregon DEQ beer report (404 on
+  oregon.gov, recovered from the Wayback Machine). The full PEFCRs came down
+  intact, so the Section 7.1 benchmark tables Anne could not reach are now
+  extracted in that folder's README: beer 0.551 kg CO2e/l excl. use, still
+  wine 2.00, sparkling 2.80. **Our wine and sparkling rows are too LOW**
+  against the official EU reference, the opposite direction to beer.
+- **Internal benchmarks plan**: `tasks/internal-benchmarks-plan.md`. We
+  already have a k-anonymous peer-benchmark engine (`peer_benchmark_view`,
+  k>=5 enforced in the view) that is not wired to the intensity score.
+  Phase 0 of that plan is a privacy fix that should happen regardless:
+  `get_organization_benchmark_comparison` exposes the top org's score with
+  no minimum-cohort guard.
 - Decide whether absolute emissions leave the vitality score entirely and
   become the outcome + Targets driver (recommended, agreed in principle).
 - Legal view on EmpCo before any shareable "vitality score" badge or an EU
