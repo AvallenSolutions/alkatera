@@ -9,7 +9,9 @@ import type { AxisKey } from './VitalityAxisSections';
 /**
  * The nine-axis profile: the shape of the organisation in one glance.
  *
- * Nine hairline bars, grouped into the three pillars and coloured by pillar.
+ * Nine hairline bars, grouped into the three pillars and coloured by pillar
+ * from the validated chart palette — not from the room inks, which fail the
+ * chroma floor at mark scale and are not separable under deuteranopia.
  *
  * DELIBERATELY NOT A RADAR. A radar plots zero at the centre and joins the
  * points, so three axes sitting at 0 still enclose an area — the chart draws a

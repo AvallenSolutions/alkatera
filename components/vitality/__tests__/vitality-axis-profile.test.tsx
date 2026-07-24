@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { VitalityAxisProfile } from '../VitalityAxisProfile';
+import { CHART } from '@/components/studio/theme';
 import type { VitalityComposite } from '@/lib/vitality/composite';
 
 /**
@@ -60,16 +61,35 @@ describe('VitalityAxisProfile', () => {
 
   it('colours each bar by its pillar, not by how good the score is', () => {
     render(<VitalityAxisProfile composite={composite()} />);
-    const styleOf = (title: string) =>
-      screen.getByTitle(title).querySelector('div[style*="background-color"]')?.getAttribute('style') ?? '';
+    // Only the colour, not the whole style string — the heights differ by score.
+    const colourOf = (title: string) => {
+      const style =
+        screen.getByTitle(title).querySelector('div[style*="background-color"]')?.getAttribute('style') ?? '';
+      return (style.match(/background-color:\s*([^;]+)/) ?? [, ''])[1].trim();
+    };
 
-    // Nature at 100 and Climate at 60 are the same colour: the bar says which
-    // pillar it belongs to, never how healthy it is. Tone would double-encode
+    // Asserted against the palette tokens rather than literal rgb(), so a
+    // validated palette change does not break a test about pillar grouping.
+    // The invariant is what matters: Nature at 100 and Climate at 60 are the
+    // SAME colour because they are the same pillar. Tone would double-encode
     // the number and turn the profile into a traffic light.
-    expect(styleOf('Climate: 60')).toContain('rgb(32, 94, 64)');
-    expect(styleOf('Nature: 100')).toContain('rgb(32, 94, 64)');
-    expect(styleOf('Community: 6')).toContain('rgb(43, 70, 192)');
-    expect(styleOf('Certs: 14')).toContain('rgb(109, 58, 93)');
+    expect(colourOf('Climate: 60')).toBe(colourOf('Nature: 100'));
+    expect(colourOf('Water: 46')).toBe(colourOf('Climate: 60'));
+
+    // ...and the three pillars are three different colours.
+    const env = colourOf('Climate: 60');
+    const people = colourOf('Community: 6');
+    const gov = colourOf('Certs: 14');
+    expect(new Set([env, people, gov]).size).toBe(3);
+
+    // Each is a declared series slot, not an ad-hoc colour.
+    const toRgb = (hex: string) => {
+      const n = parseInt(hex.slice(1), 16);
+      return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
+    };
+    expect(env).toBe(toRgb(CHART.series[0]));
+    expect(people).toBe(toRgb(CHART.series[1]));
+    expect(gov).toBe(toRgb(CHART.series[2]));
   });
 
   it('scales bar height as a straight percentage of the score', () => {
