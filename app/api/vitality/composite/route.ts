@@ -893,7 +893,28 @@ async function buildEnvironmentalInputs(
   const inputs = toEnvironmentalInputs(signals)
   return {
     ...inputs,
-    climate_breakdown: climateBreakdown,
+    climate_breakdown: {
+      ...climateBreakdown,
+      /**
+       * The two years behind the year-on-year sub-score.
+       *
+       * `buildClimateInputs` has always computed these (its own type says
+       * "keep these alongside the inputs so the UI can show the math") but
+       * the route dropped them on the floor, so every surface could say
+       * "year on year: 100" and none could say what actually changed.
+       * Additive, so nothing that reads the old shape breaks.
+       */
+      progress: {
+        current_year_kgco2e: climateInputs.diagnostics.current_year_emissions_kgco2e,
+        prior_year_kgco2e: climateInputs.diagnostics.prior_year_emissions_kgco2e,
+        current_year_units: climateInputs.diagnostics.current_year_units,
+        prior_year_units: climateInputs.diagnostics.prior_year_units,
+        /** Negative is a reduction. Null when there is no prior year to compare. */
+        delta_pct: climateInputs.yoy_delta_pct,
+        per_unit_actual_kgco2e: climateInputs.diagnostics.per_unit_actual_kgco2e,
+        per_unit_benchmark_kgco2e: climateInputs.diagnostics.per_unit_benchmark_kgco2e,
+      },
+    },
     water_breakdown: waterBreakdown,
     circularity_breakdown: circularityBreakdown,
     nature_breakdown: natureBreakdown,

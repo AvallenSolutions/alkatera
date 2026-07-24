@@ -267,6 +267,25 @@ export interface ClimateScoreBreakdown {
   mode: ClimateScoreMode
   /** Blend weights applied. Both 0 in 'no_data' mode. */
   weights: { intensity: number; yoy: number }
+  /**
+   * The two years behind `yoy_sub`, so a surface can show the progress
+   * rather than only the resulting sub-score. Attached by the composite
+   * route from `buildClimateInputs`'s diagnostics; optional because
+   * `computeClimateScore` itself is pure scoring and does not know them.
+   */
+  progress?: ClimateProgress
+}
+
+/** Where the footprint actually got to, year against year. */
+export interface ClimateProgress {
+  current_year_kgco2e: number | null
+  prior_year_kgco2e: number | null
+  current_year_units: number
+  prior_year_units: number
+  /** Negative is a reduction. Null when there is no prior year to compare. */
+  delta_pct: number | null
+  per_unit_actual_kgco2e: number | null
+  per_unit_benchmark_kgco2e: number | null
 }
 
 const CLIMATE_INTENSITY_WEIGHT = 0.6

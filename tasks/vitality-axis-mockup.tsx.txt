@@ -1,0 +1,201 @@
+'use client'
+
+// TEMPORARY mockup of the proposed /performance/climate/ axis page, for Tim
+// to look at before the vitality redesign starts. Real numbers, pulled from
+// alkatera Drinks Co on 24 July 2026. Delete once the decision is made.
+
+import { Statement } from '@/components/studio/statement'
+import { Eyebrow } from '@/components/studio/eyebrow'
+import { PosterBlock } from '@/components/studio/poster-block'
+import { FactList, type FactRowItem } from '@/components/studio/fact-list'
+import { StateChip } from '@/components/studio/state-chip'
+import { PillButton } from '@/components/studio/pill-button'
+
+/** The evidence room's ink, so the mockup wears the colours the real page would. */
+const ROOM_VARS = {
+  '--room-rgb': '191 75 42',
+  '--room-accent-rgb': '191 75 42',
+  '--room-on-rgb': '242 241 234',
+} as React.CSSProperties
+
+/** One hairline bar: the studio's way of drawing a proportion. */
+function ScoreBar({ value, label, weight }: { value: number; label: string; weight: string }) {
+  return (
+    <div className="border-b border-studio-hairline py-3">
+      <div className="flex items-baseline justify-between gap-4">
+        <span className="font-display text-sm font-semibold text-foreground">{label}</span>
+        <span className="shrink-0 font-mono text-[11px] uppercase tracking-[0.16em] text-studio-dim">
+          {value} · weighted {weight}
+        </span>
+      </div>
+      <div className="mt-2 h-[3px] w-full bg-studio-ink/10">
+        <div className="h-full bg-room-accent" style={{ width: `${value}%` }} />
+      </div>
+    </div>
+  )
+}
+
+const HOTSPOTS: FactRowItem[] = [
+  { id: '1', title: '500ml amber glass bottle', hint: 'Packaging · 24% of material emissions', value: '61.5', unit: 'T CO2E', chip: { tone: 'stale', label: 'BIGGEST' }, href: '#' },
+  { id: '2', title: 'Malted barley', hint: 'Ingredient · 13%', value: '32.9', unit: 'T CO2E', href: '#' },
+  { id: '3', title: '330ml aluminium can', hint: 'Packaging · 13%', value: '32.2', unit: 'T CO2E', href: '#' },
+  { id: '4', title: '700ml flint glass bottle', hint: 'Packaging · 12%', value: '30.4', unit: 'T CO2E', href: '#' },
+  { id: '5', title: 'Pale ale malt', hint: 'Ingredient · 12%', value: '29.9', unit: 'T CO2E', href: '#' },
+]
+
+const MOVES: FactRowItem[] = [
+  {
+    id: 'm1',
+    title: 'Lighten the 500ml amber bottle',
+    hint: 'One material is a quarter of your footprint. A 15% lighter bottle would take about 9 t CO2e off the year.',
+    href: '#',
+  },
+  {
+    id: 'm2',
+    title: 'Get a real electricity figure for the Somerset site',
+    hint: 'Two facilities are still on spend-based estimates, which is what holds the intensity sub-score at 34.',
+    href: '#',
+  },
+]
+
+export default function AxisPreviewPage() {
+  return (
+    <div style={ROOM_VARS} className="min-h-screen bg-background">
+      <div className="mx-auto max-w-4xl space-y-10 px-6 py-10 pb-24">
+        <Statement eyebrow="THE EVIDENCE · CLIMATE" headline="Your climate score is 60." />
+
+        <PosterBlock
+          eyebrow="THE CLIMATE AXIS"
+          mark="quarter"
+          href="#"
+          headline={
+            <>
+              60
+              <span className="ml-2 font-mono text-sm font-normal uppercase tracking-[0.18em] opacity-80">
+                / 100
+              </span>
+            </>
+          }
+          note="MONITOR · 673 T CO2E THIS YEAR"
+        />
+
+        {/* Progress: the two years side by side, absolute AND per unit,
+            because absolute on its own tells a flattering lie. */}
+        <section>
+          <Eyebrow className="mb-1">Your progress</Eyebrow>
+          <p className="mb-4 text-sm text-muted-foreground">
+            Last year against this year, on the same basis.
+          </p>
+
+          <div className="grid grid-cols-[auto_1fr_1fr_1fr] gap-x-6 gap-y-0 text-sm">
+            <div className="contents font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+              <span className="border-b border-studio-hairline pb-2" />
+              <span className="border-b border-studio-hairline pb-2 text-right">Footprint</span>
+              <span className="border-b border-studio-hairline pb-2 text-right">Made</span>
+              <span className="border-b border-studio-hairline pb-2 text-right">Per unit</span>
+            </div>
+
+            <div className="contents">
+              <span className="border-b border-studio-hairline py-3 font-mono text-[11px] uppercase tracking-[0.16em] text-studio-dim">
+                2025
+              </span>
+              <span className="border-b border-studio-hairline py-3 text-right tabular-nums">517.2 t</span>
+              <span className="border-b border-studio-hairline py-3 text-right tabular-nums">848,674</span>
+              <span className="border-b border-studio-hairline py-3 text-right tabular-nums">0.609 kg</span>
+            </div>
+
+            <div className="contents">
+              <span className="border-b border-studio-hairline py-3 font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-foreground">
+                2026
+              </span>
+              <span className="border-b border-studio-hairline py-3 text-right font-semibold tabular-nums">322.1 t</span>
+              <span className="border-b border-studio-hairline py-3 text-right font-semibold tabular-nums">528,467</span>
+              <span className="border-b border-studio-hairline py-3 text-right font-semibold tabular-nums">0.610 kg</span>
+            </div>
+
+            <div className="contents">
+              <span className="py-3 font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+                Change
+              </span>
+              <span className="py-3 text-right">
+                <StateChip tone="good">Down 38%</StateChip>
+              </span>
+              <span className="py-3 text-right">
+                <StateChip tone="quiet">Down 38%</StateChip>
+              </span>
+              <span className="py-3 text-right">
+                <StateChip tone="attention">No change</StateChip>
+              </span>
+            </div>
+          </div>
+
+          {/* CAVEAT, 24 July: the per-unit column above is NOT measured. Both
+              years are computed from the same current PCF × that year's units
+              (see buildClimateInputs' own docstring), so intensity is held
+              constant by construction and "no change" is arithmetic, not a
+              finding. Wording below says only what the data supports. This
+              becomes a real comparison once PCFs are year-vintaged. */}
+          <p className="mt-4 border-l-2 border-studio-attention pl-3 text-sm leading-relaxed text-foreground">
+            Your total footprint fell 195 t CO2e, from 517 t to 322 t, and you produced
+            38% fewer units. We cannot yet tell you how much of that came from cleaner
+            production, because your footprints are only measured for one year. Once
+            there are two, this is where the split will be.
+          </p>
+        </section>
+
+        {/* The thing the page has never said: why the number is what it is. */}
+        <section>
+          <Eyebrow className="mb-1">How this score is built</Eyebrow>
+          <p className="mb-3 text-sm text-muted-foreground">
+            Two measures, blended.
+          </p>
+          <ScoreBar label="Carbon intensity" value={34} weight="60%" />
+          <ScoreBar label="Year on year" value={100} weight="40%" />
+          <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.16em] text-studio-dim">
+            34 × 0.6 + 100 × 0.4 = 60
+          </p>
+          <p className="mt-3 text-sm text-muted-foreground">
+            At 0.610 kg per unit you are 1.39× the drinks-sector benchmark of 0.440,
+            which is what holds intensity at 34.
+          </p>
+        </section>
+
+        <section>
+          <Eyebrow className="mb-1">What is driving it</Eyebrow>
+          <p className="mb-3 text-sm text-muted-foreground">
+            Five materials carry 73% of your material emissions.
+          </p>
+          <FactList items={HOTSPOTS} />
+        </section>
+
+        <section>
+          <Eyebrow className="mb-1">What would move it most</Eyebrow>
+          <FactList items={MOVES} />
+        </section>
+
+        <section>
+          <Eyebrow tone="dim" className="mb-2">The full breakdown</Eyebrow>
+          <p className="mb-3 text-sm text-muted-foreground">
+            Scope 1, 2 and 3, the 15 Scope 3 categories, life-cycle stages and the
+            per-facility split. This is where the existing CarbonDeepDive lives, on the
+            page rather than inside a sheet on top of it.
+          </p>
+          <div className="flex gap-2">
+            <PillButton size="sm" href="#">Open the breakdown</PillButton>
+            <PillButton size="sm" variant="ghost" href="#">Back to the vitality</PillButton>
+          </div>
+        </section>
+
+        <section className="border-t border-studio-hairline pt-5">
+          <Eyebrow tone="dim" className="mb-2">Methodology</Eyebrow>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Intensity is kg CO2e per litre produced, scored against the drinks-sector
+            band. Year on year compares this year to last on the same basis. GHG
+            Protocol Corporate Standard and ISO 14064.{' '}
+            <StateChip>Blended mode</StateChip>
+          </p>
+        </section>
+      </div>
+    </div>
+  )
+}

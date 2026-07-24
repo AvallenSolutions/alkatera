@@ -138,7 +138,14 @@ export interface AggregationResult {
 
 /**
  * Calculate and store aggregated impacts for a product carbon footprint.
- * This runs entirely client-side using the authenticated Supabase client.
+ *
+ * Takes its Supabase client as an argument, so it runs ANYWHERE a client can
+ * be supplied: browser, route handler, or a test with a stub. It has no
+ * browser dependency of its own. (This line used to read "runs entirely
+ * client-side", which was read as "browser-only" and cost at least one
+ * session a plan to extract the maths or drive a headless browser before
+ * anyone checked. See lib/__tests__/lca-aggregator-golden.test.ts, which
+ * exercises it in plain vitest.)
  *
  * facilityEmissions: Pre-computed facility emissions passed directly from
  * the calculator. This bypasses the product_carbon_footprint_production_sites

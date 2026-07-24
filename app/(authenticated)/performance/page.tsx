@@ -852,7 +852,7 @@ export default function PerformancePage() {
   return (
     <div className="space-y-6 animate-fade-in-up">
       <header>
-        <Eyebrow className="mb-3">THE CELLAR · VITALITY</Eyebrow>
+        <Eyebrow className="mb-3">THE EVIDENCE · VITALITY</Eyebrow>
         <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
           The vitality.
         </h1>

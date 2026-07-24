@@ -1,105 +1,181 @@
-# Handoff: alkatera v2 — Phase 2 testing on staging
-Updated: 2026-07-23 | Branch: redesign | Worktree: `.claude/worktrees/redesign`
+# Handoff: THE VITALITY PAGE
+Updated: 2026-07-24 13:40 | Branch: redesign | Worktree: `.claude/worktrees/redesign` | Dev port: 8894 (`redesign-verify`)
+
+## START HERE
+**Work `tasks/vitality-redesign-plan.md`, starting at step 1 of "The work, in
+order".** Nothing else. Tim has asked for the vitality page twice; two sessions
+have now done other things instead.
+
+There are other live streams in this worktree (`tasks/phase2-staging-handoff.md`,
+`tasks/alkatera-v2-launch-plan.md`). **Do not start on them.** They are listed
+at the FOOT of this file for context only. A previous session read a pointer to
+the staging handoff at the top of this file and worked its punch list instead of
+the vitality page — that was a defect in how this file was written, not in the
+session's judgement.
 
 ## Goal
-alkatera v2 = redesign UI + Vercel hosting + the EXISTING Alkatera2 database. Customer
-data never moves; the staging Supabase project (`vwhdyqvlgjqmlzmsvaes`) is a disposable
-test bed, never promoted. Staging (https://alkatera-staging.vercel.app, auto-deploys
-`redesign` on push) is where Tim tests until happy; then the additive migrations go to
-Alkatera2, redesign merges to main, DNS moves, Netlify shuts down. Strategy:
-`tasks/alkatera-v2-launch-plan.md`. We are in PHASE 2: Tim's room-by-room pass per
-`tasks/phase2-test-script.md`, sessions work the punch list at its foot.
+Tim's room-by-room polish of the redesign, done in one session: reorganise which
+pages live in which room, put the four growing/hospitality modules behind a
+"what do you work with?" question instead of admin beta flags, bring the Rosa
+surfaces onto the studio design system, and plan the vitality page rebuild.
+Everything is LOCAL and uncommitted on `redesign`. Never merge to main.
 
 ## Done (verified)
-- **main re-merged into redesign** (`ff0fcbc2`, 23 Jul): the last 3 main-only commits
-  (Resend delivery webhook + unsubscribe route, jobs-diff doc, env budget bump).
-  Divergence with main again 0. Conflicts resolved in the studio idiom (PillButton,
-  StateChip); the incoming migration renumbered `20260721100000` -> `20260721110000`
-  because staging already holds `pcf_end_use_scenarios` at that version. resend-webhook
-  suite 15/15, `tsc --noEmit` clean, pushed. PROD (Alkatera2) already had this schema
-  (verified via MCP); STAGING applied 23 Jul via MCP with Tim's permission and verified
-  (table + 4 columns + RLS), tracker row set to `20260721110000` for repo parity.
-- **main merged into redesign** (`094cac4d`, 28 commits incl. parametric packaging).
-  811 scoped tests, tsc, prod build green; packaging wizard walked in a browser
-  (parametric rows in product_materials, no factor search). Divergence with main: 0.
-- **Five 20260719* migrations applied to STAGING** and verified (13 endpoints, 3
-  gap-fillers, EPR uuid, PCF index, RLS policy); recorded in its migration tracker.
-- **Report-sections plan: all 10 steps shipped** (`76cfab11..fb47b6e2`). Five sections
-  render with honest skeletons, facilities page new, zero N/A, four phantom
-  SECTION_TO_TOPIC ids fixed, one completeness oracle drives document AND funnel.
-  Browser-verified on empty org: funnel "0 of 13 measures recorded" rows, generated doc
-  contains the People page with the honest line.
-- **Demo seeder now self-sufficient** (`6c7dd675`): foundation.ts creates org/
-  facilities/products when missing (prod unchanged); seed ran twice on a wiped local
-  org, identical counts, second run a no-op.
-- **Unauthenticated deep-link bug fixed** (`5405065c`): cold visit to an authed URL
-  skeletoned forever (org provider never cleared isLoading when user was null at boot);
-  verified logged-out /desk now redirects to /login. This was Tim's staging symptom.
-- **Staging account unblocked by hand** (via Supabase MCP): tim@alkatera.com arrival
-  marked complete, `is_alkatera_admin=true`, org Avallenspirits set canopy/active
-  (was seed/pending, which the payment gate correctly bounced).
-- GEMINI_API_KEY added to staging Vercel (Tim) and deployed; env audit found nothing
-  else missing that matters (PostHog key absent = harmless console noise).
+- **Room reorganisation.** New map in `components/studio/platform-rooms.ts`:
+  Evidence = Reports/LCAs/Vitality/Emissions (+overflow); Cellar narrowed to
+  Products/Liquids/Packaging/Ingredients; Library gained "Your library" and
+  Uploads; Workbench gained Integrations. Moved: `/performance`, `/reports/lcas`,
+  `/nature-assessment` (cellar→evidence), `/data/scope-1-2` (workbench→evidence),
+  `/evidence-library` + `/uploads` (→library). Verified in a browser on
+  `/cellar` and `/desk`; 35 tests in `platform-rooms.test.ts`, incl. a guard that
+  every tab resolves back to its own room.
+- **Beta flags retired.** `viticulture_beta`/`orchard_beta`/`arable_beta`/
+  `hospitality_beta` are gone; the four are ordinary Canopy features named
+  `viticulture`/`orchards`/`arable_fields`/`hospitality`. New split: **declared**
+  (`organizations.works_with`) vs **entitled** (Canopy). Single source of truth
+  `lib/subscription/works-with.ts`; one server gate `lib/subscription/module-access.ts`.
+  Two migrations applied to the LOCAL db and proven idempotent; the seed carried
+  Local Dev Co's three old beta grants into `works_with` correctly.
+- **`arrival-modules` step** added to the arrival ritual (now 8 screens, was 7),
+  plus `components/settings/WorksWithPanel.tsx` to change the answer later.
+- **Rosa on the studio system.** ActionProposalCard, RosaDrawer, NudgeRail,
+  RosaConversation, RosaInputBar, RosaPersonaPrompt, plus hub children
+  (ProgressTracker now uses `Panel`, OnboardingResumeBanner, RosaCanvas). Zero
+  old-design markers left across 13 live files. Drawer and hub screenshotted
+  signed-in with real data.
+- **Desk greeting name.** `lib/user-name.ts`, three sources: signup metadata →
+  `profiles.full_name` → email local part (role addresses and company slugs
+  refused). `tim@alkatera.com` now renders "Good morning, Tim." — seen live.
+  9 tests. Same helper adopted by the Rosa brief, which had the identical bug.
+- **"Give us anything" moved into the ink band** beside Ask Rosa and removed
+  from all six room landings. Screenshotted open.
+- **Forest only on the desk**; removed from the other six rooms, `pb-48` → `pb-16`,
+  single-child fragments collapsed.
+- **Forest "see it on its own" toggle** — cards fade, pill becomes "Show the
+  desk", Escape also returns. Measured: opacity 0 / `pointer-events: none` when
+  cleared, back to 1 via both routes.
+- **The walk's slide transitions.** Was one keyed `fixed inset-0` panel per
+  slide, so advancing unmounted the old and faded the new in from transparent —
+  the desk flashed through. Now one persistent backdrop that only changes
+  colour. Measured: 22 intermediate colours over ~620ms, backdrop opacity 1 in
+  every frame.
+- **The walk's Network slide** was `STUDIO.ochreInk` (ochre's accent form for
+  text ON PAPER) on the ochre ground: dark gold on gold. Now ink, ~7.8:1.
+  Measured across all six slides: network is the only one with ink text.
+- **Footer = the other rooms.** The ink band repeated the room's own tabs, which
+  the band three lines above already carried. Now `otherRoomLinks()`, persona-
+  ordered, current room and desk excluded. Verified on `/cellar` and `/desk`.
+- **Stale room eyebrows fixed** on the three moved pages (LCAs, Nature,
+  Vitality still said "THE CELLAR").
+- `tsc --noEmit` clean and `pnpm build` exit 0 after every stage; 132 tests green
+  across `components/studio`, `lib/studio`, `lib/onboarding`, `lib/subscription`,
+  `lib/__tests__/user-name`.
 
 ## Done (unverified)
-- Nothing on staging beyond login has been exercised: the demo-seed click, the rooms,
-  reports end-to-end with real Gemini + PDFShift are all untested there.
-- Report sections against RICH data (only the all-skeleton empty-org case is proven);
-  the thin-data mixed state (one demographics row → some tiles real, rest skeletons)
-  is the exact case Tim originally asked for and still needs eyes.
+- **The arrival `arrival-modules` step has never been walked in a browser.** Its
+  save path (`PUT /api/organization/works-with` → `refreshOrganizations`) is
+  typechecked and unit-tested at the parser level only.
+- **`WorksWithPanel` in Settings** — same: never clicked.
+- The CANOPY-locked state of a declared module in the workbench (chip + billing
+  link) has not been seen; the local org is Canopy so it always renders unlocked.
+- Rosa's live conversation rendering was checked against realistic markdown in a
+  harness, not against a real streamed LLM turn. The history dropdown opens but
+  Radix portals do not appear in screenshots.
 
 ## In flight
-**A PARALLEL SESSION is building the cellar LCA dossier stream** (commits up to
-`aad9f57f`: server-side footprint calc under Inngest, the dossier UI, asks, a share
-gate, an Inngest concurrency-cap fix). Its state lives in its own build log
-(`tasks/` docs from commits `69b4ee8a`/`15c6d703`). Coordinate before touching
-cellar/LCA files; this handoff does not speak for that stream.
+Nothing half-edited. The last change was `app/api/vitality/composite/route.ts`
++ `lib/vitality/environmental.ts`, adding a `progress` object to
+`climate_breakdown` (both years, delta, per-unit actual vs benchmark). The route
+was computing these and discarding them; the type's own comment said to keep
+them "so the UI can show the math". Additive, typechecks, returns real data.
 
-Tim is mid Phase 2 setup: just unblocked past /complete-subscription. His next clicks:
-refresh staging → desk loads → `/admin/demo-seed` → Seed Drinks Co demo (do NOT run
-Recalculate LCAs after) → start the Cellar checklist in `tasks/phase2-test-script.md`.
+The Climate axis mockup now lives at `tasks/vitality-axis-mockup.tsx.txt`,
+moved out of `app/` before committing so it does not ship as a live route.
 
-## Next
-1. Work the punch list in `tasks/phase2-test-script.md` as Tim adds items (3 done so far).
-2. Thin-data mixed-state report check (add one demographics row, regenerate).
-3. If Tim wants the full arrival checkout testable on staging: add a Stripe TEST-mode
-   webhook endpoint pointing at the staging URL first.
-4. Phase 3 in parallel (see launch plan): goldens harness AFTER Tim's prod recalc;
-   migration rehearsal on an Alkatera2 clone; production Vercel project + env parity;
-   Inngest registration (mandatory or all 14 crons stop silently); enable RLS with read
-   policies on the 11 flagged reference tables; rotate the old prod service-role key.
+## Next — the vitality page, and only the vitality page
+1. **Vitality visual redesign** — `tasks/vitality-redesign-plan.md`, "The work,
+   in order", steps 1-7. **Step 1 (move the pillar breakdown out of the hero and
+   delete the four duplicate PillarCards) is independently shippable** and makes
+   the current page better on its own. Start there.
+   The Climate axis mockup Tim approved the shape of is
+   `tasks/vitality-axis-mockup.tsx.txt` — real studio primitives, real numbers.
+   Kept as `.txt` so it is neither routed nor typechecked; drop it back into
+   `app/` temporarily if you want to look at it running.
+2. **Vitality scoring** — the separate stream at the foot of the same plan. Do
+   NOT bundle it with the visual work. Order matters: false label → unit-size
+   fallback → benchmark boundary audit → year-vintaged PCFs → re-anchor.
+
+Only after both, and only if asked:
+3. Walk the arrival ritual on a fresh org to exercise `arrival-modules`, and
+   click `WorksWithPanel` in Settings (both untested, see above).
+4. Commit. None of this session's 89 changed files are committed.
+
+## Other live streams — CONTEXT ONLY, do not start here
+- `tasks/phase2-staging-handoff.md` — Phase 2 staging test punch list. Still
+  live and unfinished, but it is NOT this stream's work.
+- `tasks/alkatera-v2-launch-plan.md` — the cutover strategy.
+- **Done from that stream on 24 Jul, do not redo:** the numbers-don't-change
+  golden harness. `lib/__tests__/lca-aggregator-golden.test.ts` +
+  `support/aggregator-harness.ts` + `fixtures/lca-golden-cases.ts`. 8/8 pass on
+  redesign (re-run and confirmed 24 Jul 13:34); proves redesign reproduces
+  main's LCA numbers exactly, and the reorder of downstream stages vs the loss
+  block is behaviour-preserving. Verified by mutation, not by going green.
+  **Caveat: all three files are UNTRACKED, and exist only in the `redesign` and
+  `zealous-golick-15a7ed` worktrees.** If they are meant to be a cross-branch
+  invariant they need committing on both branches, or they evaporate.
 
 ## Gotchas and decisions
-- THE DECIDED PATH: Alkatera2 is production forever; staging DB never promoted. The one
-  sanctioned redesign→main merge happens at launch only. Push work to `redesign`.
-- Staging is deliberately NO-Inngest (stray INNGEST_* keys strand jobs); production
-  cutover REQUIRES Inngest app registration.
-- Payment gate: an org with subscription 'pending' outside the arrival ritual bounces
-  to /complete-subscription BY DESIGN; on staging unblock via DB (tier+status), never
-  by clicking through Stripe.
-- Stripe webhook points at prod Netlify; a staging checkout will hang after payment.
-  Config gap, not a bug; repoint is a Layer 4 cutover item.
-- Anthropic quota exhausted until ~1 Aug: the arrival website scrape on staging fails
-  and falls back to manual entry. Expected.
-- get_user_bootstrap / get_supplier_context RPCs are absent on staging (prod-only,
-  applied ad hoc); code falls back by design, but staging↔prod function drift is real.
-- Browser-pane quirks: viewport can collapse to 0x0 (fix: resize_window desktop, then
-  dispatch a resize event); Radix components need full pointerdown→click sequences;
-  the app scrolls <main>, not the window. Never bare `npx vitest run` (hangs) — scope.
-- Worktree dirty-by-design, do NOT commit: `.claude/launch.json` (merge-verify :8897),
-  `tsconfig.json` (Next auto-edit), `.env.local` (local-only Supabase demo keys).
-- Local DB hand-tweaks this session: dev@local.test is admin, its metadata org points
-  at Local Dev Co, local Avallenspirits arrival completed, local demo org fully seeded.
-- Seeder foundation quirk: advancing the products id sequence uses throwaway inserts
-  (PostgREST cannot setval); gated so it never runs where products already existed.
+- **Declared vs entitled is deliberate.** A declared module shows in the
+  workbench on ANY tier wearing a CANOPY chip. That visibility IS the upsell —
+  do not "fix" it by hiding it. Tim's call.
+- The four modules are deliberately NOT in the static room registry;
+  `roomWithModules()` appends the declared ones per org, so a business that
+  grows nothing never sees the words.
+- **`yoy_sub` in the vitality climate score does not measure emissions.** Both
+  years come from the same current PCF × that year's units, so it is a volume
+  and mix index. Confirmed in code and by the sustainability advisor. Do not
+  "fix" it by swapping to an intensity trend — that yields 0.00% for every org
+  until PCFs are year-vintaged. Full write-up in the plan.
+- **The `?? 1.0` unit-size fallback flatters the score by up to ~30 points**,
+  one-directionally (`unit_size_l` is only in the benchmark numerator). Green-
+  claims risk. Remove it.
+- Do not repeat the SBTi claim that you cannot meet a target through output
+  reduction. It is wrong; recalculation triggers on structural change only.
+- Setting `color` on the walk's root element does not reach its text (an
+  `!important` inline does not move the computed value either, and no matching
+  CSS rule was found). Set it on the content wrapper. Cause unexplained.
+- Browser-pane quirks that cost time: fixed overlays screenshot blank until you
+  `dispatchEvent(new Event('resize'))`; `navigate` sometimes drops the path, so
+  use `window.location.href`; the walk auto-advances every 8s, which invalidates
+  slow multi-call DOM probes — do the whole probe in ONE `javascript_exec`.
+- Never bare `npx vitest run` (hangs). Scope to directories or files.
+- **The LCA calculator is NOT browser-only**, whatever older notes say.
+  `lib/product-lca-calculator.ts` has zero `window`/`document`/`localStorage`;
+  its only browser touch is `ctx?.supabase ?? getSupabaseBrowserClient()`, a
+  fallback that a passed-in client bypasses. `aggregateProductImpacts(supabase,
+  …)` takes the client as an argument. It needs a client, not a browser. The
+  aggregator's "runs entirely client-side" docstring propagated this and has
+  been corrected in place. Verified 24 Jul.
+- `tsconfig.json` is auto-edited by the dev server (adds `.next-8894/types`).
+  Revert before committing; it is not part of the work.
+- Local Supabase for this worktree is the **alkatera main-repo instance** on
+  :54321 (`supabase_db_alkatera`); the redesign worktree's own `supabase start`
+  fails on a port clash. The two migrations below were applied there.
 
 ## Pending Tim actions
-- Refresh staging; seed the demo org; walk `tasks/phase2-test-script.md`, adding one
-  punch-list line per issue.
-- Staging Supabase Auth → URL Configuration → Add URL:
-  `https://alkatera-staging.vercel.app/**` (redirect allow-list was empty).
-- Phase 3, when ready: run the all-orgs recalc on PROD (/admin-tools/recalculate-lca,
-  Happy Curations then Everleaf, warn Clair first) BEFORE we snapshot goldens; delete
-  the gaia-query edge function in the prod Supabase dashboard.
+- **Two migrations to run on prod/staging when this ships** (both already on
+  local, first one proven idempotent):
+  - `supabase/migrations/20260724100000_organizations_works_with.sql` — adds
+    the column, seeds it from the dying beta flags, then strips them.
+  - `supabase/migrations/20260724110000_tier_features_single_source.sql` —
+    regenerated tier features; canopy 65 → 69.
+- **Anne Jones question**: are the five figures in `lib/industry-benchmarks.ts`
+  lifecycle or facility-level (scope 1+2 per hL)? The file header says
+  lifecycle; the cited BIER study is operational. If operational, every
+  intensity ratio in the product is wrong. Highest-value open question.
+- Decide whether absolute emissions leave the vitality score entirely and
+  become the outcome + Targets driver (recommended, agreed in principle).
+- Legal view on EmpCo before any shareable "vitality score" badge or an EU
+  QR carbon-label menu (national rules from 27 Sept 2026).
 
 Next session opener: `Read tasks/handoff.md and continue.`

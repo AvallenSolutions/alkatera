@@ -4047,7 +4047,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       console.warn('[calculateProductCarbonFootprint] Processing emissions will be zero unless manually entered');
     }
 
-    // 8. Run aggregation to calculate totals (client-side, no edge function needed)
+    // 8. Run aggregation to calculate totals (in-process, no edge function needed)
     onProgress?.('Aggregating lifecycle impacts...', 75);
     console.log(`[calculateProductCarbonFootprint] Calling aggregation engine...`);
 
