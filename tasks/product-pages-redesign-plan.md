@@ -257,6 +257,51 @@ Seen in the browser. The diagnosis holds, and one new finding.
   and tone chips. The hub should read like this. First visual verification of
   the dossier since it was built (the LCA plan flagged it as never seen).
 
+## Build log (24 July)
+
+| Phase | Commit | State |
+|---|---|---|
+| 0 baseline | — | Done. Findings recorded above. |
+| A the list | `cd4d91d0` | Done, verified. |
+| B the hub | `7aa09942` | Done, verified. |
+| C recipe skin | — | **NOT STARTED.** The rows are still shadcn cards with a blue Note alert, "Matched, please check" badges and red asterisks. This is the largest remaining gap. |
+| D the guidance | `c41b8413` | Done, verified. |
+| E the sweep | — | Not started. |
+
+### Verified in a browser on :8894
+List (9 products, one fetch, search, portfolio, archived, mobile 375),
+hub (completed-LCA can, bottle, 24-can multipack, stage figures reproducing the
+old accordion exactly), the walk (auto-run correctly suppressed for a user
+carrying the old flag, manual replay, ring with no scrim, step advance), the
+setup checklist with finished items struck through.
+
+### Known gaps, in priority order
+1. **Phase C is not done.** The recipe editor's rows and the compliance
+   wizard's steps are still old-design.
+2. `enableTourAnchors` / `data-tour-anchor` props are now dead (always false)
+   in IngredientRow and IngredientEditorTabs. Remove during Phase C.
+3. The walk's final step (the Ask Rosa action) is code-verified only; the
+   preview pane's step-clicking was too unreliable to confirm it visually.
+4. Delete-with-multipack-guard is verified by construction (lifted from the
+   hub verbatim); nothing was actually deleted on the seeded org.
+
+### Environment notes for the next session
+- **Another session was editing this worktree at the same time** (59 unrelated
+  files, new desk-welcome / section-no-access / impact-valuation work between
+  17:49 and 18:10). Every commit here staged its files explicitly. Check
+  `git status` before assuming a dirty tree is yours.
+- `lib/access/sections.ts` is untracked, from that other stream, and has a
+  pre-existing `--downlevelIteration` tsc error. Nothing here imports it.
+- The browser pane lies: `window.innerHeight`, `main.getBoundingClientRect()`
+  and `document.body.innerText` all intermittently read 0/empty while the pane
+  is hidden, and `document.querySelectorAll` can return nothing on a page that
+  is rendering perfectly. **Screenshots are the only reliable ground truth.**
+  Relative measurements (element top minus container top, taken in one pass)
+  survive; absolute ones do not.
+- A stale dev compile can pin an error quoting source you have since changed.
+  `rm -rf .next-8894` and restart; the first compile after that takes about
+  three minutes, so a blank page is not necessarily a broken one.
+
 ## Build order
 
 Dev server: `redesign-verify` (:8894). Sign in as dev@local.test.
