@@ -89,9 +89,37 @@ before planning anything about background jobs.
      totals and never touches `materials`, and both branches add downstream results after
      scaling. There is now a test that pins this rather than an argument that asserts it.
    - **Coverage limit, read before trusting it:** the harness starts from already-resolved
-     material rows, so it locks the AGGREGATOR. It does not cover factor resolution in
-     `product-lca-calculator.ts` (124 changed lines) or `impact-waterfall-resolver.ts` (72).
-     Those remain unproven and are the natural next extension.
+     material rows, so it locks the AGGREGATOR. It does not cover the resolved VALUES on those
+     rows. See item 6 for how far that gap has since been closed.
+6. **The calculator + resolver diff — CLOSED 2026-07-24, no numbers move.** This was item 5's
+   stated coverage gap. All three remaining changed files were run down; none moves a customer's
+   footprint at cutover.
+   - **`impact-waterfall-resolver.ts` (72 lines): plumbing only.** Every change is the new
+     `ctx?: CalculationContext` injection so the resolver can run server-side with a
+     service-role client. The browser path is unchanged by construction —
+     `resolveInternalCallAuth` with no ctx reads the session and returns the same relative URL
+     and the same `Authorization: Bearer <user token>` header main built inline. The only
+     behavioural change is off-browser and strictly louder: where main silently skipped the
+     OpenLCA hop without a token and resolved from a generic factor, redesign records a
+     `transient` fallback event saying so.
+   - **`computeAttributionRatio` — proven number-neutral across the whole unit vocabulary.**
+     Redesign routes both unit strings through the new `normaliseProductionUnit()` where main
+     only lowercased and trimmed, and this sits directly on the scope 1 + 2 every product
+     inherits from its facility. Probed all **1024 pairs** of the 32 production-unit spellings
+     this codebase has written, on both branches: **zero ratios differ.** The only delta is
+     four spurious "can't be converted automatically" warnings that stop firing on
+     `cases`/`case`, which are the same unit. Locked by the new
+     `lib/__tests__/facility-attribution-golden.test.ts` (23 tests, passes on both).
+   - **The maturation warehouse double-count guard is inert at cutover.** Redesign skips the
+     synthetic `[Maturation] Warehouse Energy` row when the named warehouse facility already
+     reports electricity for the period, which would lower aged-spirit footprints. It hangs off
+     `maturation_profiles.warehouse_facility_id`, added by redesign-only migration
+     `20260722100000_phase1_inheritance_homes.sql` as a **nullable column with no default and
+     no backfill**. Every existing profile is therefore NULL, the guard never fires, and no
+     existing footprint moves until someone opts in by picking a warehouse.
+   - **Still not covered:** the resolved impact VALUES themselves (which factor the waterfall
+     picks for a given material). Both branches share that code, so it is low cutover risk, but
+     it is the remaining gap if anyone wants to go further.
 
 ## Gotchas and decisions
 - **Cutover + the pending recalc together WILL move UK orgs' end-of-life numbers.** Found while
@@ -104,6 +132,17 @@ before planning anything about background jobs.
   only bites when something recalculates. It is arguably a correctness FIX (a UK distillery
   should not carry EU recycling rates), so the action is to expect it and tell Clair, not to
   revert it. The harness passes an explicit region, so it does not catch this by design.
+- **Equivalent mutants are real; do not read a surviving mutation as a weak test.** Case
+  insensitivity in the attribution path is implemented at THREE sites (`prodUnit`, `totalUnit`,
+  and inside `allocationVolumeToBasis`). Removing any one or two of them changes nothing,
+  because the survivors still normalise. Only removing all three breaks it, and the test does
+  then fail. When a mutation survives, check whether the behaviour genuinely moved before
+  concluding the test is inadequate.
+- **Asserting a number is not always asserting the behaviour.** The attribution test originally
+  checked only the ratio for same-unit spellings, and a mutant that stripped unit recognition
+  entirely passed all 23 tests — because an unrecognised pair still divides the two numbers as
+  entered, landing on the same answer. What separates "recognised" from "fell through" is
+  whether it WARNED. The suite now asserts both.
 - **A failed freight-factor lookup silently zeroes distribution.**
   `calculateTransportEmissions` throws when the `staging_emission_factors` row is missing, and
   `calculateDistributionEmissions` catches PER LEG and books 0 with only a `console.warn`. So a
@@ -118,10 +157,13 @@ before planning anything about background jobs.
   4 projects (agentos 2 Jul, healthyhospo 4 Jul, founder-os 10 Jul, hayle-council 11 Jul);
   `alkatera-staging` was created 18 Jul and 404s by team id, team slug, project slug AND
   deployment hostname. Not an account boundary, a token scope.
-- **Cutting over today would silently revert the LCA engine.** `redesign` does NOT have main's
-  parametric packaging work: no `lib/calculations/packaging-factor.ts`, no
-  `PackagingMaterialClassPicker`, no golden test. Packaging would compute the old fuzzy-matched
-  way and every customer's numbers would shift back. This is the single biggest cutover risk.
+- ~~**Cutting over today would silently revert the LCA engine.**~~ **STALE AND WRONG — CLOSED.**
+  This said redesign had none of main's parametric packaging work and called it "the single
+  biggest cutover risk". It was closed by the 20 Jul merge (item 4 said so; this bullet was
+  never updated, and it read as live). Verified 2026-07-24: redesign has
+  `lib/calculations/packaging-factor.ts`, `components/products/PackagingMaterialClassPicker.tsx`
+  AND `lib/__tests__/packaging-parametric-golden.test.ts`, all three **byte-identical to main**.
+  Nothing reverts.
 - **Sequence matters: run the recalc BEFORE porting.** Otherwise you cannot tell recalc drift from
   redesign drift, and there are three number-states in play at once.
 - **Two deployments, one Inngest app id.** `id: 'alkatera'` on both branches. Inngest keys are the
