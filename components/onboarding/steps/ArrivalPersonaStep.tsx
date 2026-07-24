@@ -16,7 +16,7 @@ const PERSONA_OPTIONS: { value: PersonaChoice; label: string; description: strin
 ]
 
 /**
- * Screen 2 of 5: "What do you do here?" Writes the choice into the same
+ * Screen 2 of 8: "What do you do here?" Writes the choice into the same
  * rosa_memory 'persona' key that lib/rosa/useUserRole.ts already reads, so
  * the desk re-weights via deskOrderForPersona() the moment onboarding ends.
  * Skippable — a fresh owner who'd rather not say lands on the default

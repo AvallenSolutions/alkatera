@@ -93,9 +93,9 @@ export const HELP_MAP: HelpEntry[] = [
   },
   {
     prefix: '/cellar',
-    summary: 'The cellar turns your products into carbon footprints, one life cycle assessment at a time.',
-    wikiSlugs: ['life-cycle-assessment', 'product-carbon-footprint', 'functional-unit'],
-    rosaPrompt: 'Help me understand my product footprints.',
+    summary: 'The cellar is what your drinks are made of: the liquid, the packaging and the ingredients behind every product.',
+    wikiSlugs: ['product-carbon-footprint', 'life-cycle-assessment', 'functional-unit'],
+    rosaPrompt: 'Help me set up a product and what it is made of.',
   },
   {
     prefix: '/products',
@@ -115,11 +115,39 @@ export const HELP_MAP: HelpEntry[] = [
     wikiSlugs: ['scope-3-emissions', 'scope-3-categories', 'primary-vs-secondary-data'],
     rosaPrompt: 'How do I add a supplier and request their data?',
   },
+  // The two surfaces that moved into the evidence room from elsewhere.
+  {
+    prefix: '/data/scope-1-2',
+    summary: 'Emissions is your whole-company footprint: what you burn, what you buy in and everything up and down your chain.',
+    wikiSlugs: ['scope-1-emissions', 'scope-2-emissions', 'scope-3-emissions'],
+    rosaPrompt: 'Walk me through my emissions and where the big numbers are.',
+  },
+  {
+    prefix: '/performance',
+    summary: 'Vitality is one score for how healthy the whole picture is, built pillar by pillar from everything you have measured.',
+    wikiSlugs: ['carbon-intensity', 'primary-vs-secondary-data'],
+    rosaPrompt: 'What is pulling my vitality score down?',
+  },
+  // More specific than the generic /evidence entry below: the evidence
+  // library moved to the library room, so it takes the library's help.
+  {
+    prefix: '/evidence-library',
+    summary: 'Your library holds every document you have gathered: certificates, invoices, spec sheets and supplier evidence.',
+    wikiSlugs: ['primary-vs-secondary-data'],
+    rosaPrompt: 'What documents am I still missing?',
+  },
   {
     prefix: '/evidence',
-    summary: 'The evidence is where your work becomes proof: reports, certifications and the targets you are working towards.',
+    summary: 'The evidence is where your work becomes proof: your reports and finished LCAs, your vitality score and the emissions behind them.',
     wikiSlugs: ['sustainability-reporting', 'science-based-targets', 'b-corp'],
     rosaPrompt: 'What evidence am I missing?',
+  },
+  // More specific than the generic /reports entry below.
+  {
+    prefix: '/reports/lcas',
+    summary: 'The LCAs are the product footprints you have finished, ready to show. A half-finished one is picked up from its product in the cellar.',
+    wikiSlugs: ['life-cycle-assessment', 'product-carbon-footprint', 'system-boundaries'],
+    rosaPrompt: 'Talk me through one of my product footprints.',
   },
   {
     prefix: '/reports',
@@ -135,9 +163,15 @@ export const HELP_MAP: HelpEntry[] = [
   },
   {
     prefix: '/library',
-    summary: 'The library is your reference shelf: the knowledge bank and the wiki, whenever you need to look something up.',
+    summary: 'The library is the shelf: every document you have gathered, plus the knowledge bank and the wiki when you need to look something up.',
     wikiSlugs: [],
     rosaPrompt: 'What should I read to understand my footprint better?',
+  },
+  {
+    prefix: '/uploads',
+    summary: 'Uploads is where anything you have dropped in goes while we read it, so nothing gets lost mid-analysis.',
+    wikiSlugs: [],
+    rosaPrompt: 'What happened to the document I uploaded?',
   },
   {
     prefix: '/wiki',

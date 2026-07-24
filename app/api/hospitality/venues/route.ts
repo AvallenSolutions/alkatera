@@ -2,8 +2,7 @@
  * Hospitality venues list + create.
  *
  * A venue is an org-scoped restaurant / bar / accommodation that anchors
- * per-venue hospitality reporting. Gated behind the `hospitality_beta` flag at
- * the UI/layout level; this route enforces organisation scoping.
+ * per-venue hospitality reporting. Gated behind the Canopy tier at * the UI/layout level; this route enforces organisation scoping.
  *
  * GET  /api/hospitality/venues   — list, default active. ?status=all|active|archived.
  * POST /api/hospitality/venues   — create. Body validated against the venue-type enum.

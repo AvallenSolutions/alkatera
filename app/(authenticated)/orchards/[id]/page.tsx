@@ -199,7 +199,7 @@ export default function OrchardDetailPage() {
 
   if (showQuestionnaire) {
     return (
-      <FeatureGate feature="orchard_beta">
+      <FeatureGate feature="orchards">
         <div className="space-y-8">
           <div className="min-w-0">
             <Statement
@@ -247,7 +247,7 @@ export default function OrchardDetailPage() {
     .join(' · ');
 
   return (
-    <FeatureGate feature="orchard_beta">
+    <FeatureGate feature="orchards">
       <div className="space-y-10">
         <div className="min-w-0 space-y-4">
           <BackLink />

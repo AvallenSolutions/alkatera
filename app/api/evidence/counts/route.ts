@@ -69,24 +69,42 @@ export async function GET(request: NextRequest) {
     return data.overall_risk_level ?? null
   }
 
+  const year = new Date().getFullYear()
+
+  /** This year's TNFD assessment status, for the nature row chip. */
+  const natureStatus = async (): Promise<string> => {
+    const { data, error } = await db
+      .from('nature_impact_assessments')
+      .select('assessment_status')
+      .eq('organization_id', organizationId)
+      .eq('assessment_year', year)
+      .maybeSingle()
+    if (error || !data) return 'not_started'
+    return data.assessment_status ?? 'not_started'
+  }
+
   const [
     reportsGenerated,
     certificationsActive,
     targetsActive,
     guardianChecks,
-    libraryDocuments,
     historicalImports,
+    lcasCompleted,
     footprint,
     guardianRisk,
+    nature,
   ] = await Promise.all([
     count('generated_reports', (q) => q.eq('status', 'completed')),
     count('organization_certifications', (q) => q.neq('status', 'not_started')),
     count('sustainability_targets', (q) => q.eq('status', 'active')),
     count('greenwash_assessments'),
-    count('evidence_documents'),
     count('historical_imports'),
+    // Completed only: this room shows finished work. Drafts are resumed from
+    // the product they belong to, in the cellar.
+    count('product_carbon_footprints', (q) => q.eq('status', 'completed')),
     latestFootprint(),
     lastGuardianRisk(),
+    natureStatus(),
   ])
 
   return NextResponse.json({
@@ -95,9 +113,11 @@ export async function GET(request: NextRequest) {
     targetsActive,
     guardianChecks,
     guardianLastRisk: guardianRisk, // 'low' | 'medium' | 'high' | null
-    libraryDocuments,
     historicalImports,
+    lcasCompleted,
     footprintYear: footprint.year,
     footprintStatus: footprint.status, // e.g. 'draft' | 'finalized' | null
+    natureStatus: nature, // 'not_started' | 'draft' | 'complete'
+    year,
   })
 }

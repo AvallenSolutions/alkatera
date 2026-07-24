@@ -4,11 +4,16 @@
  * The evidence landing (/evidence/): the room-landing pattern, brick.
  *
  * The desk's grammar inside the room: one statement, the room's one brick
- * poster (THE PROOF — how many reports and certifications you can show, the
- * room's product), then every surface as a quiet fact row with its live
- * count. Navigation stays flat: the band tabs are the shortcuts, this page
- * is the introduction, and it is where the footprint, guardian, library and
- * historical surfaces (not all on the band) become discoverable.
+ * poster, then every surface as a quiet fact row with its live count.
+ * Navigation stays flat: the band tabs are the shortcuts, this page is the
+ * introduction, and it is where the surfaces behind "More…" become
+ * discoverable.
+ *
+ * Since 24 July 2026 this is the room of proof AND the numbers behind it:
+ * the completed LCAs, the vitality score and the corporate emissions moved
+ * in from the cellar and the workbench. The vitality score is the hero
+ * poster — the one number that answers "how are we doing?", which is what
+ * anyone walking into this room came to find out.
  */
 
 import { useEffect, useState } from 'react'
@@ -17,9 +22,7 @@ import { Statement } from '@/components/studio/statement'
 import { PosterBlock } from '@/components/studio/poster-block'
 import { FactList, type FactRowItem } from '@/components/studio/fact-list'
 import type { WorkingTone } from '@/components/studio/theme'
-import { GrowthFieldMount } from '@/components/studio/growth/growth-field-mount'
 import { RoomSetupPanel } from '@/components/studio/room-setup-panel'
-import { GiveDoor } from '@/components/studio/give-door'
 
 interface EvidenceCounts {
   reportsGenerated: number
@@ -27,10 +30,12 @@ interface EvidenceCounts {
   targetsActive: number
   guardianChecks: number
   guardianLastRisk: string | null
-  libraryDocuments: number
   historicalImports: number
   footprintYear: number | null
   footprintStatus: string | null
+  lcasCompleted: number
+  natureStatus: string
+  year: number
 }
 
 function useEvidenceCounts(): EvidenceCounts | null {
@@ -56,32 +61,59 @@ function useEvidenceCounts(): EvidenceCounts | null {
   return counts
 }
 
-/** The room's poster: THE PROOF — reports and certifications you can show. */
-function ProofPoster({ counts }: { counts: EvidenceCounts | null }) {
-  const hasReports = counts !== null && counts.reportsGenerated > 0
+interface Composite {
+  score: number | null
+  band: string
+}
+
+/** The vitality score, shared with the desk and Rosa so they cannot disagree. */
+function useVitality(): Composite | null {
+  const { currentOrganization } = useOrganization()
+  const [v, setV] = useState<Composite | null>(null)
+
+  useEffect(() => {
+    if (!currentOrganization?.id) return
+    let cancelled = false
+    fetch(`/api/vitality/composite?organization_id=${currentOrganization.id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.composite) return
+        setV({ score: data.composite.composite ?? null, band: data.composite.band ?? 'AWAITING DATA' })
+      })
+      .catch(() => {
+        // Quiet: the poster falls back to its no-score copy.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [currentOrganization?.id])
+
+  return v
+}
+
+/** The room's hero: the vitality score, the one number that answers "how are we doing?". */
+function VitalityPoster() {
+  const v = useVitality()
+  const hasScore = v !== null && v.score !== null
 
   return (
     <PosterBlock
-      eyebrow="THE PROOF"
+      eyebrow="THE VITALITY"
       mark="quarter"
-      href="/reports/sustainability/"
+      href={hasScore ? '/performance/' : '/products/'}
       headline={
-        hasReports ? (
+        hasScore ? (
           <>
-            {counts!.reportsGenerated}
+            {v!.score}
             <span className="ml-2 font-mono text-sm font-normal uppercase tracking-[0.18em] opacity-80">
-              {counts!.reportsGenerated === 1 ? 'report' : 'reports'}
+              / 100
             </span>
           </>
         ) : (
-          'No reports yet.'
+          'Awaiting your first score.'
         )
       }
-      note={
-        hasReports
-          ? `${counts!.certificationsActive} ${counts!.certificationsActive === 1 ? 'CERTIFICATION' : 'CERTIFICATIONS'} · OPEN THE REPORTS`
-          : 'GENERATE YOUR FIRST REPORT'
-      }
+      note={hasScore ? `${v!.band} · OPEN THE VITALITY` : 'BUILD A PRODUCT TO BEGIN'}
     />
   )
 }
@@ -109,6 +141,28 @@ export default function EvidenceLandingPage() {
       value: counts && counts.reportsGenerated > 0 ? String(counts.reportsGenerated) : undefined,
       unit: counts && counts.reportsGenerated > 0 ? 'GENERATED' : undefined,
       href: '/reports/sustainability/',
+    },
+    {
+      // Completed work only. A half-finished LCA is resumed from the product
+      // it belongs to, over in the cellar, not from this list.
+      id: 'lcas',
+      title: 'The LCAs',
+      hint: 'The product footprints you have finished and can show',
+      value: counts && counts.lcasCompleted > 0 ? String(counts.lcasCompleted) : undefined,
+      unit: counts && counts.lcasCompleted > 0 ? 'COMPLETE' : undefined,
+      href: '/reports/lcas/',
+    },
+    {
+      id: 'vitality',
+      title: 'The vitality',
+      hint: 'How healthy the whole picture is, pillar by pillar',
+      href: '/performance/',
+    },
+    {
+      id: 'emissions',
+      title: 'The emissions',
+      hint: 'Scope 1, 2 and 3 for the whole company, year by year',
+      href: '/data/scope-1-2/',
     },
     {
       id: 'footprint',
@@ -148,12 +202,20 @@ export default function EvidenceLandingPage() {
       href: '/greenwash-guardian/',
     },
     {
-      id: 'library',
-      title: 'The library',
-      hint: 'Every document you have gathered as evidence',
-      value: counts && counts.libraryDocuments > 0 ? String(counts.libraryDocuments) : undefined,
-      unit: counts && counts.libraryDocuments > 0 ? 'DOCS' : undefined,
-      href: '/evidence-library/',
+      // The TNFD assessment: an outcome you prove with, so it sits here
+      // rather than in the cellar where it used to live.
+      id: 'nature',
+      title: 'The nature assessment',
+      hint: counts ? `${counts.year} TNFD assessment` : 'This year’s TNFD assessment',
+      chip: counts
+        ? counts.natureStatus === 'complete'
+          ? { tone: 'good', label: 'Complete' }
+          : counts.natureStatus === 'draft'
+            ? { tone: 'attention', label: 'In progress' }
+            : undefined
+        : undefined,
+      meta: counts && counts.natureStatus === 'not_started' ? 'Not started' : undefined,
+      href: '/nature-assessment/',
     },
     {
       id: 'historical',
@@ -165,23 +227,17 @@ export default function EvidenceLandingPage() {
   ]
 
   return (
-    <>
-      {/* The living forest: the org's data completeness, growing. */}
-      <GrowthFieldMount />
-      {/* pb-48: the forest's stage; open paper at the page foot. */}
-      <div className="relative z-[1] mx-auto max-w-4xl space-y-10 pb-48">
+    <div className="mx-auto max-w-4xl space-y-10 pb-16">
       <Statement eyebrow="THE EVIDENCE" headline="What you can prove." />
 
       <RoomSetupPanel room="evidence" />
 
-      <GiveDoor hint="Certificates and reports land here." />
 
-      <ProofPoster counts={counts} />
+      <VitalityPoster />
 
       <section>
         <FactList items={rows} />
       </section>
-      </div>
-    </>
+    </div>
   )
 }

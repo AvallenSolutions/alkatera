@@ -26,14 +26,10 @@ const TogglePatchSchema = z.object({
  * automatically makes its flag settable here — no need to touch this list
  * when we register a new integration.
  */
-const PRODUCT_BETA_CODES = [
-  'impact_valuation_beta',
-  'epr_beta',
-  'viticulture_beta',
-  'arable_beta',
-  'orchard_beta',
-  'hospitality_beta',
-] as const;
+// Viticulture, orchards, arable fields and hospitality left this list on
+// 2026-07-24: they are ordinary Canopy features now, declared per org in
+// `organizations.works_with` (see lib/subscription/works-with.ts).
+const PRODUCT_BETA_CODES = ['impact_valuation_beta', 'epr_beta'] as const;
 
 const ALLOWED_FEATURE_CODES = new Set<string>([
   ...PRODUCT_BETA_CODES,

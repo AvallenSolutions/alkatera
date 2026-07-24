@@ -2,31 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import { dispatchSoilBaseline } from '@/lib/geo/dispatch';
+import { requireModuleAccess } from '@/lib/subscription/module-access';
 
-/**
- * Check viticulture beta access for the given organisation.
- * Returns null if access is granted, or a NextResponse 403 if denied.
- */
-async function checkViticultureAccess(
-  supabase: any,
-  organizationId: string
-): Promise<NextResponse | null> {
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('subscription_tier, feature_flags')
-    .eq('id', organizationId)
-    .maybeSingle();
-
-  const allowedTiers = ['canopy'];
-  const hasOrgOverride = (org?.feature_flags as Record<string, unknown>)?.viticulture_beta === true;
-  if (!allowedTiers.includes(org?.subscription_tier || '') && !hasOrgOverride) {
-    return NextResponse.json(
-      { error: 'Viticulture features require beta access or a Canopy subscription' },
-      { status: 403 }
-    );
-  }
-  return null;
-}
+/** Tier gate for the viticulture module. Canopy only, no beta override. */
+const checkViticultureAccess = (supabase: any, organizationId: string) =>
+  requireModuleAccess(supabase, organizationId, 'viticulture');
 
 /**
  * GET /api/vineyards

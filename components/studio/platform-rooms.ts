@@ -4,18 +4,28 @@
  * Seven rooms, one house, ordered by how often you reach for them:
  *   Today (forest)      · daily: the brief, the pulse
  *   The workbench (cobalt) · weekly: the data going in
- *   The cellar (plum)   · weekly: the product footprints being made
+ *   The cellar (plum)   · what a product is made of
  *   The network (ochre) · the people you talk to
- *   The evidence (brick)· the outputs you show
+ *   The evidence (brick)· the outputs you show, and the numbers behind them
  *   The library (teal)  · the reference you reach for now and then
  *   The wiring (ink)    · settings, compliance, the rare and the seasonal
  *
  * The desk (/desk) is the hall; every room keeps it one click away, top
  * left. Frequency defines the rooms (one set for everyone); the persona
  * only re-weights the desk order and each room's tab order. Room mapping
- * approved by Tim (6 July 2026).
+ * approved by Tim (6 July 2026), reorganised by Tim (24 July 2026):
+ *
+ *   · the cellar narrowed to composition alone — what a drink is made of.
+ *     Its outcomes (LCAs, vitality, the nature assessment) moved next door.
+ *   · the evidence became the room of proof AND the numbers behind it:
+ *     reports, completed LCAs, vitality as its hero, and the emissions.
+ *   · the library gained the evidence library ("your library") and uploads,
+ *     so everything you have gathered sits on one shelf.
+ *   · the workbench kept the operational data and gained integrations; the
+ *     four growing/hospitality modules are declared per org, not universal.
  */
 
+import { MODULE_HREF, MODULE_LABEL, WORKS_WITH_MODULES, type WorksWithModule } from '@/lib/subscription/works-with';
 import { ON_COLOUR_RGB, STUDIO, type RoomConfig } from './theme';
 
 export type PlatformRoomKey =
@@ -71,22 +81,21 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
     onRgb: ON_COLOUR_RGB.cream,
     mark: 'triangle', // the climb
     landing: '/workbench/',
+    // Six flat tabs: the operational surfaces an org touches every week.
+    // Integrations points straight at the settings tab that owns it, the
+    // Billing precedent. The declared modules (vineyards, orchards, arable
+    // fields, hospitality) are appended to `more` per org — see
+    // roomWithModules below; they are never in the static registry, so an
+    // org that does not grow anything never sees the words.
     tabs: [
       { label: 'Facilities', href: '/company/facilities/' },
-      { label: 'Emissions', href: '/data/scope-1-2/' },
       { label: 'Spend', href: '/data/spend-data/' },
+      { label: 'Integrations', href: '/settings?tab=integrations' },
       { label: 'Quality', href: '/data/quality/' },
-    ],
-    more: [
-      { label: 'Sources', href: '/data/sources/' },
-      { label: 'Inventory', href: '/data/inventory-ledger/' },
       { label: 'Fleet', href: '/company/fleet/' },
-      { label: 'Vineyards', href: '/vineyards/' },
-      { label: 'Orchards', href: '/orchards/' },
-      { label: 'Arable fields', href: '/arable-fields/' },
-      { label: 'Hospitality', href: '/hospitality/' },
-      { label: 'Uploads', href: '/uploads/' },
+      { label: 'Sources', href: '/data/sources/' },
     ],
+    more: [{ label: 'Inventory', href: '/data/inventory-ledger/' }],
   },
   cellar: {
     key: 'cellar',
@@ -99,16 +108,14 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
     onRgb: ON_COLOUR_RGB.cream,
     mark: 'diamond', // the bottled facet
     landing: '/cellar/',
+    // Composition only: what a drink is made of, each part owned once. The
+    // outcomes the cellar used to carry (LCAs, vitality, the nature
+    // assessment) live in the evidence room, where the proof lives.
     tabs: [
       { label: 'Products', href: '/products/' },
-      // What a product is made of, one level up from the product itself: the
-      // liquid you make and the ingredients you buy, each owned once.
       { label: 'Liquids', href: '/products/liquids/' },
-      { label: 'Packs', href: '/products/packs/' },
+      { label: 'Packaging', href: '/products/packs/' },
       { label: 'Ingredients', href: '/products/ingredients/' },
-      { label: 'LCAs', href: '/reports/lcas/' },
-      { label: 'Vitality', href: '/performance/' },
-      { label: 'Nature', href: '/nature-assessment/' },
     ],
   },
   network: {
@@ -122,13 +129,14 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
     onRgb: ON_COLOUR_RGB.ink,
     mark: 'square', // the envelope, tilted
     landing: '/network/',
-    // Five flat tabs; the band fits them, so no "More…" overflow (the cellar
-    // precedent). Experts and Responsibility come up from the old overflow.
+    // Five flat tabs; the band fits them, so no "More…" overflow. Ordered
+    // the way you reach for them: the chain first, the people you can call
+    // second, then the two inboxes, then sourcing.
     tabs: [
       { label: 'Suppliers', href: '/suppliers/' },
+      { label: 'Experts', href: '/expert-partners/' },
       { label: 'Messages', href: '/settings/messages/' },
       { label: 'Support', href: '/settings/feedback/' },
-      { label: 'Experts', href: '/expert-partners/' },
       { label: 'Sourcing', href: '/supplier-responsibility/' },
     ],
   },
@@ -143,16 +151,26 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
     onRgb: ON_COLOUR_RGB.cream,
     mark: 'quarter', // the atelier window
     landing: '/evidence/',
-    // Five flat tabs; the band fits them, so no "More…" overflow (the network
-    // precedent). Reports points straight at the real hub (the old /reports/
-    // front door now redirects there). Materiality + Transition plan were tabs
-    // of the hub, not destinations; Footprint + Historical live on the landing.
+    // The room of proof and the numbers behind it. Four flat tabs: what you
+    // publish, the finished product footprints, the vitality score (this
+    // room's hero) and the corporate emissions. Reports points straight at
+    // the real hub (the old /reports/ front door redirects there). The
+    // longer tail — certifications, the guardian, targets, the company
+    // footprint, the nature assessment, historical imports — sits behind
+    // "More…" and on the landing, so nothing is undiscoverable.
     tabs: [
       { label: 'Reports', href: '/reports/sustainability/' },
+      { label: 'LCAs', href: '/reports/lcas/' },
+      { label: 'Vitality', href: '/performance/' },
+      { label: 'Emissions', href: '/data/scope-1-2/' },
+    ],
+    more: [
       { label: 'Certifications', href: '/certifications/' },
-      { label: 'Guardian', href: '/greenwash-guardian/' },
       { label: 'Targets', href: '/pulse/targets/' },
-      { label: 'Library', href: '/evidence-library/' },
+      { label: 'Guardian', href: '/greenwash-guardian/' },
+      { label: 'Company footprint', href: '/reports/company-footprint/' },
+      { label: 'Nature', href: '/nature-assessment/' },
+      { label: 'Historical', href: '/reports/historical/' },
     ],
   },
   library: {
@@ -166,9 +184,15 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
     onRgb: ON_COLOUR_RGB.cream,
     mark: 'arch', // the doorway
     landing: '/library/',
+    // Everything you have gathered, on one shelf: your own documents first
+    // (the evidence library, renamed so it reads as yours rather than as a
+    // second "library"), then the reference we bring, then the inbox that
+    // fills the shelf.
     tabs: [
+      { label: 'Your library', href: '/evidence-library/' },
       { label: 'Knowledge', href: '/knowledge-bank/' },
       { label: 'Wiki', href: '/wiki/' },
+      { label: 'Uploads', href: '/uploads/' },
     ],
   },
   wiring: {
@@ -221,6 +245,9 @@ const ROOM_PREFIXES: Array<[prefix: string, room: PlatformRoomKey]> = [
   ['/rosa', 'today'],
   ['/pulse', 'today'],
   ['/dashboard', 'today'],
+  // the evidence room's two strays out of /data — checked before the /data
+  // catch-all below, which still belongs to the workbench.
+  ['/data/scope-1-2', 'evidence'],
   // the workbench (data going in)
   ['/workbench', 'workbench'],
   ['/company', 'workbench'],
@@ -229,23 +256,23 @@ const ROOM_PREFIXES: Array<[prefix: string, room: PlatformRoomKey]> = [
   ['/orchards', 'workbench'],
   ['/arable-fields', 'workbench'],
   ['/hospitality', 'workbench'],
-  ['/uploads', 'workbench'],
-  // the cellar (footprints being made)
+  // the cellar (what a drink is made of)
   ['/cellar', 'cellar'],
   ['/products', 'cellar'],
-  ['/reports/lcas', 'cellar'],
-  ['/nature-assessment', 'cellar'],
-  ['/performance', 'cellar'],
-  // the evidence (before /reports catch nothing else; /reports/lcas already routed above)
+  // the evidence (the proof, and the numbers behind it). /reports/lcas is no
+  // longer a special case: the whole /reports tree wears brick now.
+  ['/evidence-library', 'library'], // before /evidence, and it moved rooms
   ['/evidence', 'evidence'],
   ['/reports', 'evidence'],
   ['/certifications', 'evidence'],
   ['/greenwash-guardian', 'evidence'],
-  ['/evidence-library', 'evidence'],
-  // the library
+  ['/nature-assessment', 'evidence'],
+  ['/performance', 'evidence'],
+  // the library (everything you have gathered, plus the reference we bring)
   ['/library', 'library'],
   ['/knowledge-bank', 'library'],
   ['/wiki', 'library'],
+  ['/uploads', 'library'],
   // the wiring (settings, compliance, the rare)
   ['/wiring', 'wiring'],
   ['/settings', 'wiring'],
@@ -260,6 +287,79 @@ const ROOM_PREFIXES: Array<[prefix: string, room: PlatformRoomKey]> = [
   ['/dev', 'wiring'],
   ['/complete-subscription', 'wiring'],
 ];
+
+/**
+ * The workbench, with this org's declared modules appended to its overflow.
+ *
+ * The four modules (vineyards, orchards, arable fields, hospitality) are not
+ * for every drinks business, so they are never in the static registry: an org
+ * that does not grow anything never sees the words. What it declared on the
+ * arrival ritual's modules step (organizations.works_with) is what appears.
+ *
+ * Returns the room untouched for every other room and for an org that has
+ * declared nothing, so callers can pass every room through this without a
+ * branch and without churning object identity for the common case.
+ */
+export function roomWithModules(
+  room: RoomConfig,
+  modules: WorksWithModule[] | null | undefined,
+): RoomConfig {
+  if (room.key !== 'workbench' || !modules || modules.length === 0) return room;
+  // Canonical order, not click order, so the menu is stable between orgs.
+  const declared = WORKS_WITH_MODULES.filter((m) => modules.includes(m));
+  if (declared.length === 0) return room;
+  return {
+    ...room,
+    more: [
+      ...(room.more ?? []),
+      ...declared.map((m) => ({ label: MODULE_LABEL[m], href: MODULE_HREF[m] })),
+    ],
+  };
+}
+
+/**
+ * A room's name as a tab label: "The cellar." → "Cellar", "Today." → "Today".
+ * Derived rather than stored so the registry keeps one name per room. The
+ * band uppercases it in CSS; the value itself stays properly cased so it
+ * reads correctly anywhere else it is used.
+ */
+export function roomShortName(room: RoomConfig): string {
+  const bare = room.name.replace(/^The\s+/i, '').replace(/\.$/, '');
+  return bare.charAt(0).toUpperCase() + bare.slice(1);
+}
+
+/**
+ * Where a room opens from outside it: its landing page, or its first
+ * surface for the rooms that have no landing of their own (Today opens on
+ * the brief). Never returns an empty string for a real room.
+ */
+export function roomHref(key: PlatformRoomKey): string {
+  const room = PLATFORM_ROOMS[key];
+  return room.landing ?? room.tabs[0]?.href ?? '/desk/';
+}
+
+/**
+ * The rooms you could go to next, for the ink band at the foot of every
+ * surface.
+ *
+ * The band used to repeat the room's own tabs, which the room band already
+ * carries three lines above — the same six words twice on one screen, and
+ * no way out of the room except back up to the desk. Going down the page
+ * now means going somewhere else in the house.
+ *
+ * Ordered by persona like the desk's poster blocks, so the whole platform
+ * agrees about which room a given person reaches for first. The current
+ * room is omitted (you are in it) and so is the desk (the band's top-left
+ * grid mark is already one click from anywhere).
+ */
+export function otherRoomLinks(
+  current: PlatformRoomKey,
+  persona?: Persona | null,
+): RoomConfig['tabs'] {
+  return deskOrderForPersona(persona)
+    .filter((key) => key !== current && key !== 'desk')
+    .map((key) => ({ label: roomShortName(PLATFORM_ROOMS[key]), href: roomHref(key) }));
+}
 
 /** Which room does this path belong to? The desk and unknowns take ink. */
 export function roomForPath(pathname: string | null): RoomConfig {

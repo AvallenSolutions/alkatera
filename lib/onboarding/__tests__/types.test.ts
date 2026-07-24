@@ -59,16 +59,24 @@ describe('Onboarding Types & Utilities', () => {
   })
 
   describe('the arrival ritual shape', () => {
-    it('is the 7-screen ritual from the arrival-front-door plan', () => {
+    it('is the 8-screen ritual from the arrival-front-door plan', () => {
+      // 'arrival-modules' joined on 2026-07-24: which of the four growing /
+      // hospitality modules this business works with, asked straight after
+      // "where you make it" because it is the same question one step out.
       expect(ARRIVAL_STEPS.map(s => s.id)).toEqual([
         'arrival-website',
         'arrival-persona',
         'arrival-confirm',
         'arrival-reveal',
         'arrival-facility',
+        'arrival-modules',
         'arrival-estimate',
         'arrival-plan',
       ])
+    })
+
+    it('numbers every step by its own position', () => {
+      ARRIVAL_STEPS.forEach((s, i) => expect(s.index).toBe(i))
     })
 
     it('opens org creation (arrival-website) unskippably', () => {

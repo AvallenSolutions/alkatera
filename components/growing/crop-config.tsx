@@ -55,7 +55,7 @@ export interface QuestionnaireRenderProps<TSite, TProfile> {
 export interface CropConfig<TSite extends GrowingSiteBase, TProfile> {
   /** Route and API key, e.g. 'vineyards'. */
   key: 'vineyards' | 'orchards' | 'arable-fields';
-  featureFlag: 'viticulture_beta' | 'orchard_beta' | 'arable_beta';
+  feature: 'viticulture' | 'orchards' | 'arable_fields';
   /** Lowercase nouns for copy: 'vineyard' / 'vineyards'. */
   singular: string;
   plural: string;
@@ -104,7 +104,7 @@ function varietiesLine(varieties: string[] | null | undefined): string {
 
 export const vineyardConfig: CropConfig<Vineyard, VineyardGrowingProfile> = {
   key: 'vineyards',
-  featureFlag: 'viticulture_beta',
+  feature: 'viticulture',
   singular: 'vineyard',
   plural: 'vineyards',
   eyebrow: 'THE WORKBENCH · VINEYARDS',
@@ -155,7 +155,7 @@ export const vineyardConfig: CropConfig<Vineyard, VineyardGrowingProfile> = {
 
 export const orchardConfig: CropConfig<Orchard, OrchardGrowingProfile> = {
   key: 'orchards',
-  featureFlag: 'orchard_beta',
+  feature: 'orchards',
   singular: 'orchard',
   plural: 'orchards',
   eyebrow: 'THE WORKBENCH · ORCHARDS',
@@ -212,7 +212,7 @@ export const orchardConfig: CropConfig<Orchard, OrchardGrowingProfile> = {
 
 export const arableFieldConfig: CropConfig<ArableField, ArableGrowingProfile> = {
   key: 'arable-fields',
-  featureFlag: 'arable_beta',
+  feature: 'arable_fields',
   singular: 'arable field',
   plural: 'arable fields',
   eyebrow: 'THE WORKBENCH · ARABLE FIELDS',

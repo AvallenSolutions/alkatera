@@ -33,32 +33,19 @@ interface Organization {
   feature_flags: Record<string, boolean> | null;
 }
 
-/** The beta features that can be toggled */
+/**
+ * The beta features that can be toggled.
+ *
+ * Hospitality, viticulture, orchards and arable fields left this list on
+ * 2026-07-24. They are ordinary Canopy features now: an org says which it
+ * needs on the arrival ritual's modules step (or in Settings), and the tier
+ * decides whether they open. See lib/subscription/works-with.ts.
+ */
 const BETA_FEATURES = [
-  {
-    code: 'hospitality_beta',
-    label: 'Hospitality',
-    description: 'Hospitality module: impact of meals, drinks, menus and room nights for venues with restaurants/bars/accommodation',
-  },
   {
     code: 'epr_beta',
     label: 'EPR Compliance',
     description: 'Access to the UK Extended Producer Responsibility compliance tools',
-  },
-  {
-    code: 'viticulture_beta',
-    label: 'Viticulture (Self-Grown)',
-    description: 'Vineyard management and self-grown ingredient LCA calculations with FLAG-aligned soil carbon',
-  },
-  {
-    code: 'arable_beta',
-    label: 'Arable Fields (Grain Growing)',
-    description: 'Arable field management and self-grown grain LCA calculations with FLAG v1.2 compliance, fertiliser emissions, and multi-harvest averaging',
-  },
-  {
-    code: 'orchard_beta',
-    label: 'Orchards (Fruit Growing)',
-    description: 'Fruit orchard management and LCA calculations with FLAG v1.2 compliance, transport tracking, and multi-harvest averaging',
   },
 ] as const;
 

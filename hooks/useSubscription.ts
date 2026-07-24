@@ -115,14 +115,13 @@ export type FeatureCode =
   | "epr_beta"
   // Xero Integration (beta)
   | "xero_integration_beta"
-  // Viticulture / Self-Grown Ingredients (beta)
-  | "viticulture_beta"
-  // Orchards / Fruit Growing (beta)
-  | "orchard_beta"
-  // Arable Fields / Grain Growing (beta)
-  | "arable_beta"
-  // Hospitality (beta)
-  | "hospitality_beta"
+  // The four "what do you work with?" modules. Canopy-tier features since
+  // 2026-07-24 (they were private betas): an org declares which it needs in
+  // `organizations.works_with`, and the tier decides whether they open.
+  | "viticulture"
+  | "orchards"
+  | "arable_fields"
+  | "hospitality"
   // Per-integration beta flags. Each integration in
   // lib/integrations/directory.ts gates on `${slug}_integration_beta`; we
   // accept any slug here so adding a provider doesn't require touching

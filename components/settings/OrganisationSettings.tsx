@@ -15,6 +15,7 @@ import { Eyebrow, Panel } from "@/components/studio";
 import { useSubscription } from "@/hooks/useSubscription";
 import { HospitalityFootprintToggle } from "@/components/hospitality/HospitalityFootprintToggle";
 import { EmailIntakePanel } from "@/components/settings/EmailIntakePanel";
+import { WorksWithPanel } from "@/components/settings/WorksWithPanel";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -693,7 +694,7 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
                 </p>
               </div>
 
-              {hasFeature('hospitality_beta' as any) && (
+              {hasFeature('hospitality') && (
                 <div className="space-y-2">
                   <Label>Hospitality in the company total</Label>
                   <HospitalityFootprintToggle />
@@ -788,6 +789,9 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
           </div>
         </div>
       </Panel>
+
+      {/* Saves itself on toggle: one column, nothing else depends on it. */}
+      <WorksWithPanel />
 
       <Separator />
 

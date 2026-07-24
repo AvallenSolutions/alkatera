@@ -26,6 +26,15 @@ export interface Organization {
   product_type?: string | null
   report_defaults?: Record<string, any> | null
   subscription_status?: string | null
+  subscription_tier?: string | null
+  /**
+   * The modules this business declares it works with: vineyards, orchards,
+   * arable fields, hospitality. Set on the arrival ritual's modules step and
+   * changeable in Settings. Read it via
+   * `parseWorksWith` (lib/subscription/works-with.ts), never raw — the column
+   * is jsonb and a bad row must not throw mid-render.
+   */
+  works_with?: unknown
   /** Seed brand colour (#RRGGBB) and the studio room palette derived from it. */
   brand_colour?: string | null
   room_palette?: import('@/lib/studio/brand-palette').RoomPalette | null

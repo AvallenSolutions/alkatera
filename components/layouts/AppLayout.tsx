@@ -8,7 +8,14 @@ import { useSubscription } from '@/hooks/useSubscription'
 import { RoomBand } from '@/components/studio/room-band'
 import { AskRosaBand } from '@/components/studio/ask-rosa-band'
 import { BandControls } from '@/components/studio/band-controls'
-import { roomForPath, tabsForPersona, type PlatformRoomKey } from '@/components/studio/platform-rooms'
+import {
+  roomForPath,
+  roomWithModules,
+  tabsForPersona,
+  otherRoomLinks,
+  type PlatformRoomKey,
+} from '@/components/studio/platform-rooms'
+import { parseWorksWith } from '@/lib/subscription/works-with'
 import { resolveRoomPalette } from '@/lib/studio/brand-palette'
 import { useUserRole } from '@/lib/rosa/useUserRole'
 import { SupplierLayout } from './SupplierLayout'
@@ -231,8 +238,14 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
   // everywhere below (band, tabs, eyebrows, links). If the org has a brand
   // palette, the room wears the brand-derived colour instead of the studio
   // default; the marks and accents follow the CSS vars for free.
-  const room = roomForPath(pathname)
+  // The workbench also carries whichever of the four modules this org said it
+  // works with; every other room is returned untouched.
+  const room = roomWithModules(roomForPath(pathname), parseWorksWith(currentOrganization?.works_with))
   const roomTabs = tabsForPersona(room, persona)
+  // The band above carries this room's surfaces; the band below carries the
+  // way out to the other rooms. Repeating the same six words in both was
+  // navigation that went nowhere.
+  const wayOut = otherRoomLinks(room.key as PlatformRoomKey, persona)
   const paletteEntry = resolveRoomPalette(currentOrganization)[room.key as PlatformRoomKey]
   const roomVars = {
     '--room-rgb': paletteEntry?.rgb ?? room.rgb,
@@ -265,8 +278,9 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
             </div>
           </main>
 
-          {/* ...and the ink band below: Rosa's permanent home. */}
-          <AskRosaBand tabs={roomTabs} />
+          {/* ...and the ink band below: Rosa's permanent home, and the
+              doors to the rest of the house. */}
+          <AskRosaBand tabs={wayOut} />
         </div>
 
         {/*

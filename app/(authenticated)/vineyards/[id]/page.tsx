@@ -102,7 +102,7 @@ export default function VineyardDetailPage() {
 
   if (error || !vineyard) {
     return (
-      <FeatureGate feature="viticulture_beta">
+      <FeatureGate feature="viticulture">
         <div className="space-y-4">
           <BackLink />
           <p className="text-sm text-muted-foreground">{error || 'Vineyard not found.'}</p>
@@ -138,7 +138,7 @@ export default function VineyardDetailPage() {
       : null;
 
     return (
-      <FeatureGate feature="viticulture_beta">
+      <FeatureGate feature="viticulture">
         <div className="space-y-8">
           <div className="min-w-0">
             <Statement
@@ -184,7 +184,7 @@ export default function VineyardDetailPage() {
     .join(' · ');
 
   return (
-    <FeatureGate feature="viticulture_beta">
+    <FeatureGate feature="viticulture">
       <div className="space-y-10">
         <div className="min-w-0 space-y-4">
           <BackLink />

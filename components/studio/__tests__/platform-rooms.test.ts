@@ -2,6 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   PLATFORM_ROOMS,
   roomForPath,
+  roomWithModules,
+  roomHref,
+  roomShortName,
+  otherRoomLinks,
   deskOrderForPersona,
   tabsForPersona,
   DESK_ORDER,
@@ -13,17 +17,36 @@ describe('roomForPath', () => {
     expect(roomForPath('/pulse/financial/').key).toBe('today');
   });
 
-  it('splits data capture (workbench) from footprints (cellar)', () => {
+  it('splits data capture (workbench) from composition (cellar)', () => {
     expect(roomForPath('/company/facilities/').key).toBe('workbench');
-    expect(roomForPath('/data/scope-1-2/').key).toBe('workbench');
+    expect(roomForPath('/data/spend-data/').key).toBe('workbench');
     expect(roomForPath('/products/').key).toBe('cellar');
+    expect(roomForPath('/products/liquids/').key).toBe('cellar');
+    expect(roomForPath('/products/packs/').key).toBe('cellar');
   });
 
-  it('routes /reports/lcas to the cellar but /reports to the evidence', () => {
-    // Order-sensitive: the more specific LCA prefix must win.
-    expect(roomForPath('/reports/lcas/').key).toBe('cellar');
+  it('routes the whole /reports tree, LCAs included, to the evidence', () => {
+    expect(roomForPath('/reports/lcas/').key).toBe('evidence');
     expect(roomForPath('/reports/sustainability/').key).toBe('evidence');
     expect(roomForPath('/reports/').key).toBe('evidence');
+  });
+
+  it('gives the evidence the outcome surfaces that moved in', () => {
+    // Emissions came up from the workbench; the /data catch-all must not
+    // reclaim it, so the specific prefix has to be checked first.
+    expect(roomForPath('/data/scope-1-2/').key).toBe('evidence');
+    expect(roomForPath('/data/quality/').key).toBe('workbench');
+    // Vitality and the nature assessment came across from the cellar.
+    expect(roomForPath('/performance/').key).toBe('evidence');
+    expect(roomForPath('/nature-assessment/').key).toBe('evidence');
+  });
+
+  it('gives the library the two surfaces that moved in', () => {
+    // /evidence-library must beat the /evidence prefix, or it wears brick.
+    expect(roomForPath('/evidence-library/').key).toBe('library');
+    expect(roomForPath('/evidence-library/abc123').key).toBe('library');
+    expect(roomForPath('/evidence/').key).toBe('evidence');
+    expect(roomForPath('/uploads/').key).toBe('library');
   });
 
   it('keeps Pulse in Today but routes Targets to the evidence room', () => {
@@ -43,6 +66,13 @@ describe('roomForPath', () => {
   it('sends knowledge and wiki to the library', () => {
     expect(roomForPath('/knowledge-bank/').key).toBe('library');
     expect(roomForPath('/wiki/anything').key).toBe('library');
+  });
+
+  it('keeps the four modules in the workbench', () => {
+    expect(roomForPath('/vineyards/').key).toBe('workbench');
+    expect(roomForPath('/orchards/').key).toBe('workbench');
+    expect(roomForPath('/arable-fields/').key).toBe('workbench');
+    expect(roomForPath('/hospitality/').key).toBe('workbench');
   });
 
   it('tucks compliance and settings into the wiring', () => {
@@ -101,6 +131,156 @@ describe('tabsForPersona', () => {
         expect(out).toHaveLength(room.tabs.length);
         expect(new Set(out.map((t) => t.href)).size).toBe(room.tabs.length);
       }
+    }
+  });
+});
+
+describe('roomWithModules', () => {
+  const declaredHrefs = (modules: Parameters<typeof roomWithModules>[1]) =>
+    (roomWithModules(PLATFORM_ROOMS.workbench, modules).more ?? []).map((t) => t.href);
+
+  it('never leaks a module the org has not declared', () => {
+    // The whole point: an org that grows nothing never sees the words.
+    for (const modules of [null, undefined, []] as const) {
+      const more = declaredHrefs(modules);
+      expect(more).toEqual(['/data/inventory-ledger/']);
+    }
+  });
+
+  it('appends only the declared modules, after the room’s own overflow', () => {
+    expect(declaredHrefs(['hospitality'])).toEqual([
+      '/data/inventory-ledger/',
+      '/hospitality/',
+    ]);
+  });
+
+  it('orders modules canonically, not in the order they were clicked', () => {
+    expect(declaredHrefs(['hospitality', 'viticulture'])).toEqual([
+      '/data/inventory-ledger/',
+      '/vineyards/',
+      '/hospitality/',
+    ]);
+  });
+
+  it('leaves every other room untouched, declarations or not', () => {
+    for (const key of ['today', 'cellar', 'network', 'evidence', 'library', 'wiring'] as const) {
+      const room = PLATFORM_ROOMS[key];
+      expect(roomWithModules(room, ['viticulture', 'hospitality'])).toBe(room);
+    }
+  });
+
+  it('does not mutate the registry', () => {
+    const before = PLATFORM_ROOMS.workbench.more?.length ?? 0;
+    roomWithModules(PLATFORM_ROOMS.workbench, ['viticulture', 'orchards']);
+    expect(PLATFORM_ROOMS.workbench.more?.length ?? 0).toBe(before);
+  });
+});
+
+describe('the reorganised tabs', () => {
+  const hrefs = (key: keyof typeof PLATFORM_ROOMS) =>
+    PLATFORM_ROOMS[key].tabs.map((t) => t.href);
+
+  it('narrows the cellar to composition alone', () => {
+    expect(hrefs('cellar')).toEqual([
+      '/products/',
+      '/products/liquids/',
+      '/products/packs/',
+      '/products/ingredients/',
+    ]);
+  });
+
+  it('gives the evidence its four proof surfaces', () => {
+    expect(hrefs('evidence')).toEqual([
+      '/reports/sustainability/',
+      '/reports/lcas/',
+      '/performance/',
+      '/data/scope-1-2/',
+    ]);
+  });
+
+  it('puts your own documents first on the library shelf', () => {
+    expect(hrefs('library')).toEqual([
+      '/evidence-library/',
+      '/knowledge-bank/',
+      '/wiki/',
+      '/uploads/',
+    ]);
+  });
+
+  it('every tab and overflow entry resolves back to its own room', () => {
+    // A tab that routes elsewhere flips the band colour mid-navigation.
+    // Two deliberate exceptions, both settings-tab deep links (the Billing
+    // precedent): the query string cannot be seen by roomForPath.
+    const crossRoom = new Set(['/settings?tab=integrations', '/settings?tab=billing']);
+    for (const [key, room] of Object.entries(PLATFORM_ROOMS)) {
+      if (key === 'desk') continue;
+      for (const tab of [...room.tabs, ...(room.more ?? [])]) {
+        if (crossRoom.has(tab.href)) continue;
+        expect(`${key}:${tab.href}:${roomForPath(tab.href).key}`).toBe(`${key}:${tab.href}:${key}`);
+      }
+    }
+  });
+});
+
+describe('otherRoomLinks', () => {
+  it('never offers the room you are standing in', () => {
+    for (const key of DESK_ORDER) {
+      const hrefs = otherRoomLinks(key).map((t) => t.href);
+      expect(hrefs).not.toContain(roomHref(key));
+    }
+  });
+
+  it('offers every other room, and never the desk', () => {
+    // Seven rooms, minus the one you are in. The desk is the hall and is
+    // already one click away from the band's top-left grid mark.
+    const links = otherRoomLinks('cellar');
+    expect(links).toHaveLength(DESK_ORDER.length - 1);
+    expect(links.map((t) => t.label)).not.toContain('Desk');
+  });
+
+  it('is the way OUT, not a repeat of the room band', () => {
+    // The bug this fixes: the ink band used to render the room's own tabs,
+    // the same words already sitting in the band at the top of the page.
+    const cellarSurfaces = PLATFORM_ROOMS.cellar.tabs.map((t) => t.href);
+    for (const link of otherRoomLinks('cellar')) {
+      expect(cellarSurfaces).not.toContain(link.href);
+    }
+  });
+
+  it('follows the persona ordering the desk uses', () => {
+    // Finance leads with the evidence, so it leads the band too.
+    expect(otherRoomLinks('today', 'finance')[0].label).toBe('Evidence');
+    expect(otherRoomLinks('today', 'operator')[0].label).toBe('Workbench');
+  });
+
+  it('every link lands in the room it names', () => {
+    for (const key of DESK_ORDER) {
+      for (const link of otherRoomLinks(key)) {
+        expect(`${link.label} → ${roomForPath(link.href).key}`).toBe(
+          `${link.label} → ${DESK_ORDER.find((k) => roomShortName(PLATFORM_ROOMS[k]) === link.label)}`,
+        );
+      }
+    }
+  });
+});
+
+describe('roomShortName and roomHref', () => {
+  it('drops the article and the full stop', () => {
+    expect(roomShortName(PLATFORM_ROOMS.cellar)).toBe('Cellar');
+    expect(roomShortName(PLATFORM_ROOMS.today)).toBe('Today');
+    expect(roomShortName(PLATFORM_ROOMS.wiring)).toBe('Wiring');
+  });
+
+  it('opens a room on its landing, or its first surface when it has none', () => {
+    expect(roomHref('cellar')).toBe('/cellar/');
+    // Today has no landing of its own: it opens on the brief.
+    expect(PLATFORM_ROOMS.today.landing).toBeUndefined();
+    expect(roomHref('today')).toBe('/rosa/');
+  });
+
+  it('gives every room a real destination', () => {
+    for (const key of DESK_ORDER) {
+      expect(roomHref(key)).toMatch(/^\//);
     }
   });
 });

@@ -253,7 +253,7 @@ export default function ArableFieldDetailPage() {
 
   if (showQuestionnaire) {
     return (
-      <FeatureGate feature="arable_beta">
+      <FeatureGate feature="arable_fields">
         <div className="space-y-8">
           <div className="min-w-0">
             <Statement
@@ -300,7 +300,7 @@ export default function ArableFieldDetailPage() {
     .join(' · ');
 
   return (
-    <FeatureGate feature="arable_beta">
+    <FeatureGate feature="arable_fields">
       <div className="space-y-10">
         <div className="min-w-0 space-y-4">
           <BackLink />

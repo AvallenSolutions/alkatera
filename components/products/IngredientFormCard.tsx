@@ -394,9 +394,9 @@ export function IngredientFormCard({
   const { hasFeature } = useSubscription();
   const { currentOrganization } = useOrganization();
   const { isAlkateraAdmin } = useIsAlkateraAdmin();
-  const showViticultureToggle = hasFeature('viticulture_beta') && isViticultureEligible(currentOrganization, isAlkateraAdmin);
-  const showArableToggle = hasFeature('arable_beta') && isArableEligible(currentOrganization as any, isAlkateraAdmin);
-  const showOrchardToggle = hasFeature('orchard_beta') && isOrchardEligible(currentOrganization as any, isAlkateraAdmin);
+  const showViticultureToggle = hasFeature('viticulture') && isViticultureEligible(currentOrganization, isAlkateraAdmin);
+  const showArableToggle = hasFeature('arable_fields') && isArableEligible(currentOrganization as any, isAlkateraAdmin);
+  const showOrchardToggle = hasFeature('orchards') && isOrchardEligible(currentOrganization as any, isAlkateraAdmin);
 
   const [containerOpen, setContainerOpen] = useState<boolean>(
     !!(ingredient.inbound_container_type)

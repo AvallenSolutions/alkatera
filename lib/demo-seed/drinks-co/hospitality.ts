@@ -9,6 +9,7 @@ import {
   upsert,
   type SeedCtx,
 } from './shared';
+import { parseWorksWith } from '@/lib/subscription/works-with';
 
 /**
  * Seed the hospitality module: the winery's tasting room, cellar-door bar,
@@ -437,21 +438,21 @@ async function resolveCreator(ctx: SeedCtx): Promise<string | null> {
 }
 
 /**
- * The whole /hospitality route tree sits behind the `hospitality_beta` feature
- * flag, so seeded rows are invisible without it. The flag is a JSON boolean in
- * organizations.feature_flags — a string "true" does not match the usage RPC.
+ * The whole /hospitality route tree only shows for an org that has declared
+ * the module in `organizations.works_with`, and only opens on Canopy. The demo
+ * org is Canopy, so declaring the module is all the seeder has to do.
  */
 async function enableHospitality(ctx: SeedCtx): Promise<void> {
   const { svc, orgId } = ctx;
 
-  const { data: org } = await svc.from('organizations').select('feature_flags').eq('id', orgId).maybeSingle();
-  const flags = ((org as any)?.feature_flags ?? {}) as Record<string, unknown>;
-  if (flags.hospitality_beta !== true) {
+  const { data: org } = await svc.from('organizations').select('works_with').eq('id', orgId).maybeSingle();
+  const declared = parseWorksWith((org as any)?.works_with);
+  if (!declared.includes('hospitality')) {
     const { error } = await svc
       .from('organizations')
-      .update({ feature_flags: { ...flags, hospitality_beta: true } })
+      .update({ works_with: [...declared, 'hospitality'] })
       .eq('id', orgId);
-    if (error) ctx.warnings.push(`hospitality_beta flag: ${error.message}`);
+    if (error) ctx.warnings.push(`works_with hospitality: ${error.message}`);
   }
 
   // `configured` must be true or /hospitality shows the first-run function
@@ -462,7 +463,7 @@ async function enableHospitality(ctx: SeedCtx): Promise<void> {
     [{ organization_id: orgId, meals: true, drinks: true, rooms: true, configured: true }],
     'organization_id',
   );
-  ctx.report.hospitalitySettings = 'meals + drinks + rooms enabled, hospitality_beta on';
+  ctx.report.hospitalitySettings = 'meals + drinks + rooms enabled, hospitality declared';
 }
 
 async function seedVenues(ctx: SeedCtx, createdBy: string | null): Promise<void> {

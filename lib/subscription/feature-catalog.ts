@@ -102,6 +102,14 @@ export const FEATURE_MIN_TIER: Record<string, TierName> = {
   gap_analysis: 'canopy',
   audit_packages: 'canopy',
   third_party_verification: 'canopy',
+  // The four "what do you work with?" modules. Left private beta on
+  // 2026-07-24: they are ordinary Canopy features now, declared per org in
+  // `organizations.works_with` and opened by the tier. Declaring a module
+  // shows it in the workbench; Canopy is what makes it work.
+  viticulture: 'canopy',
+  orchards: 'canopy',
+  arable_fields: 'canopy',
+  hospitality: 'canopy',
   // Legacy canopy-only codes
   custom_weighting: 'canopy',
   white_label: 'canopy',
@@ -136,10 +144,6 @@ export const EXCLUSIVE_LADDERS: string[][] = [
 export const BETA_FEATURES: FeatureCode[] = [
   'impact_valuation_beta',
   'epr_beta',
-  'viticulture_beta',
-  'orchard_beta',
-  'arable_beta',
-  'hospitality_beta',
 ];
 
 /** True for any beta feature (enumerated product betas or an integration beta). */

@@ -13,12 +13,13 @@ import { PLATFORM_ROOMS } from '../platform-rooms';
  */
 
 const CELLAR = PLATFORM_ROOMS.cellar.tabs;
+const EVIDENCE = PLATFORM_ROOMS.evidence.tabs;
 
 describe('activeHref', () => {
   it('lights the tab for its own surface', () => {
     // The bug: pathname has no trailing slash, every href does.
     expect(activeHref('/products', CELLAR)).toBe('/products/');
-    expect(activeHref('/reports/lcas', CELLAR)).toBe('/reports/lcas/');
+    expect(activeHref('/reports/lcas', EVIDENCE)).toBe('/reports/lcas/');
   });
 
   it('tolerates a trailing slash on the pathname', () => {

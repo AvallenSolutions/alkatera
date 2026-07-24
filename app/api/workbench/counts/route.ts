@@ -3,14 +3,15 @@
  *
  * GET /api/workbench/counts — one cheap round trip for the landing's fact
  * rows: sites, vehicles, growing sites, hospitality venues, plus whether
- * Xero is connected and which beta rooms this org has keys to. Counts only
- * (head queries), no rows; the landing must stay light. Sibling of
- * /api/desk/counts, same shape and auth.
+ * Xero is connected, which modules this org has declared it works with, and
+ * whether its tier opens them. Counts only (head queries), no rows; the
+ * landing must stay light. Sibling of /api/desk/counts, same shape and auth.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
+import { parseWorksWith, tierOpensModules } from '@/lib/subscription/works-with'
 
 export const runtime = 'nodejs'
 
@@ -46,14 +47,17 @@ export async function GET(request: NextRequest) {
       count('arable_fields'),
       count('hospitality_venues'),
       count('xero_connections'),
-      db.from('organizations').select('feature_flags').eq('id', organizationId).single(),
+      db
+        .from('organizations')
+        .select('works_with, subscription_tier')
+        .eq('id', organizationId)
+        .single(),
     ])
 
-  // feature_flags is a jsonb object map: {"hospitality_beta": true, ...}
-  const flags: Record<string, unknown> =
-    org?.data?.feature_flags && typeof org.data.feature_flags === 'object'
-      ? org.data.feature_flags
-      : {}
+  // Declared is what the business says it does; entitled is what its plan
+  // opens. The landing shows every declared module and marks the ones the
+  // tier does not yet reach.
+  const worksWith = parseWorksWith(org?.data?.works_with)
 
   return NextResponse.json({
     facilities,
@@ -63,11 +67,7 @@ export async function GET(request: NextRequest) {
     arableFields,
     venues,
     xeroConnected: xeroConnections > 0,
-    flags: {
-      viticulture: flags['viticulture_beta'] === true,
-      orchard: flags['orchard_beta'] === true,
-      arable: flags['arable_beta'] === true,
-      hospitality: flags['hospitality_beta'] === true,
-    },
+    worksWith,
+    modulesUnlocked: tierOpensModules(org?.data?.subscription_tier),
   })
 }

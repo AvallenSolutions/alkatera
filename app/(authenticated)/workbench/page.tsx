@@ -9,20 +9,21 @@
  * strays, so nothing in the room is undiscoverable. Navigation stays flat:
  * the band tabs are the shortcuts, this page is the introduction.
  *
- * Beta rooms (the fields, hospitality) only appear for orgs holding the
- * flag — stricter than the More… menu, which leaks the labels.
+ * The four modules (vineyards, orchards, arable fields, hospitality) appear
+ * only for an org that declared them on the arrival ritual's modules step.
+ * A declared module the org's tier does not yet open still shows, wearing a
+ * CANOPY chip: that is the upsell, made concrete rather than hidden.
  */
 
 import { useEffect, useState } from 'react'
 import { useOrganization } from '@/lib/organizationContext'
+import { MODULE_HREF, type WorksWithModule } from '@/lib/subscription/works-with'
 import { useCompanyFootprint } from '@/hooks/data/useCompanyFootprint'
 import { Statement } from '@/components/studio/statement'
 import { Eyebrow } from '@/components/studio/eyebrow'
 import { PosterBlock } from '@/components/studio/poster-block'
 import { FactList, type FactRowItem } from '@/components/studio/fact-list'
-import { GrowthFieldMount } from '@/components/studio/growth/growth-field-mount'
 import { RoomSetupPanel } from '@/components/studio/room-setup-panel'
-import { GiveDoor } from '@/components/studio/give-door'
 
 interface WorkbenchCounts {
   facilities: number
@@ -32,7 +33,10 @@ interface WorkbenchCounts {
   arableFields: number
   venues: number
   xeroConnected: boolean
-  flags: { viticulture: boolean; orchard: boolean; arable: boolean; hospitality: boolean }
+  /** What this business said it works with. Declared need, not entitlement. */
+  worksWith: WorksWithModule[]
+  /** Whether the org's tier (Canopy) actually opens those modules. */
+  modulesUnlocked: boolean
 }
 
 function useWorkbenchCounts(): WorkbenchCounts | null {
@@ -89,10 +93,13 @@ function FootprintPoster() {
         )
       }
       note={
+        // The emissions surface moved to the evidence room on 24 July 2026.
+        // The poster still points at it: this is what the workbench data
+        // adds up to, and saying where it lives is the honest label.
         hasData
           ? footprint!.status === 'Finalized'
-            ? 'COMPLETE · OPEN THE EMISSIONS'
-            : 'DRAFT · OPEN THE EMISSIONS'
+            ? 'COMPLETE · SEE IT IN THE EVIDENCE'
+            : 'DRAFT · SEE IT IN THE EVIDENCE'
           : 'START WITH YOUR FACILITIES'
       }
       href={hasData ? '/data/scope-1-2/' : '/company/facilities/'}
@@ -124,6 +131,15 @@ export default function WorkbenchLandingPage() {
       href: '/data/spend-data/',
     },
     {
+      id: 'integrations',
+      title: 'The integrations',
+      hint: counts?.xeroConnected
+        ? 'The systems already feeding you data, and what else you could connect'
+        : 'Connect the systems you already use so the data arrives on its own',
+      chip: counts?.xeroConnected ? { tone: 'good', label: 'CONNECTED' } : undefined,
+      href: '/settings?tab=integrations',
+    },
+    {
       id: 'quality',
       title: 'Data quality',
       hint: 'How solid the numbers are, and what to upgrade first',
@@ -151,59 +167,60 @@ export default function WorkbenchLandingPage() {
     },
   ]
 
-  const fields: FactRowItem[] = []
-  if (counts?.flags.viticulture) {
-    fields.push({
-      id: 'vineyards',
+  // One row per declared module. The count and the hint differ per module;
+  // the CANOPY chip is shared, and appears whenever the tier does not yet
+  // open what the business said it does.
+  const MODULE_ROWS: Record<
+    WorksWithModule,
+    { title: string; hint: string; count: (c: WorkbenchCounts) => number; unit: [string, string] }
+  > = {
+    viticulture: {
       title: 'The vineyards',
       hint: 'Growing data for the LCA engine',
-      value: String(counts.vineyards),
-      unit: counts.vineyards === 1 ? 'SITE' : 'SITES',
-      href: '/vineyards/',
-    })
-  }
-  if (counts?.flags.orchard) {
-    fields.push({
-      id: 'orchards',
+      count: (c) => c.vineyards,
+      unit: ['SITE', 'SITES'],
+    },
+    orchards: {
       title: 'The orchards',
       hint: 'Growing data for the LCA engine',
-      value: String(counts.orchards),
-      unit: counts.orchards === 1 ? 'SITE' : 'SITES',
-      href: '/orchards/',
-    })
-  }
-  if (counts?.flags.arable) {
-    fields.push({
-      id: 'arable',
+      count: (c) => c.orchards,
+      unit: ['SITE', 'SITES'],
+    },
+    arable_fields: {
       title: 'The arable fields',
       hint: 'Growing data for the LCA engine',
-      value: String(counts.arableFields),
-      unit: counts.arableFields === 1 ? 'SITE' : 'SITES',
-      href: '/arable-fields/',
-    })
-  }
-  if (counts?.flags.hospitality) {
-    fields.push({
-      id: 'hospitality',
+      count: (c) => c.arableFields,
+      unit: ['SITE', 'SITES'],
+    },
+    hospitality: {
       title: 'The hospitality',
       hint: 'Venues, menus and meals, measured like products',
-      value: String(counts.venues),
-      unit: counts.venues === 1 ? 'VENUE' : 'VENUES',
-      href: '/hospitality/',
-    })
+      count: (c) => c.venues,
+      unit: ['VENUE', 'VENUES'],
+    },
   }
 
+  const locked = counts !== null && !counts.modulesUnlocked
+  const fields: FactRowItem[] = (counts?.worksWith ?? []).map((key) => {
+    const row = MODULE_ROWS[key]
+    const n = counts ? row.count(counts) : 0
+    return {
+      id: key,
+      title: row.title,
+      hint: locked ? `${row.hint}. Part of the Canopy plan.` : row.hint,
+      value: locked ? undefined : String(n),
+      unit: locked ? undefined : n === 1 ? row.unit[0] : row.unit[1],
+      chip: locked ? { tone: 'attention' as const, label: 'CANOPY' } : undefined,
+      href: locked ? '/settings?tab=billing' : MODULE_HREF[key],
+    }
+  })
+
   return (
-    <>
-      {/* The living forest: the org's data completeness, growing. */}
-      <GrowthFieldMount />
-      {/* pb-48: the forest's stage; open paper at the page foot. */}
-      <div className="relative z-[1] mx-auto max-w-4xl space-y-10 pb-48">
+    <div className="mx-auto max-w-4xl space-y-10 pb-16">
       <Statement eyebrow="THE WORKBENCH" headline="The data going in." />
 
       <RoomSetupPanel room="workbench" />
 
-      <GiveDoor hint="Bills and meter readings land here." />
 
       <FootprintPoster />
 
@@ -217,7 +234,6 @@ export default function WorkbenchLandingPage() {
           <FactList items={fields} />
         </section>
       )}
-      </div>
-    </>
+    </div>
   )
 }

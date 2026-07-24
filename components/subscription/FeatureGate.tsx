@@ -458,10 +458,10 @@ const featureInfo: Partial<Record<FeatureCode, FeatureInfo>> = {
     icon: Link2,
     category: "Integrations",
   },
-  viticulture_beta: {
+  viticulture: {
     name: "Viticulture (Self-Grown Ingredients)",
     description:
-      "Manage your vineyards and calculate the environmental impact of self-grown ingredients using primary data. Currently in private beta with SBTi FLAG-aligned soil carbon accounting.",
+      "Manage your vineyards and calculate the environmental impact of self-grown ingredients using primary data, with SBTi FLAG-aligned soil carbon accounting.",
     benefits: [
       "Model vineyard-level climate, water, and land use impacts",
       "SBTi FLAG-compliant reporting with separate emissions and removals",
@@ -472,10 +472,10 @@ const featureInfo: Partial<Record<FeatureCode, FeatureInfo>> = {
     icon: Leaf,
     category: "Products & LCA",
   },
-  orchard_beta: {
+  orchards: {
     name: "Orchards (Fruit Growing)",
     description:
-      "Manage your fruit orchards and calculate the environmental impact of self-grown fruit using primary data. Currently in private beta with SBTi FLAG v1.2 compliance and orchard-to-facility transport tracking.",
+      "Manage your fruit orchards and calculate the environmental impact of self-grown fruit using primary data, with SBTi FLAG v1.2 compliance and orchard-to-facility transport tracking.",
     benefits: [
       "Model orchard-level climate, water, and land use impacts by fruit type",
       "SBTi FLAG v1.2 compliant with separate emissions and removals reporting",
@@ -487,10 +487,10 @@ const featureInfo: Partial<Record<FeatureCode, FeatureInfo>> = {
     icon: TreePine,
     category: "Products & LCA",
   },
-  arable_beta: {
+  arable_fields: {
     name: "Arable Fields (Grain Growing)",
     description:
-      "Manage your arable fields and calculate the environmental impact of self-grown grain crops (barley, wheat, oats, etc.) using primary data. Currently in private beta with SBTi FLAG v1.2 compliance, lime CO2 emissions, grain drying energy, and field-to-facility transport tracking.",
+      "Manage your arable fields and calculate the environmental impact of self-grown grain crops (barley, wheat, oats, etc.) using primary data, with SBTi FLAG v1.2 compliance, lime CO2 emissions, grain drying energy, and field-to-facility transport tracking.",
     benefits: [
       "Model field-level climate, water, and land use impacts by crop type",
       "SBTi FLAG v1.2 compliant with separate emissions and removals reporting",
@@ -503,10 +503,10 @@ const featureInfo: Partial<Record<FeatureCode, FeatureInfo>> = {
     icon: Wheat,
     category: "Products & LCA",
   },
-  hospitality_beta: {
-    name: "Hospitality (Beta)",
+  hospitality: {
+    name: "Hospitality",
     description:
-      "Calculate the impact of meals, drinks, menus and room nights, and roll it into your total company footprint. Currently in private beta for venues that run restaurants, bars or accommodation.",
+      "Calculate the impact of meals, drinks, menus and room nights, and roll it into your total company footprint. For venues that run restaurants, bars or accommodation.",
     benefits: [
       "Per-cover and per-room-night carbon, water and land impact",
       "Own-wine drinks pull live impact straight from your product LCAs",
@@ -614,10 +614,10 @@ const featureNames: Record<FeatureCode, string> = {
   impact_valuation_beta: "Impact Valuation (Beta)",
   epr_beta: "EPR Compliance (Beta)",
   xero_integration_beta: "Xero Integration (Beta)",
-  viticulture_beta: "Viticulture (Beta)",
-  orchard_beta: "Orchards (Beta)",
-  arable_beta: "Arable Fields (Beta)",
-  hospitality_beta: "Hospitality (Beta)",
+  viticulture: "Viticulture",
+  orchards: "Orchards",
+  arable_fields: "Arable Fields",
+  hospitality: "Hospitality",
   breww_integration_beta: "Breww Integration (Beta)",
 };
 

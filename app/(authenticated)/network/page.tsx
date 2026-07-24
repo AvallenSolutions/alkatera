@@ -17,9 +17,7 @@ import { useOrganization } from '@/lib/organizationContext'
 import { Statement } from '@/components/studio/statement'
 import { PosterBlock } from '@/components/studio/poster-block'
 import { FactList, type FactRowItem } from '@/components/studio/fact-list'
-import { GrowthFieldMount } from '@/components/studio/growth/growth-field-mount'
 import { RoomSetupPanel } from '@/components/studio/room-setup-panel'
-import { GiveDoor } from '@/components/studio/give-door'
 
 interface NetworkCounts {
   suppliers: number
@@ -148,23 +146,17 @@ export default function NetworkLandingPage() {
   ]
 
   return (
-    <>
-      {/* The living forest: the org's data completeness, growing. */}
-      <GrowthFieldMount />
-      {/* pb-48: the forest's stage; open paper at the page foot. */}
-      <div className="relative z-[1] mx-auto max-w-4xl space-y-10 pb-48">
+    <div className="mx-auto max-w-4xl space-y-10 pb-16">
       <Statement eyebrow="THE NETWORK" headline="The people you talk to." />
 
       <RoomSetupPanel room="network" />
 
-      <GiveDoor hint="Supplier documents land here." />
 
       <ChainPoster counts={counts} />
 
       <section>
         <FactList items={rows} />
       </section>
-      </div>
-    </>
+    </div>
   )
 }

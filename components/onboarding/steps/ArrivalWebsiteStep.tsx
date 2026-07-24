@@ -35,7 +35,7 @@ const VOLUME_OPTIONS: { value: AnnualProductionBucket; label: string; sublabel: 
 ]
 
 /**
- * Screen 1 of 6: the front door itself. One question — "Where can we find
+ * Screen 1 of 8: the front door itself. One question — "Where can we find
  * you?" — does double duty as the welcome (one sentence about alkatera
  * above the input) and the org-creation step: submitting silently calls the
  * same create-organization edge function app/create-organization/page.tsx

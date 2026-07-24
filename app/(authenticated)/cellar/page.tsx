@@ -4,10 +4,15 @@
  * The cellar landing (/cellar/): the room-landing pattern, plum.
  *
  * The desk's grammar inside the room: one statement, the room's one plum
- * poster (the vitality score, the room's outcome number, which otherwise
- * lives only on the desk), then every surface as a quiet fact row with its
- * live count. Navigation stays flat: the band tabs are the shortcuts, this
- * page is the introduction.
+ * poster, then every surface as a quiet fact row with its live count.
+ * Navigation stays flat: the band tabs are the shortcuts, this page is the
+ * introduction.
+ *
+ * Since 24 July 2026 the cellar is composition alone: what a drink is made
+ * of, each part owned once. The outcomes it used to carry (the LCAs, the
+ * vitality score, the nature assessment) moved to the evidence room, so the
+ * poster is now LCA coverage — how much of the range has a finished
+ * footprint, which is both this room's product and its one honest nudge.
  */
 
 import { useEffect, useState } from 'react'
@@ -15,15 +20,15 @@ import { useOrganization } from '@/lib/organizationContext'
 import { Statement } from '@/components/studio/statement'
 import { PosterBlock } from '@/components/studio/poster-block'
 import { FactList, type FactRowItem } from '@/components/studio/fact-list'
-import { GrowthFieldMount } from '@/components/studio/growth/growth-field-mount'
 import { RoomSetupPanel } from '@/components/studio/room-setup-panel'
-import { GiveDoor } from '@/components/studio/give-door'
 
 interface CellarCounts {
   products: number
+  liquids: number
+  packs: number
+  ingredients: number
   lcasCompleted: number
   lcasDraft: number
-  natureStatus: string
   year: number
 }
 
@@ -50,138 +55,93 @@ function useCellarCounts(): CellarCounts | null {
   return counts
 }
 
-interface Composite {
-  score: number | null
-  band: string
-}
+/**
+ * The room's poster: how much of the range has a finished footprint. The
+ * products count is the headline (it is what the room holds); the coverage
+ * is the note, because it is the thing worth acting on.
+ */
+function CoveragePoster({ counts }: { counts: CellarCounts | null }) {
+  const hasProducts = counts !== null && counts.products > 0
 
-/** The vitality score for the poster, shared with the desk and Rosa. */
-function useVitality(): Composite | null {
-  const { currentOrganization } = useOrganization()
-  const [v, setV] = useState<Composite | null>(null)
-
-  useEffect(() => {
-    if (!currentOrganization?.id) return
-    let cancelled = false
-    fetch(`/api/vitality/composite?organization_id=${currentOrganization.id}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (cancelled || !data?.composite) return
-        setV({ score: data.composite.composite ?? null, band: data.composite.band ?? 'AWAITING DATA' })
-      })
-      .catch(() => {
-        // Quiet: the poster falls back to its no-score copy.
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [currentOrganization?.id])
-
-  return v
-}
-
-/** The room's poster: this year's vitality score, the outcome number. */
-function VitalityPoster() {
-  const v = useVitality()
-  const hasScore = v && v.score !== null
+  const note = !hasProducts
+    ? 'ADD YOUR FIRST PRODUCT'
+    : counts!.lcasCompleted === 0
+      ? 'NONE WITH A COMPLETE LCA YET'
+      : `${counts!.lcasCompleted} WITH A COMPLETE LCA · OPEN THE PRODUCTS`
 
   return (
     <PosterBlock
-      eyebrow="THE VITALITY"
+      eyebrow="THE RANGE"
       headline={
-        hasScore ? (
+        hasProducts ? (
           <>
-            {v!.score}
+            {counts!.products}
             <span className="ml-2 font-mono text-sm font-normal uppercase tracking-[0.18em] opacity-80">
-              / 100
+              {counts!.products === 1 ? 'product' : 'products'}
             </span>
           </>
         ) : (
-          'Awaiting your first score.'
+          'Nothing in the cellar yet.'
         )
       }
-      note={hasScore ? `${v!.band} · OPEN THE VITALITY` : 'BUILD A PRODUCT TO BEGIN'}
-      href={hasScore ? '/performance/' : '/products/'}
+      note={note}
+      href="/products/"
       mark="diamond"
     />
   )
-}
-
-/** "Not started" / "Draft" / "Complete" for the nature row. */
-function natureLabel(status: string): string {
-  if (status === 'complete') return 'Complete'
-  if (status === 'draft') return 'In progress'
-  return 'Not started'
 }
 
 export default function CellarLandingPage() {
   const counts = useCellarCounts()
   const fig = (n: number | undefined) => (n === undefined ? undefined : String(n))
 
-  const lcaHint =
-    counts === null
-      ? 'Life cycle assessments, made in the wizard'
-      : counts.lcasDraft > 0
-        ? `${counts.lcasCompleted} complete, ${counts.lcasDraft} in progress`
-        : `${counts.lcasCompleted} complete`
-
   const rows: FactRowItem[] = [
     {
       id: 'products',
       title: 'The products',
-      hint: 'Everything you make, and the footprint behind it',
+      hint: 'Everything you make: a liquid, a fill, a pack and a route',
       value: fig(counts?.products),
       unit: counts ? (counts.products === 1 ? 'PRODUCT' : 'PRODUCTS') : undefined,
       href: '/products/',
     },
     {
-      id: 'lcas',
-      title: 'The LCAs',
-      hint: lcaHint,
-      value: fig(counts?.lcasCompleted),
-      unit: counts ? 'COMPLETE' : undefined,
-      href: '/reports/lcas/',
+      id: 'liquids',
+      title: 'The liquids',
+      hint: 'What you make, once, however many ways you bottle it',
+      value: fig(counts?.liquids),
+      unit: counts ? (counts.liquids === 1 ? 'LIQUID' : 'LIQUIDS') : undefined,
+      href: '/products/liquids/',
     },
     {
-      id: 'vitality',
-      title: 'The vitality',
-      hint: 'How healthy the whole picture is, pillar by pillar',
-      href: '/performance/',
+      id: 'packaging',
+      title: 'The packaging',
+      hint: 'Bottles, cans, cases and closures, shared across the range',
+      value: fig(counts?.packs),
+      unit: counts ? (counts.packs === 1 ? 'FORMAT' : 'FORMATS') : undefined,
+      href: '/products/packs/',
     },
     {
-      id: 'nature',
-      title: 'The nature assessment',
-      hint: counts ? `${counts.year} TNFD assessment` : 'This year’s TNFD assessment',
-      chip: counts
-        ? counts.natureStatus === 'complete'
-          ? { tone: 'good', label: natureLabel(counts.natureStatus) }
-          : counts.natureStatus === 'draft'
-            ? { tone: 'attention', label: natureLabel(counts.natureStatus) }
-            : undefined
-        : undefined,
-      meta: counts && counts.natureStatus === 'not_started' ? natureLabel(counts.natureStatus) : undefined,
-      href: '/nature-assessment/',
+      id: 'ingredients',
+      title: 'The ingredients',
+      hint: 'What you buy in, and the factor behind each one',
+      value: fig(counts?.ingredients),
+      unit: counts ? (counts.ingredients === 1 ? 'INGREDIENT' : 'INGREDIENTS') : undefined,
+      href: '/products/ingredients/',
     },
   ]
 
   return (
-    <>
-      {/* The living forest: the org's data completeness, growing. */}
-      <GrowthFieldMount />
-      {/* pb-48: the forest's stage; open paper at the page foot. */}
-      <div className="relative z-[1] mx-auto max-w-4xl space-y-10 pb-48">
-      <Statement eyebrow="THE CELLAR" headline="The footprints being made." />
+    <div className="mx-auto max-w-4xl space-y-10 pb-16">
+      <Statement eyebrow="THE CELLAR" headline="What a drink is made of." />
 
       <RoomSetupPanel room="cellar" />
 
-      <GiveDoor hint="Spec sheets and recipes land here." />
 
-      <VitalityPoster />
+      <CoveragePoster counts={counts} />
 
       <section>
         <FactList items={rows} />
       </section>
-      </div>
-    </>
+    </div>
   )
 }

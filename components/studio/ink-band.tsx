@@ -6,7 +6,11 @@ import type { RoomTab } from './theme';
 interface InkBandProps {
   /** The room's one primary action (a PillButton, usually). */
   action?: ReactNode;
-  /** The room's surfaces again, for the thumb. */
+  /**
+   * Where to go next. In the platform this is the OTHER rooms (the room's
+   * own surfaces live in the band at the top); the distributor portal
+   * still passes its room's tabs.
+   */
   tabs?: RoomTab[];
   /** Anything else that earns a place: a search pill, a quiet note. */
   children?: ReactNode;
@@ -35,7 +39,13 @@ export function InkBand({ action, tabs, children, className }: InkBandProps) {
         {action}
         {children}
         {tabs && tabs.length > 0 ? (
-          <MonoTabs tabs={tabs} on="paper" className="ml-auto [&_a]:h-12 [&_a]:py-0 [&_a]:flex [&_a]:items-center" />
+          // min-w-0 so a long list of rooms scrolls inside its own lane
+          // instead of shouldering Rosa off the end of the band.
+          <MonoTabs
+            tabs={tabs}
+            on="paper"
+            className="ml-auto min-w-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&_a]:flex [&_a]:h-12 [&_a]:items-center [&_a]:py-0"
+          />
         ) : null}
       </div>
     </div>

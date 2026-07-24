@@ -42,9 +42,23 @@ export async function GET(request: NextRequest) {
     return error ? 0 : (n ?? 0)
   }
 
-  const [resources, categories] = await Promise.all([
+  /** Head count scoped to this org only (no platform-global rows). */
+  const ownCount = async (table: string, apply?: (q: any) => any) => {
+    let q = db.from(table).select('id', { count: 'exact', head: true }).eq('organization_id', organizationId)
+    if (apply) q = apply(q)
+    const { count: n, error } = await q
+    return error ? 0 : (n ?? 0)
+  }
+
+  const [resources, categories, documents, uploadsPending] = await Promise.all([
     count('knowledge_bank_items', (q) => q.eq('status', 'published')),
     count('knowledge_bank_categories'),
+    // The org's own shelf: the evidence library.
+    ownCount('evidence_documents'),
+    // Anything the user dropped in that has not finished landing. The
+    // uploads inbox is per-user by design (a job belongs to whoever started
+    // it), so this figure is scoped the same way the page is.
+    ownCount('ingest_jobs', (q) => q.eq('user_id', user.id).neq('status', 'completed')),
   ])
 
   // The wiki is filesystem-backed, not a table: count its published pages.
@@ -55,5 +69,5 @@ export async function GET(request: NextRequest) {
     // Quiet: the row renders without a figure if the pages aren't bundled.
   }
 
-  return NextResponse.json({ resources, categories, wikiPages })
+  return NextResponse.json({ resources, categories, wikiPages, documents, uploadsPending })
 }

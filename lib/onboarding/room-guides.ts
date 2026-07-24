@@ -41,7 +41,7 @@ export const ROOM_GUIDES: Partial<Record<PlatformRoomKey, RoomGuide>> = {
   },
   cellar: {
     intro:
-      'The cellar is where your products become footprints: recipes, packaging and the life-cycle assessment behind each one.',
+      'The cellar is what your drinks are made of: the liquid, the packaging and the ingredients, each one owned in a single place.',
     bands: ['production'],
   },
   network: {
@@ -51,7 +51,7 @@ export const ROOM_GUIDES: Partial<Record<PlatformRoomKey, RoomGuide>> = {
   },
   evidence: {
     intro:
-      'The evidence is where your work becomes proof: reports, certifications and the targets you are working towards.',
+      'The evidence is where your work becomes proof: your reports and finished LCAs, your vitality score and the emissions behind them.',
     bands: ['evidence', 'stewardship'],
   },
   wiring: {
@@ -61,7 +61,7 @@ export const ROOM_GUIDES: Partial<Record<PlatformRoomKey, RoomGuide>> = {
   },
   library: {
     intro:
-      'The library is your reference shelf: the knowledge bank and the wiki, whenever you need to look something up.',
+      'The library is the shelf: every document you have gathered, plus the knowledge bank and the wiki when you need to look something up.',
     bands: [],
   },
 }

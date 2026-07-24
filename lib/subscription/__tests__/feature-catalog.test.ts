@@ -49,7 +49,9 @@ describe('feature-catalog: tier generation', () => {
   it('produces the expected cumulative grant counts (matches the shipped DB arrays)', () => {
     expect(featuresForTier('seed')).toHaveLength(17);
     expect(featuresForTier('blossom')).toHaveLength(38);
-    expect(featuresForTier('canopy')).toHaveLength(65);
+    // 65 → 69 on 2026-07-24: viticulture, orchards, arable_fields and
+    // hospitality left private beta and became canopy features.
+    expect(featuresForTier('canopy')).toHaveLength(69);
   });
 
   it('is cumulative for non-ladder features: each tier is a superset of the one below', () => {
@@ -92,7 +94,11 @@ describe('feature-catalog: classification helpers', () => {
     expect(getRequiredTierForFeature('dashboard_vitality')).toBe('seed');
     expect(getRequiredTierForFeature('full_scope_3')).toBe('blossom');
     expect(getRequiredTierForFeature('governance_ethics')).toBe('canopy');
-    expect(getRequiredTierForFeature('hospitality_beta')).toBe('canopy');
+    expect(getRequiredTierForFeature('epr_beta')).toBe('canopy');
+    // The four works-with modules are ordinary canopy features, not betas.
+    expect(getRequiredTierForFeature('hospitality')).toBe('canopy');
+    expect(getRequiredTierForFeature('viticulture')).toBe('canopy');
+    expect(isBetaFeature('hospitality')).toBe(false);
     expect(getRequiredTierForFeature('totally_unknown_code' as never)).toBe('seed');
   });
 

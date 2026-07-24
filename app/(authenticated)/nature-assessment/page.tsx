@@ -297,8 +297,8 @@ export default function NatureAssessmentPage() {
     s => sectionStatus(s, form, locateSummary) === 'complete',
   ).length
 
-  if (!hasFeature('viticulture_beta') && !hasFeature('orchard_beta') && !hasFeature('arable_beta')) {
-    return <FeatureGate feature="orchard_beta" />
+  if (!hasFeature('viticulture') && !hasFeature('orchards') && !hasFeature('arable_fields')) {
+    return <FeatureGate feature="orchards" />
   }
 
   if (loading) {
@@ -313,7 +313,7 @@ export default function NatureAssessmentPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <Eyebrow className="mb-3">THE CELLAR · NATURE</Eyebrow>
+        <Eyebrow className="mb-3">THE EVIDENCE · NATURE</Eyebrow>
         <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
           Nature impact assessment.
         </h1>

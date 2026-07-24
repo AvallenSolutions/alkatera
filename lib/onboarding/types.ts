@@ -14,6 +14,7 @@
  */
 
 import type { PlatformRoomKey } from '@/components/studio/platform-rooms'
+import type { WorksWithModule } from '@/lib/subscription/works-with'
 
 export type OnboardingFlow = 'owner' | 'member' | 'fast_track' | 'advisor' | 'arrival'
 
@@ -75,6 +76,7 @@ export type OnboardingStep =
   | 'arrival-confirm'
   | 'arrival-reveal'
   | 'arrival-facility'
+  | 'arrival-modules'
   | 'arrival-estimate'
   | 'arrival-plan'
 
@@ -133,8 +135,11 @@ export const ARRIVAL_STEPS: OnboardingStepConfig[] = [
   { id: 'arrival-confirm',  phase: 'welcome', title: 'Your Company',  description: 'Confirm what we found',        skippable: true,  index: 2 },
   { id: 'arrival-reveal',   phase: 'welcome', title: 'Here You Are',  description: 'What we found on your website', skippable: true, index: 3 },
   { id: 'arrival-facility', phase: 'welcome', title: 'Where You Make It', description: 'Your production site',      skippable: true,  index: 4 },
-  { id: 'arrival-estimate', phase: 'welcome', title: 'Your Forest',   description: 'Your instant estimate',        skippable: false, index: 5 },
-  { id: 'arrival-plan',     phase: 'welcome', title: 'Your Plan',     description: 'Start your trial',             skippable: false, index: 6 },
+  // Straight after "where you make it", because it is the same question one
+  // step further out: do you grow or serve any of it yourself?
+  { id: 'arrival-modules',  phase: 'welcome', title: 'What You Work With', description: 'Fields, orchards, venues', skippable: true, index: 5 },
+  { id: 'arrival-estimate', phase: 'welcome', title: 'Your Forest',   description: 'Your instant estimate',        skippable: false, index: 6 },
+  { id: 'arrival-plan',     phase: 'welcome', title: 'Your Plan',     description: 'Start your trial',             skippable: false, index: 7 },
 ]
 
 export const TOTAL_ARRIVAL_STEPS = ARRIVAL_STEPS.length
@@ -263,6 +268,15 @@ export interface PersonalizationData {
   facilityId?: string
   /** Facility country (human-readable label), for the estimate's grid factor. */
   facilityCountry?: string
+  /**
+   * The modules this business said it works with on the arrival ritual's
+   * modules step: any of 'viticulture' | 'orchards' | 'arable_fields' |
+   * 'hospitality'. The step writes them straight to
+   * `organizations.works_with` (the source of truth the rooms read); this
+   * copy is the backup of record if that write fails, and it is what lets
+   * the step render its own answer when a user steps back to it.
+   */
+  worksWith?: WorksWithModule[]
   /** Last estimated footprint in tonnes CO₂e/year. Set by the estimate step. */
   estimateTonnesCO2e?: number
   /** First sustainability target: % reduction from the estimate baseline. */

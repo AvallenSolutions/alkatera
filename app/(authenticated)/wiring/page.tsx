@@ -16,9 +16,7 @@ import { useOrganization } from '@/lib/organizationContext'
 import { Statement } from '@/components/studio/statement'
 import { PosterBlock } from '@/components/studio/poster-block'
 import { FactList, type FactRowItem } from '@/components/studio/fact-list'
-import { GrowthFieldMount } from '@/components/studio/growth/growth-field-mount'
 import { RoomSetupPanel } from '@/components/studio/room-setup-panel'
-import { GiveDoor } from '@/components/studio/give-door'
 
 interface WiringCounts {
   plan: { tier: string | null; status: string | null; renewsAt: string | null }
@@ -187,23 +185,17 @@ export default function WiringLandingPage() {
   ]
 
   return (
-    <>
-      {/* The living forest: the org's data completeness, growing. */}
-      <GrowthFieldMount />
-      {/* pb-48: the forest's stage; open paper at the page foot. */}
-      <div className="relative z-[1] mx-auto max-w-4xl space-y-10 pb-48">
+    <div className="mx-auto max-w-4xl space-y-10 pb-16">
       <Statement eyebrow="THE WIRING" headline="The quiet machinery." />
 
       <RoomSetupPanel room="wiring" />
 
-      <GiveDoor hint="Anything else, we will file it." />
 
       <PlanPoster counts={counts} />
 
       <section>
         <FactList items={rows} />
       </section>
-      </div>
-    </>
+    </div>
   )
 }

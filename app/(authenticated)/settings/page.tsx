@@ -176,7 +176,7 @@ export default function SettingsPage() {
         </TabsContent>}
 
         {isOrgAdmin && showVineyards && <TabsContent value="vineyards" className="space-y-4">
-          <FeatureGate feature="viticulture_beta">
+          <FeatureGate feature="viticulture">
             <VineyardSettings />
           </FeatureGate>
         </TabsContent>}

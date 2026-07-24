@@ -3,14 +3,24 @@
 import { useRosaContext } from '@/lib/rosa/RosaContextProvider';
 import { useRosaNudges } from '@/lib/rosa/useRosaNudges';
 import { InkBand } from './ink-band';
+import { GiveDoorBand } from './give-door-band';
 import type { RoomTab } from './theme';
 
 /**
  * The ink band, inhabited: Rosa's permanent home at the bottom of every
  * surface. One ring, one prompt, never a big block. The old lime header
  * button is retired; ⌘/ still works (wired in RosaContextProvider).
+ *
+ * "Give us anything" sits beside her: the two ways to hand alkatera
+ * something, in the one strip that is on every screen. It used to be a
+ * panel repeated at the top of six room landings.
  */
-export function AskRosaBand({ tabs }: { tabs?: RoomTab[] }) {
+export function AskRosaBand({
+  /** The other rooms: where you go next, not where you already are. */
+  tabs,
+}: {
+  tabs?: RoomTab[]
+}) {
   const { isOpen, isPinned, open } = useRosaContext();
   const { count } = useRosaNudges();
 
@@ -37,6 +47,7 @@ export function AskRosaBand({ tabs }: { tabs?: RoomTab[] }) {
         </button>
       }
     >
+      <GiveDoorBand />
       <span className="hidden shrink-0 font-mono text-[10px] uppercase tracking-[0.2em] opacity-50 md:block">
         ⌘ /
       </span>

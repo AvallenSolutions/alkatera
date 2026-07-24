@@ -2,16 +2,24 @@
  * Arable field feature utilities
  */
 
+import { parseWorksWith } from '@/lib/subscription/works-with';
+
 /**
  * Check if an organisation is eligible for arable field features.
- * Currently gated to Spirits/Whisky producers and admin users.
+ * A UI visibility hint gated to Spirits/Whisky/Beer producers and admins;
+ * an org that has declared the module in `works_with` qualifies whatever it
+ * makes. The Canopy tier check (`hasFeature('arable_fields')`) remains the
+ * authoritative gate.
  */
 export function isArableEligible(
-  org: { product_type?: string | null; feature_flags?: Record<string, unknown> } | null | undefined,
+  org:
+    | { product_type?: string | null; works_with?: unknown }
+    | null
+    | undefined,
   isAlkateraAdmin: boolean
 ): boolean {
   if (isAlkateraAdmin) return true;
-  if ((org?.feature_flags as Record<string, unknown>)?.arable_beta === true) return true;
+  if (parseWorksWith(org?.works_with).includes('arable_fields')) return true;
   const type = org?.product_type?.toLowerCase();
   return type === 'spirits' || type === 'whisky' || type === 'beer';
 }

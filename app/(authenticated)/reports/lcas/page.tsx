@@ -220,7 +220,7 @@ export default function LcasPage() {
     <div className="mx-auto max-w-5xl space-y-10 p-6">
       {/* The statement */}
       <div className="flex flex-wrap items-end justify-between gap-6">
-        <Statement eyebrow="THE CELLAR · LCAS" headline="The life cycle assessments." />
+        <Statement eyebrow="THE EVIDENCE · LCAS" headline="The life cycle assessments." />
         <PillButton href="/products">Create new LCA</PillButton>
       </div>
 

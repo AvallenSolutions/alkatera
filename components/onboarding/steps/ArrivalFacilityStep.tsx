@@ -13,7 +13,7 @@ import { Eyebrow, PillButton } from '@/components/studio'
 import { ArrowRight, MapPin } from 'lucide-react'
 
 /**
- * Screen 5 of 7: "Where do you make it?" — the first facility, folded into the
+ * Screen 5 of 8: "Where do you make it?" — the first facility, folded into the
  * ritual so the workbench room is never cold on arrival.
  *
  * Confirm-not-ask: if Companies House gave us a registered address we lead with

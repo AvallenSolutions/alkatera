@@ -43,26 +43,22 @@ export async function GET(request: NextRequest) {
 
   const year = new Date().getFullYear()
 
-  const [products, lcasCompleted, lcasDraft, nature] = await Promise.all([
+  const [products, liquids, packs, ingredients, lcasCompleted, lcasDraft] = await Promise.all([
     count('products'),
+    count('liquids'),
+    count('pack_formats'),
+    count('ingredients'),
     count('product_carbon_footprints', (q) => q.eq('status', 'completed')),
     count('product_carbon_footprints', (q) => q.in('status', ['draft', 'in_progress'])),
-    db
-      .from('nature_impact_assessments')
-      .select('assessment_status')
-      .eq('organization_id', organizationId)
-      .eq('assessment_year', year)
-      .maybeSingle(),
   ])
-
-  const natureStatus: string =
-    nature?.data?.assessment_status ?? 'not_started'
 
   return NextResponse.json({
     products,
+    liquids,
+    packs,
+    ingredients,
     lcasCompleted,
     lcasDraft,
-    natureStatus,
     year,
   })
 }

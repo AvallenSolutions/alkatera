@@ -75,7 +75,15 @@ describe('Onboarding Flow Integration', () => {
     it('lets the arrival ritual skip everything it marks skippable', () => {
       const skippable = ARRIVAL_STEPS.filter(s => s.skippable).map(s => s.id)
       // Everything between the opener and the estimate/plan close is optional.
-      expect(skippable).toEqual(['arrival-persona', 'arrival-confirm', 'arrival-reveal', 'arrival-facility'])
+      expect(skippable).toEqual([
+        'arrival-persona',
+        'arrival-confirm',
+        'arrival-reveal',
+        'arrival-facility',
+        // Most drinks businesses grow nothing and serve nothing, so the
+        // modules question has to be as skippable as the rest of the middle.
+        'arrival-modules',
+      ])
       // Skipping still reaches the end.
       let step: OnboardingStep | null = 'arrival-website'
       let hops = 0
@@ -122,7 +130,8 @@ describe('Onboarding Flow Integration', () => {
         completedSteps: ['arrival-website', 'arrival-persona', 'arrival-confirm', 'arrival-reveal'],
       }
       expect(getStepConfig(state.currentStep).id).toBe('arrival-facility')
-      expect(getNextStep(state.currentStep, 'arrival')).toBe('arrival-estimate')
+      expect(getNextStep(state.currentStep, 'arrival')).toBe('arrival-modules')
+      expect(getNextStep('arrival-modules', 'arrival')).toBe('arrival-estimate')
     })
   })
 })

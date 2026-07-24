@@ -32,7 +32,7 @@ function trialEndLabel(): string {
 }
 
 /**
- * Screen 6 of 6: the trial/plan choice, restyled for the studio and moved
+ * Screen 8 of 8: the trial/plan choice, restyled for the studio and moved
  * to the END of the ritual — the user sees their number (arrival-estimate)
  * before ever being asked for a card. Reuses complete-subscription's
  * checkout-session call verbatim (same API, same business rules, same

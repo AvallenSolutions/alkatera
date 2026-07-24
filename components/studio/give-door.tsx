@@ -3,11 +3,17 @@
 /**
  * The give door — Pillar 1 of the data-revolution plan ("the give
  * affordance everywhere", tasks/data-revolution-plan.md): giving alkatera
- * data must be one gesture from anywhere. A quiet studio panel offering the
- * same three doors wherever it is mounted — drop a file (the shared
- * UniversalDropzone classifier, one classifier for every channel), paste a
- * link (the website-import job FastTrackSetupStep already uses), or tell
- * Rosa — so no room is more than a glance from "just give it to us".
+ * data must be one gesture from anywhere. Three doors — drop a file (the
+ * shared UniversalDropzone classifier, one classifier for every channel),
+ * paste a link (the website-import job FastTrackSetupStep already uses),
+ * or tell Rosa.
+ *
+ * It used to be a panel each room mounted for itself, which meant six
+ * copies of the same offer taking up the top of six pages, and the offer
+ * was still missing from every room that did not happen to mount it. It
+ * lives in the ink band now (components/studio/give-door-band.tsx),
+ * alongside Ask Rosa: one place, every surface, no page real estate. The
+ * shared body below is what both wear.
  *
  * "Drop a file." reuses UniversalDropzone's own trigger prop rather than
  * a separate global opener: there is no app-wide drag layer or open event
@@ -37,11 +43,12 @@ interface GiveDoorProps {
 }
 
 /**
- * Give us anything: the desk and every data-taking room mount this once.
- * Three quiet actions, one destination — the ingest pipeline every channel
- * already shares (lib/ingest/classify-document.ts).
+ * The three doors themselves, without any surrounding chrome, so the band
+ * affordance and the panel are the same offer rather than two that drift.
+ * One destination — the ingest pipeline every channel already shares
+ * (lib/ingest/classify-document.ts).
  */
-export function GiveDoor({ hint, className }: GiveDoorProps) {
+export function GiveDoorActions({ hint }: { hint?: string }) {
   const { askRosa } = useRosaContext()
   const [linkOpen, setLinkOpen] = useState(false)
   const [url, setUrl] = useState('')
@@ -73,9 +80,8 @@ export function GiveDoor({ hint, className }: GiveDoorProps) {
   }
 
   return (
-    <Panel className={className ?? 'mb-8'}>
-      <Eyebrow tone="dim">Give us anything</Eyebrow>
-      <p className="mt-2 font-display text-sm font-semibold text-foreground">
+    <>
+      <p className="font-display text-sm font-semibold text-foreground">
         Drop a document, paste a link, or tell Rosa. We will read it and file it.
       </p>
       {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
@@ -124,6 +130,22 @@ export function GiveDoor({ hint, className }: GiveDoorProps) {
           </Link>
         </p>
       ) : null}
+    </>
+  )
+}
+
+/**
+ * The panel form, kept for any surface that genuinely wants the offer
+ * inline rather than in the band. No room mounts it today — the band is
+ * the one place — but the composition is here if a page earns it.
+ */
+export function GiveDoor({ hint, className }: GiveDoorProps) {
+  return (
+    <Panel className={className ?? 'mb-8'}>
+      <Eyebrow tone="dim">Give us anything</Eyebrow>
+      <div className="mt-2">
+        <GiveDoorActions hint={hint} />
+      </div>
     </Panel>
   )
 }

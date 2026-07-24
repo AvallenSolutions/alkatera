@@ -146,7 +146,7 @@ export function GrowingSitesPage<TSite extends GrowingSiteBase, TProfile>({
   // The questionnaire takeover: full width, behind a studio statement header
   if (questionnaireSite) {
     return (
-      <FeatureGate feature={config.featureFlag}>
+      <FeatureGate feature={config.feature}>
         <div className="space-y-8">
           <div className="min-w-0">
             <Statement
@@ -229,7 +229,7 @@ export function GrowingSitesPage<TSite extends GrowingSiteBase, TProfile>({
   });
 
   return (
-    <FeatureGate feature={config.featureFlag}>
+    <FeatureGate feature={config.feature}>
       <div className="space-y-8">
         <div className="min-w-0">
           <Statement eyebrow={config.eyebrow} headline={config.headline}>
