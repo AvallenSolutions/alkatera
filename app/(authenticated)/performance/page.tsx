@@ -719,8 +719,14 @@ export default function PerformancePage() {
       // until the climate explainer UI is refreshed for the breakdown.
       totalEmissions: totalCO2,
       // Blended-climate fields. The ScoreExplainer climate section renders
-      // these when present (intensity sub, YoY sub, blend mode + weights).
+      // these when present (intensity sub, YoY sub, blend mode + weights, and
+      // `benchmark`, which names the rung of the fallback ladder the
+      // denominator came from).
       climateBreakdown,
+      // Legacy literature citation. The explainer renders this ONLY when the
+      // composite has no ladder result to show, so a peer benchmark is never
+      // presented beside a paper that had nothing to do with it. It is a
+      // deliberate leftover, not a second source of truth.
       benchmarkSource: {
         name: industryBenchmarkData.sourceName,
         url: industryBenchmarkData.sourceUrl,

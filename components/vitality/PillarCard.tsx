@@ -24,7 +24,10 @@ interface PillarCardProps {
     platform_average?: number;
     category_average?: number;
     category_name?: string;
-    top_performer?: number;
+    /** 75th percentile of the cohort — never one organisation's score. */
+    top_quartile?: number;
+    /** How many organisations the figures above are drawn from. */
+    cohort_count?: number;
   };
   expanded?: boolean;
   onToggle?: () => void;

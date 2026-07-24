@@ -4,6 +4,7 @@ import { inngest } from '../client';
 import { calculateProductLCA } from '@/lib/product-lca-calculator';
 import { toValidAllocations } from '@/lib/utils/lca-recalc-allocations';
 import { recomputeScenariosForPcf } from '@/lib/lca/scenarios';
+import { snapshotSingleProductIntensity } from '@/lib/benchmarks/product-intensity';
 
 /**
  * Recalculate one product's footprint, server-side.
@@ -231,6 +232,22 @@ export const lcaRecalcRun = inngest.createFunction(
         console.log(`[lcaRecalcRun] Recomputed ${result.computed} end-use scenario(s)`);
       }
       return result;
+    });
+
+    // ── Peer benchmark cohort ────────────────────────────────────────────
+    // A fresh footprint joins the cohort the moment it exists, rather than
+    // waiting for tomorrow's sweep. Its own step so a benchmark write retries
+    // without re-running the calculation, and it never fails the run: the
+    // helper swallows its own errors and this step only reports what happened.
+    await step.run('snapshot-benchmark-intensity', async () => {
+      if (!outcome.pcfId) return { written: 0 };
+      const result = await snapshotSingleProductIntensity(supabase, outcome.pcfId);
+      if (result.error) {
+        console.error(`[lcaRecalcRun] benchmark snapshot failed: ${result.error}`);
+      } else if (result.skipped) {
+        console.log(`[lcaRecalcRun] product excluded from the benchmark cohort: ${result.skipped}`);
+      }
+      return { written: result.row ? 1 : 0, skipped: result.skipped };
     });
 
     await step.run('finalise', async () => {

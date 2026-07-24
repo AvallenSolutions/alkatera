@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import type { BenchmarkMix } from '@/lib/benchmarks/ladder';
 
 type ScoreType =
   | 'overall'
@@ -42,6 +43,12 @@ export interface CalculationInputs {
     yoy_sub: number | null;
     mode: 'blended' | 'intensity_only' | 'yoy_only' | 'no_data';
     weights: { intensity: number; yoy: number };
+    /**
+     * Which rung of the fallback ladder the benchmark came from. Rendered in
+     * preference to `benchmarkSource` below, which can only ever describe a
+     * literature row and would otherwise cite a paper beside a peer figure.
+     */
+    benchmark?: BenchmarkMix | null;
   } | null;
   benchmarkSource?: {
     name: string;
@@ -232,7 +239,10 @@ interface ScoreExplainerProps {
     platform_average?: number;
     category_average?: number;
     category_name?: string;
-    top_performer?: number;
+    /** 75th percentile of the cohort — never one organisation's score. */
+    top_quartile?: number;
+    /** How many organisations the figures above are drawn from. */
+    cohort_count?: number;
   };
   calculationInputs?: CalculationInputs;
   className?: string;
@@ -553,6 +563,105 @@ function formatNatureValue(value: number): string {
   return value.toExponential(1);
 }
 
+/**
+ * What the climate score was compared against, and where that came from.
+ *
+ * The fallback ladder makes "no benchmark" a supported outcome rather than a
+ * failure, and this row is the part of the contract that faces the user: it
+ * must always say which rung it is on. The four cases look deliberately
+ * different from one another, because a cohort of eight real products and a
+ * 2012 paper carry very different weight and should not be able to be mistaken
+ * for each other at a glance.
+ *
+ * `fallbackSource` is the old literature-only citation block. It renders only
+ * when the ladder has said nothing, so a peer figure is never sat next to a
+ * paper it has nothing to do with.
+ */
+function BenchmarkRungRow({
+  benchmark,
+  fallbackSource,
+}: {
+  benchmark: BenchmarkMix | null;
+  fallbackSource?: { name: string; url: string; year: number; category?: string };
+}) {
+  if (!benchmark?.dominant_rung) {
+    if (!fallbackSource) return null;
+    return (
+      <div className="flex items-center justify-between text-xs border-t pt-1.5 mt-1.5">
+        <span className="text-muted-foreground">
+          {fallbackSource.category ? `Benchmark source (${fallbackSource.category})` : 'Benchmark source'}
+        </span>
+        <a
+          href={fallbackSource.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 max-w-[180px] truncate"
+        >
+          {fallbackSource.name} ({fallbackSource.year})
+          <ExternalLink className="h-3 w-3 flex-shrink-0" />
+        </a>
+      </div>
+    );
+  }
+
+  const isPeer =
+    benchmark.dominant_rung === 'peer-like-for-like' ||
+    benchmark.dominant_rung === 'peer-category';
+  const rungLabel: Record<NonNullable<BenchmarkMix['dominant_rung']>, string> = {
+    'peer-like-for-like': 'Compared with similar products',
+    'peer-category': 'Compared with the same category',
+    literature: 'Compared with a published figure',
+    none: 'Not benchmarked',
+  };
+
+  return (
+    <div className="border-t pt-1.5 mt-1.5 space-y-1">
+      <div className="flex items-center justify-between text-xs gap-3">
+        <span className="text-muted-foreground">Benchmark</span>
+        <span className="font-medium text-right">{rungLabel[benchmark.dominant_rung]}</span>
+      </div>
+
+      {benchmark.label && (
+        <p className="text-[11px] text-foreground">{benchmark.label}</p>
+      )}
+
+      {isPeer && benchmark.cohort_organizations !== null && (
+        <p className="text-[10px] text-muted-foreground">
+          Across {benchmark.cohort_organizations} businesses on alkatera. Comparisons are withheld
+          below five so no single business can be identified. These are other alkatera customers,
+          not a sample of the drinks sector, so expect them to be doing better than most.
+        </p>
+      )}
+
+      {benchmark.caveat && (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400">{benchmark.caveat}</p>
+      )}
+
+      {/*
+        A product can sit on more than one rung across a portfolio. When it
+        does, say so: the headline names the rung most of the volume is on,
+        and this line stops that reading as though it covered everything.
+      */}
+      {(() => {
+        const others = Object.entries(benchmark.by_rung).filter(
+          ([rung, count]) => count > 0 && rung !== benchmark.dominant_rung,
+        );
+        if (others.length === 0) return null;
+        const unbenchmarked = benchmark.by_rung.none;
+        return (
+          <p className="text-[10px] text-muted-foreground">
+            {benchmark.by_rung[benchmark.dominant_rung]} of your products use this benchmark
+            {unbenchmarked > 0 && benchmark.dominant_rung !== 'none'
+              ? `; ${unbenchmarked} cannot be benchmarked yet and are left out of the comparison`
+              : ''}
+            .
+          </p>
+        );
+      })()}
+    </div>
+  );
+}
+
 function CalculationBreakdown({ scoreType, inputs }: { scoreType: ScoreType; inputs: CalculationInputs }) {
   if (scoreType === 'overall' && inputs.pillarScores) {
     const ps = inputs.pillarScores;
@@ -631,24 +740,20 @@ function CalculationBreakdown({ scoreType, inputs }: { scoreType: ScoreType; inp
               <span className="font-semibold tabular-nums">{cb.score} / 100</span>
             </div>
           )}
-          {inputs.benchmarkSource && (
-            <div className="flex items-center justify-between text-xs border-t pt-1.5 mt-1.5">
-              <span className="text-muted-foreground">
-                {inputs.benchmarkSource.category ? `Benchmark source (${inputs.benchmarkSource.category})` : 'Benchmark source'}
-              </span>
-              <a
-                href={inputs.benchmarkSource.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 max-w-[180px] truncate"
-              >
-                {inputs.benchmarkSource.name} ({inputs.benchmarkSource.year})
-                <ExternalLink className="h-3 w-3 flex-shrink-0" />
-              </a>
-            </div>
-          )}
+          {/*
+            Which rung of the ladder this comparison stands on. A peer
+            benchmark and a published one must never look alike, so the peer
+            case shows its cohort and the literature case shows its citation
+            and its caveat. When there is no benchmark at all, that is stated
+            plainly: a measured footprint beside "we cannot benchmark this yet"
+            is more credible than a fabricated 70.
+          */}
+          <BenchmarkRungRow
+            benchmark={cb.benchmark ?? null}
+            fallbackSource={inputs.benchmarkSource}
+          />
           <p className="text-[10px] text-muted-foreground mt-1.5">
-            Climate is scored per unit (whole product, packaging included), benchmarked against industry data weighted by your product mix and units produced. The year-on-year line rewards absolute reductions: a 10% drop earns full marks because it beats Paris-aligned trajectories.
+            Climate is scored per unit (whole product, packaging included), against the benchmark named above weighted by your product mix and units produced. The year-on-year line rewards absolute reductions: a 10% drop earns full marks because it beats Paris-aligned trajectories.
           </p>
         </div>
       );
@@ -1524,7 +1629,7 @@ export function ScoreExplainer({
 
                   {benchmark.platform_average && (
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">AlkaTera Average</span>
+                      <span className="text-muted-foreground">Other businesses on alkatera</span>
                       <span className="font-medium">{benchmark.platform_average}</span>
                     </div>
                   )}
@@ -1536,14 +1641,32 @@ export function ScoreExplainer({
                     </div>
                   )}
 
-                  {benchmark.top_performer && (
+                  {/*
+                    A top quartile, not a top performer. The cohort maximum is
+                    one identifiable business's exact score, and the k≥5 floor
+                    the view enforces does not change that — it only means four
+                    others are stood behind them.
+                  */}
+                  {benchmark.top_quartile && (
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Top Performer</span>
+                      <span className="text-muted-foreground">Top quartile</span>
                       <span className="font-medium text-green-600 dark:text-green-400">
-                        {benchmark.top_performer}
+                        {benchmark.top_quartile}
                       </span>
                     </div>
                   )}
+
+                  {/*
+                    Never a bare number: say what it is compared against. These
+                    are businesses that bought carbon software, not a sample of
+                    the sector, so the copy never says "industry average".
+                  */}
+                  {benchmark.cohort_count ? (
+                    <p className="text-[10px] text-muted-foreground pt-1">
+                      Drawn from {benchmark.cohort_count} businesses on alkatera. Comparisons are
+                      withheld below five so no single business can be identified.
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </div>

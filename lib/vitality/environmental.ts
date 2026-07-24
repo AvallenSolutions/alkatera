@@ -20,6 +20,16 @@ import {
   type WaterBenchmark,
 } from '@/lib/industry-benchmarks'
 import type { EnvironmentalInputs } from './composite'
+import type { SystemBoundary } from '@/lib/system-boundaries'
+import {
+  emptyBenchmarkMix,
+  emptyPeerCohorts,
+  resolveProductBenchmark,
+  summariseBenchmarkMix,
+  type BenchmarkMix,
+  type PeerCohortIndex,
+  type ResolvedBenchmark,
+} from '@/lib/benchmarks/ladder'
 
 export interface AggregatedImpacts {
   climate_change_gwp100: number
@@ -39,6 +49,14 @@ export interface PcfRowForAggregator {
   status: string
   aggregated_impacts: AggregatedImpacts | null
   production_volume?: number | null
+  /**
+   * How far this footprint follows the product. Carried so the benchmark
+   * ladder can refuse to compare a cradle-to-grave figure against a
+   * cradle-to-gate cohort. Free text in the database, so read it through
+   * `strictBoundary`, never raw.
+   */
+  system_boundary?: string | null
+  lca_scope_type?: string | null
 }
 
 const ZERO_IMPACTS: AggregatedImpacts = {
@@ -274,6 +292,15 @@ export interface ClimateScoreBreakdown {
    * `computeClimateScore` itself is pure scoring and does not know them.
    */
   progress?: ClimateProgress
+  /**
+   * Which rung of the fallback ladder the benchmark denominator came from,
+   * and the size of the cohort behind it. Attached by the composite route.
+   *
+   * The UI must render this. A peer benchmark and a literature benchmark
+   * must never look alike, and a benchmark with no cohort size beside it is
+   * a bare number.
+   */
+  benchmark?: BenchmarkMix
 }
 
 /** Where the footprint actually got to, year against year. */
@@ -1816,6 +1843,18 @@ export interface ClimateProductRow {
   units_produced_prior: number
   /** Per-unit cradle-to-grave emissions in kgCO2e (climate_change_gwp100). */
   per_unit_emissions_kgco2e: number | null
+  /**
+   * Canonical system boundary of this product's footprint. Required for a
+   * peer comparison: comparing a cradle-to-grave figure against a
+   * cradle-to-gate cohort is the exact failure the literature table has.
+   * Null blocks both peer rungs and drops the product to literature.
+   */
+  system_boundary?: SystemBoundary | null
+  /**
+   * Cross-organisation pack token (e.g. 'glass-bottle'). Null blocks the
+   * like-for-like rung only; the product still reaches the category rung.
+   */
+  pack_format?: string | null
 }
 
 export interface ClimateInputsResult {
@@ -1833,6 +1872,13 @@ export interface ClimateInputsResult {
     per_unit_benchmark_kgco2e: number | null
     products_in_benchmark: number
     products_in_actual: number
+    /**
+     * Which rung of the fallback ladder the benchmark came from, and how big
+     * the cohort behind it is. The UI must say this: a peer benchmark and a
+     * literature benchmark must never look alike, and a cohort size is what
+     * stops the comparison being a bare number.
+     */
+    benchmark_mix: BenchmarkMix
   }
 }
 
@@ -1854,10 +1900,29 @@ export interface ClimateInputsResult {
  * Computed from the same per-unit emissions figure × units produced in
  * each year (so we're holding product-level intensity constant and only
  * tracking the change in volume × mix).
+ *
+ * Where the benchmark comes from
+ * ==============================
+ * The fallback ladder in `lib/benchmarks/ladder.ts`, per product: peer
+ * like-for-like, then peer category-only, then literature, then nothing.
+ *
+ * "Then nothing" is the change that has teeth. The old `pickBenchmark`
+ * cascade always returned a figure, ending at a 1.0 kg/l default whose own
+ * caveat reads "INTERNAL ASSUMPTION DRESSED AS A SOURCE", so every product
+ * carried a denominator whether or not one existed. A product on rung 4 now
+ * contributes to NEITHER side of the benchmark average, and an organisation
+ * whose products are all on rung 4 gets a null intensity ratio — which
+ * `computeClimateScore` already handles by falling back to the year-on-year
+ * term, or reporting no data. That is the intended outcome: a real footprint
+ * beside "we cannot benchmark this yet" is more credible than a fabricated 70.
+ *
+ * `cohorts` is optional so every existing caller and test keeps working; with
+ * no cohort index the ladder simply starts at rung 3.
  */
 export function buildClimateInputs(
   rows: ClimateProductRow[],
   orgProductType?: string | null,
+  cohorts: PeerCohortIndex = emptyPeerCohorts(),
 ): ClimateInputsResult {
   const diagnostics: ClimateInputsResult['diagnostics'] = {
     current_year_emissions_kgco2e: null,
@@ -1868,7 +1933,9 @@ export function buildClimateInputs(
     per_unit_benchmark_kgco2e: null,
     products_in_benchmark: 0,
     products_in_actual: 0,
+    benchmark_mix: emptyBenchmarkMix(),
   }
+  const resolutions: Array<{ resolved: ResolvedBenchmark; weight: number }> = []
 
   let currentEmissions = 0
   let priorEmissions = 0
@@ -1901,14 +1968,27 @@ export function buildClimateInputs(
       priorEmissions += (perUnit as number) * pri
     }
 
-    // Benchmark contribution: pickBenchmark always returns something now
-    // (cascades to org-level type and finally to BIER industry default),
-    // so any product with units_current and a unit_size contributes.
-    const benchmark = pickBenchmark(r.product_category, r.product_type, orgProductType)
+    // Benchmark contribution. The ladder can legitimately return nothing, and
+    // a product with no benchmark contributes to neither the numerator nor the
+    // denominator — it is excluded from the comparison rather than compared
+    // against an invented figure.
+    const resolved = resolveProductBenchmark(
+      {
+        productCategory: r.product_category,
+        productType: r.product_type,
+        orgProductType,
+        systemBoundary: r.system_boundary ?? null,
+        packFormat: r.pack_format ?? null,
+      },
+      cohorts,
+    )
     if (r.unit_size_l && r.unit_size_l > 0 && cur > 0) {
-      benchmarkNumerator += benchmark.kgCO2ePerLitre * r.unit_size_l * cur
-      benchmarkDenominator += cur
-      benchmarkProducts += 1
+      resolutions.push({ resolved, weight: cur })
+      if (resolved.kgCO2ePerLitre !== null) {
+        benchmarkNumerator += resolved.kgCO2ePerLitre * r.unit_size_l * cur
+        benchmarkDenominator += cur
+        benchmarkProducts += 1
+      }
     }
   }
 
@@ -1916,6 +1996,7 @@ export function buildClimateInputs(
   diagnostics.prior_year_units = priorUnits
   diagnostics.products_in_actual = actualProducts
   diagnostics.products_in_benchmark = benchmarkProducts
+  diagnostics.benchmark_mix = summariseBenchmarkMix(resolutions)
 
   // Intensity ratio
   let intensity_ratio: number | null = null
@@ -1948,40 +2029,17 @@ export function buildClimateInputs(
   return { intensity_ratio, yoy_delta_pct, diagnostics }
 }
 
-/**
- * Resolve a per-product carbon benchmark.
- *
- * Order of precedence:
- *   1. product-level category (most specific)
- *   2. product-level product_type
- *   3. org-level product_type (passed from the route)
- *   4. DEFAULT_BENCHMARK (1.0 kgCO2e/L generic beverage industry avg)
- *
- * Always returns a benchmark — never null. This guarantees the climate
- * score has something to compare against even when product categorisation
- * is missing on legacy / lightly-populated data.
+/*
+ * `pickBenchmark` used to live here: a cascade ending at
+ * `getBenchmarkForCategory(null)`, which returns the 1.0 kg/l
+ * DEFAULT_BENCHMARK. Its own comment said "Always returns a benchmark — never
+ * null. This guarantees the climate score has something to compare against",
+ * and that guarantee was the bug: an uncategorised product should be UNSCORED,
+ * not scored against an invented number. It is replaced by
+ * `resolveProductBenchmark` in lib/benchmarks/ladder.ts, where returning
+ * nothing is a supported outcome. The literature cascade itself survives there
+ * as `pickLiteratureBenchmark`, minus the default.
  */
-function pickBenchmark(
-  category: string | null,
-  productType: string | null,
-  orgProductType?: string | null,
-): IndustryBenchmark {
-  if (category) {
-    const b = getBenchmarkForCategory(category)
-    if (b) return b
-  }
-  if (productType) {
-    const result = getBenchmarkForProductType(productType, [])
-    if (result?.benchmark) return result.benchmark
-  }
-  if (orgProductType) {
-    const result = getBenchmarkForProductType(orgProductType, [])
-    if (result?.benchmark) return result.benchmark
-  }
-  // Final fallback — DEFAULT_BENCHMARK (1.0 kgCO2e/L from BIER industry avg).
-  // Surfaced via getBenchmarkForCategory(null) which returns DEFAULT.
-  return getBenchmarkForCategory(null)
-}
 
 /**
  * Convert EnvSignals → EnvironmentalInputs for computeEnvironmentalPillar.

@@ -175,6 +175,9 @@ export interface AlkateraEvents {
 
   // ─────────── Wiki -> Rosa knowledge-base sync ───────────
   'wiki/sync.tick': { data: Record<string, never> };
+
+  // ─────────── Internal benchmarks: cohort backfill ───────────
+  'benchmarks/intensity.backfill': { data: Record<string, never> };
 }
 
 const eventKey = process.env.INNGEST_EVENT_KEY;

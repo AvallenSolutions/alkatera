@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { indexPeerCohorts } from '@/lib/benchmarks/ladder'
 import {
   aggregateImpacts,
   computeWaterRiskLevel,
@@ -1160,33 +1161,165 @@ describe('buildClimateInputs', () => {
   })
 
   it('computes a per-unit benchmark weighted by current-year units across mixed portfolios', () => {
-    // 1000 cans of Lager @ 0.33L (benchmark 0.85 kg/L → 0.2805 kg/can)
-    // 1000 bottles of Whisky @ 0.7L (benchmark 3.8 kg/L → 2.66 kg/bottle)
-    // Both benchmarks weighted equally by units_current.
-    // Expected per-unit benchmark = (0.2805*1000 + 2.66*1000) / 2000 = 1.47025 kg/unit
+    // Both categories are chosen because their literature citations are not
+    // flagged 'no': Wine and RTD are 'approximate', so they reach rung 3 and
+    // carry a denominator. Lager and Whisky no longer do — see the
+    // unsupported-citation test below.
+    //
+    // 1000 bottles of Red Wine @ 0.75L (benchmark 1.6 kg/L → 1.2 kg/bottle)
+    // 1000 cans of Canned Cocktail @ 0.25L (benchmark 0.55 kg/L → 0.1375 kg/can)
+    // Expected per-unit benchmark = (1.2*1000 + 0.1375*1000) / 2000 = 0.66875
     const out = buildClimateInputs([
+      row({
+        product_id: 'wine',
+        product_category: 'Red Wine',
+        unit_size_l: 0.75,
+        units_produced_current: 1000,
+        units_produced_prior: 1000,
+        per_unit_emissions_kgco2e: 1.1,
+      }),
+      row({
+        product_id: 'rtd',
+        product_category: 'Canned Cocktail',
+        unit_size_l: 0.25,
+        units_produced_current: 1000,
+        units_produced_prior: 1000,
+        per_unit_emissions_kgco2e: 0.15,
+      }),
+    ])
+    expect(out.diagnostics.per_unit_benchmark_kgco2e).toBeCloseTo(0.66875, 4)
+    // Per-unit actual = (1.1*1000 + 0.15*1000) / 2000 = 0.625 kg/unit
+    expect(out.diagnostics.per_unit_actual_kgco2e).toBeCloseTo(0.625, 4)
+    expect(out.intensity_ratio).toBeCloseTo(0.625 / 0.66875, 4)
+    expect(out.diagnostics.benchmark_mix.dominant_rung).toBe('literature')
+  })
+
+  it('gives no benchmark to a category whose citation does not support its value', () => {
+    // Lager's row cites a facility scope 1+2 study that publishes no absolute
+    // per-litre figures at all. Before the ladder it still produced a 0.85
+    // denominator and scored a glass-packing brewer 10-25 against it. It must
+    // now contribute to neither side of the comparison.
+    const out = buildClimateInputs([
+      row({
+        product_id: 'beer',
+        product_category: 'Lager',
+        product_type: 'Beer & Cider',
+        units_produced_current: 1000,
+        units_produced_prior: 0,
+      }),
+    ])
+    expect(out.intensity_ratio).toBeNull()
+    expect(out.diagnostics.per_unit_benchmark_kgco2e).toBeNull()
+    expect(out.diagnostics.products_in_benchmark).toBe(0)
+    expect(out.diagnostics.benchmark_mix.dominant_rung).toBe('none')
+    expect(out.diagnostics.benchmark_mix.by_rung.none).toBe(1)
+  })
+
+  it('leaves an unbenchmarkable product out of the average rather than scoring it against nothing', () => {
+    // The wine has a benchmark, the lager does not. The denominator must be
+    // the wine's alone: averaging in a zero, or a 1.0 default, would move a
+    // real customer's score on the strength of a product we cannot compare.
+    const out = buildClimateInputs([
+      row({
+        product_id: 'wine',
+        product_category: 'Red Wine',
+        unit_size_l: 0.75,
+        units_produced_current: 1000,
+        units_produced_prior: 1000,
+        per_unit_emissions_kgco2e: 1.1,
+      }),
       row({
         product_id: 'beer',
         product_category: 'Lager',
         unit_size_l: 0.33,
         units_produced_current: 1000,
         units_produced_prior: 1000,
-        per_unit_emissions_kgco2e: 0.25, // beer
-      }),
-      row({
-        product_id: 'whisky',
-        product_category: 'Whisky',
-        unit_size_l: 0.7,
-        units_produced_current: 1000,
-        units_produced_prior: 1000,
-        per_unit_emissions_kgco2e: 2.5, // whisky
+        per_unit_emissions_kgco2e: 0.25,
       }),
     ])
-    expect(out.diagnostics.per_unit_benchmark_kgco2e).toBeCloseTo(1.47025, 4)
-    // Per-unit actual = (0.25*1000 + 2.5*1000) / 2000 = 1.375 kg/unit
-    expect(out.diagnostics.per_unit_actual_kgco2e).toBeCloseTo(1.375, 4)
-    // Intensity ratio = 1.375 / 1.47025 ≈ 0.935
-    expect(out.intensity_ratio).toBeCloseTo(0.935, 2)
+    // 1.6 kg/L × 0.75 L = 1.2, over the wine's 1000 units only.
+    expect(out.diagnostics.per_unit_benchmark_kgco2e).toBeCloseTo(1.2, 4)
+    expect(out.diagnostics.products_in_benchmark).toBe(1)
+    // Both products still count toward the measured footprint. Not being
+    // benchmarkable does not make emissions disappear.
+    expect(out.diagnostics.products_in_actual).toBe(2)
+    expect(out.diagnostics.benchmark_mix.by_rung.literature).toBe(1)
+    expect(out.diagnostics.benchmark_mix.by_rung.none).toBe(1)
+  })
+
+  it('prefers a peer cohort over the literature row, and reports the cohort', () => {
+    const cohorts = indexPeerCohorts([
+      {
+        bucket_kind: 'category_format',
+        metric_key: 'co2e_per_litre',
+        category_group: 'Wine',
+        system_boundary: 'cradle-to-gate',
+        pack_format: 'glass-bottle',
+        sample_size: 9,
+        organization_count: 6,
+        p25: 0.9,
+        p50: 1.0,
+        p75: 1.3,
+        mean_value: 1.05,
+      },
+    ])
+    const out = buildClimateInputs(
+      [
+        row({
+          product_id: 'wine',
+          product_category: 'Red Wine',
+          unit_size_l: 0.75,
+          units_produced_current: 1000,
+          units_produced_prior: 1000,
+          per_unit_emissions_kgco2e: 1.1,
+          system_boundary: 'cradle-to-gate',
+          pack_format: 'glass-bottle',
+        }),
+      ],
+      null,
+      cohorts,
+    )
+    // The peer median of 1.0 replaces the literature 1.6: 1.0 × 0.75 = 0.75.
+    expect(out.diagnostics.per_unit_benchmark_kgco2e).toBeCloseTo(0.75, 4)
+    expect(out.diagnostics.benchmark_mix.dominant_rung).toBe('peer-like-for-like')
+    expect(out.diagnostics.benchmark_mix.cohort_products).toBe(9)
+    expect(out.diagnostics.benchmark_mix.cohort_organizations).toBe(6)
+  })
+
+  it('will not compare a cradle-to-grave product against a cradle-to-gate cohort', () => {
+    const cohorts = indexPeerCohorts([
+      {
+        bucket_kind: 'category',
+        metric_key: 'co2e_per_litre',
+        category_group: 'Wine',
+        system_boundary: 'cradle-to-gate',
+        pack_format: null,
+        sample_size: 9,
+        organization_count: 6,
+        p25: 0.9,
+        p50: 1.0,
+        p75: 1.3,
+        mean_value: 1.05,
+      },
+    ])
+    const out = buildClimateInputs(
+      [
+        row({
+          product_id: 'wine',
+          product_category: 'Red Wine',
+          unit_size_l: 0.75,
+          units_produced_current: 1000,
+          units_produced_prior: 1000,
+          per_unit_emissions_kgco2e: 1.1,
+          system_boundary: 'cradle-to-grave',
+        }),
+      ],
+      null,
+      cohorts,
+    )
+    // Falls through to literature rather than borrowing the gate cohort.
+    expect(out.diagnostics.benchmark_mix.dominant_rung).toBe('literature')
+    expect(out.diagnostics.per_unit_benchmark_kgco2e).toBeCloseTo(1.6 * 0.75, 4)
   })
 
   it('computes YoY delta from prior-year totals using the same per-unit emissions', () => {
@@ -1217,7 +1350,9 @@ describe('buildClimateInputs', () => {
 
   it('returns null YoY when no prior-year units', () => {
     const out = buildClimateInputs([
-      row({ units_produced_current: 1000, units_produced_prior: 0 }),
+      // Red Wine rather than the default Lager: the fixture's category has no
+      // usable benchmark any more, and this test is about the YoY term.
+      row({ product_category: 'Red Wine', units_produced_current: 1000, units_produced_prior: 0 }),
     ])
     expect(out.yoy_delta_pct).toBeNull()
     expect(out.intensity_ratio).not.toBeNull() // intensity still works

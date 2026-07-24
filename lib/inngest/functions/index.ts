@@ -40,6 +40,7 @@ import {
 } from './pulse-jobs';
 import { retentionPurgeSweep } from './retention';
 import { wikiSyncTick } from './wiki-sync';
+import { benchmarksBackfillRun } from './benchmarks';
 
 export const allFunctions: InngestFunction.Any[] = [
   scrapingQueueTick,
@@ -79,4 +80,5 @@ export const allFunctions: InngestFunction.Any[] = [
   pulseRefreshShadowPrices,
   retentionPurgeSweep,
   wikiSyncTick,
+  benchmarksBackfillRun,
 ];

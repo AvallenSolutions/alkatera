@@ -75,6 +75,8 @@ import {
   type WasteEntry,
   type WaterProductRow,
 } from '@/lib/vitality/environmental'
+import { indexPeerCohorts, type PeerBucket } from '@/lib/benchmarks/ladder'
+import { strictBoundary } from '@/lib/benchmarks/product-intensity'
 import { destinationToTreatmentMethod } from '@/lib/byproducts/destination-types'
 import {
   computeSocialScore,
@@ -221,10 +223,12 @@ async function buildEnvironmentalInputs(
     materialOrigins,
     countryFactors,
     natureDependencies,
+    peerCohortRows,
+    intensityRows,
   ] = await Promise.allSettled([
     service
       .from('product_carbon_footprints')
-      .select('id, product_id, product_name, status, aggregated_impacts, csrd_compliant, updated_at')
+      .select('id, product_id, product_name, status, aggregated_impacts, csrd_compliant, updated_at, system_boundary, lca_scope_type')
       .eq('organization_id', organizationId)
       // Include onboarding estimates so Vitality has a score on day one;
       // a real completed LCA supersedes its estimate via DB trigger so we
@@ -349,6 +353,21 @@ async function buildEnvironmentalInputs(
       .from('nature_dependencies')
       .select('dependency_type, materiality, notes')
       .eq('organization_id', organizationId),
+    // Peer cohorts for the benchmark ladder. The view carries the k-anonymity
+    // guard (≥5 distinct organisations) so this read cannot expose a thin
+    // cohort however it is filtered, and it returns no organisation identity
+    // at all — only bucket dimensions, counts and percentiles.
+    service.from('product_intensity_benchmark_view').select('*'),
+    // This org's own products, in the same dimensions the cohorts are bucketed
+    // on. Read from the snapshot table rather than re-derived here so the
+    // product is matched to the cohort by the identical rule that built it.
+    service
+      .from('product_intensity_snapshots')
+      .select('product_id, system_boundary, pack_format, snapshot_date')
+      .eq('organization_id', organizationId)
+      .eq('metric_key', 'co2e_per_litre')
+      .order('snapshot_date', { ascending: false })
+      .limit(1000),
   ])
 
   const valOrNull = <T>(r: PromiseSettledResult<T>): T | null =>
@@ -493,6 +512,21 @@ async function buildEnvironmentalInputs(
   for (const p of productRowsData) {
     if (p.id !== null && p.id !== undefined) productById.set(String(p.id), p)
   }
+
+  // The peer cohorts, and where each of this org's products sits within them.
+  const peerCohorts = indexPeerCohorts(
+    (((valOrNull(peerCohortRows) as any)?.data ?? []) as PeerBucket[]) ?? [],
+  )
+  // Latest snapshot per product. Rows arrive newest-first, so the first one
+  // seen for a product is the current one.
+  const packFormatByProduct = new Map<string, string | null>()
+  for (const row of ((valOrNull(intensityRows) as any)?.data ?? []) as Array<{
+    product_id: number | string
+    pack_format: string | null
+  }>) {
+    const key = String(row.product_id)
+    if (!packFormatByProduct.has(key)) packFormatByProduct.set(key, row.pack_format ?? null)
+  }
   const completedLcas = lcas.filter(l => l.status === 'completed')
   const climateRowsByProduct = new Map<string, ClimateProductRow>()
   for (const lca of completedLcas) {
@@ -519,6 +553,12 @@ async function buildEnvironmentalInputs(
       units_produced_prior: pri,
       per_unit_emissions_kgco2e:
         perUnit !== null && Number.isFinite(perUnit) ? Number(perUnit) : null,
+      // The two bucket dimensions the peer rungs need. The boundary is read
+      // strictly: an unreadable value yields null and blocks the peer rungs
+      // rather than being assumed to be cradle-to-gate, because a boundary we
+      // guessed at is the one thing a peer comparison cannot survive.
+      system_boundary: strictBoundary(lca.system_boundary ?? lca.lca_scope_type),
+      pack_format: packFormatByProduct.get(productKey) ?? null,
     })
   }
   // Org-level product_type fallback — used by the climate/water benchmark
@@ -532,6 +572,7 @@ async function buildEnvironmentalInputs(
   const climateInputs = buildClimateInputs(
     Array.from(climateRowsByProduct.values()),
     orgProductType,
+    peerCohorts,
   )
   const climateBreakdown = computeClimateScore({
     intensity_ratio: climateInputs.intensity_ratio,
@@ -914,6 +955,17 @@ async function buildEnvironmentalInputs(
         per_unit_actual_kgco2e: climateInputs.diagnostics.per_unit_actual_kgco2e,
         per_unit_benchmark_kgco2e: climateInputs.diagnostics.per_unit_benchmark_kgco2e,
       },
+      /**
+       * Which rung of the fallback ladder the denominator came from, and how
+       * big the cohort behind it is.
+       *
+       * This is not decoration. A peer benchmark and a literature benchmark
+       * must never look alike on screen, and a benchmark with no cohort size
+       * beside it is a bare number. It also carries the record of what a score
+       * was compared against, which is what makes a historical score
+       * explainable once the cohort has moved underneath it.
+       */
+      benchmark: climateInputs.diagnostics.benchmark_mix,
     },
     water_breakdown: waterBreakdown,
     circularity_breakdown: circularityBreakdown,

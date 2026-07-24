@@ -35,6 +35,12 @@ const GROUPS: { label: string; items: FactRowItem[] }[] = [
         href: '/admin/reference-data',
       },
       {
+        id: 'benchmarks',
+        title: 'Internal benchmarks',
+        hint: 'The shape of our own intensity cohort, and how it compares with the published figures.',
+        href: '/admin/benchmarks',
+      },
+      {
         id: 'agribalyse-backfill',
         title: 'Agribalyse backfill',
         hint: 'Backfill ingredient factors from the Agribalyse dataset.',

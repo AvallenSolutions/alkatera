@@ -16,6 +16,7 @@ import { detectAnomaliesForOrg, persistAnomalies } from './anomaly';
 import { renderAnomalyAlertEmail } from './anomaly-alert-email';
 import { REFERENCE_PRICES, REFERENCE_QUARTER } from './reference-shadow-prices';
 import { getAppBaseUrl } from '@/lib/deployment/base-url';
+import { snapshotOrgProductIntensity } from '@/lib/benchmarks/product-intensity';
 
 const NOTIFY_THROTTLE_DAYS = 7;
 
@@ -26,6 +27,8 @@ export interface SnapshotsSweepResult {
   failed: number;
   total: number;
   rows_written: number;
+  /** Product-intensity cohort rows written alongside the org KPIs. */
+  intensity_rows_written: number;
   failures: { organization_id: string; error: string }[];
 }
 
@@ -33,11 +36,12 @@ export async function runSnapshotsSweep(supabase: SupabaseClient): Promise<Snaps
   const { data: orgs, error: orgsError } = await supabase.from('organizations').select('id');
   if (orgsError) throw new Error(orgsError.message);
   if (!orgs || orgs.length === 0) {
-    return { synced: 0, failed: 0, total: 0, rows_written: 0, failures: [] };
+    return { synced: 0, failed: 0, total: 0, rows_written: 0, intensity_rows_written: 0, failures: [] };
   }
 
   const today = new Date();
   let totalRowsWritten = 0;
+  let totalIntensityRows = 0;
   let successCount = 0;
   const failures: { organization_id: string; error: string }[] = [];
 
@@ -55,9 +59,33 @@ export async function runSnapshotsSweep(supabase: SupabaseClient): Promise<Snaps
       failures.push({ organization_id: org.id, error: err instanceof Error ? err.message : 'Unknown error' });
       console.error(`Pulse snapshots failed for org ${org.id}:`, err);
     }
+
+    // Per-product intensity for the peer benchmark cohort. Deliberately its
+    // own try/catch and not counted in `synced`: the org KPIs are what Pulse
+    // is for, and a benchmark row failing to write must never make a Pulse
+    // sweep look failed. Re-running daily is also what keeps the benchmark
+    // view's 365-day window honest — a completed LCA is never recalculated on
+    // its own, so without this every cohort would empty a year after backfill.
+    try {
+      const intensity = await snapshotOrgProductIntensity(supabase, org.id, today);
+      if (intensity.error) {
+        console.error(`[benchmarks] intensity snapshot failed for org ${org.id}: ${intensity.error}`);
+      } else {
+        totalIntensityRows += intensity.written;
+      }
+    } catch (err: unknown) {
+      console.error(`[benchmarks] intensity snapshot threw for org ${org.id}:`, err);
+    }
   }
 
-  return { synced: successCount, failed: failures.length, total: orgs.length, rows_written: totalRowsWritten, failures };
+  return {
+    synced: successCount,
+    failed: failures.length,
+    total: orgs.length,
+    rows_written: totalRowsWritten,
+    intensity_rows_written: totalIntensityRows,
+    failures,
+  };
 }
 
 // ─────────────────────────── Insights ───────────────────────────
