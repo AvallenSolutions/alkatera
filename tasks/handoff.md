@@ -169,10 +169,18 @@ Only after both, and only if asked:
     the column, seeds it from the dying beta flags, then strips them.
   - `supabase/migrations/20260724110000_tier_features_single_source.sql` —
     regenerated tier features; canopy 65 → 69.
-- **Anne Jones question**: are the five figures in `lib/industry-benchmarks.ts`
-  lifecycle or facility-level (scope 1+2 per hL)? The file header says
-  lifecycle; the cited BIER study is operational. If operational, every
-  intensity ratio in the product is wrong. Highest-value open question.
+- **Anne Jones questions — written up and ready to send**:
+  `tasks/benchmark-questions-anne-jones.md`. Twelve questions in four groups,
+  self-contained (she needs no code access). The two that matter:
+  (a) are the benchmark figures lifecycle or operational — the BIER 2023 rows
+  (Beer & Cider, RTD, Non-Alc) look like facility scope 1+2 per hL while the
+  file header claims lifecycle; and (b) **the numerator and denominator are on
+  different boundaries**, verified: nothing adjusts for `system_boundary`, so a
+  cradle-to-gate and a cradle-to-grave product are scored against the same
+  fixed benchmark. Because distribution / use phase / end-of-life are
+  TIER-GATED, a customer who upgrades and switches on end-of-life makes their
+  own intensity score worse for doing more thorough work. Fix that regardless
+  of what Anne says.
 - Decide whether absolute emissions leave the vitality score entirely and
   become the outcome + Targets driver (recommended, agreed in principle).
 - Legal view on EmpCo before any shareable "vitality score" badge or an EU
