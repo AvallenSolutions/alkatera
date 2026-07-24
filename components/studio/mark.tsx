@@ -49,6 +49,13 @@ export function Mark({ shape, tone = 'paper', corner = 'br', className }: MarkPr
       {shape === 'ring' && (
         <circle cx="50" cy="50" r="36" fill="none" stroke={fill} strokeWidth="24" />
       )}
+      {shape === 'bars' && (
+        <g fill={fill}>
+          <rect x="8" y="30" width="20" height="70" />
+          <rect x="40" y="10" width="20" height="90" />
+          <rect x="72" y="46" width="20" height="54" />
+        </g>
+      )}
     </svg>
   );
 }

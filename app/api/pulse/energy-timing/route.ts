@@ -11,6 +11,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { denySection } from '@/lib/auth/section-access';
 import { resolveFacilityRegionCode } from '@/lib/energy/region';
 import { fetchRegionalToday, CARBON_INTENSITY_REGIONS } from '@/lib/integrations/uk-carbon-intensity';
 import { buildTimingInsight, type IntensityPoint } from '@/lib/energy/timing';
@@ -32,10 +34,18 @@ export async function GET(request: NextRequest) {
   const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
   if (authError || !user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
 
-  const orgId = request.nextUrl.searchParams.get('organization_id');
-  if (!orgId) return NextResponse.json({ error: 'organization_id required' }, { status: 400 });
+  const orgIdParam = request.nextUrl.searchParams.get('organization_id');
+  if (!orgIdParam) return NextResponse.json({ error: 'organization_id required' }, { status: 400 });
 
-  // Facilities for the org (RLS scopes this to the user's memberships/advisor access).
+  // The comment below used to claim RLS scoped this read. It does not:
+  // getSupabaseAPIClient() returns a SERVICE-ROLE client, which bypasses RLS
+  // entirely, so the org id was taken on trust. Verify membership explicitly.
+  const orgId = await resolveAccessibleOrg(supabase, user, orgIdParam);
+  if (!orgId) return NextResponse.json({ error: 'No organisation' }, { status: 403 });
+
+  const denied = await denySection(supabase, user, orgId, 'pulse');
+  if (denied) return denied;
+
   const { data: facilities } = await supabase
     .from('facilities')
     .select('id, name, location_country_code, address_country, address_postcode, grid_region_code')

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { denySection } from '@/lib/auth/section-access';
 import { getOrCreateCorporateReport, deriveReportingYear } from '@/lib/xero/report-helper';
 import { getSpendFactor, calculateSpendBasedEmissions } from '@/lib/xero/spend-factors';
 import { warmFactorCache } from '@/lib/external-data/cache';
@@ -40,6 +41,9 @@ export async function POST(request: NextRequest) {
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
+
+    const denied = await denySection(supabase, user, organizationId, 'financial');
+    if (denied) return denied;
 
     // Foundation A: load any active reference set (USEEIO for USD spend, etc.).
     await warmFactorCache(supabase);

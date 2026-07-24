@@ -489,7 +489,7 @@ function BoardPageContent() {
   return (
     <div className="space-y-8 animate-fade-in-up">
       <TopicHeader
-        eyebrow={<>THE WIRING &middot; GOVERNANCE</>}
+        eyebrow={<>OUR PEOPLE &middot; GOVERNANCE</>}
         headline={<>The board.</>}
         description="Track board diversity, independence, and governance."
         backHref="/governance"

@@ -176,7 +176,7 @@ function CharitableGivingPageContent() {
   return (
     <div className="space-y-8 animate-fade-in-up">
       <TopicHeader
-        eyebrow={<>THE WIRING &middot; COMMUNITY IMPACT</>}
+        eyebrow={<>OUR PEOPLE &middot; COMMUNITY IMPACT</>}
         headline={<>Charitable giving.</>}
         description="Track donations, contributions, and charitable activities."
         backHref="/community-impact"

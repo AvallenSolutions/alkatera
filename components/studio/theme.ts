@@ -25,6 +25,12 @@ export const STUDIO = {
   ochre: '#DFA32B',
   ochreInk: '#A97C14', // ochre's accent form on paper (contrast)
   brick: '#BF4B2A',
+  // The people. Added when the social side of the platform (people, community,
+  // governance) was promoted out of the wiring's overflow into a room of its
+  // own. Deep blue-grey: the one clear gap left between cobalt's saturation
+  // and ink's neutrality, and it reads civic rather than decorative, which
+  // suits fair work and governance better than another bright hue would.
+  slate: '#3F5468',
   // working tones — states, never decoration
   good: '#047857',
   attention: '#B45309',
@@ -34,7 +40,17 @@ export const STUDIO = {
 
 export type WorkingTone = 'good' | 'attention' | 'stale' | 'hold' | 'quiet';
 
-export type MarkShape = 'circle' | 'triangle' | 'square' | 'quarter' | 'diamond' | 'arch' | 'ring';
+export type MarkShape =
+  | 'circle'
+  | 'triangle'
+  | 'square'
+  | 'quarter'
+  | 'diamond'
+  | 'arch'
+  | 'ring'
+  // The people's mark: three uprights side by side, a crowd rather than a
+  // person. Added with the eighth room; the other seven shapes were spent.
+  | 'bars';
 
 export type RoomKey = 'desk' | 'portfolio' | 'supply' | 'post' | 'evidence';
 

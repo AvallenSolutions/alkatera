@@ -11,6 +11,7 @@ import { GracePeriodBanner } from '@/components/subscription/GracePeriodBanner'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
+import { useCanAccessSection } from '@/lib/access/SectionAccessProvider'
 import { FeatureGate } from '@/components/subscription/FeatureGate'
 // Round 5 (auto-research): only one settings tab is visible at a time, so the
 // other panels needn't be in /settings' First Load JS. Lazy-load all panels.
@@ -34,6 +35,11 @@ export default function SettingsPage() {
 
   // Check if user is an admin (owner or admin)
   const isOrgAdmin = userRole === 'owner' || userRole === 'admin'
+  // Billing and Subscription are the money tabs, so they answer to the
+  // Financial section as well as to the admin role. An admin whose Financial
+  // access has been switched off by the owner does not see the card on file.
+  const { allowed: canSeeFinancial } = useCanAccessSection('financial')
+  const showBilling = isOrgAdmin && canSeeFinancial
   const { isAlkateraAdmin } = useIsAlkateraAdmin()
   const showVineyards = isViticultureEligible(currentOrganization, isAlkateraAdmin)
   const { usage, subscriptionStatus } = useSubscription()
@@ -43,7 +49,16 @@ export default function SettingsPage() {
   // Two-way tab sync: the URL is the single source of truth. Reading ?tab=
   // keeps the 8 inbound deep-link sources working; writing it back on change
   // fixes browser back/forward inside settings.
-  const activeTab = searchParams.get('tab') || (isOrgAdmin ? 'subscription' : 'profile')
+  // A restricted admin arriving on ?tab=billing (the wiring room links straight
+  // to it) would otherwise land on an empty panel, so fall through to Profile
+  // rather than render a tab that no longer exists.
+  const requestedTab = searchParams.get('tab')
+  const activeTab =
+    requestedTab && (showBilling || (requestedTab !== 'billing' && requestedTab !== 'subscription'))
+      ? requestedTab
+      : showBilling
+        ? 'subscription'
+        : 'profile'
 
   function handleTabChange(value: string) {
     router.replace(`/settings?tab=${value}`, { scroll: false })
@@ -136,7 +151,7 @@ export default function SettingsPage() {
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList>
-          {isOrgAdmin && (
+          {showBilling && (
             <>
               <TabsTrigger value="subscription">Subscription</TabsTrigger>
               <TabsTrigger value="billing">Billing</TabsTrigger>
@@ -155,14 +170,14 @@ export default function SettingsPage() {
           <TabsTrigger value="support">Support</TabsTrigger>
         </TabsList>
 
-        {isOrgAdmin && <TabsContent value="subscription" className="space-y-6">
+        {showBilling && <TabsContent value="subscription" className="space-y-6">
           <SubscriptionSettings
             organizationData={organizationData}
             onSubscriptionChanged={fetchOrganizationData}
           />
         </TabsContent>}
 
-        {isOrgAdmin && <TabsContent value="billing" className="space-y-4">
+        {showBilling && <TabsContent value="billing" className="space-y-4">
           <BillingSettings organizationData={organizationData} />
         </TabsContent>}
 

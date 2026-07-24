@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { denySection } from '@/lib/auth/section-access';
 import { getOrgFyStartMonth } from '@/lib/log-data/org-fiscal-year';
 import { getLabelYearForDate } from '@/lib/log-data/period-utils';
 import { loadShadowPrices } from '@/lib/pulse/shadow-prices';
@@ -48,6 +49,9 @@ export async function GET(request: NextRequest) {
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation' }, { status: 403 });
     }
+
+    const denied = await denySection(svc, user, organizationId, 'financial');
+    if (denied) return denied;
 
     const format = request.nextUrl.searchParams.get('format') ?? 'json';
 

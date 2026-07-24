@@ -10,7 +10,7 @@
  * lib/ai/gemini.ts because it needs to emit deltas as they arrive.
  */
 
-import { executeTool, ROSA_TOOLS, type ToolContext } from './tools';
+import { executeTool, rosaToolsFor, type ToolContext } from './tools';
 import { runToolLoop as runGeminiToolLoop, GEMINI_ROSA_MODEL } from '@/lib/ai/gemini';
 
 export interface ToolCallAudit {
@@ -53,7 +53,9 @@ export async function runToolLoop({
     model,
     systemPrompt,
     userMessage,
-    tools: ROSA_TOOLS,
+    // Only the tools this caller's section access allows; executeTool refuses
+    // the rest a second time in case one is named anyway.
+    tools: rosaToolsFor(toolContext.sectionAccess),
     maxRounds,
     maxTokens,
     executeTool: (name, input) => executeTool(toolContext, name, input),

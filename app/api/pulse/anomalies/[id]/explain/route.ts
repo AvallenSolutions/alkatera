@@ -22,6 +22,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { denySection } from '@/lib/auth/section-access';
 import { runToolLoop } from '@/lib/rosa/run-tool-loop';
 import { GEMINI_ROSA_MODEL } from '@/lib/ai/models';
 import { METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
@@ -84,6 +85,9 @@ export async function POST(
     if (!accessibleOrg) {
       return NextResponse.json({ error: 'Not a member of this organisation' }, { status: 403 });
     }
+
+    const denied = await denySection(svc, user, accessibleOrg, 'pulse');
+    if (denied) return denied;
 
     let body: { force?: boolean } = {};
     try { body = await request.json(); } catch { /* empty body is fine */ }

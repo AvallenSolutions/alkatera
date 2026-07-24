@@ -47,6 +47,9 @@ const ROOM_OFFSET: Record<string, number> = {
   cellar: 60,
   network: -30,
   evidence: -55,
+  // The people room joined the house last, so it takes the gap between the
+  // library and the workbench rather than pushing the established fan around.
+  people: 25,
 };
 
 /** Saturation ceiling so a bright anchor never reads as neon once rotated. */
@@ -65,13 +68,14 @@ function greenPenalty(hue: number): number {
   return 0.11 * Math.sin((Math.PI * (h - 40)) / (175 - 40));
 }
 
-/** The six rooms that carry a colour; the desk and wiring stay in ink. */
+/** The seven rooms that carry a colour; the desk and wiring stay in ink. */
 const COLOURED_ROOMS: PlatformRoomKey[] = [
   'today',
   'workbench',
   'cellar',
   'network',
   'evidence',
+  'people',
   'library',
 ];
 

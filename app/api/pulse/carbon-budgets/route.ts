@@ -21,6 +21,7 @@ import { getYearRangeForOrg, getLabelYearForDate } from '@/lib/log-data/period-u
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { canAccessSection } from '@/lib/auth/section-access';
 import { getMemberRole } from '@/app/api/stripe/_helpers/get-member-role';
 import { latestValue } from '@/lib/pulse/snapshot-latest';
 
@@ -50,6 +51,11 @@ async function resolveOrg(request: NextRequest) {
   // which an advisor (non-member) never holds, so writes stay member-only.
   const organizationId = await resolveAccessibleOrg(serviceClient(), user, orgIdParam);
   if (!organizationId) return { error: 'No organisation', status: 403 as const };
+
+  // Checked here rather than per handler so every verb in this file inherits it.
+  if (!(await canAccessSection(serviceClient(), user.id, organizationId, 'pulse'))) {
+    return { error: 'You do not have access to this section.', status: 403 as const };
+  }
 
   const role = await getMemberRole(supabase, organizationId, user.id);
   return { userId: user.id, organizationId, role, supabase };

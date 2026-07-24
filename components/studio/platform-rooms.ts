@@ -1,12 +1,13 @@
 /**
  * The platform's house of rooms.
  *
- * Seven rooms, one house, ordered by how often you reach for them:
+ * Eight rooms, one house, ordered by how often you reach for them:
  *   Today (forest)      · daily: the brief, the pulse
  *   The workbench (cobalt) · weekly: the data going in
  *   The cellar (plum)   · what a product is made of
  *   The network (ochre) · the people you talk to
  *   The evidence (brick)· the outputs you show, and the numbers behind them
+ *   Our people (slate) · who we employ, who we answer to, who we help
  *   The library (teal)  · the reference you reach for now and then
  *   The wiring (ink)    · settings, compliance, the rare and the seasonal
  *
@@ -26,6 +27,7 @@
  */
 
 import { MODULE_HREF, MODULE_LABEL, WORKS_WITH_MODULES, type WorksWithModule } from '@/lib/subscription/works-with';
+import { canReachPath, type SectionAccess } from '@/lib/access/sections';
 import { ON_COLOUR_RGB, STUDIO, type RoomConfig } from './theme';
 
 export type PlatformRoomKey =
@@ -34,6 +36,7 @@ export type PlatformRoomKey =
   | 'workbench'
   | 'cellar'
   | 'network'
+  | 'people'
   | 'evidence'
   | 'library'
   | 'wiring';
@@ -140,6 +143,49 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
       { label: 'Sourcing', href: '/supplier-responsibility/' },
     ],
   },
+  people: {
+    key: 'people',
+    name: 'Our people.',
+    colour: STUDIO.slate,
+    rgb: '63 84 104',
+    accentOnPaper: STUDIO.slate,
+    accentRgb: '63 84 104',
+    onColour: 'cream',
+    onRgb: ON_COLOUR_RGB.cream,
+    mark: 'bars', // a crowd, not a person
+    landing: '/people-culture/',
+    // The social side of the business, promoted out of the wiring's "More…"
+    // overflow (24 July 2026). It had been filed under settings next to EPR
+    // and Dependencies, two clicks deep and under no name at all — the old
+    // sidebar's "Social Impact" group had simply dissolved in the move to
+    // rooms, so nobody could find it.
+    //
+    // Three flat tabs, not four. The room's landing IS /people-culture/, so a
+    // "People" tab pointing at the same page was the room name twice on one
+    // line. Every other room with a landing leaves it off the tab row too
+    // (the cellar does not carry a "Cellar" tab); you reach it by clicking
+    // the room name. Fair work earns a flat tab despite being a sub-page: it
+    // is the one surface here people open weekly, and the one the
+    // Compensation section gates.
+    tabs: [
+      { label: 'Community', href: '/community-impact/' },
+      { label: 'Governance', href: '/governance/' },
+      { label: 'Fair work', href: '/people-culture/fair-work/' },
+    ],
+    more: [
+      { label: 'Diversity & inclusion', href: '/people-culture/diversity-inclusion/' },
+      { label: 'Wellbeing', href: '/people-culture/wellbeing/' },
+      { label: 'Training', href: '/people-culture/training/' },
+      { label: 'Charitable giving', href: '/community-impact/charitable-giving/' },
+      { label: 'Local impact', href: '/community-impact/local-impact/' },
+      { label: 'Volunteering', href: '/community-impact/volunteering/' },
+      { label: 'Impact stories', href: '/community-impact/stories/' },
+      { label: 'Policies', href: '/governance/policies/' },
+      { label: 'Stakeholders', href: '/governance/stakeholders/' },
+      { label: 'Board', href: '/governance/board/' },
+      { label: 'Transparency', href: '/governance/transparency/' },
+    ],
+  },
   evidence: {
     key: 'evidence',
     name: 'The evidence.',
@@ -211,11 +257,10 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
       // Straight to the tab: the /settings/billing stub stays only as an alias.
       { label: 'Billing', href: '/settings?tab=billing' },
     ],
+    // People, Governance and Community moved out to the people room (24 July
+    // 2026) — see the people room for why.
     more: [
       { label: 'EPR', href: '/epr/' },
-      { label: 'People', href: '/people-culture/' },
-      { label: 'Governance', href: '/governance/' },
-      { label: 'Community', href: '/community-impact/' },
       { label: 'Byproducts', href: '/byproducts/' },
       { label: 'Nature actions', href: '/nature-actions/' },
       { label: 'Vitality weights', href: '/governance/vitality-weights/' },
@@ -273,13 +318,14 @@ const ROOM_PREFIXES: Array<[prefix: string, room: PlatformRoomKey]> = [
   ['/knowledge-bank', 'library'],
   ['/wiki', 'library'],
   ['/uploads', 'library'],
+  // our people (the social side: who we employ, who we answer to, who we help)
+  ['/people-culture', 'people'],
+  ['/community-impact', 'people'],
+  ['/governance', 'people'],
   // the wiring (settings, compliance, the rare)
   ['/wiring', 'wiring'],
   ['/settings', 'wiring'],
   ['/epr', 'wiring'],
-  ['/people-culture', 'wiring'],
-  ['/governance', 'wiring'],
-  ['/community-impact', 'wiring'],
   ['/byproducts', 'wiring'],
   ['/nature-actions', 'wiring'],
   ['/dependencies', 'wiring'],
@@ -318,6 +364,36 @@ export function roomWithModules(
 }
 
 /**
+ * The room with the surfaces this person may not reach removed.
+ *
+ * Composes with `roomWithModules` and returns the room untouched when nothing
+ * is denied, so callers can pass every room through both without a branch and
+ * without churning object identity for the common case (nobody restricted).
+ *
+ * A door you can see but not open is worse than no door: it tells a restricted
+ * person exactly what is being kept from them, and invites a click that ends in
+ * a refusal. So the tabs go, rather than being locked.
+ */
+export function filterRoomForAccess(room: RoomConfig, access: SectionAccess): RoomConfig {
+  const denied = Object.values(access).some((granted) => granted === false);
+  if (!denied) return room;
+
+  const tabs = room.tabs.filter((tab) => canReachPath(tab.href, access));
+  const more = room.more?.filter((tab) => canReachPath(tab.href, access));
+  if (tabs.length === room.tabs.length && (more?.length ?? 0) === (room.more?.length ?? 0)) {
+    return room;
+  }
+  return { ...room, tabs, more };
+}
+
+/** Does this room have anything left for this person to open? */
+export function roomIsReachable(room: RoomConfig, access: SectionAccess): boolean {
+  const filtered = filterRoomForAccess(room, access);
+  if (filtered.landing && canReachPath(filtered.landing, access)) return true;
+  return filtered.tabs.length > 0 || (filtered.more?.length ?? 0) > 0;
+}
+
+/**
  * A room's name as a tab label: "The cellar." → "Cellar", "Today." → "Today".
  * Derived rather than stored so the registry keeps one name per room. The
  * band uppercases it in CSS; the value itself stays properly cased so it
@@ -333,9 +409,14 @@ export function roomShortName(room: RoomConfig): string {
  * surface for the rooms that have no landing of their own (Today opens on
  * the brief). Never returns an empty string for a real room.
  */
-export function roomHref(key: PlatformRoomKey): string {
+export function roomHref(key: PlatformRoomKey, access: SectionAccess = {}): string {
   const room = PLATFORM_ROOMS[key];
-  return room.landing ?? room.tabs[0]?.href ?? '/desk/';
+  // Never open a room on a door this person cannot walk through: Today's first
+  // tab is the Brief for most people, but a restricted Pulse must not become
+  // the landing for anyone whose first reachable surface it is not.
+  if (room.landing && canReachPath(room.landing, access)) return room.landing;
+  const firstOpen = room.tabs.find((tab) => canReachPath(tab.href, access));
+  return room.landing ?? firstOpen?.href ?? room.tabs[0]?.href ?? '/desk/';
 }
 
 /**
@@ -355,10 +436,12 @@ export function roomHref(key: PlatformRoomKey): string {
 export function otherRoomLinks(
   current: PlatformRoomKey,
   persona?: Persona | null,
+  access: SectionAccess = {},
 ): RoomConfig['tabs'] {
   return deskOrderForPersona(persona)
     .filter((key) => key !== current && key !== 'desk')
-    .map((key) => ({ label: roomShortName(PLATFORM_ROOMS[key]), href: roomHref(key) }));
+    .filter((key) => roomIsReachable(PLATFORM_ROOMS[key], access))
+    .map((key) => ({ label: roomShortName(PLATFORM_ROOMS[key]), href: roomHref(key, access) }));
 }
 
 /** Which room does this path belong to? The desk and unknowns take ink. */
@@ -383,18 +466,22 @@ const CORE_ORDER: PlatformRoomKey[] = [
   'cellar',
   'network',
   'evidence',
+  'people',
   'library',
 ];
 
+// The people room sits late for most personas — it is a monthly-to-quarterly
+// room, not a daily one — but ahead of the library for leadership, who answer
+// for fair work and governance, and who are the ones asked about them.
 const PERSONA_LEAD: Record<Persona, PlatformRoomKey[]> = {
   // operators live in data capture
-  operator: ['today', 'workbench', 'cellar', 'network', 'evidence', 'library'],
+  operator: ['today', 'workbench', 'cellar', 'network', 'evidence', 'people', 'library'],
   // finance leads with the numbers and the proof
-  finance: ['today', 'evidence', 'cellar', 'workbench', 'network', 'library'],
-  // leadership wants the headline and what we can show
-  leadership: ['today', 'evidence', 'network', 'cellar', 'workbench', 'library'],
+  finance: ['today', 'evidence', 'cellar', 'workbench', 'network', 'people', 'library'],
+  // leadership wants the headline, what we can show, and who we answer to
+  leadership: ['today', 'evidence', 'people', 'network', 'cellar', 'workbench', 'library'],
   // sustainability leads build footprints and chase certifications
-  sustainability: ['today', 'cellar', 'evidence', 'workbench', 'network', 'library'],
+  sustainability: ['today', 'cellar', 'evidence', 'people', 'workbench', 'network', 'library'],
   unknown: CORE_ORDER,
 };
 

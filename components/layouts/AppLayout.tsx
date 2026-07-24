@@ -11,10 +11,14 @@ import { BandControls } from '@/components/studio/band-controls'
 import {
   roomForPath,
   roomWithModules,
+  filterRoomForAccess,
   tabsForPersona,
   otherRoomLinks,
   type PlatformRoomKey,
 } from '@/components/studio/platform-rooms'
+import { SectionAccessProvider, useSectionAccess } from '@/lib/access/SectionAccessProvider'
+import { sectionsForPath } from '@/lib/access/sections'
+import { SectionNoAccess } from '@/components/studio/section-no-access'
 import { parseWorksWith } from '@/lib/subscription/works-with'
 import { resolveRoomPalette } from '@/lib/studio/brand-palette'
 import { useUserRole } from '@/lib/rosa/useUserRole'
@@ -49,9 +53,13 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
     <OnboardingProvider>
       <RosaContextProvider>
         <RealtimeRefreshProvider>
-          <AppLayoutInner requireOrganization={requireOrganization}>
-            {children}
-          </AppLayoutInner>
+          {/* Section access sits inside the org context and outside the shell:
+              the room band, the desk and the page gate all read the same map. */}
+          <SectionAccessProvider>
+            <AppLayoutInner requireOrganization={requireOrganization}>
+              {children}
+            </AppLayoutInner>
+          </SectionAccessProvider>
         </RealtimeRefreshProvider>
       </RosaContextProvider>
     </OnboardingProvider>
@@ -104,6 +112,7 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
   const { currentOrganization, isLoading: isOrganizationLoading, userRole } = useOrganization()
   const { subscriptionStatus, isLoading: subscriptionLoading } = useSubscription()
   const { persona } = useUserRole()
+  const { access: sectionAccess, isLoading: sectionAccessLoading } = useSectionAccess()
   const pathname = usePathname()
   // The arrival ritual is the front door itself for org-less owners (see
   // tasks/arrival-front-door-plan.md) — read its state here so both the
@@ -240,12 +249,26 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
   // default; the marks and accents follow the CSS vars for free.
   // The workbench also carries whichever of the four modules this org said it
   // works with; every other room is returned untouched.
-  const room = roomWithModules(roomForPath(pathname), parseWorksWith(currentOrganization?.works_with))
+  // ...and with the surfaces this person may not reach removed. Gating here
+  // rather than per page means a new restricted route is covered the moment
+  // it is added to the registry, with no wrapper to forget.
+  const room = filterRoomForAccess(
+    roomWithModules(roomForPath(pathname), parseWorksWith(currentOrganization?.works_with)),
+    sectionAccess,
+  )
   const roomTabs = tabsForPersona(room, persona)
   // The band above carries this room's surfaces; the band below carries the
   // way out to the other rooms. Repeating the same six words in both was
   // navigation that went nowhere.
-  const wayOut = otherRoomLinks(room.key as PlatformRoomKey, persona)
+  const wayOut = otherRoomLinks(room.key as PlatformRoomKey, persona, sectionAccess)
+
+  // The closed door. A restricted page that renders for a beat before being
+  // replaced has already leaked, so while access is still resolving we hold the
+  // surface back rather than show it — but we show a skeleton, not a refusal,
+  // so the common case (nothing restricted) never flashes a locked screen.
+  const restrictedSections = sectionsForPath(pathname)
+  const blockedBy = restrictedSections.find((key) => sectionAccess[key] === false)
+  const awaitingAccess = sectionAccessLoading && restrictedSections.length > 0
   const paletteEntry = resolveRoomPalette(currentOrganization)[room.key as PlatformRoomKey]
   const roomVars = {
     '--room-rgb': paletteEntry?.rgb ?? room.rgb,
@@ -274,7 +297,20 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
               <ReadOnlyPaywallBanner />
             )}
             <div className="container mx-auto px-4 py-6 sm:px-6 lg:px-8">
-              {children}
+              {blockedBy ? (
+                <SectionNoAccess section={blockedBy} />
+              ) : awaitingAccess ? (
+                <div className="space-y-6">
+                  <Skeleton className="h-9 w-64" />
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <Skeleton key={i} className="h-32 w-full rounded-[6px]" />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                children
+              )}
             </div>
           </main>
 

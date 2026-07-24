@@ -18,6 +18,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { denySection } from '@/lib/auth/section-access';
 import { renderInsightShareHtml } from '@/lib/pulse/insight-share';
 import { convertHtmlToPdf } from '@/lib/pdf/pdfshift-client';
 import { enforceExportAllowed } from '@/middleware/subscription-check';
@@ -73,6 +74,9 @@ export async function POST(
     if (!accessibleOrg) {
       return NextResponse.json({ error: 'Not a member of this organisation' }, { status: 403 });
     }
+
+    const denied = await denySection(svc, user, accessibleOrg, 'pulse');
+    if (denied) return denied;
 
     // Sharing/exporting an insight (email or PDF) is a paid feature.
     const exportBlocked = await enforceExportAllowed(insight.organization_id);

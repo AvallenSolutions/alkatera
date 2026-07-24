@@ -22,6 +22,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { denySection } from '@/lib/auth/section-access';
 import { loadShadowPrices } from '@/lib/pulse/shadow-prices';
 import { latestValue } from '@/lib/pulse/snapshot-latest';
 
@@ -78,6 +79,9 @@ export async function GET(request: NextRequest) {
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation' }, { status: 403 });
     }
+
+    const denied = await denySection(svc, user, organizationId, 'pulse');
+    if (denied) return denied;
 
     // Trailing-12-month total_co2e in kg, convert to tonnes.
     const today = new Date();

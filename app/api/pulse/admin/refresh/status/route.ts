@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { getMemberRole } from '@/app/api/stripe/_helpers/get-member-role';
+import { denySection } from '@/lib/auth/section-access';
 import type { PulseRefreshRun } from '@/lib/pulse/refresh-jobs';
 
 /**
@@ -51,6 +52,10 @@ export async function GET(request: NextRequest) {
     if (role !== 'owner' && role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    // Same gate as the trigger it polls.
+    const denied = await denySection(serviceClient(), user, membership.organization_id, 'pulse');
+    if (denied) return denied;
 
     const { data: run, error } = await serviceClient()
       .from('pulse_refresh_runs')

@@ -23,6 +23,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { denySection } from '@/lib/auth/section-access';
 import { METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
 
 export const runtime = 'nodejs';
@@ -88,6 +89,9 @@ export async function GET(request: NextRequest) {
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation' }, { status: 403 });
     }
+
+    const denied = await denySection(svc, user, organizationId, 'pulse');
+    if (denied) return denied;
 
     const cats = categoriesForMetric(metricParam);
     if (cats.length === 0) {

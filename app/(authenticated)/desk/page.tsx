@@ -15,8 +15,11 @@ import { DeskArrivalWalk } from '@/components/studio/desk-arrival-walk';
 import {
   PLATFORM_ROOMS,
   deskOrderForPersona,
+  roomIsReachable,
   type PlatformRoomKey,
 } from '@/components/studio/platform-rooms';
+import { useSectionAccess } from '@/lib/access/SectionAccessProvider';
+import { canReachPath, type SectionAccess } from '@/lib/access/sections';
 import { useUserRole } from '@/lib/rosa/useUserRole';
 import { useOrganization } from '@/lib/organizationContext';
 import { resolveRoomPalette } from '@/lib/studio/brand-palette';
@@ -49,15 +52,27 @@ function greeting(): string {
 }
 
 /** The desk face of each room: eyebrow, its one sentence, where it opens. */
-function posterContent(counts: DeskCounts | null): Record<
+function posterContent(counts: DeskCounts | null, access: SectionAccess): Record<
   Exclude<PlatformRoomKey, 'desk'>,
   { eyebrow: string; headline: string; note: string; href: string }
 > {
+  // Today's note names its three surfaces. Naming a room someone has been
+  // kept out of is its own small leak, so the note is built from what they
+  // can actually open.
+  const todayNote = [
+    ['BRIEF', '/rosa/'],
+    ['PULSE', '/pulse/'],
+    ['FINANCIAL', '/pulse/financial/'],
+  ]
+    .filter(([, href]) => canReachPath(href, access))
+    .map(([label]) => label)
+    .join(' · ');
+
   return {
     today: {
       eyebrow: 'TODAY',
       headline: 'The day ahead.',
-      note: 'BRIEF · PULSE · FINANCIAL',
+      note: todayNote,
       href: '/rosa/',
     },
     workbench: {
@@ -90,6 +105,12 @@ function posterContent(counts: DeskCounts | null): Record<
         : 'REPORTS · LCAS · VITALITY',
       href: '/evidence/',
     },
+    people: {
+      eyebrow: 'OUR PEOPLE',
+      headline: 'Who we look after.',
+      note: 'PEOPLE · COMMUNITY · GOVERNANCE',
+      href: '/people-culture/',
+    },
     library: {
       eyebrow: 'THE LIBRARY',
       headline: 'What we know.',
@@ -107,6 +128,7 @@ function posterContent(counts: DeskCounts | null): Record<
 
 export default function DeskPage() {
   const { user } = useAuth();
+  const { access: sectionAccess } = useSectionAccess();
   const { profile } = useProfile();
   const { persona } = useUserRole();
   const { currentOrganization } = useOrganization();
@@ -140,9 +162,12 @@ export default function DeskPage() {
     };
   }, []);
 
-  const content = posterContent(counts);
-  // Persona order minus the wiring (the quiet ink block below the grid).
-  const order = deskOrderForPersona(persona).filter((k) => k !== 'wiring');
+  const content = posterContent(counts, sectionAccess);
+  // Persona order minus the wiring (the quiet ink block below the grid), minus
+  // any room this person has nothing left to open in.
+  const order = deskOrderForPersona(persona)
+    .filter((k) => k !== 'wiring')
+    .filter((k) => roomIsReachable(PLATFORM_ROOMS[k], sectionAccess));
 
   const block = (key: Exclude<PlatformRoomKey, 'desk' | 'wiring'>): ReactNode => {
     const room = PLATFORM_ROOMS[key];

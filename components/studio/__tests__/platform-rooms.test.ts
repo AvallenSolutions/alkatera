@@ -78,8 +78,17 @@ describe('roomForPath', () => {
   it('tucks compliance and settings into the wiring', () => {
     expect(roomForPath('/settings/').key).toBe('wiring');
     expect(roomForPath('/epr/').key).toBe('wiring');
-    expect(roomForPath('/governance/').key).toBe('wiring');
-    expect(roomForPath('/people-culture/').key).toBe('wiring');
+    expect(roomForPath('/byproducts/').key).toBe('wiring');
+  });
+
+  it('gives the social surfaces to the people room, not the wiring', () => {
+    // These three used to sit in the wiring's "More…" overflow, under no
+    // shared name, which is why nobody could find "Social Impact" after the
+    // move to rooms. They are a room now.
+    expect(roomForPath('/people-culture/').key).toBe('people');
+    expect(roomForPath('/people-culture/fair-work/').key).toBe('people');
+    expect(roomForPath('/community-impact/').key).toBe('people');
+    expect(roomForPath('/governance/').key).toBe('people');
   });
 
   it('defaults the desk and unknown paths to the wiring ink', () => {
@@ -95,7 +104,7 @@ describe('deskOrderForPersona', () => {
       const order = deskOrderForPersona(p);
       expect(order[order.length - 1]).toBe('wiring');
       expect(new Set(order).size).toBe(order.length); // no dupes
-      expect(order).toHaveLength(7); // six colours + wiring
+      expect(order).toHaveLength(8); // seven colours + wiring
     }
   });
 
@@ -207,11 +216,40 @@ describe('the reorganised tabs', () => {
     ]);
   });
 
+  it('never repeats a room\u2019s landing as one of its own tabs', () => {
+    // "People" pointed at /people-culture/, which was also the room's landing
+    // \u2014 so the band read "Our people." and then "PEOPLE" straight after it,
+    // two words for one page. You reach a room's landing by clicking its name.
+    for (const [key, room] of Object.entries(PLATFORM_ROOMS)) {
+      if (!room.landing) continue;
+      const dupes = [...room.tabs, ...(room.more ?? [])]
+        .filter((t) => t.href === room.landing)
+        .map((t) => t.label);
+      expect(`${key}: ${dupes.join(', ')}`).toBe(`${key}: `);
+    }
+  });
+
+  it('gives the people room three tabs and calls it Our people', () => {
+    expect(PLATFORM_ROOMS.people.name).toBe('Our people.');
+    expect(roomShortName(PLATFORM_ROOMS.people)).toBe('Our people');
+    expect(hrefs('people')).toEqual([
+      '/community-impact/',
+      '/governance/',
+      '/people-culture/fair-work/',
+    ]);
+  });
+
   it('every tab and overflow entry resolves back to its own room', () => {
     // A tab that routes elsewhere flips the band colour mid-navigation.
-    // Two deliberate exceptions, both settings-tab deep links (the Billing
-    // precedent): the query string cannot be seen by roomForPath.
-    const crossRoom = new Set(['/settings?tab=integrations', '/settings?tab=billing']);
+    // Deliberate exceptions. The two settings-tab deep links (the Billing
+    // precedent) because the query string cannot be seen by roomForPath; and
+    // Vitality weights, which configures the vitality score (a wiring job)
+    // but lives on a /governance path, so the people room owns its colour.
+    const crossRoom = new Set([
+      '/settings?tab=integrations',
+      '/settings?tab=billing',
+      '/governance/vitality-weights/',
+    ]);
     for (const [key, room] of Object.entries(PLATFORM_ROOMS)) {
       if (key === 'desk') continue;
       for (const tab of [...room.tabs, ...(room.more ?? [])]) {
@@ -286,13 +324,14 @@ describe('roomShortName and roomHref', () => {
 });
 
 describe('DESK_ORDER', () => {
-  it('is the six coloured rooms then the wiring', () => {
+  it('is the seven coloured rooms then the wiring', () => {
     expect(DESK_ORDER).toEqual([
       'today',
       'workbench',
       'cellar',
       'network',
       'evidence',
+      'people',
       'library',
       'wiring',
     ]);

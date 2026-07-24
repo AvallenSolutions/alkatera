@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { denySection } from '@/lib/auth/section-access';
 import { guardOrgWrite } from '@/lib/auth/guard-org-write';
 import { getOrCreateCorporateReport, deriveReportingYear } from '@/lib/xero/report-helper';
 import { getSpendFactor, calculateSpendBasedEmissions } from '@/lib/xero/spend-factors';
@@ -71,6 +72,9 @@ export async function POST(request: NextRequest) {
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
+
+    const sectionDenied = await denySection(supabase, user, organizationId, 'financial');
+    if (sectionDenied) return sectionDenied;
 
     const denied = await guardOrgWrite(supabase, user, organizationId);
     if (denied) return denied;

@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { canAccessSection } from '@/lib/auth/section-access';
 import { getMemberRole } from '@/app/api/stripe/_helpers/get-member-role';
 import { loadShadowPrices } from '@/lib/pulse/shadow-prices';
 import { ALL_METRIC_KEYS } from '@/lib/pulse/metric-keys';
@@ -39,6 +40,13 @@ async function resolveOrg(request: NextRequest) {
   // which an advisor (non-member) never holds, so writes stay member-only.
   const organizationId = await resolveAccessibleOrg(serviceClient(), user, orgIdParam);
   if (!organizationId) return { error: 'No organisation', status: 403 as const };
+
+  // Shadow prices are the money view; a member whose Financial section is off
+  // must not read them. Checked here rather than per handler so every verb in
+  // this file inherits it.
+  if (!(await canAccessSection(serviceClient(), user.id, organizationId, 'financial'))) {
+    return { error: 'You do not have access to this section.', status: 403 as const };
+  }
 
   const role = await getMemberRole(supabase, organizationId, user.id);
   return { userId: user.id, organizationId, role, supabase };

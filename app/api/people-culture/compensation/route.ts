@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { denySection } from '@/lib/auth/section-access';
 
 /**
  * GET /api/people-culture/compensation
@@ -19,6 +20,9 @@ export async function GET(request: NextRequest) {
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
+
+    const denied = await denySection(supabase, user, organizationId, 'compensation');
+    if (denied) return denied;
 
     // Parse query params
     const searchParams = request.nextUrl.searchParams;
@@ -94,6 +98,9 @@ export async function POST(request: NextRequest) {
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
+
+    const denied = await denySection(supabase, user, organizationId, 'compensation');
+    if (denied) return denied;
 
     const body = await request.json();
 
@@ -178,6 +185,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
 
+    const denied = await denySection(supabase, user, organizationId, 'compensation');
+    if (denied) return denied;
+
     const body = await request.json();
 
     if (!body.id) {
@@ -246,6 +256,9 @@ export async function DELETE(request: NextRequest) {
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
+
+    const denied = await denySection(supabase, user, organizationId, 'compensation');
+    if (denied) return denied;
 
     const body = await request.json();
 

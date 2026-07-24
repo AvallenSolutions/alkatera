@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { denySection } from '@/lib/auth/section-access';
 import {
   gatherInsightContext,
   generateInsight,
@@ -72,6 +73,9 @@ export async function POST(request: NextRequest) {
   if (!accessibleOrg) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
+
+  const denied = await denySection(adminClient, userData.user, accessibleOrg, 'pulse');
+  if (denied) return denied;
 
   // Rate limit: one refresh per org per hour.
   const sinceStr = new Date(Date.now() - 60 * 60_000).toISOString();

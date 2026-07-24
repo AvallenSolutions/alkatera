@@ -310,7 +310,7 @@ function VolunteeringPageContent() {
   return (
     <div className="space-y-8 animate-fade-in-up">
       <TopicHeader
-        eyebrow={<>THE WIRING &middot; COMMUNITY IMPACT</>}
+        eyebrow={<>OUR PEOPLE &middot; COMMUNITY IMPACT</>}
         headline={<>Volunteering.</>}
         description="Track employee volunteer activities and community service."
         backHref="/community-impact"

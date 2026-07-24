@@ -27,7 +27,8 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Content, FunctionCall, Part } from '@google/generative-ai';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
-import { executeTool, ROSA_TOOLS, ACTION_TOOL_NAMES, type ToolContext } from '@/lib/rosa/tools';
+import { executeTool, rosaToolsFor, ACTION_TOOL_NAMES, type ToolContext } from '@/lib/rosa/tools';
+import { getSectionAccess } from '@/lib/auth/section-access';
 import { buildMemoryBlock } from '@/lib/rosa/memory';
 import { buildRosaPageContextBlock } from '@/lib/rosa/persona';
 import { loadAttachment } from '@/lib/rosa/document-extraction';
@@ -109,11 +110,17 @@ export async function POST(request: NextRequest) {
     return errorResponse('message or attachments required', 400);
   }
 
+  // Rosa runs on the service-role client, so she bypasses RLS like every other
+  // API route. Without this she would happily read out the Financial numbers to
+  // someone whose Financial section is switched off.
+  const sectionAccess = await getSectionAccess(serviceSupabase, user.id, organizationId);
+
   // conversation id filled in below once resolved
   const toolCtx: ToolContext = {
     supabase: serviceSupabase,
     organizationId,
     userId: user.id,
+    sectionAccess,
   };
 
   // Resolve / create conversation.
@@ -211,7 +218,7 @@ export async function POST(request: NextRequest) {
         const generativeModel = client.getGenerativeModel({
           model: GEMINI_ROSA_MODEL,
           systemInstruction: systemPrompt,
-          tools: toGeminiFunctionDeclarations(ROSA_TOOLS),
+          tools: toGeminiFunctionDeclarations(rosaToolsFor(sectionAccess)),
           generationConfig: { maxOutputTokens: 2000 },
         });
 

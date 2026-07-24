@@ -10,9 +10,9 @@ import { cn } from '@/lib/utils'
  * room by room, each card carrying that room's OWN real data. It does three
  * jobs at once — teaches the (unconventional) navigation model, proves the
  * "lights on in every room" promise, and covers the Stripe webhook wait
- * invisibly (six rooms at a human pace is ~a minute, well past webhook lag).
+ * invisibly (seven rooms at a human pace is ~a minute, well past webhook lag).
  *
- * One explainer screen names the concept, then six full-screen room cards.
+ * One explainer screen names the concept, then seven full-screen room cards.
  * Auto-advances (tap or → to skip; ← to go back); calls onDone after the last
  * room, where the parent shows the planting moment.
  *
@@ -44,16 +44,18 @@ const WALK_ROOMS: WalkRoom[] = [
   { key: 'workbench', name: 'The workbench', purpose: 'What we measure.', colour: STUDIO.cobalt, onDark: true, shape: 'triangle', tabs: 'Facilities · Spend · Integrations · Quality' },
   { key: 'evidence', name: 'The evidence', purpose: 'What we can prove.', colour: STUDIO.brick, onDark: true, shape: 'quarter', tabs: 'Reports · LCAs · Vitality · Emissions' },
   { key: 'network', name: 'The network', purpose: "Who we're talking to.", colour: STUDIO.ochre, onDark: false, shape: 'square', tabs: 'Suppliers · Experts · Messages' },
+  { key: 'people', name: 'Our people', purpose: 'Who we look after.', colour: STUDIO.slate, onDark: true, shape: 'bars', tabs: 'Community · Governance · Fair work' },
   { key: 'library', name: 'The library', purpose: 'What we know.', colour: STUDIO.teal, onDark: true, shape: 'arch', tabs: 'Your library · Knowledge · Wiki' },
   { key: 'today', name: 'Today', purpose: 'The day ahead.', colour: STUDIO.forest, onDark: true, shape: 'circle', tabs: 'The brief · Pulse · The ask queue' },
 ]
 
-/** The seven-room index shown on the explainer screen. */
+/** The eight-room index shown on the explainer screen. */
 const EXPLAINER_ROOMS: { name: string; colour: string; shape: MarkShape; desc: string }[] = [
   { name: 'The cellar', colour: STUDIO.plum, shape: 'diamond', desc: 'What your drinks are made of: the liquid, the packaging and the ingredients.' },
   { name: 'The workbench', colour: STUDIO.cobalt, shape: 'triangle', desc: 'What you measure: your sites, energy, water, waste and spend.' },
   { name: 'The evidence', colour: STUDIO.brick, shape: 'quarter', desc: 'What you can prove: reports, finished LCAs, your vitality score and your emissions.' },
   { name: 'The network', colour: STUDIO.ochre, shape: 'square', desc: 'Who you talk to: suppliers, messages and expert help.' },
+  { name: 'Our people', colour: STUDIO.slate, shape: 'bars', desc: 'Who you look after: your team, your community and how you govern yourselves.' },
   { name: 'The library', colour: STUDIO.teal, shape: 'arch', desc: 'What you keep: your own documents, plus plain-language guides for your industry.' },
   { name: 'Today', colour: STUDIO.forest, shape: 'circle', desc: 'The day ahead: Rosa’s brief of what needs you.' },
   { name: 'The wiring', colour: STUDIO.ink, shape: 'ring', desc: 'Behind the walls: settings, billing and your team.' },
@@ -69,6 +71,13 @@ function markPath(shape: MarkShape, fill: string) {
     case 'diamond': return <polygon points="50,2 98,50 50,98 2,50" fill={fill} />
     case 'arch': return <path d="M 10 100 L 10 50 A 40 40 0 0 1 90 50 L 90 100 Z" fill={fill} />
     case 'ring': return <circle cx="50" cy="50" r="36" fill="none" stroke={fill} strokeWidth="24" />
+    case 'bars': return (
+      <g fill={fill}>
+        <rect x="8" y="30" width="20" height="70" />
+        <rect x="40" y="10" width="20" height="90" />
+        <rect x="72" y="46" width="20" height="54" />
+      </g>
+    )
   }
 }
 
@@ -97,6 +106,8 @@ export function TheWalk({ onDone }: { onDone: () => void }) {
           : 'Confirm your data and it becomes reportable proof.'
       case 'network':
         return 'Your suppliers, and the asks that fill the gaps you can’t fill alone.'
+      case 'people':
+        return 'Fair work, your community and how you govern yourselves, all in one room.'
       case 'library':
         return 'Plain-language guides for your industry are already on the shelf.'
       case 'today':
@@ -106,16 +117,18 @@ export function TheWalk({ onDone }: { onDone: () => void }) {
     }
   }, [productCount, tonnes, facilityCountry, fromWebsite])
 
-  // index 0 = explainer, 1..6 = room cards
+  // index 0 = explainer, 1..N = room cards
   const [index, setIndex] = useState(0)
   const total = WALK_ROOMS.length + 1
 
+  // The bound check sits OUTSIDE the updater. It used to call onDone() inside
+  // setIndex's callback, which React runs during render — so finishing the
+  // walk set state in the parent mid-render and logged a "Cannot update a
+  // component while rendering a different component" warning every time.
   const advance = useCallback(() => {
-    setIndex(i => {
-      if (i + 1 >= total) { onDone(); return i }
-      return i + 1
-    })
-  }, [total, onDone])
+    if (index + 1 >= total) { onDone(); return }
+    setIndex(index + 1)
+  }, [index, total, onDone])
 
   const back = useCallback(() => setIndex(i => Math.max(0, i - 1)), [])
 
@@ -135,7 +148,7 @@ export function TheWalk({ onDone }: { onDone: () => void }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [advance, back])
 
-  // index 0 is the explainer on cream; 1..6 are the rooms, each on its own ink.
+  // index 0 is the explainer on cream; 1..N are the rooms, each on its own ink.
   const room = index === 0 ? null : WALK_ROOMS[index - 1]
   // Cream on the dark rooms, INK on ochre — the house rule, the same one
   // PLATFORM_ROOMS states for the network (`onColour: 'ink'`). This used to
@@ -183,7 +196,7 @@ export function TheWalk({ onDone }: { onDone: () => void }) {
               This is a house, not a dashboard.
             </h1>
             <p className="mx-auto max-w-md text-sm text-muted-foreground">
-              Everything you do lives in one of seven rooms, and every room keeps its colour, so you always know where you are. The desk is the hall: you can see into every room, and Rosa can fetch anything from any of them. Let&apos;s take the walk.
+              Everything you do lives in one of eight rooms, and every room keeps its colour, so you always know where you are. The desk is the hall: you can see into every room, and Rosa can fetch anything from any of them. Let&apos;s take the walk.
             </p>
             <div className="grid gap-2 text-left sm:grid-cols-2">
               {EXPLAINER_ROOMS.map(r => (

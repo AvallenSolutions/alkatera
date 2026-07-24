@@ -600,7 +600,7 @@ function LocalImpactPageContent() {
   return (
     <div className="space-y-8 animate-fade-in-up">
       <TopicHeader
-        eyebrow={<>THE WIRING &middot; COMMUNITY IMPACT</>}
+        eyebrow={<>OUR PEOPLE &middot; COMMUNITY IMPACT</>}
         headline={<>Local impact.</>}
         description="Track local employment, sourcing, and community investment."
         backHref="/community-impact"

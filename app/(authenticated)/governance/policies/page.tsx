@@ -637,7 +637,7 @@ function PoliciesPageContent() {
   return (
     <div className="space-y-8 animate-fade-in-up">
       <TopicHeader
-        eyebrow={<>THE WIRING &middot; GOVERNANCE</>}
+        eyebrow={<>OUR PEOPLE &middot; GOVERNANCE</>}
         headline={<>Policies.</>}
         description="Create, track, and publish organisational policies."
         backHref="/governance"

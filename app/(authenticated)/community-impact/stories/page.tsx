@@ -142,7 +142,7 @@ function ImpactStoriesPageContent() {
   return (
     <div className="space-y-8 animate-fade-in-up">
       <TopicHeader
-        eyebrow={<>THE WIRING &middot; COMMUNITY IMPACT</>}
+        eyebrow={<>OUR PEOPLE &middot; COMMUNITY IMPACT</>}
         headline={<>Impact stories.</>}
         description="Document and share your community impact stories."
         backHref="/community-impact"

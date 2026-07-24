@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Governance & ethics hub (/governance/), THE WIRING, in the studio
+ * Governance & ethics hub (/governance/), OUR PEOPLE, in the studio
  * grammar: the family finally gets its eyebrow, the score is said once
  * through the shared ScoreHero, the doors are quiet hairline blocks, the
  * tabs are URL-synced mono tabs. The score recalc POST is unchanged.
@@ -77,7 +77,7 @@ function GovernancePageContent() {
   return (
     <div className="space-y-8 animate-fade-in-up">
       <HubHeader
-        eyebrow={<>THE WIRING &middot; GOVERNANCE</>}
+        eyebrow={<>OUR PEOPLE &middot; GOVERNANCE</>}
         headline={<>Governance &amp; ethics.</>}
         description="Policies, stakeholder engagement, board composition, and transparency."
       >

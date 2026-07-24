@@ -32,6 +32,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { denySection } from '@/lib/auth/section-access';
 import { loadShadowPrices, type ShadowPrice } from '@/lib/pulse/shadow-prices';
 import type { MetricKey } from '@/lib/pulse/metric-keys';
 import { reliableYoyPct } from '@/lib/pulse/snapshot-latest';
@@ -75,6 +76,9 @@ export async function GET(request: NextRequest) {
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation' }, { status: 403 });
     }
+
+    const denied = await denySection(svc, user, organizationId, 'financial');
+    if (denied) return denied;
 
     // Load resolved shadow prices for this org (org override > global default).
     const prices = await loadShadowPrices(svc, organizationId);

@@ -621,7 +621,7 @@ function StakeholdersPageContent() {
   return (
     <div className="space-y-8 animate-fade-in-up">
       <TopicHeader
-        eyebrow={<>THE WIRING &middot; GOVERNANCE</>}
+        eyebrow={<>OUR PEOPLE &middot; GOVERNANCE</>}
         headline={<>Stakeholders.</>}
         description="Track and manage stakeholder relationships."
         backHref="/governance"

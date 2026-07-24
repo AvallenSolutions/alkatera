@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Community impact hub (/community-impact/), THE WIRING, in the studio
+ * Community impact hub (/community-impact/), OUR PEOPLE, in the studio
  * grammar: statement with eyebrow, the score said once through the shared
  * ScoreHero (the hand-rolled pink ScoreRing is gone), quiet doors, URL-synced
  * mono tabs, dim compliance footnote. The donation POST and the score
@@ -347,7 +347,7 @@ function CommunityImpactPageContent() {
   return (
     <div className="space-y-8 animate-fade-in-up">
       <HubHeader
-        eyebrow={<>THE WIRING &middot; COMMUNITY IMPACT</>}
+        eyebrow={<>OUR PEOPLE &middot; COMMUNITY IMPACT</>}
         headline={<>Community &amp; impact.</>}
         description="Charitable giving, local impact, volunteering, and community engagement."
       >

@@ -207,7 +207,7 @@ function TransparencyPageContent() {
   return (
     <div className="space-y-8 animate-fade-in-up">
       <TopicHeader
-        eyebrow={<>THE WIRING &middot; GOVERNANCE</>}
+        eyebrow={<>OUR PEOPLE &middot; GOVERNANCE</>}
         headline={<>Transparency.</>}
         description="Mission, values, legal structure, and public commitments."
         backHref="/governance"

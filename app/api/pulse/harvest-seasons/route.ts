@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { denySection } from '@/lib/auth/section-access';
 import { HARVEST_SEASONS, relevantCrops } from '@/lib/pulse/harvest-seasons';
 
 export const runtime = 'nodejs';
@@ -36,6 +37,9 @@ export async function GET(request: NextRequest) {
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation' }, { status: 403 });
     }
+
+    const denied = await denySection(svc, user, organizationId, 'pulse');
+    if (denied) return denied;
 
     // Pull a corpus of free-text names for fuzzy matching:
     //   1. product names + product_type

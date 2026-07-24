@@ -46,6 +46,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { AdvisorManagement } from '@/components/settings/AdvisorManagement'
+import { MemberSectionAccess } from '@/components/settings/MemberSectionAccess'
+import { useAuth } from '@/components/providers/AuthProvider'
+import { SECTION_KEYS, RESTRICTABLE_SECTIONS, type SectionAccess } from '@/lib/access/sections'
 
 interface TeamMember {
   membership_id: string
@@ -68,6 +71,55 @@ interface TeamSettingsProps {
   showHeader?: boolean
 }
 
+/**
+ * The Access cell: a one-glance summary plus the way in.
+ *
+ * Says what is OFF, never what is on — "Pulse off" is the information an
+ * administrator is scanning for, and "Full access" is the quiet default that
+ * needs no explanation.
+ */
+function AccessCell({
+  member,
+  access,
+  onOpen,
+}: {
+  member: TeamMember
+  access: SectionAccess
+  onOpen: () => void
+}) {
+  if (member.role === 'owner') {
+    return (
+      <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-studio-dim">
+        <ShieldCheck className="h-3 w-3" />
+        Full
+      </span>
+    )
+  }
+
+  const off = SECTION_KEYS.filter((key) => access[key] === false)
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group inline-flex max-w-[14rem] items-center gap-2 text-left"
+    >
+      {off.length === 0 ? (
+        <span className="text-xs text-studio-dim underline decoration-studio-hairline underline-offset-4 group-hover:decoration-foreground">
+          Full access
+        </span>
+      ) : (
+        <span className="inline-flex items-center gap-1.5">
+          <Lock className="h-3 w-3 shrink-0 text-studio-attention" />
+          <span className="truncate text-xs text-foreground underline decoration-studio-hairline underline-offset-4 group-hover:decoration-foreground">
+            {off.map((key) => RESTRICTABLE_SECTIONS[key].label).join(', ')} off
+          </span>
+        </span>
+      )}
+    </button>
+  )
+}
+
 const BUSY_TEXT = (
   <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
     Loading
@@ -76,6 +128,7 @@ const BUSY_TEXT = (
 
 export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
   const { currentOrganization, userRole } = useOrganization()
+  const { user } = useAuth()
   const [members, setMembers] = useState<TeamMember[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isInviting, setIsInviting] = useState(false)
@@ -87,6 +140,10 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [roleMap, setRoleMap] = useState<Record<string, string>>({})
   const [updatingRole, setUpdatingRole] = useState<string | null>(null)
+  const [accessMember, setAccessMember] = useState<TeamMember | null>(null)
+  // Per-member denial summary, so the table can say "Pulse off" without
+  // opening every dialog. Read-only: the dialog owns the writes.
+  const [accessByUser, setAccessByUser] = useState<Record<string, SectionAccess>>({})
   const { toast } = useToast()
   const { currentCount, maxCount, isUnlimited, checkLimit } = useTeamMemberLimit()
   const atLimit = !isUnlimited && maxCount != null && currentCount >= maxCount
@@ -117,6 +174,24 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // The whole org's denials in one read. The "Org admins can read section
+  // access for their organisation" RLS policy scopes this; a non-admin gets
+  // nothing back and never renders the column anyway.
+  const fetchSectionAccess = async () => {
+    if (!currentOrganization) return
+    const { data, error } = await supabase
+      .from('organization_section_access')
+      .select('user_id, section_key, granted')
+      .eq('organization_id', currentOrganization.id)
+    if (error) return
+    const byUser: Record<string, SectionAccess> = {}
+    for (const row of (data ?? []) as Array<{ user_id: string; section_key: string; granted: boolean }>) {
+      if (!(SECTION_KEYS as string[]).includes(row.section_key)) continue
+      byUser[row.user_id] = { ...byUser[row.user_id], [row.section_key]: row.granted }
+    }
+    setAccessByUser(byUser)
   }
 
   const fetchRoles = async () => {
@@ -327,6 +402,7 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
     fetchMembers()
     fetchInvitations()
     fetchRoles()
+    fetchSectionAccess()
   }, [currentOrganization])
 
   if (!currentOrganization) {
@@ -442,6 +518,7 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
+                    {isAdmin && <TableHead>Access</TableHead>}
                     {isOwner && <TableHead className="text-right">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -487,6 +564,15 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
                           </StateChip>
                         )}
                       </TableCell>
+                      {isAdmin && (
+                        <TableCell>
+                          <AccessCell
+                            member={member}
+                            access={accessByUser[member.user_id] ?? {}}
+                            onOpen={() => setAccessMember(member)}
+                          />
+                        </TableCell>
+                      )}
                       {isOwner && (
                         <TableCell className="text-right">
                           {member.role !== 'owner' && (
@@ -577,6 +663,17 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {accessMember && (
+        <MemberSectionAccess
+          open={!!accessMember}
+          onOpenChange={(open) => !open && setAccessMember(null)}
+          member={accessMember}
+          callerRole={userRole}
+          callerUserId={user?.id}
+          onChanged={fetchSectionAccess}
+        />
+      )}
 
       {/* Advisor Management Section */}
       {isAdmin && <AdvisorManagement />}

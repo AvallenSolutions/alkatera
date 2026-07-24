@@ -28,6 +28,7 @@ import { buildDossier } from '@/lib/lca/dossier';
 import { getBenchmarkForProductType } from '@/lib/industry-benchmarks';
 import { gatherGrowthIngredients, scoreFromIngredients, computeGrowthSignals } from '@/lib/desk/growth-score';
 import { logRosaTelemetry } from './budget';
+import { withheldRosaTools, type SectionAccess } from '@/lib/access/sections';
 
 export interface ToolContext {
   supabase: SupabaseClient;
@@ -35,6 +36,27 @@ export interface ToolContext {
   userId: string;
   /** Optional conversation id for attaching pending actions. */
   conversationId?: string | null;
+  /**
+   * The caller's restrictable-section access (lib/access/sections.ts). Rosa
+   * runs on a service-role client, so without this she is a way round every
+   * gate in the app: "what's our cost per litre?" would answer for someone
+   * whose Financial section is switched off. Absent means unrestricted.
+   */
+  sectionAccess?: SectionAccess;
+}
+
+/**
+ * The tools this caller may be offered.
+ *
+ * Withholding rather than refusing: a tool Rosa cannot see is one she will not
+ * mention, so she answers "I can't see that for you" naturally instead of
+ * narrating a permission error.
+ */
+export function rosaToolsFor(access: SectionAccess | undefined): ToolDefinition[] {
+  if (!access) return ROSA_TOOLS;
+  const withheld = new Set(withheldRosaTools(access));
+  if (withheld.size === 0) return ROSA_TOOLS;
+  return ROSA_TOOLS.filter((tool) => !withheld.has(tool.name));
 }
 
 /** Tool names that create a pending action (user must confirm). */
@@ -767,6 +789,18 @@ export async function executeTool(
   input: unknown,
 ): Promise<ToolResult> {
   try {
+    // Belt-and-braces with rosaToolsFor(): the list the model is offered is
+    // already filtered, but a tool name can also arrive from a replayed
+    // conversation or a model that invents one, so refuse here too.
+    const withheld = new Set(withheldRosaTools(ctx.sectionAccess ?? {}));
+    if (withheld.has(name)) {
+      return {
+        content: 'That part of the platform is not available to this user.',
+        is_error: true,
+        audit: { tool: name, withheld: true },
+      };
+    }
+
     switch (name) {
       case 'get_org_context':
         return await toolGetOrgContext(ctx);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { getMemberRole } from '@/app/api/stripe/_helpers/get-member-role';
+import { denySection } from '@/lib/auth/section-access';
 import { inngest } from '@/lib/inngest/client';
 import { seedPulseJobs } from '@/lib/pulse/refresh-jobs';
 import { runPulseRefreshInline } from '@/lib/pulse/run-refresh';
@@ -73,6 +74,11 @@ export async function POST(request: NextRequest) {
         { status: 403 },
       );
     }
+
+    // An admin whose Pulse section has been switched off does not get to drive
+    // it either. (An owner is never restrictable, so this is a no-op for them.)
+    const denied = await denySection(serviceClient(), user, membership.organization_id, 'pulse');
+    if (denied) return denied;
 
     const baseUrl = request.nextUrl.origin;
     const service = serviceClient();

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * People & culture hub (/people-culture/), THE WIRING, in the studio
+ * People & culture hub (/people-culture/), OUR PEOPLE, in the studio
  * grammar: one statement, the family score said once through the shared
  * ScoreHero, quiet doors to the four detail pages, URL-synced mono tabs,
  * and a dim compliance footnote. The score recalc POST is unchanged.
@@ -85,7 +85,7 @@ function PeopleCulturePageContent() {
   return (
     <div className="space-y-8 animate-fade-in-up">
       <HubHeader
-        eyebrow={<>THE WIRING &middot; PEOPLE &amp; CULTURE</>}
+        eyebrow={<>OUR PEOPLE &middot; PEOPLE &amp; CULTURE</>}
         headline={<>People &amp; culture.</>}
         description="Workforce wellbeing, diversity, fair work, and development metrics."
       >

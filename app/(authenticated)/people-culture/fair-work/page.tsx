@@ -428,7 +428,7 @@ function FairWorkPageContent() {
   return (
     <div className="space-y-8 animate-fade-in-up">
       <TopicHeader
-        eyebrow={<>THE WIRING &middot; PEOPLE &amp; CULTURE</>}
+        eyebrow={<>OUR PEOPLE &middot; PEOPLE &amp; CULTURE</>}
         headline={<>Fair work.</>}
         description="Living wage compliance, pay equity, and compensation analytics."
         backHref="/people-culture"

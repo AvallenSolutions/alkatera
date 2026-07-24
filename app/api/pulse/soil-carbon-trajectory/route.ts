@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { canAccessSection } from '@/lib/auth/section-access';
 import {
   computeAnnualStockChange,
   buildSoilCarbonTrajectory,
@@ -42,6 +43,11 @@ async function resolveOrg(request: NextRequest) {
   // Member OR active advisor for the requested/selected org.
   const organizationId = await resolveAccessibleOrg(serviceClient(), user, orgIdParam);
   if (!organizationId) return { error: 'No organisation', status: 403 as const };
+
+  // Checked here rather than per handler so every verb in this file inherits it.
+  if (!(await canAccessSection(serviceClient(), user.id, organizationId, 'pulse'))) {
+    return { error: 'You do not have access to this section.', status: 403 as const };
+  }
   return { organizationId };
 }
 

@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { denySection } from '@/lib/auth/section-access';
 import {
   ABATEMENT_LEVERS,
   levelisedAbatementCost,
@@ -52,6 +53,9 @@ export async function GET(request: NextRequest) {
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation' }, { status: 403 });
     }
+
+    const denied = await denySection(svc, user, organizationId, 'pulse');
+    if (denied) return denied;
 
     // 12-month emissions by activity category (kg -> tonnes).
     const today = new Date();

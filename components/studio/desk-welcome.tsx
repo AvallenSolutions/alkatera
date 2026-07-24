@@ -52,7 +52,13 @@ import { useOrganization } from '@/lib/organizationContext';
 import { useUserRole } from '@/lib/rosa/useUserRole';
 import { trackOnboarding } from '@/lib/onboarding/telemetry';
 import { ROOM_GUIDES } from '@/lib/onboarding/room-guides';
-import { PLATFORM_ROOMS, deskOrderForPersona, type PlatformRoomKey } from './platform-rooms';
+import {
+  PLATFORM_ROOMS,
+  deskOrderForPersona,
+  roomIsReachable,
+  type PlatformRoomKey,
+} from './platform-rooms';
+import { useSectionAccess } from '@/lib/access/SectionAccessProvider';
 import { STUDIO_EASE } from './theme';
 import { Panel } from './panel';
 import { Eyebrow } from './eyebrow';
@@ -132,9 +138,17 @@ export function DeskWelcome() {
   const { persona } = useUserRole();
   const { state, isLoading, shouldShowOnboarding, markRoomIntroSeen } = useOnboarding();
 
-  // The full seven-room desk order, persona-weighted, wiring last — the
-  // same order the desk grid actually renders in.
-  const order = useMemo(() => deskOrderForPersona(persona), [persona]);
+  // The full desk order, persona-weighted, wiring last — the same order the
+  // desk grid actually renders in, and with the same rooms removed: the tour
+  // must not walk someone to a poster block that is not on their desk.
+  const { access: sectionAccess } = useSectionAccess();
+  const order = useMemo(
+    () =>
+      deskOrderForPersona(persona).filter((key) =>
+        roomIsReachable(PLATFORM_ROOMS[key], sectionAccess),
+      ),
+    [persona, sectionAccess],
+  );
 
   const introSeen = state.rooms?.desk?.introSeen ?? false;
 

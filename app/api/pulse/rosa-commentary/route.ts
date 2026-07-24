@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { denySection } from '@/lib/auth/section-access';
 import { runToolLoop } from '@/lib/rosa/run-tool-loop';
 import { buildRosaMicroPersona } from '@/lib/rosa/persona';
 
@@ -101,6 +102,9 @@ export async function POST(request: NextRequest) {
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation' }, { status: 403 });
     }
+
+    const denied = await denySection(svc, user, organizationId, 'pulse');
+    if (denied) return denied;
 
     const userMessage = `${spec.userPrefix}\n\n<context>\n${JSON.stringify(body.context ?? {}, null, 2)}\n</context>\n\nReply with three to four short bullets, nothing else.`;
 
