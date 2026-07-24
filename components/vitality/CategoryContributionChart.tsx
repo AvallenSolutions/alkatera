@@ -34,36 +34,15 @@ interface CategoryContributionChartProps {
   className?: string;
 }
 
-const SCOPE3_COLORS = [
-  'bg-emerald-500',
-  'bg-teal-500',
-  'bg-cyan-500',
-  'bg-sky-500',
-  'bg-blue-500',
-  'bg-indigo-500',
-  'bg-violet-500',
-  'bg-fuchsia-500',
-  'bg-pink-500',
-  'bg-rose-500',
-  'bg-orange-500',
-  'bg-amber-500',
-  'bg-yellow-500',
-  'bg-lime-500',
-  'bg-green-500',
-];
-
-const GRADIENT_COLORS = [
-  'bg-gradient-to-r from-emerald-400 to-teal-500',
-  'bg-gradient-to-r from-cyan-400 to-blue-500',
-  'bg-gradient-to-r from-blue-400 to-indigo-500',
-  'bg-gradient-to-r from-indigo-400 to-violet-500',
-  'bg-gradient-to-r from-violet-400 to-fuchsia-500',
-  'bg-gradient-to-r from-fuchsia-400 to-pink-500',
-  'bg-gradient-to-r from-pink-400 to-rose-500',
-  'bg-gradient-to-r from-rose-400 to-orange-500',
-  'bg-gradient-to-r from-orange-400 to-amber-500',
-  'bg-gradient-to-r from-amber-400 to-yellow-500',
-];
+/**
+ * One bar colour, the room's ink.
+ *
+ * This was two rainbows — fifteen flat hues and ten gradients — cycled by
+ * index. Neither carried meaning: the category is named on the row, and a bar
+ * whose colour is decided by its position in an array tells the reader nothing
+ * except that someone wanted it colourful. Width is the measurement.
+ */
+const BAR_CLASS = 'bg-room-accent';
 
 export function CategoryContributionChart({
   categories,
@@ -88,9 +67,9 @@ export function CategoryContributionChart({
 
   const getColor = (index: number): string => {
     if (colorScheme === 'gradient') {
-      return GRADIENT_COLORS[index % GRADIENT_COLORS.length];
+      return BAR_CLASS;
     }
-    return SCOPE3_COLORS[index % SCOPE3_COLORS.length];
+    return BAR_CLASS;
   };
 
   const formatValue = (value: number): string => {
@@ -107,7 +86,7 @@ export function CategoryContributionChart({
     if (!trend) return null;
     const Icon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
     const color =
-      trend === 'down' ? 'text-green-600' : trend === 'up' ? 'text-red-600' : 'text-slate-500';
+      trend === 'down' ? 'text-studio-good' : trend === 'up' ? 'text-studio-stale' : 'text-muted-foreground';
     return (
       <span className={cn('flex items-center gap-0.5 text-xs', color)}>
         <Icon className="h-3 w-3" />
@@ -119,10 +98,10 @@ export function CategoryContributionChart({
   const DataQualityIndicator = ({ quality }: { quality?: string }) => {
     if (!quality) return null;
     const config: Record<string, { icon: typeof CheckCircle2; color: string; label: string }> = {
-      primary: { icon: CheckCircle2, color: 'text-green-600', label: 'Primary data' },
-      secondary: { icon: CheckCircle2, color: 'text-blue-600', label: 'Secondary data' },
-      estimated: { icon: AlertCircle, color: 'text-amber-600', label: 'Estimated' },
-      missing: { icon: AlertCircle, color: 'text-red-600', label: 'Missing data' },
+      primary: { icon: CheckCircle2, color: 'text-studio-good', label: 'Primary data' },
+      secondary: { icon: CheckCircle2, color: 'text-muted-foreground', label: 'Secondary data' },
+      estimated: { icon: AlertCircle, color: 'text-studio-attention', label: 'Estimated' },
+      missing: { icon: AlertCircle, color: 'text-studio-stale', label: 'Missing data' },
     };
     const conf = config[quality] || config.estimated;
     const Icon = conf.icon;
@@ -150,7 +129,7 @@ export function CategoryContributionChart({
           </CardHeader>
         )}
         <CardContent className="space-y-4">
-          <div className="flex h-8 rounded-lg overflow-hidden">
+          <div className="flex h-8 rounded-[6px] overflow-hidden">
             {displayCategories.map((cat, idx) => {
               const width = total > 0 ? (cat.value / total) * 100 : 0;
               if (width < 0.5) return null;
@@ -187,7 +166,7 @@ export function CategoryContributionChart({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div
-                      className="h-full bg-slate-300 dark:bg-slate-600 transition-all hover:opacity-80"
+                      className="h-full bg-studio-ink/20 transition-all hover:opacity-80"
                       style={{ width: `${(otherTotal / total) * 100}%` }}
                     />
                   </TooltipTrigger>
@@ -210,7 +189,7 @@ export function CategoryContributionChart({
               <div
                 key={cat.id}
                 className={cn(
-                  'flex items-center gap-2 p-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors',
+                  'flex items-center gap-2 p-2 rounded-md hover: dark:hover:bg-studio-ink/10/50 cursor-pointer transition-colors',
                   cat.onClick || onCategoryClick ? 'cursor-pointer' : ''
                 )}
                 onClick={() => {
@@ -237,7 +216,7 @@ export function CategoryContributionChart({
     <div className={cn('space-y-3', className)}>
       {(title || subtitle) && (
         <div className="mb-4">
-          {title && <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h3>}
+          {title && <h3 className="text-sm font-semibold text-foreground">{title}</h3>}
           {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
         </div>
       )}
@@ -261,14 +240,14 @@ export function CategoryContributionChart({
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <div className={cn('w-2.5 h-2.5 rounded-sm flex-shrink-0', cat.color || getColor(idx))} />
-                <span className="text-sm font-medium truncate text-slate-900 dark:text-slate-100">
+                <span className="text-sm font-medium truncate text-foreground">
                   {cat.name}
                 </span>
                 {showDataQuality && <DataQualityIndicator quality={cat.dataQuality} />}
                 {showTrends && <TrendIndicator trend={cat.trend} value={cat.trendValue} />}
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <span className="text-sm font-mono text-slate-700 dark:text-slate-300">
+                <span className="text-sm font-mono text-muted-foreground">
                   {formatValue(cat.value)}
                 </span>
                 {showPercentages && (
@@ -281,7 +260,7 @@ export function CategoryContributionChart({
                 )}
               </div>
             </div>
-            <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+            <div className="w-full bg-studio-ink/10 rounded-full h-2 overflow-hidden">
               <div
                 className={cn(
                   'h-full rounded-full transition-all duration-500',
@@ -299,13 +278,13 @@ export function CategoryContributionChart({
         <div className="group">
           <div className="flex items-center justify-between mb-1.5">
             <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-sm bg-slate-400" />
-              <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+              <div className="w-2.5 h-2.5 rounded-sm bg-studio-ink/30" />
+              <span className="text-sm font-medium text-muted-foreground">
                 Other ({categories.length - (maxCategories || 0)} categories)
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-mono text-slate-600">{formatValue(otherTotal)}</span>
+              <span className="text-sm font-mono text-muted-foreground">{formatValue(otherTotal)}</span>
               {showPercentages && (
                 <Badge variant="outline" className="text-xs tabular-nums">
                   {((otherTotal / total) * 100).toFixed(1)}%
@@ -313,18 +292,18 @@ export function CategoryContributionChart({
               )}
             </div>
           </div>
-          <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+          <div className="w-full bg-studio-ink/10 rounded-full h-2 overflow-hidden">
             <div
-              className="h-full rounded-full bg-slate-400"
+              className="h-full rounded-full bg-studio-ink/30"
               style={{ width: `${(otherTotal / total) * 100}%` }}
             />
           </div>
         </div>
       )}
 
-      <div className="pt-3 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
-        <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Total</span>
-        <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
+      <div className="pt-3 border-t flex items-center justify-between">
+        <span className="text-sm font-medium text-muted-foreground">Total</span>
+        <span className="text-sm font-bold text-foreground">
           {formatValue(total)} {unit}
         </span>
       </div>

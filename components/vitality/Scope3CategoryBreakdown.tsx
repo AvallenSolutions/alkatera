@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { StateChip } from '@/components/studio/state-chip';
+import { SectionTabs } from '@/components/studio/section-tabs';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Sheet,
   SheetContent,
@@ -75,23 +75,16 @@ const CATEGORY_ICONS: Record<number, typeof Package> = {
   15: PiggyBank,
 };
 
-const CATEGORY_COLORS: Record<number, string> = {
-  1: 'bg-emerald-500',
-  2: 'bg-teal-500',
-  3: 'bg-cyan-500',
-  4: 'bg-sky-500',
-  5: 'bg-amber-500',
-  6: 'bg-blue-500',
-  7: 'bg-indigo-500',
-  8: 'bg-violet-500',
-  9: 'bg-fuchsia-500',
-  10: 'bg-pink-500',
-  11: 'bg-rose-500',
-  12: 'bg-orange-500',
-  13: 'bg-yellow-500',
-  14: 'bg-lime-500',
-  15: 'bg-green-500',
-};
+/**
+ * Every category bar takes the room's ink.
+ *
+ * This was a fifteen-hue rainbow, one per GHG Protocol category. Fifteen hues
+ * are not distinguishable to a reader and the category is named in words on
+ * the same row, so the colour was encoding something already said — while
+ * making the panel look like a chart of nothing in particular. The bar's job
+ * is magnitude, and its width already carries that.
+ */
+const CATEGORY_BAR = 'bg-room-accent';
 
 export function Scope3CategoryBreakdown({
   categories,
@@ -105,6 +98,7 @@ export function Scope3CategoryBreakdown({
   className,
 }: Scope3CategoryBreakdownProps) {
   const [selectedCategory, setSelectedCategory] = useState<Scope3CategoryData | null>(null);
+  const [tab, setTab] = useState('products');
   const [detailSheetOpen, setDetailSheetOpen] = useState(false);
 
   const formatEmissions = (value: number): string => {
@@ -125,7 +119,7 @@ export function Scope3CategoryBreakdown({
     dataQuality: cat.dataQuality,
     trend: cat.trend,
     trendValue: cat.trendPercentage,
-    color: CATEGORY_COLORS[cat.category],
+    color: CATEGORY_BAR,
     onClick: () => {
       setSelectedCategory(cat);
       setDetailSheetOpen(true);
@@ -161,59 +155,56 @@ export function Scope3CategoryBreakdown({
       return (
         <div className="space-y-6">
           <div className="grid grid-cols-3 gap-4">
-            <Card className="bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200">
-              <CardContent className="p-4">
-                <p className="text-xs text-emerald-700 dark:text-emerald-400">Products</p>
-                <p className="text-2xl font-bold text-emerald-900 dark:text-emerald-100">
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="space-y-3">
+                <p className="text-xs text-studio-good dark:text-studio-good">Products</p>
+                <p className="text-2xl font-bold text-studio-good">
                   {productDetails.length}
                 </p>
-              </CardContent>
-            </Card>
-            <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200">
-              <CardContent className="p-4">
-                <p className="text-xs text-blue-700 dark:text-blue-400">Units Produced</p>
-                <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+              </div>
+            </section>
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground dark:text-muted-foreground">Units Produced</p>
+                <p className="text-2xl font-bold text-foreground">
                   {productDetails
                     .reduce((sum, p) => sum + p.unitsProduced, 0)
                     .toLocaleString()}
                 </p>
-              </CardContent>
-            </Card>
-            <Card className="bg-amber-50 dark:bg-amber-950/20 border-amber-200">
-              <CardContent className="p-4">
-                <p className="text-xs text-amber-700 dark:text-amber-400">Total Emissions</p>
-                <p className="text-2xl font-bold text-amber-900 dark:text-amber-100">
+              </div>
+            </section>
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="space-y-3">
+                <p className="text-xs text-studio-attention dark:text-studio-attention">Total Emissions</p>
+                <p className="text-2xl font-bold text-studio-attention">
                   {formatEmissions(selectedCategory.totalEmissions)} CO₂e
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           </div>
 
-          <Tabs defaultValue="products" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="products">By Product</TabsTrigger>
-              <TabsTrigger value="materials">Top Materials</TabsTrigger>
-              <TabsTrigger value="entries">All Entries</TabsTrigger>
-            </TabsList>
+          
+            <SectionTabs value={tab} onChange={setTab} tabs={[{ value: 'products', label: 'By Product' }, { value: 'materials', label: 'Top Materials' }, { value: 'entries', label: 'All Entries' }]} />
 
-            <TabsContent value="products" className="mt-4 space-y-3">
+            {tab === 'products' && (
+<div className="mt-4 space-y-3">
               {productDetails
                 .sort((a, b) => b.totalEmissions - a.totalEmissions)
                 .map(product => (
-                  <Card key={product.productId} className="overflow-hidden">
+                  <section key={product.productId} className="border-t border-studio-hairline pt-5">
                     <div className="p-4">
                       <div className="flex items-start justify-between mb-3">
                         <div>
-                          <h4 className="font-semibold text-slate-900 dark:text-slate-100">
+                          <h4 className="font-semibold text-foreground">
                             {product.productName}
                           </h4>
                           {product.sku && (
                             <p className="text-xs text-muted-foreground">SKU: {product.sku}</p>
                           )}
                         </div>
-                        <Badge variant="secondary">
+                        <StateChip>
                           {formatEmissions(product.totalEmissions)} CO₂e
-                        </Badge>
+                        </StateChip>
                       </div>
 
                       <div className="grid grid-cols-3 gap-4 text-sm mb-3">
@@ -241,9 +232,9 @@ export function Scope3CategoryBreakdown({
                         </div>
                       </div>
 
-                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2">
+                      <div className="w-full rounded-full h-2">
                         <div
-                          className="h-full rounded-full bg-emerald-500"
+                          className="h-full rounded-full bg-room-accent"
                           style={{
                             width: `${
                               (product.totalEmissions / selectedCategory.totalEmissions) * 100
@@ -253,7 +244,7 @@ export function Scope3CategoryBreakdown({
                       </div>
 
                       {(product.materials.length > 0 || product.packaging.length > 0) && (
-                        <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                        <div className="mt-4 pt-4 border-t">
                           <div className="grid md:grid-cols-2 gap-4">
                             {product.materials.length > 0 && (
                               <div>
@@ -299,11 +290,13 @@ export function Scope3CategoryBreakdown({
                         </div>
                       )}
                     </div>
-                  </Card>
+                  </section>
                 ))}
-            </TabsContent>
+            </div>
+)}
 
-            <TabsContent value="materials" className="mt-4">
+            {tab === 'materials' && (
+<div className="mt-4 space-y-3">
               {(() => {
                 const allMaterials = productDetails.flatMap(p => [
                   ...p.materials.map(m => ({ ...m, type: 'ingredient' as const })),
@@ -347,16 +340,19 @@ export function Scope3CategoryBreakdown({
                   />
                 );
               })()}
-            </TabsContent>
+            </div>
+)}
 
-            <TabsContent value="entries" className="mt-4">
+            {tab === 'entries' && (
+<div className="mt-4 space-y-3">
               <EmissionsDrillDownTable
                 entries={entries}
                 showCategory={false}
                 emptyMessage="No individual entries recorded"
               />
-            </TabsContent>
-          </Tabs>
+            </div>
+)}
+          
         </div>
       );
     }
@@ -371,40 +367,40 @@ export function Scope3CategoryBreakdown({
       return (
         <div className="space-y-6">
           <div className="grid grid-cols-3 gap-4">
-            <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200">
-              <CardContent className="p-4">
-                <p className="text-xs text-blue-700 dark:text-blue-400">Trips</p>
-                <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground dark:text-muted-foreground">Trips</p>
+                <p className="text-2xl font-bold text-foreground">
                   {travelDetails.length}
                 </p>
-              </CardContent>
-            </Card>
-            <Card className="bg-sky-50 dark:bg-sky-950/20 border-sky-200">
-              <CardContent className="p-4">
-                <p className="text-xs text-sky-700 dark:text-sky-400">Total Distance</p>
-                <p className="text-2xl font-bold text-sky-900 dark:text-sky-100">
+              </div>
+            </section>
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground dark:text-muted-foreground">Total Distance</p>
+                <p className="text-2xl font-bold text-foreground">
                   {travelDetails
                     .reduce((sum, t) => sum + (t.distance || 0), 0)
                     .toLocaleString()}{' '}
                   km
                 </p>
-              </CardContent>
-            </Card>
-            <Card className="bg-amber-50 dark:bg-amber-950/20 border-amber-200">
-              <CardContent className="p-4">
-                <p className="text-xs text-amber-700 dark:text-amber-400">Total Emissions</p>
-                <p className="text-2xl font-bold text-amber-900 dark:text-amber-100">
+              </div>
+            </section>
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="space-y-3">
+                <p className="text-xs text-studio-attention dark:text-studio-attention">Total Emissions</p>
+                <p className="text-2xl font-bold text-studio-attention">
                   {formatEmissions(selectedCategory.totalEmissions)} CO₂e
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">By Transport Mode</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <section className="border-t border-studio-hairline pt-5">
+            <div className="mb-3">
+              <Eyebrow>By Transport Mode</Eyebrow>
+            </div>
+            <div className="space-y-3">
               <CategoryContributionChart
                 categories={Array.from(byMode.entries())
                   .sort((a, b) => b[1] - a[1])
@@ -419,8 +415,8 @@ export function Scope3CategoryBreakdown({
                   }))}
                 showTrends={false}
               />
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
           <EmissionsDrillDownTable
             entries={travelDetails.map(t => ({
@@ -445,27 +441,27 @@ export function Scope3CategoryBreakdown({
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
-          <Card className="bg-slate-50 dark:bg-slate-900/50">
-            <CardContent className="p-4">
+          <section className="border-t border-studio-hairline pt-5">
+            <div className="space-y-3">
               <p className="text-xs text-muted-foreground">Entries</p>
               <p className="text-2xl font-bold">{selectedCategory.entryCount}</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-slate-50 dark:bg-slate-900/50">
-            <CardContent className="p-4">
+            </div>
+          </section>
+          <section className="border-t border-studio-hairline pt-5">
+            <div className="space-y-3">
               <p className="text-xs text-muted-foreground">Total Emissions</p>
               <p className="text-2xl font-bold">
                 {formatEmissions(selectedCategory.totalEmissions)} CO₂e
               </p>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         </div>
 
         {entries.length > 0 ? (
           <EmissionsDrillDownTable entries={entries} showCategory={false} />
         ) : (
-          <Card className="bg-slate-50 dark:bg-slate-900/50">
-            <CardContent className="p-8 text-center">
+          <section className="border-t border-studio-hairline pt-5">
+            <div className="space-y-3">
               <Info className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
               <p className="text-sm text-muted-foreground">
                 No detailed entries available for this category.
@@ -473,8 +469,8 @@ export function Scope3CategoryBreakdown({
               <p className="text-xs text-muted-foreground mt-2">
                 Add data through the Company Footprint builder to see detailed breakdowns.
               </p>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         )}
       </div>
     );
@@ -484,8 +480,8 @@ export function Scope3CategoryBreakdown({
     return (
       <div className={cn('space-y-4', className)}>
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-1/3" />
-          <div className="h-64 bg-slate-200 dark:bg-slate-700 rounded" />
+          <div className="h-8 bg-studio-ink/10 rounded w-1/3" />
+          <div className="h-64 bg-studio-ink/10 rounded" />
         </div>
       </div>
     );
@@ -495,65 +491,65 @@ export function Scope3CategoryBreakdown({
     <div className={cn('space-y-6', className)}>
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          <h3 className="text-lg font-semibold text-foreground">
             Scope 3 Emissions by Category
           </h3>
           <p className="text-sm text-muted-foreground">
             GHG Protocol Corporate Value Chain (Scope 3) Standard
           </p>
         </div>
-        <Badge variant="outline" className="text-lg font-mono">
+        <StateChip>
           {formatEmissions(totalScope3)} CO₂e
-        </Badge>
+        </StateChip>
       </div>
 
       <div className="grid grid-cols-4 gap-3">
-        <Card className="bg-green-50 dark:bg-green-950/20 border-green-200">
-          <CardContent className="p-3 text-center">
-            <CheckCircle2 className="h-5 w-5 mx-auto mb-1 text-green-600" />
-            <p className="text-xl font-bold text-green-900 dark:text-green-100">
+        <section className="border-t border-studio-hairline pt-5">
+          <div className="space-y-3">
+            <CheckCircle2 className="h-5 w-5 mx-auto mb-1 text-studio-good" />
+            <p className="text-xl font-bold text-studio-good">
               {qualityStats.primary}
             </p>
-            <p className="text-xs text-green-700 dark:text-green-400">Primary Data</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200">
-          <CardContent className="p-3 text-center">
-            <CheckCircle2 className="h-5 w-5 mx-auto mb-1 text-blue-600" />
-            <p className="text-xl font-bold text-blue-900 dark:text-blue-100">
+            <p className="text-xs text-studio-good dark:text-studio-good">Primary Data</p>
+          </div>
+        </section>
+        <section className="border-t border-studio-hairline pt-5">
+          <div className="space-y-3">
+            <CheckCircle2 className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+            <p className="text-xl font-bold text-foreground">
               {qualityStats.secondary}
             </p>
-            <p className="text-xs text-blue-700 dark:text-blue-400">Secondary Data</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-amber-50 dark:bg-amber-950/20 border-amber-200">
-          <CardContent className="p-3 text-center">
-            <AlertCircle className="h-5 w-5 mx-auto mb-1 text-amber-600" />
-            <p className="text-xl font-bold text-amber-900 dark:text-amber-100">
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground">Secondary Data</p>
+          </div>
+        </section>
+        <section className="border-t border-studio-hairline pt-5">
+          <div className="space-y-3">
+            <AlertCircle className="h-5 w-5 mx-auto mb-1 text-studio-attention" />
+            <p className="text-xl font-bold text-studio-attention">
               {qualityStats.estimated}
             </p>
-            <p className="text-xs text-amber-700 dark:text-amber-400">Estimated</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-slate-50 dark:bg-slate-900/50 border-slate-200">
-          <CardContent className="p-3 text-center">
-            <AlertCircle className="h-5 w-5 mx-auto mb-1 text-slate-400" />
-            <p className="text-xl font-bold text-slate-900 dark:text-slate-100">
+            <p className="text-xs text-studio-attention dark:text-studio-attention">Estimated</p>
+          </div>
+        </section>
+        <section className="border-t border-studio-hairline pt-5">
+          <div className="space-y-3">
+            <AlertCircle className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+            <p className="text-xl font-bold text-foreground">
               {qualityStats.missing}
             </p>
             <p className="text-xs text-muted-foreground">Not Reported</p>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Active Categories</CardTitle>
-          <CardDescription>
+      <section className="border-t border-studio-hairline pt-5">
+        <div className="mb-3">
+          <Eyebrow>Active Categories</Eyebrow>
+          <p className="text-sm text-muted-foreground">
             {activeCategories.length} of 15 Scope 3 categories have reported emissions
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div className="space-y-3">
           {activeCategories.length > 0 ? (
             <CategoryContributionChart
               categories={chartData}
@@ -576,32 +572,28 @@ export function Scope3CategoryBreakdown({
               </p>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       {inactiveCategories.length > 0 && (
-        <Card className="bg-slate-50 dark:bg-slate-900/50">
-          <CardHeader>
-            <CardTitle className="text-sm text-muted-foreground">Not Reported</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <section className="border-t border-studio-hairline pt-5">
+          <div className="mb-3">
+            <Eyebrow>Not Reported</Eyebrow>
+          </div>
+          <div className="space-y-3">
             <div className="flex flex-wrap gap-2">
               {inactiveCategories.map(cat => {
                 const Icon = CATEGORY_ICONS[cat.category] || Package;
                 return (
-                  <Badge
-                    key={cat.category}
-                    variant="outline"
-                    className="text-muted-foreground gap-1"
-                  >
+                  <StateChip>
                     <Icon className="h-3 w-3" />
                     Cat {cat.category}
-                  </Badge>
+                  </StateChip>
                 );
               })}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       )}
 
       <Sheet open={detailSheetOpen} onOpenChange={setDetailSheetOpen}>
@@ -612,8 +604,8 @@ export function Scope3CategoryBreakdown({
                 <div className="flex items-center gap-3">
                   <div
                     className={cn(
-                      'p-2.5 rounded-lg',
-                      CATEGORY_COLORS[selectedCategory.category]
+                      'p-2.5 rounded-[6px]',
+                      CATEGORY_BAR
                     )}
                   >
                     {(() => {
