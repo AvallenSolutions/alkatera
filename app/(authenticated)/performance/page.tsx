@@ -42,6 +42,7 @@ import type {
 } from '@/lib/vitality/environmental';
 import { PerformanceSummary } from '@/components/vitality/PillarCard';
 import { VitalityAxisSections, type AxisFacts } from '@/components/vitality/VitalityAxisSections';
+import { VitalityAxisProfile } from '@/components/vitality/VitalityAxisProfile';
 // Round 3 (auto-research): these deep-dive / sheet panels render only inside an
 // expanded pillar or an opened sheet, so their recharts-heavy bundles shouldn't
 // sit in /performance's First Load JS. Lazy-load them.
@@ -896,6 +897,9 @@ export default function PerformancePage() {
       )}
 
       <FlagThresholdBanner />
+
+      {/* The shape of the org in one glance, before the nine readings. */}
+      <VitalityAxisProfile composite={vitalityComposite} />
 
       {/* The nine axes. One list, three sections, every axis at the same
           standing — replaces the hero's boxed pillar breakdown AND the four
