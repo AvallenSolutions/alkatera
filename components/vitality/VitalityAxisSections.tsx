@@ -20,9 +20,11 @@ import type {
  * axes, which are the healthy ones, while the composite was being dragged
  * down by People & culture.
  *
- * Rows carry an `onSelect` today, which opens that axis's detail in place.
- * At step 3 of the plan those become hrefs to `/performance/[axis]/` and the
- * in-place detail goes; the row rhythm here does not need to change for that.
+ * Rows link to `/performance/[axis]/`. An axis is somewhere you GO, the way
+ * you go from the cellar to a product — not a card that expands, and not a
+ * sheet laid over the page you were reading. Axes with no page of their own
+ * (the social and governance ones, which have no deep-dive body yet) render as
+ * plain rows rather than dead links.
  */
 
 export type AxisKey =
@@ -48,8 +50,7 @@ export type AxisFacts = Partial<Record<AxisKey, string>>;
 function axisRows(
   sub: Record<string, number | null>,
   facts: AxisFacts,
-  selectable: Set<AxisKey>,
-  onSelect?: (axis: AxisKey) => void,
+  linked: Set<AxisKey>,
 ): FactRowItem[] {
   return Object.entries(sub).map(([key, value]) => {
     const axis = key as AxisKey;
@@ -61,7 +62,7 @@ function axisRows(
       // no headline figure says nothing rather than inventing one.
       hint: scored ? facts[axis] : 'Nothing yet',
       value: scored ? String(Math.round(value as number)) : '—',
-      onClick: selectable.has(axis) && onSelect ? () => onSelect(axis) : undefined,
+      href: linked.has(axis) ? `/performance/${axis}/` : undefined,
     };
   });
 }
@@ -91,36 +92,34 @@ function Section({
 export function VitalityAxisSections({
   composite,
   facts = {},
-  selectableAxes,
-  onSelectAxis,
+  linkedAxes,
 }: {
   composite: VitalityComposite | null;
   /** Plain-language figures, keyed by axis. Supplied by the page. */
   facts?: AxisFacts;
-  /** Axes that currently have somewhere to go. */
-  selectableAxes?: AxisKey[];
-  onSelectAxis?: (axis: AxisKey) => void;
+  /** Axes that have a page of their own. */
+  linkedAxes?: AxisKey[];
 }) {
   if (!composite) return null;
 
-  const selectable = new Set<AxisKey>(selectableAxes ?? []);
+  const linked = new Set<AxisKey>(linkedAxes ?? []);
 
   return (
     <div className="space-y-6">
       <Section
         title="The environment"
         score={composite.e.score}
-        items={axisRows(composite.e.sub as any, facts, selectable, onSelectAxis)}
+        items={axisRows(composite.e.sub as any, facts, linked)}
       />
       <Section
         title="The people"
         score={composite.s.score}
-        items={axisRows(composite.s.sub as any, facts, selectable, onSelectAxis)}
+        items={axisRows(composite.s.sub as any, facts, linked)}
       />
       <Section
         title="The governance"
         score={composite.g.score}
-        items={axisRows(composite.g.sub as any, facts, selectable, onSelectAxis)}
+        items={axisRows(composite.g.sub as any, facts, linked)}
       />
     </div>
   );

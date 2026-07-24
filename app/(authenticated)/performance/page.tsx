@@ -9,10 +9,8 @@ import { BigNumber } from '@/components/studio/big-number';
 import { StateChip } from '@/components/studio/state-chip';
 import { PillButton } from '@/components/studio/pill-button';
 
-import { useCompanyMetrics, CompanyMetrics } from '@/hooks/data/useCompanyMetrics';
-import { useCompanyFootprint } from '@/hooks/data/useCompanyFootprint';
-import { useWasteMetrics } from '@/hooks/data/useWasteMetrics';
-import { useFacilityWaterData } from '@/hooks/data/useFacilityWaterData';
+import { type CompanyMetrics } from '@/hooks/data/useCompanyMetrics';
+import { useAxisData } from '@/hooks/data/useAxisData';
 import { useOrganization } from '@/lib/organizationContext';
 import { usePersistedYear, useLatestDataYear } from '@/hooks/usePersistedYear';
 import type {
@@ -50,16 +48,13 @@ const CarbonDeepDive = dynamic(() => import('@/components/vitality/CarbonDeepDiv
 const WaterDeepDive = dynamic(() => import('@/components/vitality/WaterDeepDive').then((m) => m.WaterDeepDive), { ssr: false });
 const WasteDeepDive = dynamic(() => import('@/components/vitality/WasteDeepDive').then((m) => m.WasteDeepDive), { ssr: false });
 const NatureDeepDive = dynamic(() => import('@/components/vitality/NatureDeepDive').then((m) => m.NatureDeepDive), { ssr: false });
-const CarbonBreakdownSheet = dynamic(() => import('@/components/vitality/CarbonBreakdownSheet').then((m) => m.CarbonBreakdownSheet), { ssr: false });
-const WaterImpactSheet = dynamic(() => import('@/components/vitality/WaterImpactSheet').then((m) => m.WaterImpactSheet), { ssr: false });
-const CircularitySheet = dynamic(() => import('@/components/vitality/CircularitySheet').then((m) => m.CircularitySheet), { ssr: false });
-const NatureImpactSheet = dynamic(() => import('@/components/vitality/NatureImpactSheet').then((m) => m.NatureImpactSheet), { ssr: false });
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import type { NatureMetrics } from '@/hooks/data/useCompanyMetrics';
+import type { ScopeBreakdown } from '@/lib/vitality/scope3-transform';
 
 /**
  * Derive biodiversity risk from per-unit nature metrics using the established
@@ -98,298 +93,8 @@ function deriveBiodiversityRisk(natureMetrics: NatureMetrics | null): 'high' | '
   return 'high';                         // Mostly needs work → high risk
 }
 
-interface ScopeBreakdown {
-  scope1: number;
-  scope2: number;
-  scope3: number;
-}
-
-const SCOPE3_CATEGORY_DEFINITIONS = [
-  { category: 1, name: 'Purchased Goods & Services', description: 'Upstream emissions from purchased goods and services' },
-  { category: 2, name: 'Capital Goods', description: 'Upstream emissions from capital goods' },
-  { category: 3, name: 'Fuel & Energy Related Activities', description: 'Not included in Scope 1 or 2' },
-  { category: 4, name: 'Upstream Transportation', description: 'Transportation of purchased goods' },
-  { category: 5, name: 'Waste Generated in Operations', description: 'Disposal of waste generated' },
-  { category: 6, name: 'Business Travel', description: 'Employee business travel' },
-  { category: 7, name: 'Employee Commuting', description: 'Employee travel to work' },
-  { category: 8, name: 'Upstream Leased Assets', description: 'Emissions from leased assets' },
-  { category: 9, name: 'Downstream Transportation', description: 'Transportation of sold products' },
-  { category: 10, name: 'Processing of Sold Products', description: 'Processing by third parties' },
-  { category: 11, name: 'Use of Sold Products', description: 'End use of products' },
-  { category: 12, name: 'End-of-Life Treatment', description: 'Disposal of sold products' },
-  { category: 13, name: 'Downstream Leased Assets', description: 'Emissions from leased assets' },
-  { category: 14, name: 'Franchises', description: 'Emissions from franchises' },
-  { category: 15, name: 'Investments', description: 'Emissions from investments' },
-];
-
-function transformFootprintToScope3Categories(
-  footprintData: any
-): {
-  categories: Scope3CategoryData[];
-  productDetails: ProductEmissionDetail[];
-  travelDetails: BusinessTravelDetail[];
-  logisticsDetails: LogisticsDetail[];
-  wasteDetails: WasteDetail[];
-  totalScope3: number;
-} {
-  if (!footprintData?.breakdown?.scope3) {
-    return {
-      categories: [],
-      productDetails: [],
-      travelDetails: [],
-      logisticsDetails: [],
-      wasteDetails: [],
-      totalScope3: 0,
-    };
-  }
-
-  const scope3Data = footprintData.breakdown.scope3;
-
-  // Map all available scope 3 category data from corporate emissions calculator
-  // Categories not populated remain as 0 with 'missing' quality
-  // GHG Protocol Category Mapping:
-  // - Cat 1: Purchased goods & services (includes products, purchased_services, marketing_materials)
-  // - Cat 8: Upstream leased assets (only for actual leased asset emissions, NOT purchased services)
-  const cat1Value = (scope3Data.products || 0) + (scope3Data.purchased_services || 0) + (scope3Data.marketing_materials || scope3Data.marketing || 0) + (scope3Data.hospitality || 0);
-  const cat1HasData = cat1Value > 0;
-
-  const categoryMapping: Record<number, { value: number; dataQuality: 'primary' | 'secondary' | 'estimated' | 'missing' }> = {
-    // Cat 1: Purchased Goods & Services (products + purchased services + marketing materials)
-    1: { value: cat1Value, dataQuality: cat1HasData ? 'primary' : 'missing' },
-    // Cat 2: Capital Goods
-    2: { value: scope3Data.capital_goods || 0, dataQuality: scope3Data.capital_goods > 0 ? 'secondary' : 'missing' },
-    // Cat 3: Fuel & Energy Related (WTT) - estimated as ~15% of fuel-related emissions
-    3: { value: 0, dataQuality: 'missing' },
-    // Cat 4: Upstream Transportation (from product LCA transport impacts)
-    4: { value: scope3Data.upstream_transport || 0, dataQuality: scope3Data.upstream_transport > 0 ? 'secondary' : 'missing' },
-    // Cat 5: Waste Generated in Operations
-    5: { value: scope3Data.waste || scope3Data.operational_waste || 0, dataQuality: (scope3Data.waste || scope3Data.operational_waste) > 0 ? 'secondary' : 'missing' },
-    // Cat 6: Business Travel
-    6: { value: scope3Data.business_travel || 0, dataQuality: scope3Data.business_travel > 0 ? 'primary' : 'missing' },
-    // Cat 7: Employee Commuting
-    7: { value: scope3Data.employee_commuting || 0, dataQuality: scope3Data.employee_commuting > 0 ? 'secondary' : 'missing' },
-    // Cat 8: Upstream Leased Assets - only for actual leased asset emissions (NOT purchased services)
-    8: { value: 0, dataQuality: 'missing' },
-    // Cat 9: Downstream Transportation (logistics spend + downstream transport)
-    9: { value: (scope3Data.logistics || scope3Data.downstream_logistics || 0) + (scope3Data.downstream_transport || 0), dataQuality: (scope3Data.logistics || scope3Data.downstream_logistics || scope3Data.downstream_transport) > 0 ? 'secondary' : 'missing' },
-    // Cat 10: Processing of Sold Products - typically not applicable for finished goods
-    10: { value: 0, dataQuality: 'missing' },
-    // Cat 11: Use of Sold Products (from product LCA use phase)
-    11: { value: scope3Data.use_phase || 0, dataQuality: scope3Data.use_phase > 0 ? 'secondary' : 'missing' },
-    // Cat 12: End-of-Life Treatment (would need separate calculation from product LCA)
-    12: { value: 0, dataQuality: 'missing' },
-    // Cat 13-15: Downstream Leased Assets, Franchises, Investments - typically not applicable
-    13: { value: 0, dataQuality: 'missing' },
-    14: { value: 0, dataQuality: 'missing' },
-    15: { value: 0, dataQuality: 'missing' },
-  };
-
-  // Generate detailed entries for each category from the breakdown data
-  const generateEntriesForCategory = (categoryNum: number): Array<{
-    id: string;
-    date: string;
-    description: string;
-    emissions: number;
-    unit: string;
-    source: string;
-    dataQuality: 'primary' | 'secondary' | 'estimated';
-    metadata?: Record<string, any>;
-  }> => {
-    const entries: Array<{
-      id: string;
-      date: string;
-      description: string;
-      emissions: number;
-      unit: string;
-      source: string;
-      dataQuality: 'primary' | 'secondary' | 'estimated';
-      metadata?: Record<string, any>;
-    }> = [];
-    const today = new Date().toISOString().split('T')[0];
-
-    switch (categoryNum) {
-      case 1: // Purchased Goods & Services
-        if (scope3Data.products > 0) {
-          entries.push({
-            id: 'cat1-products',
-            date: today,
-            description: 'Product LCA Scope 3 Emissions',
-            emissions: scope3Data.products,
-            unit: 'kg CO₂e',
-            source: 'Product Carbon Footprint Assessments',
-            dataQuality: 'primary',
-            metadata: { type: 'product_lca' },
-          });
-        }
-        if (scope3Data.purchased_services > 0) {
-          entries.push({
-            id: 'cat1-services',
-            date: today,
-            description: 'Purchased Services',
-            emissions: scope3Data.purchased_services,
-            unit: 'kg CO₂e',
-            source: 'Corporate Overheads',
-            dataQuality: 'secondary',
-            metadata: { type: 'purchased_services' },
-          });
-        }
-        if ((scope3Data.marketing_materials || scope3Data.marketing) > 0) {
-          entries.push({
-            id: 'cat1-marketing',
-            date: today,
-            description: 'Marketing Materials',
-            emissions: scope3Data.marketing_materials || scope3Data.marketing,
-            unit: 'kg CO₂e',
-            source: 'Corporate Overheads',
-            dataQuality: 'secondary',
-            metadata: { type: 'marketing_materials' },
-          });
-        }
-        if (scope3Data.hospitality > 0) {
-          entries.push({
-            id: 'cat1-hospitality',
-            date: today,
-            description: 'Hospitality service (meals, drinks, rooms, waste)',
-            emissions: scope3Data.hospitality,
-            unit: 'kg CO₂e',
-            source: 'Hospitality module',
-            dataQuality: 'primary',
-            metadata: { type: 'hospitality' },
-          });
-        }
-        break;
-      case 2: // Capital Goods
-        if (scope3Data.capital_goods > 0) {
-          entries.push({
-            id: 'cat2-capital',
-            date: today,
-            description: 'Capital Goods Purchases',
-            emissions: scope3Data.capital_goods,
-            unit: 'kg CO₂e',
-            source: 'Corporate Overheads',
-            dataQuality: 'secondary',
-          });
-        }
-        break;
-      case 4: // Upstream Transportation
-        if (scope3Data.upstream_transport > 0) {
-          entries.push({
-            id: 'cat4-upstream',
-            date: today,
-            description: 'Upstream Transportation',
-            emissions: scope3Data.upstream_transport,
-            unit: 'kg CO₂e',
-            source: 'Product LCA Transport Impacts',
-            dataQuality: 'secondary',
-          });
-        }
-        break;
-      case 5: // Waste
-        if ((scope3Data.waste || scope3Data.operational_waste) > 0) {
-          entries.push({
-            id: 'cat5-waste',
-            date: today,
-            description: 'Operational Waste',
-            emissions: scope3Data.waste || scope3Data.operational_waste,
-            unit: 'kg CO₂e',
-            source: 'Corporate Overheads',
-            dataQuality: 'secondary',
-          });
-        }
-        break;
-      case 6: // Business Travel
-        if (scope3Data.business_travel > 0) {
-          entries.push({
-            id: 'cat6-travel',
-            date: today,
-            description: 'Business Travel',
-            emissions: scope3Data.business_travel,
-            unit: 'kg CO₂e',
-            source: 'Corporate Overheads / Fleet Activities',
-            dataQuality: 'primary',
-          });
-        }
-        break;
-      case 7: // Employee Commuting
-        if (scope3Data.employee_commuting > 0) {
-          entries.push({
-            id: 'cat7-commuting',
-            date: today,
-            description: 'Employee Commuting',
-            emissions: scope3Data.employee_commuting,
-            unit: 'kg CO₂e',
-            source: 'Corporate Overheads',
-            dataQuality: 'secondary',
-          });
-        }
-        break;
-      case 9: // Downstream Transportation
-        const cat9Total = (scope3Data.logistics || scope3Data.downstream_logistics || 0) + (scope3Data.downstream_transport || 0);
-        if (cat9Total > 0) {
-          if ((scope3Data.logistics || scope3Data.downstream_logistics) > 0) {
-            entries.push({
-              id: 'cat9-logistics',
-              date: today,
-              description: 'Downstream Logistics',
-              emissions: scope3Data.logistics || scope3Data.downstream_logistics,
-              unit: 'kg CO₂e',
-              source: 'Corporate Overheads',
-              dataQuality: 'secondary',
-            });
-          }
-          if (scope3Data.downstream_transport > 0) {
-            entries.push({
-              id: 'cat9-transport',
-              date: today,
-              description: 'Downstream Transportation (Product LCA)',
-              emissions: scope3Data.downstream_transport,
-              unit: 'kg CO₂e',
-              source: 'Product LCA Distribution Impacts',
-              dataQuality: 'secondary',
-            });
-          }
-        }
-        break;
-      case 11: // Use of Sold Products
-        if (scope3Data.use_phase > 0) {
-          entries.push({
-            id: 'cat11-use',
-            date: today,
-            description: 'Use Phase Emissions',
-            emissions: scope3Data.use_phase,
-            unit: 'kg CO₂e',
-            source: 'Product LCA Use Phase Impacts',
-            dataQuality: 'secondary',
-          });
-        }
-        break;
-    }
-    return entries;
-  };
-
-  const categories: Scope3CategoryData[] = SCOPE3_CATEGORY_DEFINITIONS.map(def => {
-    const mapping = categoryMapping[def.category];
-    const entries = generateEntriesForCategory(def.category);
-    return {
-      category: def.category,
-      name: def.name,
-      description: def.description,
-      totalEmissions: mapping.value,
-      entryCount: entries.length,
-      dataQuality: mapping.dataQuality,
-      entries,
-    };
-  });
-
-  return {
-    categories,
-    productDetails: [],
-    travelDetails: [],
-    logisticsDetails: [],
-    wasteDetails: [],
-    totalScope3: scope3Data.total || 0,
-  };
-}
+// Scope 3 shaping now lives in lib/vitality/scope3-transform.ts so the axis
+// routes share it. See that file's header for why.
 
 /**
  * Build the Strengths and Areas-for-Improvement lists shown on the
@@ -519,52 +224,23 @@ export default function PerformancePage() {
   const { currentOrganization } = useOrganization();
   const latestDataYear = useLatestDataYear(currentOrganization?.id);
   const { selectedYear, setSelectedYear } = usePersistedYear(AVAILABLE_YEARS, latestDataYear);
-  // All hooks now consistently use selectedYear for reporting period
-  const hookResult = useCompanyMetrics(selectedYear);
-  const { footprint: footprintData, loading: footprintLoading, refetch: refetchFootprint } = useCompanyFootprint(selectedYear);
-  const { metrics: wasteMetrics, loading: wasteLoading } = useWasteMetrics(selectedYear);
+  // Every figure on this page and on /performance/[axis]/ comes from one
+  // assembly, so a row and the axis page behind it cannot disagree.
   const {
-    companyOverview: waterCompanyOverview,
-    facilitySummaries: waterFacilitySummaries,
-    waterTimeSeries,
-    sourceBreakdown: waterSourceBreakdown,
-    loading: waterLoading,
-  } = useFacilityWaterData(selectedYear);
-
-  const {
-    categories: scope3Categories,
-    productDetails: scope3ProductDetails,
-    travelDetails: scope3TravelDetails,
-    logisticsDetails: scope3LogisticsDetails,
-    wasteDetails: scope3WasteDetails,
-    totalScope3: scope3Total,
-  } = transformFootprintToScope3Categories(footprintData);
-
-  const {
-    metrics,
-    facilityWaterRisks,
-    materialBreakdown,
-    ghgBreakdown,
-    lifecycleStageBreakdown,
+    metrics, footprintData, wasteMetrics, natureMetrics,
+    scopeBreakdown, materialBreakdown, ghgBreakdown, lifecycleStageBreakdown,
     facilityEmissionsBreakdown,
-    natureMetrics,
-    loading,
-    error,
-    refetch,
-  } = hookResult;
+    scope3Categories, scope3ProductDetails, scope3TravelDetails,
+    scope3LogisticsDetails, scope3WasteDetails, scope3Total,
+    productLcaTotalCO2, totalCO2,
+    facilityWaterRisks, waterCompanyOverview, waterFacilitySummaries,
+    waterSourceBreakdown, waterTimeSeries, waterConsumption,
+    productLcaWaterScarcity, waterScarcityImpact,
+    circularityRate, landUse,
+    loading, footprintLoading, wasteLoading, waterLoading, error, refetch, refetchFootprint,
+  } = useAxisData(selectedYear);
 
-  const scopeBreakdown: ScopeBreakdown | null = footprintData?.breakdown ? {
-    scope1: footprintData.breakdown.scope1,
-    scope2: footprintData.breakdown.scope2,
-    scope3: footprintData.breakdown.scope3.total,
-  } : null;
 
-  const [carbonSheetOpen, setCarbonSheetOpen] = useState(false);
-  const [waterSheetOpen, setWaterSheetOpen] = useState(false);
-  const [circularitySheetOpen, setCircularitySheetOpen] = useState(false);
-  const [natureSheetOpen, setNatureSheetOpen] = useState(false);
-
-  const [expandedPillar, setExpandedPillar] = useState<string | null>(null);
   const [showHotspots, setShowHotspots] = useState(true);
   const [showCompliance, setShowCompliance] = useState(false);
 
@@ -647,22 +323,7 @@ export default function PerformancePage() {
     return Array.from(byFamily.values());
   }, [orgCertifications]);
 
-  const corporateTotalCO2 = footprintData?.total_emissions || 0;
-  const productLcaTotalCO2 = metrics?.total_impacts.climate_change_gwp100 || 0;
-  const totalCO2 = corporateTotalCO2 > 0 ? corporateTotalCO2 : productLcaTotalCO2;
-  const waterConsumption = metrics?.total_impacts.water_consumption || 0;
-  const productLcaWaterScarcity = metrics?.total_impacts.water_scarcity_aware || 0;
-  const landUse = metrics?.total_impacts.land_use || 0;
 
-  // Use facility water data as primary source for water card header,
-  // falling back to product LCA water scarcity data
-  const facilityScarcityWeighted = waterCompanyOverview?.total_scarcity_weighted_m3
-    || waterCompanyOverview?.scarcity_weighted_consumption_m3
-    || 0;
-  const waterScarcityImpact = facilityScarcityWeighted > 0
-    ? facilityScarcityWeighted
-    : productLcaWaterScarcity;
-  const circularityRate = wasteMetrics?.waste_diversion_rate || metrics?.circularity_percentage || 0;
 
   // Fetch product categories for industry benchmark lookup
   const [productCategories, setProductCategories] = useState<(string | null)[]>([]);
@@ -779,29 +440,6 @@ export default function PerformancePage() {
   const totalWaterImpact = waterSourceItems.reduce((sum, item) => sum + item.netImpact, 0) || waterScarcityImpact;
   const totalWaste = wasteMetrics?.total_waste_kg || 0;
 
-  const landUseItems = useMemo(() => {
-    if (!materialBreakdown || materialBreakdown.length === 0) {
-      return [];
-    }
-    const totalLandFromMaterials = landUse || 1;
-    return materialBreakdown.slice(0, 5).map((material, idx) => {
-      const proportion = material.climate / (materialBreakdown.reduce((sum, m) => sum + m.climate, 0) || 1);
-      return {
-        id: String(idx + 1),
-        ingredient: material.name,
-        origin: material.source || 'Unknown',
-        mass: material.quantity,
-        landIntensity: landUse > 0 ? (proportion * totalLandFromMaterials) / (material.quantity || 1) : 0,
-        totalFootprint: Math.round(proportion * totalLandFromMaterials),
-      };
-    });
-  }, [materialBreakdown, landUse]);
-
-  const totalLandUse = landUseItems.reduce((sum, item) => sum + item.totalFootprint, 0) || landUse;
-
-  const togglePillar = (pillar: string) => {
-    setExpandedPillar(expandedPillar === pillar ? null : pillar);
-  };
 
   /**
    * Plain-language figures for the axis rows. "673 t CO2e", not "673 TCO2EQ";
@@ -818,7 +456,11 @@ export default function PerformancePage() {
     if (totalCO2 > 0) facts.climate = `${round(totalCO2 / 1000)} t CO2e`;
     if (waterScarcityImpact > 0) facts.water = `${round(waterScarcityImpact)} m³`;
     if (circularityRate > 0) facts.circularity = `${circularityRate.toFixed(0)}% recycled`;
-    if (totalLandUse > 0) facts.nature = `${round(totalLandUse)} m² a year`;
+    // landUse, NOT totalLandUse: the latter is the top-5 materials apportioned
+    // (landUseItems slices materialBreakdown to 5), so using it here showed a
+    // subtotal as if it were the whole. It read 13,668 against the axis page's
+    // 18,683 for the same organisation on the same day.
+    if (landUse > 0) facts.nature = `${round(landUse)} m² a year`;
 
     const achieved = dedupedCertifications.filter(
       (c) => (c.status ?? '').toLowerCase() === 'certified',
@@ -828,7 +470,7 @@ export default function PerformancePage() {
     }
 
     return facts;
-  }, [totalCO2, waterScarcityImpact, circularityRate, totalLandUse, dedupedCertifications]);
+  }, [totalCO2, waterScarcityImpact, circularityRate, landUse, dedupedCertifications]);
 
   if (loading) {
     return (
@@ -903,109 +545,14 @@ export default function PerformancePage() {
 
       {/* The nine axes. One list, three sections, every axis at the same
           standing — replaces the hero's boxed pillar breakdown AND the four
-          expandable pillar cards that repeated it. Selecting an environmental
-          axis opens its detail below; at step 3 of the plan these become
-          links to /performance/[axis]/ and the in-place detail goes. */}
+          expandable pillar cards that repeated it. Each environmental axis
+          links to its own page; the sheets and the in-card expansion are
+          gone. */}
       <VitalityAxisSections
         composite={vitalityComposite}
         facts={axisFacts}
-        selectableAxes={['climate', 'water', 'circularity', 'nature']}
-        onSelectAxis={(axis) => togglePillar(axis)}
+        linkedAxes={['climate', 'water', 'circularity', 'nature']}
       />
-
-      {/* The selected axis, in full. No card, no second score: the row above
-          already said the number, and this is the detail behind it. */}
-      {expandedPillar === 'climate' ? (
-        <section className="border-t border-border pt-6">
-          <Eyebrow className="mb-3">Climate · in full</Eyebrow>
-          <CarbonDeepDive
-            scopeBreakdown={scopeBreakdown}
-            totalCO2={totalCO2}
-            productLcaTotalCO2={productLcaTotalCO2}
-            materialBreakdown={materialBreakdown}
-            ghgBreakdown={ghgBreakdown}
-            lifecycleStageBreakdown={lifecycleStageBreakdown}
-            facilityEmissionsBreakdown={facilityEmissionsBreakdown}
-            scope3Categories={scope3Categories}
-            scope3ProductDetails={scope3ProductDetails}
-            scope3TravelDetails={scope3TravelDetails}
-            scope3LogisticsDetails={scope3LogisticsDetails}
-            scope3WasteDetails={scope3WasteDetails}
-            scope3Total={scope3Total}
-            year={selectedYear}
-            isLoadingScope3={footprintLoading}
-          />
-          <PillButton
-            variant="ghost"
-            size="sm"
-            onClick={() => setCarbonSheetOpen(true)}
-            className="mt-4 w-full"
-          >
-            View full analysis
-            <ArrowRight className="h-4 w-4" />
-          </PillButton>
-        </section>
-      ) : null}
-
-      {expandedPillar === 'water' ? (
-        <section className="border-t border-border pt-6">
-          <Eyebrow className="mb-3">Water · in full</Eyebrow>
-          <WaterDeepDive
-            facilityWaterRisks={facilityWaterRisks}
-            facilitySummaries={waterFacilitySummaries}
-            companyOverview={waterCompanyOverview}
-            sourceBreakdown={waterSourceBreakdown}
-            waterTimeSeries={waterTimeSeries}
-            loading={loading || waterLoading}
-            productLcaWaterConsumption={waterConsumption}
-            productLcaWaterScarcity={waterScarcityImpact}
-          />
-          <PillButton
-            variant="ghost"
-            size="sm"
-            onClick={() => setWaterSheetOpen(true)}
-            className="mt-4 w-full"
-          >
-            View full analysis
-            <ArrowRight className="h-4 w-4" />
-          </PillButton>
-        </section>
-      ) : null}
-
-      {expandedPillar === 'circularity' ? (
-        <section className="border-t border-border pt-6">
-          <Eyebrow className="mb-3">Circularity · in full</Eyebrow>
-          <WasteDeepDive
-            wasteMetrics={wasteMetrics}
-            loading={wasteLoading}
-          />
-          <PillButton
-            variant="ghost"
-            size="sm"
-            onClick={() => setCircularitySheetOpen(true)}
-            className="mt-4 w-full"
-          >
-            View full analysis
-            <ArrowRight className="h-4 w-4" />
-          </PillButton>
-        </section>
-      ) : null}
-
-      {expandedPillar === 'nature' ? (
-        <section className="border-t border-border pt-6">
-          <Eyebrow className="mb-3">Nature · in full</Eyebrow>
-          <NatureDeepDive natureMetrics={natureMetrics} />
-          <PillButton
-            variant="ghost"
-            size="sm"
-            onClick={() => setNatureSheetOpen(true)}
-            className="mt-4 w-full"
-          >
-            View full analysis
-            <ArrowRight className="h-4 w-4" />
-          </PillButton>
-        </section>
-      ) : null}
 
       {/* Performance Summary - Strengths & Improvements */}
       <PerformanceSummary
@@ -1240,50 +787,6 @@ export default function PerformancePage() {
         </div>
       )}
 
-      {/* Modals and Sheets */}
-      <CarbonBreakdownSheet
-        open={carbonSheetOpen}
-        onOpenChange={setCarbonSheetOpen}
-        scopeBreakdown={scopeBreakdown}
-        totalCO2={totalCO2}
-        productLcaTotalCO2={productLcaTotalCO2}
-        materialBreakdown={materialBreakdown}
-        ghgBreakdown={ghgBreakdown}
-        lifecycleStageBreakdown={lifecycleStageBreakdown}
-        facilityEmissionsBreakdown={facilityEmissionsBreakdown}
-        scope3Categories={scope3Categories}
-        scope3ProductDetails={scope3ProductDetails}
-        scope3TravelDetails={scope3TravelDetails}
-        scope3LogisticsDetails={scope3LogisticsDetails}
-        scope3WasteDetails={scope3WasteDetails}
-        scope3Total={scope3Total}
-        year={selectedYear}
-        isLoadingScope3={footprintLoading}
-      />
-
-      <WaterImpactSheet
-        open={waterSheetOpen}
-        onOpenChange={setWaterSheetOpen}
-        totalConsumption={totalWaterConsumption}
-        totalImpact={totalWaterImpact}
-        sourceItems={waterSourceItems}
-      />
-
-      <CircularitySheet
-        open={circularitySheetOpen}
-        onOpenChange={setCircularitySheetOpen}
-        metrics={wasteMetrics}
-        loading={wasteLoading}
-        year={selectedYear}
-      />
-
-      <NatureImpactSheet
-        open={natureSheetOpen}
-        onOpenChange={setNatureSheetOpen}
-        totalLandUse={totalLandUse}
-        ingredientCount={landUseItems.length}
-        landUseItems={landUseItems}
-      />
     </div>
   );
 }
