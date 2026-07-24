@@ -31,7 +31,7 @@ export function ProductSpotlight() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {display.map(p => (
           <Link key={p.id} href={hrefForProduct(p.id, p.lca_status)} className="group block min-w-0">
-            <div className="aspect-square overflow-hidden rounded-[6px] border border-border bg-muted/40 flex items-center justify-center">
+            <div className="aspect-square overflow-hidden rounded-[6px] border border-studio-hairline bg-studio-paper/60 flex items-center justify-center">
               {p.image_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img

@@ -1,21 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  Dog,
-  X,
-  Pin,
-  PinOff,
-  Sparkles,
-  Inbox,
-  Upload,
-  MessageSquare,
-  ArrowRight,
-  History,
-  Plus,
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { X, Pin, PinOff, History, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Eyebrow, Panel } from '@/components/studio'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +21,10 @@ import { RosaPersonaPrompt } from './RosaPersonaPrompt'
 
 const MIN_WIDTH = 320
 const MAX_WIDTH = 600
+
+/** The drawer's quiet header controls: a glyph, no chrome until hovered. */
+const ICON_BUTTON =
+  'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-studio-dim transition-colors duration-150 ease-studio hover:bg-studio-ink/5 hover:text-foreground'
 
 /**
  * Right-side ambient drawer for Rosa. Mounted at the AppLayout level so
@@ -148,10 +140,11 @@ function RosaDrawerBody() {
 
   return (
     <>
-      {/* Overlay backdrop — only when not pinned. */}
+      {/* Overlay backdrop — only when not pinned. Studio ink at a low
+          opacity rather than pure black: the paper behind stays warm. */}
       {!isPinned && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] transition-opacity"
+          className="fixed inset-0 z-40 bg-studio-ink/30 transition-opacity"
           onClick={close}
           aria-hidden="true"
         />
@@ -160,10 +153,10 @@ function RosaDrawerBody() {
       {/* The drawer panel itself. */}
       <aside
         className={cn(
-          'flex flex-col bg-card border-l border-border',
+          'flex flex-col border-l border-studio-hairline bg-studio-cream',
           isPinned
             ? 'h-full flex-shrink-0 relative'
-            : 'fixed right-0 top-0 bottom-0 z-50 animate-in slide-in-from-right duration-200',
+            : 'fixed right-0 top-0 bottom-0 z-50 motion-safe:animate-in motion-safe:slide-in-from-right motion-safe:duration-200 motion-safe:ease-studio',
         )}
         style={{ width: isPinned ? width : Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, width)) }}
         role="dialog"
@@ -172,47 +165,46 @@ function RosaDrawerBody() {
         {/* Resize handle on the left edge — only meaningful when pinned. */}
         {isPinned && (
           <div
-            className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-studio-forest/40 active:bg-studio-forest/60 transition-colors z-10"
+            className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize transition-colors duration-150 ease-studio hover:bg-studio-ink/20 active:bg-studio-ink/40 z-10"
             onMouseDown={onResizeMouseDown}
             aria-label="Resize drawer"
           />
         )}
 
-        {/* Header */}
-        <header className="flex items-center gap-2 px-4 py-3 border-b border-border flex-shrink-0">
-          <div className="rounded-md bg-secondary p-1.5">
-            <Dog className="h-4 w-4 text-studio-forest" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold leading-tight">Rosa</p>
+        {/* Header. The ring is the studio's signature for Rosa, the same
+            one that opens the ink band; her name is a mono eyebrow, not a
+            heading, because the drawer is chrome and not a page. */}
+        <header className="flex flex-shrink-0 items-center gap-3 border-b border-studio-hairline px-4 py-3">
+          <span
+            aria-hidden="true"
+            className="inline-block h-3.5 w-3.5 shrink-0 rounded-full border-[3.5px] border-studio-ink"
+          />
+          <div className="min-w-0 flex-1">
+            <Eyebrow tone="dim">Rosa</Eyebrow>
             {headlineSlice && (
-              <p className="text-xs text-muted-foreground truncate" title={headlineSlice.label}>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground" title={headlineSlice.label}>
                 {headlineSlice.label}
               </p>
             )}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              <button
+                type="button"
+                className={ICON_BUTTON}
                 aria-label="Recent conversations"
                 title="Recent conversations"
               >
                 <History className="h-4 w-4" />
-              </Button>
+              </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-72">
-              <DropdownMenuLabel className="text-xs uppercase tracking-wide text-muted-foreground">
+              <DropdownMenuLabel className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
                 Recent conversations
               </DropdownMenuLabel>
-              <DropdownMenuItem
-                onSelect={() => conv.reset()}
-                className="gap-2"
-              >
-                <Plus className="h-4 w-4 text-studio-forest" />
-                <span>New chat</span>
+              <DropdownMenuItem onSelect={() => conv.reset()} className="gap-2">
+                <Plus className="h-4 w-4 text-studio-dim" />
+                <span>New conversation</span>
               </DropdownMenuItem>
               {conv.recentConversations.length > 0 && <DropdownMenuSeparator />}
               {conv.recentConversations.map(c => (
@@ -221,10 +213,10 @@ function RosaDrawerBody() {
                   onSelect={() => conv.loadConversation(c.id)}
                   className="flex flex-col items-start gap-0.5 py-2"
                 >
-                  <span className="text-sm font-medium leading-snug line-clamp-1 w-full">
+                  <span className="line-clamp-1 w-full font-display text-sm font-semibold leading-snug">
                     {c.title || 'Untitled conversation'}
                   </span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                     {c.message_count ?? 0}{' '}
                     {(c.message_count ?? 0) === 1 ? 'message' : 'messages'}
                     {c.last_message_at && ' · ' + fmtRelative(c.last_message_at)}
@@ -238,25 +230,23 @@ function RosaDrawerBody() {
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
+            type="button"
             onClick={() => setPinned(!isPinned)}
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            className={ICON_BUTTON}
             aria-label={isPinned ? 'Unpin drawer' : 'Pin drawer'}
             title={isPinned ? 'Unpin drawer' : 'Pin drawer'}
           >
             {isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
+          </button>
+          <button
+            type="button"
             onClick={close}
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            className={ICON_BUTTON}
             aria-label="Close drawer"
           >
             <X className="h-4 w-4" />
-          </Button>
+          </button>
         </header>
 
         {/* Body */}
@@ -274,7 +264,7 @@ function RosaDrawerBody() {
         </div>
 
         {/* Sticky input at bottom */}
-        <div className="px-3 py-3 border-t border-border bg-card flex-shrink-0">
+        <div className="flex-shrink-0 border-t border-studio-hairline bg-studio-cream px-3 py-3">
           <RosaInputBar
             onSubmit={handleSubmit}
             placeholder={
@@ -317,7 +307,7 @@ function fmtRelative(iso: string): string {
 
 function DrawerEmptyState({ onAsk }: { onAsk: (prompt: string) => void }) {
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* One-time persona picker. Self-gating: returns null unless the
           user has no stated persona and hasn't dismissed the prompt. */}
       <RosaPersonaPrompt />
@@ -327,44 +317,44 @@ function DrawerEmptyState({ onAsk }: { onAsk: (prompt: string) => void }) {
           urgent is open. */}
       <NudgeRail />
 
-      <div className="rounded-[6px] bg-secondary border border-border p-4">
-        <h3 className="text-sm font-semibold flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-studio-forest" />
-          Hi, I&apos;m Rosa
-        </h3>
-        <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-          I see what you&apos;re looking at and can help directly. Ask me about
-          this page, drop a document, or pick a starter below.
+      {/* Rosa introduces herself in her own voice, on paper, with no box
+          around her: a statement, the way every room opens. */}
+      <div>
+        <Eyebrow tone="dim">Rosa</Eyebrow>
+        <p className="mt-2 font-display text-lg font-semibold leading-snug tracking-[-0.01em] text-foreground">
+          I can see what you are looking at.
+        </p>
+        <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+          Ask me about this page, drop a document in below, or start with one of these.
         </p>
       </div>
 
+      {/* The starters as hairline rows: the house list rhythm, the same one
+          the desk and every room landing use. */}
       <div>
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-          Try asking
-        </p>
-        <ul className="space-y-1">
-          {QUICK_PROMPTS.map(p => (
+        <Eyebrow tone="dim">Try asking</Eyebrow>
+        <ul className="mt-2 border-t border-studio-hairline">
+          {QUICK_PROMPTS.map((p) => (
             <li key={p.label}>
               <button
+                type="button"
                 onClick={() => onAsk(p.prompt)}
-                className="group w-full text-left text-sm py-2 px-2 -mx-2 rounded-md hover:bg-muted transition-colors flex items-center justify-between gap-3"
+                className="w-full border-b border-studio-hairline py-2.5 text-left text-sm leading-snug text-foreground transition-colors duration-150 ease-studio hover:text-room-accent"
               >
-                <span className="leading-snug">{p.label}</span>
-                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-studio-forest transition-colors flex-shrink-0" />
+                {p.label}
               </button>
             </li>
           ))}
         </ul>
       </div>
 
-      <div className="rounded-lg border border-dashed border-border p-3">
-        <p className="text-xs text-muted-foreground leading-relaxed flex items-start gap-2">
-          <Upload className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
-          Tip: drop any utility bill, supplier doc, or sustainability report
-          into the input below and I&apos;ll classify it and queue it for your
-          sign-off.
+      <Panel className="p-4">
+        <Eyebrow tone="dim">Give us anything</Eyebrow>
+        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+          Drop a utility bill, a supplier document or a sustainability report into the box below.
+          I will read it, work out what it is, and queue it for your sign-off.
         </p>
-      </div>
+      </Panel>
     </div>
   )
 }

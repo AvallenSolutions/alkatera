@@ -238,7 +238,7 @@ export function PriorityTiles({ onOpenQueue }: Props) {
     return (
       <section>
         {header}
-        <p className="border-b border-border pb-3 text-sm text-muted-foreground">
+        <p className="border-b border-studio-hairline pb-3 text-sm text-muted-foreground">
           You&apos;re all caught up. Drop a document or ask Rosa anything below.
         </p>
       </section>

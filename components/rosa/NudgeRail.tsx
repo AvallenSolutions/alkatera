@@ -1,19 +1,20 @@
 'use client'
 
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Inbox, AlertCircle, CalendarClock, ArrowRight } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Eyebrow, StateChip } from '@/components/studio'
+import type { WorkingTone } from '@/components/studio'
 import { useRosaNudges, type RosaNudge } from '@/lib/rosa/useRosaNudges'
 import { useRosaContext } from '@/lib/rosa/RosaContextProvider'
 
 /**
- * "What's new" rail at the top of the drawer's empty state. Shows the
- * 1-3 most urgent things Rosa has spotted (anomalies, queue items aged
- * past 48h, deadlines in the next week). Click → either deep-link or
- * seed a Rosa prompt asking about that item.
+ * "What I've spotted" at the top of the drawer's empty state. The 1-3 most
+ * urgent things Rosa has found (anomalies, queue items aged past 48h,
+ * deadlines within the week). Click to deep-link, or to seed a prompt
+ * asking her about it. Hidden when there is nothing to surface.
  *
- * Hidden when there's nothing to surface.
+ * Hairline rows in the house rhythm: severity is a typographic working
+ * tone, not a tinted icon box. The old rail used raw red-500/amber-500
+ * tints, which are off-palette and were the loudest thing in the drawer.
  */
 export function NudgeRail() {
   const { nudges, loading } = useRosaNudges()
@@ -23,12 +24,10 @@ export function NudgeRail() {
   if (loading || nudges.length === 0) return null
 
   return (
-    <div className="rounded-xl border border-border bg-background/40 p-3 space-y-1">
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 px-1">
-        What I&apos;ve spotted
-      </p>
-      <ul className="space-y-1">
-        {nudges.map(n => (
+    <div>
+      <Eyebrow tone="dim">What I&apos;ve spotted</Eyebrow>
+      <ul className="mt-2 border-t border-studio-hairline">
+        {nudges.map((n) => (
           <li key={n.id}>
             <NudgeRow
               nudge={n}
@@ -45,37 +44,33 @@ export function NudgeRail() {
 }
 
 function NudgeRow({ nudge, onClick }: { nudge: RosaNudge; onClick: () => void }) {
-  const Icon =
-    nudge.kind === 'queue' ? Inbox : nudge.kind === 'anomaly' ? AlertCircle : CalendarClock
-  const tone = severityToneClasses(nudge.severity)
+  const { tone, word } = severityState(nudge.severity)
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={cn(
-        'group w-full text-left flex items-start gap-3 rounded-lg p-2',
-        'hover:bg-muted transition-colors',
-      )}
+      className="flex w-full items-start justify-between gap-3 border-b border-studio-hairline py-2.5 text-left transition-colors duration-150 ease-studio hover:text-room-accent"
     >
-      <span className={cn('flex-shrink-0 rounded-md p-1.5 mt-0.5', tone.iconBg)}>
-        <Icon className={cn('h-3.5 w-3.5', tone.icon)} />
-      </span>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm leading-snug truncate">{nudge.label}</p>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-display text-sm font-semibold leading-snug">
+          {nudge.label}
+        </span>
         {nudge.hint && (
-          <p className="text-xs text-muted-foreground truncate">{nudge.hint}</p>
+          <span className="mt-0.5 block truncate text-xs text-muted-foreground">{nudge.hint}</span>
         )}
-      </div>
-      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-foreground flex-shrink-0 mt-1.5 transition-colors" />
+      </span>
+      {word && (
+        <StateChip tone={tone} className="mt-0.5 shrink-0">
+          {word}
+        </StateChip>
+      )}
     </button>
   )
 }
 
-function severityToneClasses(s: RosaNudge['severity']) {
-  if (s === 'high') {
-    return { iconBg: 'bg-red-500/15', icon: 'text-red-300' }
-  }
-  if (s === 'medium') {
-    return { iconBg: 'bg-amber-500/15', icon: 'text-amber-300' }
-  }
-  return { iconBg: 'bg-muted', icon: 'text-muted-foreground' }
+/** Severity as a word in a working tone. Low severity says nothing at all. */
+function severityState(s: RosaNudge['severity']): { tone: WorkingTone; word: string | null } {
+  if (s === 'high') return { tone: 'stale', word: 'Needs you' }
+  if (s === 'medium') return { tone: 'attention', word: 'Soon' }
+  return { tone: 'quiet', word: null }
 }

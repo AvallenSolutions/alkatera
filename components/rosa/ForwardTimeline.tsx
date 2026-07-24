@@ -160,7 +160,7 @@ export function ForwardTimeline() {
     return (
       <div>
         <Eyebrow className="mb-3 text-room-accent">The next 14 days</Eyebrow>
-        <p className="border-b border-border pb-3 text-sm text-muted-foreground">
+        <p className="border-b border-studio-hairline pb-3 text-sm text-muted-foreground">
           Clear horizon. Nothing time-sensitive in the next two weeks.
         </p>
       </div>

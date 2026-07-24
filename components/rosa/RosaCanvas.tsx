@@ -3,8 +3,6 @@
 import { useCallback, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowLeft } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { ForYouToday } from './ForYouToday'
 import { useRosaContext } from '@/lib/rosa/RosaContextProvider'
 
@@ -76,14 +74,14 @@ export function RosaCanvas({ initialPrompt }: { initialPrompt?: string }) {
   if (showQueue) {
     return (
       <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 py-6">
-        <Button
-          variant="ghost"
-          size="sm"
+        {/* The way back is a quiet mono link, the way every room does it. */}
+        <button
+          type="button"
           onClick={handleBackToHome}
-          className="text-muted-foreground hover:text-foreground -ml-2 mb-4"
+          className="mb-4 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim underline-offset-4 transition-colors duration-150 ease-studio hover:text-foreground hover:underline"
         >
-          <ArrowLeft className="h-4 w-4 mr-1" /> Back to home
-        </Button>
+          Back to the brief
+        </button>
         <RosaQueue />
       </div>
     )

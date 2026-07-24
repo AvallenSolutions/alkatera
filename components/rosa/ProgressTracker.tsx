@@ -6,6 +6,7 @@ import { ArrowUpRight } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { BigNumber } from '@/components/studio/big-number'
 import { Eyebrow } from '@/components/studio/eyebrow'
+import { Panel } from '@/components/studio/panel'
 import { PillButton } from '@/components/studio/pill-button'
 import { StateChip } from '@/components/studio/state-chip'
 import { STUDIO } from '@/components/studio/theme'
@@ -169,10 +170,10 @@ export function ProgressTracker() {
 
   if (loading && !data) {
     return (
-      <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6 h-full">
+      <Panel className="h-full p-5 sm:p-6">
         <Skeleton className="h-4 w-32 mb-4" />
         <Skeleton className="h-32 w-full" />
-      </div>
+      </Panel>
     )
   }
 
@@ -198,7 +199,7 @@ export function ProgressTracker() {
   // empty-state buttons. The picker is one click away.
   if (data?.status === 'no_tracker') {
     return (
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-studio-hairline pb-4">
         <p className="text-sm text-muted-foreground">
           Pick one number to watch and Rosa will tell you what its trend means.
         </p>
@@ -211,9 +212,9 @@ export function ProgressTracker() {
 
   if (!data || !data.tracker || !data.series || !data.read) {
     return (
-      <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6 h-full">
+      <Panel className="h-full p-5 sm:p-6">
         <p className="text-sm text-muted-foreground">Couldn&apos;t load your tracker. Try again.</p>
-      </div>
+      </Panel>
     )
   }
 
@@ -250,7 +251,7 @@ function ProgressTrackerCard({
     deltaIsGood === true ? 'good' : deltaIsGood === false ? 'attention' : 'quiet'
 
   return (
-    <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6 h-full">
+    <Panel className="h-full p-5 sm:p-6">
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="min-w-0">
           <Eyebrow tone="inherit" className="text-studio-forest">
@@ -317,7 +318,7 @@ function ProgressTrackerCard({
         </div>
 
         {/* Right ~40%: Rosa-voiced read */}
-        <div className="lg:col-span-2 flex flex-col gap-3 border-t lg:border-t-0 lg:border-l lg:pl-5 border-border pt-4 lg:pt-0">
+        <div className="lg:col-span-2 flex flex-col gap-3 border-t lg:border-t-0 lg:border-l lg:pl-5 border-studio-hairline pt-4 lg:pt-0">
           <div>
             <Eyebrow tone="dim">
               Rosa&apos;s read
@@ -333,7 +334,7 @@ function ProgressTrackerCard({
             </p>
           </div>
           {read.next_move ? (
-            <div className="mt-auto pt-3 border-t border-border">
+            <div className="mt-auto pt-3 border-t border-studio-hairline">
               <p className="font-mono text-[9.5px] uppercase tracking-[0.2em] text-studio-dim mb-2">
                 Best next move
               </p>
@@ -356,7 +357,7 @@ function ProgressTrackerCard({
           ) : null}
         </div>
       </div>
-    </div>
+    </Panel>
   )
 }
 

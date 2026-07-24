@@ -2,7 +2,6 @@
 
 import { useCallback, useRef, useState } from 'react'
 import { Paperclip, ArrowUp } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useOrganization } from '@/lib/organizationContext'
 import { toast } from 'sonner'
@@ -104,20 +103,20 @@ export function RosaInputBar({ onSubmit, placeholder, defaultValue }: Props) {
       />
       <div className="relative">
         {showSlash && (
-          <div className="absolute bottom-full left-0 right-0 mb-2 rounded-[6px] border border-border bg-popover overflow-hidden">
-            <ul className="py-1 max-h-64 overflow-y-auto">
+          <div className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-[6px] border border-studio-hairline bg-studio-cream">
+            <ul className="max-h-64 overflow-y-auto py-1">
               {SLASH_COMMANDS.filter(c => c.command.startsWith(value.toLowerCase())).map(c => (
                 <li key={c.command}>
                   <button
-                    className="w-full text-left px-3 py-2 hover:bg-muted text-sm flex items-center gap-3"
+                    className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors duration-150 ease-studio hover:bg-studio-ink/5"
                     onClick={() => {
                       setValue(c.command)
                       setShowSlash(false)
                       setTimeout(() => submit(), 0)
                     }}
                   >
-                    <code className="font-mono text-studio-forest">{c.command}</code>
-                    <span className="text-muted-foreground text-xs">{c.hint}</span>
+                    <code className="font-mono text-xs font-bold text-room-accent">{c.command}</code>
+                    <span className="text-xs text-muted-foreground">{c.hint}</span>
                   </button>
                 </li>
               ))}
@@ -126,8 +125,8 @@ export function RosaInputBar({ onSubmit, placeholder, defaultValue }: Props) {
         )}
         <div
           className={cn(
-            'flex items-end gap-2 rounded-[6px] border border-border bg-card',
-            'p-2 transition-colors focus-within:border-studio-forest/40',
+            'flex items-end gap-2 rounded-[6px] border border-studio-hairline bg-studio-paper/60',
+            'p-2 transition-colors duration-150 ease-studio focus-within:border-studio-ink/30',
           )}
         >
           <input
@@ -137,16 +136,14 @@ export function RosaInputBar({ onSubmit, placeholder, defaultValue }: Props) {
             onChange={onPickFile}
             className="hidden"
           />
-          <Button
+          <button
             type="button"
-            size="icon"
-            variant="ghost"
-            className="h-9 w-9 flex-shrink-0"
+            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-studio-dim transition-colors duration-150 ease-studio hover:bg-studio-ink/5 hover:text-foreground"
             onClick={() => fileRef.current?.click()}
             aria-label="Upload a document"
           >
             <Paperclip className="h-4 w-4" />
-          </Button>
+          </button>
           <textarea
             value={value}
             onChange={e => handleChange(e.target.value)}
@@ -165,16 +162,16 @@ export function RosaInputBar({ onSubmit, placeholder, defaultValue }: Props) {
               'min-h-[36px] max-h-32',
             )}
           />
-          <Button
+          {/* Ink, round, and the one act this bar exists for. */}
+          <button
             type="button"
-            size="icon"
-            className="h-9 w-9 flex-shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-studio-ink text-studio-cream transition-colors duration-150 ease-studio hover:bg-studio-ink/85 disabled:pointer-events-none disabled:opacity-40"
             onClick={submit}
             disabled={!value.trim()}
             aria-label="Send"
           >
             <ArrowUp className="h-4 w-4" />
-          </Button>
+          </button>
         </div>
       </div>
     </>

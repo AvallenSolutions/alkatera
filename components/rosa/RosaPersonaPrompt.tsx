@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Wrench, Calculator, Compass, Leaf, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Panel, Eyebrow } from '@/components/studio'
 import { trackRosa } from '@/lib/rosa/track'
 import type { RosaPersona } from '@/lib/rosa/useUserRole'
 
@@ -12,33 +12,33 @@ interface PersonaOption {
   value: Exclude<RosaPersona, 'unknown'>
   label: string
   description: string
-  Icon: React.ComponentType<{ className?: string }>
 }
 
+/**
+ * The same four choices the arrival ritual offers, worded as statements the
+ * way that screen words them (components/onboarding/steps/ArrivalPersonaStep
+ * .tsx). One question, one vocabulary, wherever it is asked.
+ */
 const OPTIONS: PersonaOption[] = [
   {
     value: 'operator',
-    label: 'Operator',
-    description: 'You enter data, run the day-to-day, work with suppliers.',
-    Icon: Wrench,
+    label: 'I run operations.',
+    description: 'Day-to-day production, data and suppliers.',
   },
   {
     value: 'finance',
-    label: 'Finance',
-    description: 'You think about cost, spend, and what this all means for the books.',
-    Icon: Calculator,
+    label: 'I look after the numbers.',
+    description: 'Cost, spend and reporting.',
   },
   {
     value: 'leadership',
-    label: 'Leadership',
-    description: 'Founder, GM, owner. You want the headline story and where to act.',
-    Icon: Compass,
+    label: 'I lead the business.',
+    description: 'The whole picture, and what to say about it.',
   },
   {
     value: 'sustainability',
-    label: 'Sustainability lead',
-    description: 'Methodology, frameworks, reporting, the technical detail.',
-    Icon: Leaf,
+    label: 'Sustainability is my job.',
+    description: 'Footprints, targets and certifications.',
   },
 ]
 
@@ -123,64 +123,49 @@ export function RosaPersonaPrompt({ onSaved }: Props) {
   if (hasStatedPersona) return null
 
   return (
-    <div
-      className={cn(
-        'relative overflow-hidden rounded-[6px] border border-border bg-card p-5 sm:p-6',
-      )}
-    >
-      <button
-        onClick={dismissWithoutChoosing}
-        aria-label="Skip for now"
-        className="absolute top-3 right-3 text-muted-foreground hover:text-foreground"
-        disabled={saving !== null}
-      >
-        <X className="h-4 w-4" />
-      </button>
+    <Panel>
+      <Eyebrow tone="dim">You</Eyebrow>
+      <p className="mt-2 font-display text-base font-semibold tracking-[-0.01em] text-foreground">
+        What do you do here?
+      </p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        One quick choice, so I show you the right things first. You can change it any time.
+      </p>
 
-      <div>
-        <h3 className="text-base font-semibold">
-          What&apos;s your day-to-day at alka<strong>tera</strong>?
-        </h3>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          One quick choice. I&apos;ll tailor what I show you and how I explain things. You can change this any time.
-        </p>
+      <div className="mt-4 space-y-2">
+        {OPTIONS.map(({ value, label, description }) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => handlePick(value)}
+            disabled={saving !== null}
+            className={cn(
+              'w-full rounded-[6px] border border-studio-hairline bg-studio-paper/60 p-3 text-left transition-colors duration-150 ease-studio',
+              'hover:border-studio-ink/25 hover:bg-secondary',
+              saving === value && 'border-studio-forest bg-secondary',
+              'disabled:opacity-60',
+            )}
+          >
+            <span className="block font-display text-sm font-semibold text-foreground">{label}</span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">{description}</span>
+          </button>
+        ))}
       </div>
 
-      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {OPTIONS.map(({ value, label, description, Icon }) => {
-          const isSaving = saving === value
-          return (
-            <button
-              key={value}
-              onClick={() => handlePick(value)}
-              disabled={saving !== null}
-              className={cn(
-                'group flex items-start gap-3 rounded-[6px] border border-border bg-background/40 p-3 text-left transition',
-                'hover:border-studio-forest/40 hover:bg-secondary',
-                'disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-background/40',
-              )}
-            >
-              <span className="flex-shrink-0 rounded-lg bg-muted/40 p-2 text-foreground group-hover:text-studio-forest">
-                {isSaving ? (
-                  <Icon className="h-4 w-4 text-studio-forest" />
-                ) : (
-                  <Icon className="h-4 w-4" />
-                )}
-              </span>
-              <span className="min-w-0">
-                <span className="block text-sm font-medium">{label}</span>
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  {description}
-                </span>
-              </span>
-            </button>
-          )
-        })}
-      </div>
+      {error && <p className="mt-3 text-xs text-studio-stale">{error}</p>}
 
-      {error && (
-        <p className="mt-3 text-xs text-destructive">{error}</p>
-      )}
-    </div>
+      {/* A quiet way past, in the studio's own words: no close glyph in the
+          corner, which reads as dismissing an advert. */}
+      <div className="mt-4 text-center">
+        <button
+          type="button"
+          onClick={dismissWithoutChoosing}
+          disabled={saving !== null}
+          className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-studio-dim transition-colors duration-150 ease-studio hover:text-foreground"
+        >
+          I&apos;d rather not say
+        </button>
+      </div>
+    </Panel>
   )
 }

@@ -1,11 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Check, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { Panel, Eyebrow, PillButton, StateChip } from '@/components/studio';
 import { confirmRosaAction, cancelRosaAction } from '@/lib/gaia';
+
+/**
+ * "Rosa wants to …": the one card that asks before she acts.
+ *
+ * Studio grammar, because this is the moment a user hands over control and
+ * it should look like the rest of the house: a hairline panel on cream, a
+ * mono eyebrow naming what is about to happen, the proposal in plain words,
+ * and two pills — ink to confirm, outline to decline. States are
+ * typographic (StateChip), never badges: "WORKING", "SAVED", "DECLINED".
+ */
 
 export interface ActionProposal {
   id: string;
@@ -54,60 +62,48 @@ export function ActionProposalCard({ proposal, onResolved }: Props) {
     }
   };
 
+  const settled = formatResult(result);
+
   return (
-    <Card className="my-2 rounded-[6px] border-border bg-card">
-      <CardContent className="p-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-              Rosa wants to
-            </p>
-            <p className="text-sm">{proposal.preview}</p>
-            {error && <p className="text-xs text-studio-stale mt-2">{error}</p>}
-            {status === 'done' && result && (
-              <p className="text-xs text-studio-good mt-2">Done. {formatResult(result)}</p>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {status === 'pending' && (
-              <>
-                <Button size="sm" variant="outline" onClick={onCancel}>
-                  <X className="h-3.5 w-3.5 mr-1" />
-                  No
-                </Button>
-                <Button size="sm" onClick={onConfirm}>
-                  <Check className="h-3.5 w-3.5 mr-1" />
-                  Confirm
-                </Button>
-              </>
-            )}
-            {status === 'executing' && (
-              <span className="text-xs text-muted-foreground">Working…</span>
-            )}
-            {status === 'done' && (
-              <span className="text-xs font-medium text-studio-good inline-flex items-center gap-1">
-                <Check className="h-3.5 w-3.5" />
-                Saved
-              </span>
-            )}
-            {status === 'cancelled' && (
-              <span className="text-xs text-muted-foreground">Cancelled</span>
-            )}
-            {status === 'failed' && (
-              <span className="text-xs text-studio-stale">Failed</span>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <Panel className="my-3 p-4">
+      <Eyebrow tone="dim">Rosa wants to</Eyebrow>
+      <p className="mt-2 font-display text-sm font-semibold leading-snug text-foreground">
+        {proposal.preview}
+      </p>
+
+      {error && <p className="mt-2 text-xs text-studio-stale">{error}</p>}
+      {status === 'done' && settled && (
+        <p className="mt-2 text-xs text-muted-foreground">{settled}</p>
+      )}
+
+      {/* The ask sits below the sentence, not beside it: a decision reads
+          better on its own line than squeezed into a right-hand gutter. */}
+      <div className="mt-4 flex items-center gap-2">
+        {status === 'pending' && (
+          <>
+            <PillButton size="sm" onClick={onConfirm}>
+              Yes, do it
+            </PillButton>
+            <PillButton size="sm" variant="ghost" onClick={onCancel}>
+              No
+            </PillButton>
+          </>
+        )}
+        {status === 'executing' && <StateChip>Working</StateChip>}
+        {status === 'done' && <StateChip tone="good">Done</StateChip>}
+        {status === 'cancelled' && <StateChip>Declined</StateChip>}
+        {status === 'failed' && <StateChip tone="stale">Failed</StateChip>}
+      </div>
+    </Panel>
   );
 }
 
+/** One plain sentence about what landed. Ids are for logs, not for people. */
 function formatResult(r: any): string {
   if (!r || typeof r !== 'object') return '';
-  if (r.entry_id) return `Entry id: ${r.entry_id}`;
-  if (r.target_id) return `Target id: ${r.target_id}`;
-  if (r.supplier_id) return `Supplier id: ${r.supplier_id}`;
+  if (r.entry_id) return 'Saved to your data.';
+  if (r.target_id) return 'Your target is set.';
+  if (r.supplier_id) return 'Added to your suppliers.';
   if (r.ticket_id) return 'A member of the team will pick this up shortly.';
   return '';
 }

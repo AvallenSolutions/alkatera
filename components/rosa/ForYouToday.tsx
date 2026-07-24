@@ -16,6 +16,8 @@ const OnboardingResumeBanner = dynamic(() => import('./OnboardingResumeBanner').
 import { SustainableAINote } from './SustainableAINote'
 import { CertificationHealthWidget } from '@/components/certifications/CertificationHealthWidget'
 import { useAuth } from '@/hooks/useAuth'
+import { useProfile } from '@/hooks/data/useProfile'
+import { firstNameFor } from '@/lib/user-name'
 import { Eyebrow } from '@/components/studio/eyebrow'
 import { Statement } from '@/components/studio/statement'
 
@@ -44,7 +46,14 @@ interface Props {
 /** The brief's one sentence: a greeting by daypart, ending with a full stop. */
 function useGreeting(): string {
   const { user } = useAuth()
-  const firstName = (user?.user_metadata?.full_name as string | undefined)?.split(' ')[0]
+  const { profile } = useProfile()
+  // Same three-source fallback as the desk, so the two greetings can never
+  // disagree about what to call someone (see lib/user-name.ts).
+  const firstName = firstNameFor({
+    metadataFullName: user?.user_metadata?.full_name as string | undefined,
+    profileFullName: profile?.full_name,
+    email: user?.email,
+  })
   const h = new Date().getHours()
   const daypart = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
   return `${daypart}${firstName ? `, ${firstName}` : ''}.`

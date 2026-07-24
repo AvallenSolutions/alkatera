@@ -2,9 +2,9 @@
 
 import React, { Fragment, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { Dog, RotateCcw, AlertTriangle, Download, Clock } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Eyebrow, StateChip } from '@/components/studio'
 import type { RosaTurn } from '@/lib/rosa/useRosaConversation'
 import { RosaThinking, RosaStreamingCursor } from './RosaThinking'
 import { ActionProposalCard } from '@/components/gaia/ActionProposalCard'
@@ -28,14 +28,16 @@ interface Props {
 }
 
 /**
- * In-canvas Rosa conversation. Shares the same shell as the home cards:
- * same canvas width, same dark cards, same lime accents, same sticky
- * input bar at the bottom of the parent (RosaCanvas).
+ * The Rosa conversation, rendered inside the drawer.
  *
- * No left sidebar. No welcome screen. No suggestion pills. No "Online"
- * badge. The user came here from the canvas; the input bar at the bottom
- * is the same input bar they were just typing into. The only header is a
- * tiny "New chat" affordance so they can clear the thread.
+ * The drawer already names her in its own header, so this no longer draws
+ * a second "Conversation with Rosa" heading of its own — that was left
+ * over from when the conversation took over the /rosa canvas, and inside
+ * the drawer it read as a duplicate title at twice the right size.
+ *
+ * The thread itself is studio-plain: what you said sits in a quiet panel
+ * on the right, what Rosa said is simply set on the paper with no box at
+ * all, because her answer is the page's content rather than a card in it.
  */
 export function RosaConversation({ turns, isStreaming, error, onReset }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -49,32 +51,26 @@ export function RosaConversation({ turns, isStreaming, error, onReset }: Props) 
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <Dog className="h-6 w-6 text-studio-forest" />
-          Conversation with Rosa
-        </h1>
-        {turns.length > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
+      {turns.length > 0 && (
+        <div className="flex justify-end">
+          <button
+            type="button"
             onClick={onReset}
-            className="text-muted-foreground hover:text-foreground"
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim underline-offset-4 transition-colors duration-150 ease-studio hover:text-foreground hover:underline"
           >
-            <RotateCcw className="h-4 w-4 mr-1" />
-            New chat
-          </Button>
-        )}
-      </div>
+            New conversation
+          </button>
+        </div>
+      )}
 
-      <div className="space-y-4">
+      <div className="space-y-5">
         {turns.map((turn, i) => (
           <Turn key={turn.id} turn={turn} isLast={i === turns.length - 1} />
         ))}
         {error && (
-          <div className="rounded-lg border border-studio-stale/30 bg-card p-3 flex items-start gap-2 text-sm text-studio-stale">
-            <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-            <p>{error}</p>
+          <div className="border-l-2 border-studio-stale pl-3">
+            <StateChip tone="stale">Something went wrong</StateChip>
+            <p className="mt-1 text-sm text-studio-stale">{error}</p>
           </div>
         )}
         <div ref={bottomRef} />
@@ -87,8 +83,8 @@ function Turn({ turn, isLast }: { turn: RosaTurn; isLast: boolean }) {
   if (turn.role === 'user') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[80%] rounded-[6px] bg-secondary border border-border px-4 py-2.5">
-          <p className="text-sm leading-relaxed whitespace-pre-wrap">{turn.content}</p>
+        <div className="max-w-[85%] rounded-[6px] border border-studio-hairline bg-studio-paper/70 px-3.5 py-2.5">
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">{turn.content}</p>
         </div>
       </div>
     )
@@ -101,73 +97,67 @@ function Turn({ turn, isLast }: { turn: RosaTurn; isLast: boolean }) {
   const canGiveFeedback = !turn.streaming && !turn.errored && !turn.id.startsWith('asst-')
 
   return (
-    <div className="group flex gap-3 items-start">
-      <div className="flex-shrink-0 rounded-[6px] bg-secondary p-2 mt-0.5">
-        <Dog className="h-5 w-5 text-studio-forest" />
+    <div className="group space-y-2">
+      {/* Her name as a mono eyebrow rather than an avatar tile: one voice,
+          named the way every section in the house is named. */}
+      <Eyebrow tone="dim">Rosa</Eyebrow>
+
+      <div className={cn(turn.errored && 'border-l-2 border-studio-stale pl-3')}>
+        {turn.content ? (
+          <AssistantBody content={turn.content} streaming={turn.streaming} />
+        ) : (
+          <ThinkingDots />
+        )}
       </div>
-      <div className="flex-1 min-w-0 space-y-2">
+
+      {/* Inline chart attached to this turn (Phase B). */}
+      {turn.chart && (
+        <div className="rounded-[6px] border border-studio-hairline bg-studio-cream p-3">
+          <RosaChartRenderer chartData={turn.chart} />
+        </div>
+      )}
+
+      {/* Download / link chips Rosa attached (Phase B). */}
+      {turn.attachments && turn.attachments.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {turn.attachments.map((a, i) => (
+            <AttachmentChip key={`${a.url}-${i}`} attachment={a} />
+          ))}
+        </div>
+      )}
+
+      {/* Action proposals streamed alongside this turn (Phase B/C).
+          Each is a propose-then-confirm card; user must click Confirm
+          for the underlying write to fire. */}
+      {turn.actionProposals && turn.actionProposals.length > 0 && (
+        <div className="space-y-2">
+          {turn.actionProposals.map((p) => (
+            <ActionProposalCard
+              key={p.id}
+              proposal={{
+                id: p.id,
+                tool_name: p.tool_name,
+                preview: p.preview,
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Per-message feedback (Pillar 4 step 1 "Capture"). Quiet by
+          design: always visible on the last message so it's easy to
+          find, otherwise only on hover so the thread doesn't turn into
+          a wall of buttons. */}
+      {canGiveFeedback && (
         <div
           className={cn(
-            'rounded-[6px] border bg-card px-4 py-3',
-            turn.errored ? 'border-studio-stale/40' : 'border-border',
+            'transition-opacity',
+            isLast ? 'opacity-100' : 'opacity-0 focus-within:opacity-100 group-hover:opacity-100',
           )}
         >
-          {turn.content ? (
-            <AssistantBody content={turn.content} streaming={turn.streaming} />
-          ) : (
-            <ThinkingDots />
-          )}
+          <MessageFeedback messageId={turn.id} />
         </div>
-
-        {/* Inline chart attached to this turn (Phase B). */}
-        {turn.chart && (
-          <div className="rounded-[6px] border border-border bg-card/60 p-3">
-            <RosaChartRenderer chartData={turn.chart} />
-          </div>
-        )}
-
-        {/* Download / link chips Rosa attached (Phase B). */}
-        {turn.attachments && turn.attachments.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {turn.attachments.map((a, i) => (
-              <AttachmentChip key={`${a.url}-${i}`} attachment={a} />
-            ))}
-          </div>
-        )}
-
-        {/* Action proposals streamed alongside this turn (Phase B/C).
-            Each is a propose-then-confirm card; user must click Confirm
-            for the underlying write to fire. */}
-        {turn.actionProposals && turn.actionProposals.length > 0 && (
-          <div className="space-y-2">
-            {turn.actionProposals.map(p => (
-              <ActionProposalCard
-                key={p.id}
-                proposal={{
-                  id: p.id,
-                  tool_name: p.tool_name,
-                  preview: p.preview,
-                }}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Per-message feedback (Pillar 4 step 1 "Capture"). Quiet by
-            design: always visible on the last message so it's easy to
-            find, otherwise only on hover so the thread doesn't turn into
-            a wall of buttons. */}
-        {canGiveFeedback && (
-          <div
-            className={cn(
-              'pl-1 transition-opacity',
-              isLast ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100',
-            )}
-          >
-            <MessageFeedback messageId={turn.id} />
-          </div>
-        )}
-      </div>
+      )}
     </div>
   )
 }
@@ -207,8 +197,8 @@ function MessageFeedback({ messageId }: { messageId: string }) {
           type="button"
           onClick={() => choose(opt.verdict)}
           className={cn(
-            'font-mono text-[10px] uppercase tracking-[0.15em] transition-colors',
-            verdict === opt.verdict ? 'text-studio-forest' : 'text-studio-dim hover:text-foreground',
+            'font-mono text-[10px] font-bold uppercase tracking-[0.15em] transition-colors duration-150 ease-studio',
+            verdict === opt.verdict ? 'text-room-accent' : 'text-studio-dim hover:text-foreground',
           )}
         >
           {opt.label}
@@ -235,17 +225,19 @@ function AttachmentChip({
       target="_blank"
       rel="noopener noreferrer"
       download={attachment.filename}
-      className="group inline-flex items-center gap-2 rounded-lg border border-border bg-background/60 px-3 py-2 hover:border-studio-forest/40 hover:bg-card transition-colors"
+      className="inline-flex items-center gap-2 rounded-[6px] border border-studio-hairline bg-studio-cream px-3 py-2 transition-colors duration-150 ease-studio hover:border-studio-ink/25"
     >
-      <Download className="h-4 w-4 text-studio-forest" />
-      <div className="text-left">
-        <p className="text-xs font-medium leading-tight">{attachment.label}</p>
+      <Download className="h-4 w-4 shrink-0 text-studio-dim" />
+      <span className="text-left">
+        <span className="block font-display text-xs font-semibold leading-tight">
+          {attachment.label}
+        </span>
         {expiresLabel && (
-          <p className="text-[10px] text-muted-foreground inline-flex items-center gap-1 mt-0.5">
-            <Clock className="h-2.5 w-2.5" /> {expiresLabel}
-          </p>
+          <span className="mt-0.5 block font-mono text-[10px] uppercase tracking-[0.14em] text-studio-dim">
+            {expiresLabel}
+          </span>
         )}
-      </div>
+      </span>
     </a>
   )
 }
@@ -445,7 +437,7 @@ function RosaImage({ src, alt }: { src: string; alt: string }) {
       <img
         src={src}
         alt={alt}
-        className="max-w-full max-h-72 rounded-lg border border-border shadow-sm hover:opacity-90 transition-opacity"
+        className="max-h-72 max-w-full rounded-[6px] border border-studio-hairline transition-opacity duration-150 ease-studio hover:opacity-90"
         onError={e => {
           // Fall back to showing the raw URL as a link when the image
           // fails to load (404, blocked content, etc.).
@@ -470,7 +462,7 @@ function RosaLink({ href, children }: { href: string; children: React.ReactNode 
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-studio-forest hover:underline break-all"
+      className="break-all text-room-accent underline-offset-2 hover:underline"
     >
       {children}
     </a>
