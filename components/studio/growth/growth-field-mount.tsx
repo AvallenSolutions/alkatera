@@ -120,7 +120,23 @@ export function useGrowthScore(): GrowthPayload | null {
   return payload;
 }
 
-export function GrowthFieldMount({ className }: { className?: string }) {
+interface GrowthFieldMountProps {
+  className?: string;
+  /** True while the page has cleared its cards to show the forest alone. */
+  forestOnly?: boolean;
+  /**
+   * Lets the forest key clear the page's cards away and bring them back.
+   * The page owns the state (it is the one that has to fade its content);
+   * pass both, or neither and the control simply isn't offered.
+   */
+  onForestOnlyChange?: (next: boolean) => void;
+}
+
+export function GrowthFieldMount({
+  className,
+  forestOnly,
+  onForestOnlyChange,
+}: GrowthFieldMountProps) {
   const { currentOrganization } = useOrganization();
   const payload = useGrowthScore();
   const orgId = currentOrganization?.id;
@@ -185,8 +201,11 @@ export function GrowthFieldMount({ className }: { className?: string }) {
         organizationId={orgId}
         season={effectiveSeason}
         rosaSpot={rosaSpot}
+        forestOnly={forestOnly}
+        onForestOnlyChange={onForestOnlyChange}
       />
-      {completedBand && (
+      {/* Nothing pops up over a cleared view: that is the whole point of it. */}
+      {completedBand && !forestOnly && (
         <BandCompletionToast band={completedBand} onDone={clearCompletedBand} />
       )}
     </>

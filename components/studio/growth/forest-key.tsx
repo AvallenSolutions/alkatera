@@ -24,6 +24,10 @@ interface ForestKeyProps {
   season: Season;
   /** Rosa's spot on screen: she stands in the same place in the download. */
   rosaSpot: { x: number; flip: boolean } | null;
+  /** True while the page's cards are cleared away to show the forest alone. */
+  forestOnly?: boolean;
+  /** Clear the cards away, or bring them back. Omit to hide the control. */
+  onForestOnlyChange?: (next: boolean) => void;
 }
 
 /** Each band in plain words: what it is, and where to grow it. */
@@ -68,7 +72,15 @@ function forestRead(score: number): string {
   return 'A full forest. Look after it.';
 }
 
-export function ForestKey({ score, bands, organizationId, season, rosaSpot }: ForestKeyProps) {
+export function ForestKey({
+  score,
+  bands,
+  organizationId,
+  season,
+  rosaSpot,
+  forestOnly = false,
+  onForestOnlyChange,
+}: ForestKeyProps) {
   const [open, setOpen] = useState(false);
 
   // The download carries the exact view state, so what arrives is what
@@ -94,6 +106,23 @@ export function ForestKey({ score, bands, organizationId, season, rosaSpot }: Fo
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
+  // Escape is also the way back from the cleared view, so nobody can get
+  // stuck looking at a forest with no way to return.
+  useEffect(() => {
+    if (!forestOnly || !onForestOnlyChange) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onForestOnlyChange(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [forestOnly, onForestOnlyChange]);
+
+  /** Clear the cards away and close the key, so nothing covers the forest. */
+  const clearAway = () => {
+    setOpen(false);
+    onForestOnlyChange?.(true);
+  };
+
   const rows: FactRowItem[] = bands
     ? (Object.keys(BAND_ROWS) as GrowthBandKey[]).map((key) => ({
         id: key,
@@ -107,14 +136,26 @@ export function ForestKey({ score, bands, organizationId, season, rosaSpot }: Fo
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="fixed bottom-16 right-4 z-30 rounded-full border border-studio-hairline bg-studio-cream/90 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-studio-dim transition-colors hover:text-studio-ink"
-        aria-expanded={open}
-      >
-        Your forest · {score}
-      </button>
+      {/* While the cards are cleared the pill becomes the way back, so the
+          forest is never a view you can be stranded in. */}
+      {forestOnly && onForestOnlyChange ? (
+        <button
+          type="button"
+          onClick={() => onForestOnlyChange(false)}
+          className="fixed bottom-16 right-4 z-30 rounded-full border border-studio-hairline bg-studio-cream/90 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-studio-dim transition-colors hover:text-studio-ink"
+        >
+          Show the desk
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="fixed bottom-16 right-4 z-30 rounded-full border border-studio-hairline bg-studio-cream/90 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-studio-dim transition-colors hover:text-studio-ink"
+          aria-expanded={open}
+        >
+          Your forest · {score}
+        </button>
+      )}
 
       {open && (
         <>
@@ -133,7 +174,16 @@ export function ForestKey({ score, bands, organizationId, season, rosaSpot }: Fo
               </div>
             )}
 
-            <div className="mt-4 border-t border-studio-hairline pt-3">
+            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-studio-hairline pt-3">
+              {onForestOnlyChange && (
+                <button
+                  type="button"
+                  onClick={clearAway}
+                  className="font-mono text-[11px] uppercase tracking-[0.18em] text-studio-dim underline-offset-4 hover:text-studio-ink hover:underline"
+                >
+                  See it on its own
+                </button>
+              )}
               <a
                 href={downloadHref}
                 download={downloadName}

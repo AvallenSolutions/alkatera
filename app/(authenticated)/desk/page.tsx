@@ -2,6 +2,9 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useProfile } from '@/hooks/data/useProfile';
+import { firstNameFor } from '@/lib/user-name';
+import { cn } from '@/lib/utils';
 import { BreathingGrid } from '@/components/studio/breathing-grid';
 import { PosterBlock } from '@/components/studio/poster-block';
 import { Statement } from '@/components/studio/statement';
@@ -9,7 +12,6 @@ import { DeskPriorities } from '@/components/studio/desk-priorities';
 import { FirstWeekCard } from '@/components/studio/first-week-card';
 import { ProvenanceScore } from '@/components/studio/provenance-score';
 import { DeskArrivalWalk } from '@/components/studio/desk-arrival-walk';
-import { GiveDoor } from '@/components/studio/give-door';
 import {
   PLATFORM_ROOMS,
   deskOrderForPersona,
@@ -62,36 +64,36 @@ function posterContent(counts: DeskCounts | null): Record<
       eyebrow: 'THE WORKBENCH',
       headline: 'What we measure.',
       note: counts
-        ? n(counts.facilities, 'FACILITY', 'FACILITIES') + ' · EMISSIONS · SPEND'
-        : 'FACILITIES · EMISSIONS · SPEND',
+        ? n(counts.facilities, 'FACILITY', 'FACILITIES') + ' · SPEND · QUALITY'
+        : 'FACILITIES · SPEND · QUALITY',
       href: '/workbench/',
     },
     cellar: {
       eyebrow: 'THE CELLAR',
-      headline: 'What we make.',
+      headline: 'What our drinks are made of.',
       note: counts
-        ? n(counts.products, 'PRODUCT', 'PRODUCTS') + ' · LCAS'
-        : 'PRODUCTS · LCAS',
+        ? n(counts.products, 'PRODUCT', 'PRODUCTS') + ' · LIQUIDS · PACKAGING'
+        : 'PRODUCTS · LIQUIDS · PACKAGING',
       href: '/cellar/',
     },
     network: {
       eyebrow: 'THE NETWORK',
       headline: "Who we're talking to.",
-      note: 'SUPPLIERS · MESSAGES · EXPERTS',
+      note: 'SUPPLIERS · EXPERTS · MESSAGES',
       href: '/network/',
     },
     evidence: {
       eyebrow: 'THE EVIDENCE',
       headline: 'What we can prove.',
       note: counts
-        ? n(counts.reports, 'REPORT', 'REPORTS') + ' · CERTIFICATIONS · TARGETS'
-        : 'REPORTS · CERTIFICATIONS · TARGETS',
+        ? n(counts.reports, 'REPORT', 'REPORTS') + ' · LCAS · VITALITY'
+        : 'REPORTS · LCAS · VITALITY',
       href: '/evidence/',
     },
     library: {
       eyebrow: 'THE LIBRARY',
       headline: 'What we know.',
-      note: 'KNOWLEDGE · WIKI',
+      note: 'YOUR LIBRARY · KNOWLEDGE · WIKI',
       href: '/library/',
     },
     wiring: {
@@ -105,11 +107,23 @@ function posterContent(counts: DeskCounts | null): Record<
 
 export default function DeskPage() {
   const { user } = useAuth();
+  const { profile } = useProfile();
   const { persona } = useUserRole();
   const { currentOrganization } = useOrganization();
   const palette = resolveRoomPalette(currentOrganization);
-  const firstName = (user?.user_metadata?.full_name as string | undefined)?.split(' ')[0];
+  // Three sources, best first: the signup name, the profile name, then the
+  // email. Reading only user_metadata left anyone who never typed a name
+  // (invited, migrated, or signed up without one) on a bare "Good morning."
+  const firstName = firstNameFor({
+    metadataFullName: user?.user_metadata?.full_name as string | undefined,
+    profileFullName: profile?.full_name,
+    email: user?.email,
+  });
   const [counts, setCounts] = useState<DeskCounts | null>(null);
+  // The forest is the desk's ground layer, and the desk's cards sit on top
+  // of it. This clears them away so it can be looked at as a picture — the
+  // forest key owns the control, the desk owns the fade.
+  const [forestOnly, setForestOnly] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -151,11 +165,20 @@ export default function DeskPage() {
 
   return (
     <>
-      {/* The living forest: the org's data completeness, growing. */}
-      <GrowthFieldMount />
+      {/* The living forest: the org's data completeness, growing. The desk
+          is its only home — the rooms are for work, not scenery. */}
+      <GrowthFieldMount forestOnly={forestOnly} onForestOnlyChange={setForestOnly} />
       {/* pb-48: the forest's stage. Open paper at the page foot so the
-          ground layer (grasses, flowers, understory) is always on show. */}
-      <div className="relative z-[1] space-y-8 pb-48">
+          ground layer (grasses, flowers, understory) is always on show.
+          Faded rather than unmounted when the forest is being looked at on
+          its own, so coming back costs nothing and scroll is kept. */}
+      <div
+        className={cn(
+          'relative z-[1] space-y-8 pb-48 motion-safe:transition-opacity motion-safe:duration-500 motion-safe:ease-studio',
+          forestOnly && 'pointer-events-none opacity-0',
+        )}
+        aria-hidden={forestOnly}
+      >
       <div className="space-y-2">
         <Statement
           eyebrow="THE DESK"
@@ -174,9 +197,6 @@ export default function DeskPage() {
 
       {/* The first seven days: a named checklist that auto-ticks and retires. */}
       <FirstWeekCard />
-
-      {/* Give us anything: the one gesture that hands data over from here. */}
-      <GiveDoor hint="Anything at all. We will work out where it goes." />
 
       {/* The key numbers greet you in the hall: the vitality panel. */}
       <VitalityHero />
