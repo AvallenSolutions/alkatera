@@ -18,8 +18,9 @@ const noStoreFetch: typeof fetch = (input, init) => fetch(input, { ...init, cach
  * function runs, but returns the result immediately so an admin can see cert
  * status without waiting for the scheduled run. Read-only; sends no email.
  *
- * Auth: any authenticated user (same bearer-token pattern as
- * /api/openlca/test-connection).
+ * Auth: alka**tera** admins only, matching the /api/admin/ prefix. It used to
+ * accept any authenticated user, which meant a customer could read the
+ * infrastructure's certificate expiry dates and hostnames.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -41,6 +42,11 @@ export async function GET(request: NextRequest) {
     const { data: user, error: userError } = await supabase.auth.getUser();
     if (userError || !user?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: isAdmin } = await supabase.rpc('is_alkatera_admin');
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
     const checks = await runCertChecks();

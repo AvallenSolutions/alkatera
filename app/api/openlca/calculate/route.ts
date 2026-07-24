@@ -93,7 +93,61 @@ interface CalculateRequest {
 // Error classification lives in lib/openlca/classify-error.ts (unit-tested;
 // the match ordering is load-bearing — see the comment there).
 
+/**
+ * A cached impact row, scaled to the requested quantity.
+ *
+ * `stale` marks a row served past its expiry because the live server could not
+ * be reached. The numbers are the same ones ecoinvent gave when the row was
+ * written, which is why serving them is right, but the caller is told so it
+ * can record the fact rather than present it as a live lookup.
+ */
+function cachedResponse(
+  row: any,
+  quantity: number,
+  database: string,
+  stale?: { since: string | null },
+) {
+  const scale = (value: number | null | undefined) => (value || 0) * quantity;
+  return {
+    success: true,
+    cached: true,
+    stale: Boolean(stale),
+    staleSince: stale?.since ?? undefined,
+    database: row.source_database || database,
+    impacts: {
+      impact_climate: scale(row.impact_climate),
+      impact_climate_fossil: scale(row.impact_climate_fossil),
+      impact_climate_biogenic: scale(row.impact_climate_biogenic),
+      impact_climate_dluc: scale(row.impact_climate_dluc),
+      impact_water: scale(row.impact_water),
+      impact_land: scale(row.impact_land),
+      impact_waste: scale(row.impact_waste),
+      impact_ozone_depletion: scale(row.impact_ozone_depletion),
+      impact_terrestrial_ecotoxicity: scale(row.impact_terrestrial_ecotoxicity),
+      impact_freshwater_ecotoxicity: scale(row.impact_freshwater_ecotoxicity),
+      impact_marine_ecotoxicity: scale(row.impact_marine_ecotoxicity),
+      impact_freshwater_eutrophication: scale(row.impact_freshwater_eutrophication),
+      impact_marine_eutrophication: scale(row.impact_marine_eutrophication),
+      impact_terrestrial_acidification: scale(row.impact_terrestrial_acidification),
+      impact_mineral_resource_scarcity: scale(row.impact_mineral_resource_scarcity),
+      impact_fossil_resource_scarcity: scale(row.impact_fossil_resource_scarcity),
+    },
+    processName: row.process_name,
+    geography: row.geography,
+    source: stale
+      ? `OpenLCA Cache (stale): ${row.process_name}`
+      : `OpenLCA Cache: ${row.process_name}`,
+  };
+}
+
 export async function POST(request: NextRequest) {
+  // Hoisted so the failure path below can still reach it: if the live call
+  // dies, an expired cache row is the best answer we have, and far better
+  // than letting the resolver fall through to a generic proxy.
+  let staleCache: any = null;
+  let staleQuantity = 1;
+  let staleDatabase = 'ecoinvent';
+
   try {
     // Check authentication
     const authHeader = request.headers.get('authorization');
@@ -169,8 +223,16 @@ export async function POST(request: NextRequest) {
       }, { status: 503 });
     }
 
-    // Check cache first (gracefully handle missing table)
-    let cached = null;
+    // Check cache first (gracefully handle missing table).
+    //
+    // Expired rows are fetched too, rather than filtered out in SQL. An
+    // expired entry is not worthless: ecoinvent 3.12 is a static, versioned
+    // dataset, so a factor cached 40 days ago is the same number the server
+    // would return today. Dropping it because a 30-day clock elapsed, at the
+    // very moment the server is unreachable, silently replaced a confidence-85
+    // ecoinvent figure with a confidence-30 name-matched proxy. Stale and
+    // labelled beats fresh-looking and wrong.
+    let cachedRow: any = null;
     try {
       const { data, error } = await supabase
         .from('openlca_impact_cache')
@@ -178,11 +240,10 @@ export async function POST(request: NextRequest) {
         .eq('organization_id', organizationId)
         .eq('process_id', processId)
         .eq('source_database', database)
-        .gt('expires_at', new Date().toISOString())
         .maybeSingle();
 
       if (!error) {
-        cached = data;
+        cachedRow = data;
       } else if (!error.message?.includes('does not exist')) {
         console.warn('[OpenLCA API] Cache query error:', error.message);
       }
@@ -190,34 +251,17 @@ export async function POST(request: NextRequest) {
       console.warn('[OpenLCA API] Cache unavailable, proceeding without cache');
     }
 
+    const cacheIsFresh = Boolean(
+      cachedRow?.expires_at && new Date(cachedRow.expires_at).getTime() > Date.now(),
+    );
+    // Held back for the failure path below: only served if the live call fails.
+    staleCache = cachedRow && !cacheIsFresh ? cachedRow : null;
+    staleQuantity = quantity;
+    staleDatabase = database;
+    const cached = cacheIsFresh ? cachedRow : null;
+
     if (cached) {
-      // Return cached data scaled by quantity
-      return NextResponse.json({
-        success: true,
-        cached: true,
-        database: cached.source_database || database,
-        impacts: {
-          impact_climate: (cached.impact_climate || 0) * quantity,
-          impact_climate_fossil: (cached.impact_climate_fossil || 0) * quantity,
-          impact_climate_biogenic: (cached.impact_climate_biogenic || 0) * quantity,
-          impact_climate_dluc: (cached.impact_climate_dluc || 0) * quantity,
-          impact_water: (cached.impact_water || 0) * quantity,
-          impact_land: (cached.impact_land || 0) * quantity,
-          impact_waste: (cached.impact_waste || 0) * quantity,
-          impact_ozone_depletion: (cached.impact_ozone_depletion || 0) * quantity,
-          impact_terrestrial_ecotoxicity: (cached.impact_terrestrial_ecotoxicity || 0) * quantity,
-          impact_freshwater_ecotoxicity: (cached.impact_freshwater_ecotoxicity || 0) * quantity,
-          impact_marine_ecotoxicity: (cached.impact_marine_ecotoxicity || 0) * quantity,
-          impact_freshwater_eutrophication: (cached.impact_freshwater_eutrophication || 0) * quantity,
-          impact_marine_eutrophication: (cached.impact_marine_eutrophication || 0) * quantity,
-          impact_terrestrial_acidification: (cached.impact_terrestrial_acidification || 0) * quantity,
-          impact_mineral_resource_scarcity: (cached.impact_mineral_resource_scarcity || 0) * quantity,
-          impact_fossil_resource_scarcity: (cached.impact_fossil_resource_scarcity || 0) * quantity,
-        },
-        processName: cached.process_name,
-        geography: cached.geography,
-        source: `OpenLCA Cache: ${cached.process_name}`,
-      });
+      return NextResponse.json(cachedResponse(cached, quantity, database));
     }
     // Skip health check — it wastes 3-5 seconds of our tight 30s budget.
     // If the server is down, the calculation call will fail with a clear error.
@@ -561,6 +605,27 @@ export async function POST(request: NextRequest) {
     // act on — critically, a 404 'process_not_found' so it retries the other DB.
     console.error('[OpenLCA API]', error);
     const { status, code, message } = classifyOpenLcaError(error);
+
+    // The server could not answer, but we have answered this exact question
+    // before. Serve that, marked stale, rather than failing and letting the
+    // waterfall substitute a generic proxy: a factor from ecoinvent last month
+    // is the same number ecoinvent would give today, and it is not remotely
+    // comparable to a name-matched guess.
+    //
+    // A 404 is deliberately excluded. That means the process genuinely is not
+    // on this server, so the resolver's retry against the other database is
+    // the correct next move and must not be pre-empted.
+    if (staleCache && code !== 'process_not_found') {
+      console.warn(
+        `[OpenLCA API] Live call failed (${code}); serving cache from ${staleCache.expires_at} as stale`,
+      );
+      return NextResponse.json(
+        cachedResponse(staleCache, staleQuantity, staleDatabase, {
+          since: staleCache.expires_at ?? null,
+        }),
+      );
+    }
+
     return NextResponse.json({ error: message, code }, { status });
   }
 }

@@ -70,4 +70,9 @@ scripts/eval-out/
 
 # Local LCA database downloads (ecoinvent .zolca libraries, ~9 GB).
 # Never belongs in git; sat untracked and unignored until 24 Jul 2026.
-OpenLCA/
+#
+# Root-anchored deliberately. macOS filesystems are case-insensitive, so a bare
+# `OpenLCA/` also matched the application's own `lib/openlca/`,
+# `app/api/openlca/` and `app/api/admin/openlca/` — which would have silently
+# ignored any NEW source file added under them.
+/OpenLCA/

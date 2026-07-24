@@ -967,6 +967,26 @@ export async function resolveImpactFactors(
       console.log(`[Waterfall] ✓ Priority 2.5 SUCCESS: OpenLCA calculation for ${material.material_name} via ${dbLabel}`);
       console.log(`[Waterfall] Climate impact: ${result.impacts.impact_climate?.toFixed(4)} kg CO2e`);
 
+      // The server was unreachable and the API served a cached figure past its
+      // expiry. The number is still ecoinvent's, so it keeps its grade, but the
+      // run records that it was not confirmed live: a report should be able to
+      // say which of its figures were read from the shelf rather than asked for.
+      if (result.stale) {
+        console.warn(
+          `[Waterfall] OpenLCA served a STALE cached factor for ${material.material_name} (expired ${result.staleSince ?? 'unknown'})`,
+        );
+        fallbackEvents?.push({
+          material_name: material.material_name,
+          material_id: material.id,
+          attempted_priority: `2.5 (OpenLCA/${result.database === 'agribalyse' ? 'Agribalyse' : 'ecoinvent'})`,
+          resolved_priority: 2,
+          fallback_reason: `The live ${dbLabel} server could not be reached, so a cached factor from ${result.staleSince ?? 'an earlier run'} was used. The figure is unchanged, it was simply not confirmed live.`,
+          factor_value_kg_co2e: result.impacts?.impact_climate ?? 0,
+          source_reference: result.source || `OpenLCA cache (stale): ${result.processName}`,
+          category: 'data_quality',
+        });
+      }
+
       return {
         impact_climate: result.impacts.impact_climate || 0,
         impact_climate_fossil: result.impacts.impact_climate_fossil || 0,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -118,6 +119,39 @@ interface InlineIngredientSearchProps {
   }) => void;
   onChange?: (value: string) => void;
   className?: string;
+}
+
+/**
+ * The live reference databases could not be reached.
+ *
+ * Shown wherever search results appear, not only on an empty result set. The
+ * ecoinvent and Agribalyse servers have twice been unreachable for weeks
+ * (expired certificates in June 2026, a lost DNS record in July) and both went
+ * unnoticed because a local factor usually matches something: the list looked
+ * normal while the best matches were silently absent.
+ */
+function DegradedDatabasesNotice({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        'rounded-[6px] border border-border bg-card px-3 py-2 text-xs text-[#B45309]',
+        className,
+      )}
+    >
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <div>
+          <p className="font-medium text-foreground">Reference databases temporarily unavailable</p>
+          <p className="mt-0.5">
+            The ecoinvent and Agribalyse databases could not be reached, so only your internal
+            factors are shown. Anything you pick now will carry a lower confidence than usual. This
+            is a server issue, not a missing ingredient. Please try again shortly, or contact
+            support if it persists.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function InlineIngredientSearch({
@@ -683,6 +717,13 @@ export function InlineIngredientSearch({
       {showResults && results.length > 0 && (
         <Card className="absolute z-50 mt-1 w-full max-h-96 overflow-y-auto shadow-lg">
           <div className="p-2 space-y-1">
+            {/* The outage has to be said here too, not only when the search
+                comes back empty. Both of the multi-week outages this notice
+                exists for were invisible precisely because a local factor
+                matched: the user saw a normal list of results with the
+                ecoinvent and Agribalyse entries quietly missing. */}
+            {liveDbDegraded && <DegradedDatabasesNotice className="mb-2" />}
+
             {/* Summary header */}
             <div className="px-2 py-1.5 border-b flex items-center justify-between flex-wrap gap-2">
               <span className="text-xs text-muted-foreground">
@@ -906,23 +947,7 @@ export function InlineIngredientSearch({
           <div className="p-4 text-sm text-muted-foreground">
             <p className="text-center">No results found for &quot;{query}&quot;</p>
 
-            {/* Live reference databases unreachable: explain the degraded state
-                so users don't read an outage as "this ingredient doesn't exist". */}
-            {liveDbDegraded && (
-              <div className="mt-3 rounded-[6px] border border-border bg-card px-3 py-2 text-xs text-[#B45309]">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="font-medium text-foreground">Reference databases temporarily unavailable</p>
-                    <p className="mt-0.5">
-                      The ecoinvent and Agribalyse databases could not be reached, so only your
-                      internal factors are shown. This is a server issue, not a missing ingredient.
-                      Please try again shortly or contact support if it persists.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
+            {liveDbDegraded && <DegradedDatabasesNotice className="mt-3" />}
 
             {/* Brand name suggestion in zero-results */}
             {(() => {

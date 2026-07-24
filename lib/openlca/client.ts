@@ -94,7 +94,13 @@ export class OpenLCAClient {
 
         if (!response.ok) {
           const errorText = await response.text().catch(() => 'Unknown error');
-          throw new Error(`OpenLCA server error: ${response.status} ${response.statusText} - ${errorText}`);
+          const httpError = new Error(
+            `OpenLCA server error: ${response.status} ${response.statusText} - ${errorText}`,
+          ) as Error & { status?: number };
+          // Carried as a number so the retry decision below can read the real
+          // status instead of sniffing the message text.
+          httpError.status = response.status;
+          throw httpError;
         }
 
         // Handle empty responses (e.g., dispose)
@@ -107,8 +113,17 @@ export class OpenLCAClient {
       } catch (error: any) {
         lastError = error instanceof Error ? error : new Error(String(error));
 
-        // Don't retry on 4xx client errors (except 429 rate limit)
-        if (error.message?.includes('40') && !error.message?.includes('429')) {
+        // Don't retry on 4xx client errors (except 429 rate limit): the request
+        // itself is wrong, so repeating it changes nothing.
+        //
+        // This used to test `error.message.includes('40')`, which is a
+        // substring match against a string that ends in the server's own
+        // response body. Any 5xx whose body happened to contain "40" (a
+        // process count, an id, a timestamp) was therefore treated as a client
+        // error and never retried, defeating the backoff during exactly the
+        // transient outages it exists for.
+        const status = (error as { status?: number }).status;
+        if (typeof status === 'number' && status >= 400 && status < 500 && status !== 429) {
           throw lastError;
         }
 

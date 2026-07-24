@@ -2,6 +2,7 @@ import 'server-only';
 import { Resend } from 'resend';
 import { inngest } from '../client';
 import { studioLayout, studioParagraph, studioNotice, STUDIO } from '@/lib/email/studio-layout';
+import { resolveServerConfig, type OpenLCADatabaseSource } from '@/lib/openlca/client';
 
 /**
  * DNS + endpoint health monitor (on Inngest).
@@ -49,6 +50,32 @@ const EXPECTED_ENDPOINTS: { url: string; serves: string }[] = [
   { url: 'https://openlca-agribalyse.alkatera.com/api/version', serves: 'Agribalyse gdt-server' },
 ];
 
+/**
+ * Answering is not the same as being ready.
+ *
+ * `api/version` proves the JVM is alive. It says nothing about whether the
+ * database actually loaded, and that is a real failure mode here: the
+ * container is capped at 10.5 GB with a 60 to 90 second load, so an
+ * out-of-memory or a failed mount can leave gdt-server up and cheerfully
+ * returning 200 while holding no processes at all. To a user that is
+ * indistinguishable from the outages this monitor was written for, because
+ * ingredient search simply returns nothing.
+ *
+ * So each server is also asked for its process list and expected to have a
+ * plausible number of them. The floors are deliberately far below the real
+ * counts (ecoinvent 3.12 has ~23,000 processes, Agribalyse 3.2 ~2,500): this
+ * is a "did the database load at all" test, not a completeness audit, and a
+ * floor set near the true count would false-alarm on every dataset update.
+ */
+const READINESS_PROBES: {
+  source: OpenLCADatabaseSource;
+  serves: string;
+  minProcesses: number;
+}[] = [
+  { source: 'ecoinvent', serves: 'ecoinvent gdt-server', minProcesses: 1000 },
+  { source: 'agribalyse', serves: 'Agribalyse gdt-server', minProcesses: 500 },
+];
+
 export interface DnsCheckResult {
   name: string;
   type: string;
@@ -65,6 +92,8 @@ export interface EndpointCheckResult {
   ok: boolean;
   status?: number;
   error?: string;
+  /** Processes the server reported holding, when the readiness probe ran. */
+  processCount?: number;
 }
 
 const DNS_TYPE_CODES: Record<string, number> = { A: 1, CNAME: 5, MX: 15, TXT: 16 };
@@ -132,6 +161,69 @@ export async function runEndpointChecks(): Promise<EndpointCheckResult[]> {
       console.error(`[dns-health] ${ep.url} unreachable — ${error}`);
     }
   }
+
+  results.push(...(await runReadinessChecks()));
+  return results;
+}
+
+/**
+ * Ask each OpenLCA server for its process list and check it holds a plausible
+ * number. Catches a server that is up but empty, which the liveness probe
+ * above reports as perfectly healthy.
+ *
+ * Skipped silently when the server is not configured in this environment: a
+ * missing OPENLCA_AGRIBALYSE_SERVER_URL means "not deployed here", not "down".
+ */
+export async function runReadinessChecks(): Promise<EndpointCheckResult[]> {
+  const results: EndpointCheckResult[] = [];
+
+  for (const probe of READINESS_PROBES) {
+    const config = resolveServerConfig(probe.source);
+    if (!config) continue;
+
+    const url = `${config.serverUrl.replace(/\/$/, '')}/data/processes`;
+    try {
+      const res = await fetch(url, {
+        headers: config.apiKey ? { 'X-API-Key': config.apiKey } : {},
+        signal: AbortSignal.timeout(30_000),
+      });
+
+      if (!res.ok) {
+        results.push({
+          url,
+          serves: `${probe.serves} (readiness)`,
+          ok: false,
+          status: res.status,
+        });
+        console.error(`[dns-health] ${url} answered HTTP ${res.status} — ${probe.serves} not ready`);
+        continue;
+      }
+
+      const body = await res.json();
+      const count = Array.isArray(body) ? body.length : 0;
+      const ok = count >= probe.minProcesses;
+      results.push({
+        url,
+        serves: `${probe.serves} (readiness)`,
+        ok,
+        status: res.status,
+        processCount: count,
+        error: ok
+          ? undefined
+          : `holds ${count} processes, expected at least ${probe.minProcesses} — the database may not have loaded`,
+      });
+      if (!ok) {
+        console.error(
+          `[dns-health] ${probe.serves} answered 200 but holds only ${count} processes — database likely not loaded`,
+        );
+      }
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      results.push({ url, serves: `${probe.serves} (readiness)`, ok: false, error });
+      console.error(`[dns-health] readiness probe failed for ${probe.serves} — ${error}`);
+    }
+  }
+
   return results;
 }
 
@@ -145,7 +237,13 @@ function buildAlertEmail(
     parts.push(`<li style="margin-bottom:6px;"><strong>${f.type} ${f.name}</strong>: expected "${f.expect}", ${got}<br/><span style="color:${STUDIO.dim};">Breaks: ${f.serves}</span></li>`);
   }
   for (const f of endpointFailures) {
-    const got = f.error ? `unreachable (${f.error})` : `HTTP ${f.status}`;
+    // A readiness failure answers perfectly well and is still broken, so
+    // "unreachable" is only right when nothing came back at all.
+    const got = f.error
+      ? f.status
+        ? `HTTP ${f.status}, but ${f.error}`
+        : `unreachable (${f.error})`
+      : `HTTP ${f.status}`;
     parts.push(`<li style="margin-bottom:6px;"><strong>${f.url}</strong>: ${got}<br/><span style="color:${STUDIO.dim};">Breaks: ${f.serves}</span></li>`);
   }
 
