@@ -34,6 +34,54 @@ export const STUDIO = {
 
 export type WorkingTone = 'good' | 'attention' | 'stale' | 'hold' | 'quiet';
 
+/**
+ * The chart palette. One source for every plotted colour.
+ *
+ * The room inks (forest, teal, plum…) are deliberately deep and low-chroma,
+ * which is right for a band or a poster and wrong for a chart mark: validated
+ * as a categorical set they FAIL on chroma (they read grey at mark scale) and
+ * forest/teal/plum are indistinguishable from each other. So each series slot
+ * is the nearest PASSING step in the same hue family, not the band ink itself.
+ *
+ * Validated with the dataviz validator against the paper surface (#ECEAE3),
+ * light only — next-themes is forced light, so there is no dark surface to
+ * satisfy:
+ *
+ *   Lightness band      PASS  all 5 inside L 0.43–0.77
+ *   Chroma floor        PASS  all 5 >= 0.1
+ *   CVD separation      PASS  worst adjacent brick↔green ΔE 8.0 (protan)
+ *   Normal-vision floor PASS  worst adjacent plum↔cobalt ΔE 20.8
+ *   Contrast vs surface PASS  all 5 >= 3:1
+ *
+ * RULES, and they are not stylistic:
+ * - Assign in this fixed order, never cycled. A sixth series folds into
+ *   "Other" or becomes small multiples — a generated hue is never correct.
+ * - Colour follows the ENTITY, not its rank. Filtering a series out must not
+ *   repaint the survivors.
+ * - Brick and ochre must never end up adjacent: they measure ΔE 12.3 in
+ *   normal vision, a hard fail. The order below already keeps them apart.
+ * - Status tones (WORKING_TONE_HEX) are reserved for state and are never
+ *   borrowed as "series 6".
+ */
+export const CHART = {
+  /** Categorical identity, in fixed order. */
+  series: ['#0B7B5E', '#C04A28', '#2B46C0', '#8E3F6D', '#A97C14'] as const,
+  /** Magnitude: one hue, light to dark. Never a rainbow. */
+  sequential: ['#CFE3DA', '#9BC6B5', '#5CA88C', '#2A8C68', '#0B7B5E'] as const,
+  /** Recessive furniture. */
+  grid: '#D9D6CB',
+  axis: '#6F6F68',
+  /** A benchmark or target line: neutral, never a series hue. */
+  reference: '#6F6F68',
+  surface: '#ECEAE3',
+} as const;
+
+/** The nth series colour. Folds to "Other" past the end rather than cycling. */
+export function chartSeries(index: number): string {
+  return CHART.series[index] ?? CHART.axis;
+}
+
+
 export type MarkShape = 'circle' | 'triangle' | 'square' | 'quarter' | 'diamond' | 'arch' | 'ring';
 
 export type RoomKey = 'desk' | 'portfolio' | 'supply' | 'post' | 'evidence';

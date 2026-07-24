@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { CHART } from '@/components/studio/theme';
 import { Eyebrow } from '@/components/studio/eyebrow';
 import { StateChip } from '@/components/studio/state-chip';
 import { SectionTabs } from '@/components/studio/section-tabs';
@@ -105,7 +106,7 @@ export function WaterDeepDive({
         source: 'Operational (Direct)',
         value: totalOperational,
         percentage: (totalOperational / total) * 100,
-        color: '#3b82f6', // blue
+        color: CHART.series[0],
       });
     }
 
@@ -114,7 +115,7 @@ export function WaterDeepDive({
         source: 'Embedded (Supply Chain)',
         value: embeddedWithProductLca,
         percentage: (embeddedWithProductLca / total) * 100,
-        color: '#06b6d4', // cyan
+        color: CHART.series[2],
       });
     }
 

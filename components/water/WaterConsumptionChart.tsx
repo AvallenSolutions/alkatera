@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { STUDIO } from '@/components/studio/theme';
+import { CHART } from '@/components/studio/theme';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -168,16 +168,16 @@ export function WaterConsumptionChart({
           <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="consumptionGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={STUDIO.forest} stopOpacity={0.3} />
-                <stop offset="95%" stopColor={STUDIO.forest} stopOpacity={0} />
+                <stop offset="5%" stopColor={CHART.series[0]} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={CHART.series[0]} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="dischargeGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={STUDIO.teal} stopOpacity={0.3} />
-                <stop offset="95%" stopColor={STUDIO.teal} stopOpacity={0} />
+                <stop offset="5%" stopColor={CHART.series[1]} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={CHART.series[1]} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="scarcityGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={STUDIO.ochreInk} stopOpacity={0.3} />
-                <stop offset="95%" stopColor={STUDIO.ochreInk} stopOpacity={0} />
+                <stop offset="5%" stopColor={CHART.series[2]} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={CHART.series[2]} stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -217,7 +217,7 @@ export function WaterConsumptionChart({
                 <Area
                   type="monotone"
                   dataKey="consumption"
-                  stroke={STUDIO.forest}
+                  stroke={CHART.series[0]}
                   strokeWidth={2}
                   fill="url(#consumptionGradient)"
                   name="consumption"
@@ -226,7 +226,7 @@ export function WaterConsumptionChart({
                   <Area
                     type="monotone"
                     dataKey="discharge"
-                    stroke={STUDIO.teal}
+                    stroke={CHART.series[1]}
                     strokeWidth={2}
                     fill="url(#dischargeGradient)"
                     name="discharge"
@@ -234,9 +234,9 @@ export function WaterConsumptionChart({
                 )}
                 <ReferenceLine
                   y={averageConsumption}
-                  stroke={STUDIO.dim}
+                  stroke={CHART.reference}
                   strokeDasharray="5 5"
-                  label={{ value: 'Avg', position: 'right', fontSize: 10, fill: STUDIO.dim }}
+                  label={{ value: 'Avg', position: 'right', fontSize: 10, fill: CHART.reference }}
                 />
               </>
             )}
@@ -245,7 +245,7 @@ export function WaterConsumptionChart({
               <Area
                 type="monotone"
                 dataKey="netConsumption"
-                stroke="#06b6d4"
+                stroke={CHART.series[2]}
                 strokeWidth={2}
                 fill="url(#consumptionGradient)"
                 name="netConsumption"
@@ -256,7 +256,7 @@ export function WaterConsumptionChart({
               <Area
                 type="monotone"
                 dataKey="scarcityWeighted"
-                stroke={STUDIO.ochreInk}
+                stroke={CHART.series[2]}
                 strokeWidth={2}
                 fill="url(#scarcityGradient)"
                 name="scarcityWeighted"

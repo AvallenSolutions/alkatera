@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import { WORKING_TONE_HEX, STUDIO } from '@/components/studio/theme';
 import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
@@ -34,9 +35,9 @@ function getScoreLabel(score: number): { label: string; colorClass: string } {
 
 // Working tones from components/studio/theme.ts: good / attention / stale.
 function getScoreColor(score: number): string {
-  if (score >= 70) return '#047857';
-  if (score >= 30) return '#B45309';
-  return '#BE123C';
+  if (score >= 70) return WORKING_TONE_HEX.good;
+  if (score >= 30) return WORKING_TONE_HEX.attention;
+  return WORKING_TONE_HEX.stale;
 }
 
 export function VitalityRing({
@@ -65,7 +66,7 @@ export function VitalityRing({
   const { label: scoreLabel, colorClass } = isNoData
     ? { label: 'NO DATA', colorClass: 'text-studio-dim' }
     : getScoreLabel(normalizedScore);
-  const strokeColor = isNoData ? '#6F6F68' : getScoreColor(normalizedScore);
+  const strokeColor = isNoData ? STUDIO.dim : getScoreColor(normalizedScore);
 
   const TrendIcon = trendDirection === 'up' ? TrendingUp :
                     trendDirection === 'down' ? TrendingDown : Minus;

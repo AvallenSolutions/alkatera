@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { CHART } from '@/components/studio/theme';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -26,13 +27,15 @@ interface WaterSourceBreakdownChartProps {
 }
 
 const SOURCE_COLORS: Record<string, string> = {
-  'Municipal': '#3b82f6',
-  'Groundwater': '#22c55e',
-  'Surface Water': '#06b6d4',
-  'Rainwater': '#8b5cf6',
-  'Recycled': '#10b981',
-  'Seawater': '#0ea5e9',
-  'Other': '#94a3b8',
+  // Categorical identity, fixed order. Past the fifth slot a hue would have to
+  // be invented, so the tail goes neutral and is read from its label.
+  'Municipal': CHART.series[0],
+  'Groundwater': CHART.series[1],
+  'Surface Water': CHART.series[2],
+  'Rainwater': CHART.series[3],
+  'Recycled': CHART.series[4],
+  'Seawater': CHART.axis,
+  'Other': CHART.axis,
 };
 
 const SOURCE_ICONS: Record<string, string> = {

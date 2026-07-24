@@ -9,7 +9,7 @@ import { trackRosa } from '@/lib/rosa/track'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StateChip } from '@/components/studio/state-chip'
-import { STUDIO, WORKING_TONE_HEX, type WorkingTone } from '@/components/studio/theme'
+import { STUDIO, WORKING_TONE_HEX, CHART, type WorkingTone } from '@/components/studio/theme'
 // Round 3 (auto-research /rosa): breakdown modal is open-gated; defer it so it
 // leaves first load (benefits /rosa and every page that renders VitalityHero).
 const VitalityBreakdownModal = dynamic(() => import('./VitalityBreakdownModal').then((m) => m.VitalityBreakdownModal), { ssr: false })
@@ -435,7 +435,7 @@ function TrendStrip({
                 )}
                 style={{
                   height: `${heightPct}%`,
-                  backgroundColor: STUDIO.forest,
+                  backgroundColor: CHART.series[0],
                 }}
               />
             </div>

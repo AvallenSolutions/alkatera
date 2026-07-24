@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { CHART } from '@/components/studio/theme';
 import { ArrowUpRight, Sparkles } from 'lucide-react'
 import {
   Dialog,
@@ -189,7 +190,7 @@ function CompositeTrend({ trend }: { trend: TrendPoint[] }) {
   }
   return (
     <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="w-full h-12">
-      <path d={seg.join(' ')} stroke="#205E40" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d={seg.join(' ')} stroke={CHART.series[0]} strokeWidth="2" fill="none" strokeLinecap="round" />
     </svg>
   )
 }

@@ -2,7 +2,7 @@
  * The studio kit: alkatera's design-language primitives.
  * App-wide on the redesign branch; see design/studio-design-language.md.
  */
-export { STUDIO, ROOMS, ON_COLOUR_RGB, STUDIO_EASE, WORKING_TONE_HEX } from './theme';
+export { STUDIO, ROOMS, ON_COLOUR_RGB, STUDIO_EASE, WORKING_TONE_HEX, CHART, chartSeries } from './theme';
 export type { RoomConfig, RoomKey, RoomTab, MarkShape, WorkingTone } from './theme';
 export { spaceGrotesk } from './fonts';
 export { StudioScope } from './studio-scope';

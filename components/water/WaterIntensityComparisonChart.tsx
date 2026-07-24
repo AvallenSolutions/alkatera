@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { STUDIO } from '@/components/studio/theme';
+import { CHART, WORKING_TONE_HEX } from '@/components/studio/theme';
 import { litresPerLitre } from '@/lib/calculations/water-use-ratio';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -127,10 +127,10 @@ export function WaterIntensityComparisonChart({
   }
 
   const getBarColor = (entry: typeof chartData[0]) => {
-    if (entry.status === 'best') return '#22c55e';
-    if (entry.status === 'worst') return '#ef4444';
-    if (entry.aboveBenchmark) return STUDIO.ochreInk;
-    return STUDIO.forest;
+    if (entry.status === 'best') return WORKING_TONE_HEX.good;
+    if (entry.status === 'worst') return WORKING_TONE_HEX.stale;
+    if (entry.aboveBenchmark) return WORKING_TONE_HEX.attention;
+    return WORKING_TONE_HEX.good;
   };
 
   const CustomTooltip = ({ active, payload }: any) => {
@@ -222,15 +222,15 @@ export function WaterIntensityComparisonChart({
             {industryBenchmark && (
               <ReferenceLine
                 x={industryBenchmark}
-                stroke={STUDIO.dim}
+                stroke={CHART.reference}
                 strokeDasharray="5 5"
-                label={{ value: 'Benchmark', position: 'top', fontSize: 10, fill: STUDIO.dim }}
+                label={{ value: 'Benchmark', position: 'top', fontSize: 10, fill: CHART.reference }}
               />
             )}
 
             <ReferenceLine
               x={avgIntensity}
-              stroke={STUDIO.forest}
+              stroke={CHART.reference}
               strokeDasharray="3 3"
               strokeOpacity={0.5}
             />

@@ -1,6 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
+import { CHART } from '@/components/studio/theme';
 import { ScoreExplainer, type CalculationInputs } from './ScoreExplainer'
 import type {
   EnvironmentalSubScores,
@@ -194,7 +195,7 @@ function MiniTrendBars({
                 'w-full rounded-sm transition-colors',
                 filled ? (isLast ? 'opacity-100' : 'opacity-65') : 'opacity-15',
               )}
-              style={{ height: `${heightPct}%`, backgroundColor: '#205E40' }}
+              style={{ height: `${heightPct}%`, backgroundColor: CHART.series[0] }}
             />
           </div>
         )

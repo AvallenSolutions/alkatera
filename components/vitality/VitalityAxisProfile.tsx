@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { STUDIO } from '@/components/studio/theme';
+import { CHART } from '@/components/studio/theme';
 import { Eyebrow } from '@/components/studio/eyebrow';
 import type { VitalityComposite } from '@/lib/vitality/composite';
 import type { AxisKey } from './VitalityAxisSections';
@@ -24,9 +24,9 @@ import type { AxisKey } from './VitalityAxisSections';
  */
 
 const PILLAR_COLOUR = {
-  e: STUDIO.forest,
-  s: STUDIO.cobalt,
-  g: STUDIO.plum,
+  e: CHART.series[0],
+  s: CHART.series[1],
+  g: CHART.series[2],
 } as const;
 
 const AXIS_SHORT: Record<AxisKey, string> = {

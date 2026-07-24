@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { CHART } from '@/components/studio/theme';
 import Link from 'next/link'
 import { ArrowUpRight, TrendingDown, TrendingUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -360,7 +361,7 @@ function CompositeChart({ trend }: { trend: TrendPoint[] }) {
                 )}
                 style={{
                   height: `${heightPct}%`,
-                  backgroundColor: '#205E40',
+                  backgroundColor: CHART.series[0],
                 }}
               />
             </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import { WORKING_TONE_HEX } from '@/components/studio/theme';
 import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Minus, ArrowUp, ArrowDown } from 'lucide-react';
 
@@ -133,7 +134,7 @@ export function Sparkline({
   });
 
   const trend = data[data.length - 1] - data[0];
-  const strokeColor = color || (trend >= 0 ? '#10b981' : '#ef4444');
+  const strokeColor = color || (trend >= 0 ? WORKING_TONE_HEX.good : WORKING_TONE_HEX.stale);
 
   const areaPoints = [
     `${padding},${height - padding}`,

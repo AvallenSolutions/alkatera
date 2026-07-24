@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import { WORKING_TONE_HEX, STUDIO } from '@/components/studio/theme';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,9 +21,9 @@ interface FacilityWaterRiskMapProps {
 }
 
 const riskColors = {
-  high: "#ef4444",
-  medium: "#f59e0b",
-  low: "#22c55e",
+  high: WORKING_TONE_HEX.stale,
+  medium: WORKING_TONE_HEX.attention,
+  low: WORKING_TONE_HEX.good,
 };
 
 /** Water risk as a working tone. Filled pills read louder than the figures. */
@@ -222,7 +223,7 @@ function FacilityWaterRiskMapInner({
                         path: google.maps.SymbolPath.CIRCLE,
                         fillColor: riskColors[facility.risk_level],
                         fillOpacity: 1,
-                        strokeColor: "#ffffff",
+                        strokeColor: STUDIO.cream,
                         strokeWeight: isSelected ? 4 : 3,
                         scale: isSelected ? 12 : 10,
                       }}

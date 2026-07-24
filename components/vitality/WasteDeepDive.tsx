@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import { CHART, WORKING_TONE_HEX } from '@/components/studio/theme';
 import { Eyebrow } from '@/components/studio/eyebrow';
 import { StateChip } from '@/components/studio/state-chip';
 import { SectionTabs } from '@/components/studio/section-tabs';
@@ -49,34 +50,49 @@ interface WasteDeepDiveProps {
   loading?: boolean;
 }
 
+/**
+ * Waste categories are identity, so they take the categorical series in fixed
+ * order. Past the fifth slot a colour would have to be invented, and an
+ * invented hue carries no meaning — the tail goes grey and is read from its
+ * label, which is the honest outcome.
+ */
 const CATEGORY_COLORS: Record<string, string> = {
-  food_waste: '#059669',
-  packaging_waste: '#0891b2',
-  process_waste: '#7c3aed',
-  hazardous: '#dc2626',
-  construction: '#d97706',
-  electronic: '#6366f1',
-  other: '#6b7280',
+  food_waste: CHART.series[0],
+  packaging_waste: CHART.series[1],
+  process_waste: CHART.series[2],
+  hazardous: CHART.series[3],
+  construction: CHART.series[4],
+  electronic: CHART.axis,
+  other: CHART.axis,
 };
 
+/**
+ * Treatments are NOT categorical: the waste hierarchy ranks them, from
+ * prevention down to landfill. That is ordinal, so it takes the sequential
+ * ramp — one hue, strongest at the top of the hierarchy — rather than seven
+ * unrelated hues that made "recycling" and "landfill" look like two arbitrary
+ * flavours of the same thing.
+ */
 const TREATMENT_COLORS: Record<string, string> = {
-  recycling: '#059669',
-  composting: '#10b981',
-  anaerobic_digestion: '#14b8a6',
-  reuse: '#06b6d4',
-  incineration_with_recovery: '#f59e0b',
-  incineration_without_recovery: '#ef4444',
-  landfill: '#6b7280',
-  other: '#9ca3af',
+  recycling: CHART.sequential[4],
+  composting: CHART.sequential[4],
+  anaerobic_digestion: CHART.sequential[3],
+  reuse: CHART.sequential[4],
+  incineration_with_recovery: CHART.sequential[2],
+  incineration_without_recovery: CHART.sequential[1],
+  landfill: CHART.sequential[0],
+  other: CHART.axis,
 };
 
 function WasteHierarchyPyramid({ wasteByTreatment }: { wasteByTreatment: WasteByTreatmentItem[] }) {
-  const hierarchy = [
-    { level: 'Prevention', treatments: [], color: '#059669', target: 100 },
-    { level: 'Reuse', treatments: ['reuse'], color: '#10b981', target: 80 },
-    { level: 'Recycling', treatments: ['recycling', 'composting', 'anaerobic_digestion'], color: '#0891b2', target: 60 },
-    { level: 'Recovery', treatments: ['incineration_with_recovery'], color: '#f59e0b', target: 40 },
-    { level: 'Disposal', treatments: ['landfill', 'incineration_without_recovery', 'other'], color: '#ef4444', target: 0 },
+  // Annotated: CHART.sequential is `as const`, so without this TS narrows the
+  // empty Prevention list to never[] and .includes() stops accepting a string.
+  const hierarchy: Array<{ level: string; treatments: string[]; color: string; target: number }> = [
+    { level: 'Prevention', treatments: [], color: CHART.sequential[4], target: 100 },
+    { level: 'Reuse', treatments: ['reuse'], color: CHART.sequential[3], target: 80 },
+    { level: 'Recycling', treatments: ['recycling', 'composting', 'anaerobic_digestion'], color: CHART.sequential[2], target: 60 },
+    { level: 'Recovery', treatments: ['incineration_with_recovery'], color: CHART.sequential[1], target: 40 },
+    { level: 'Disposal', treatments: ['landfill', 'incineration_without_recovery', 'other'], color: CHART.sequential[0], target: 0 },
   ];
 
   const totalWaste = wasteByTreatment.reduce((sum, t) => sum + t.total_kg, 0);
@@ -150,7 +166,7 @@ function CircularityGauge({ rate, target }: { rate: number; target?: number }) {
             cy="50"
             r="40"
             fill="none"
-            stroke="#e5e7eb"
+            stroke={CHART.grid}
             strokeWidth="12"
           />
           <circle
@@ -158,7 +174,7 @@ function CircularityGauge({ rate, target }: { rate: number; target?: number }) {
             cy="50"
             r="40"
             fill="none"
-            stroke={rate >= 60 ? '#059669' : rate >= 40 ? '#f59e0b' : '#ef4444'}
+            stroke={rate >= 60 ? WORKING_TONE_HEX.good : rate >= 40 ? WORKING_TONE_HEX.attention : WORKING_TONE_HEX.stale}
             strokeWidth="12"
             strokeDasharray={`${rate * 2.51} 251`}
             strokeLinecap="round"
@@ -169,7 +185,7 @@ function CircularityGauge({ rate, target }: { rate: number; target?: number }) {
               cy="50"
               r="40"
               fill="none"
-              stroke="#3b82f6"
+              stroke={CHART.series[0]}
               strokeWidth="2"
               strokeDasharray="4 4"
               strokeDashoffset={`${(100 - target) * 2.51}`}
@@ -304,7 +320,7 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
     name: cat.category_display,
     value: cat.total_kg,
     percentage: cat.percentage,
-    color: CATEGORY_COLORS[cat.category] || '#6b7280',
+    color: CATEGORY_COLORS[cat.category] || CHART.axis,
   }));
 
   const treatmentChartData = wasteMetrics.waste_by_treatment.map((t) => ({
@@ -312,7 +328,7 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
     value: t.total_kg,
     percentage: t.percentage,
     isCircular: t.is_circular,
-    color: TREATMENT_COLORS[t.treatment_method] || '#6b7280',
+    color: TREATMENT_COLORS[t.treatment_method] || CHART.axis,
   }));
 
   return (
