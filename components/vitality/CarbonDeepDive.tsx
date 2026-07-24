@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { StateChip } from '@/components/studio/state-chip';
+import { Notice } from '@/components/studio/notice';
+import { SectionTabs } from '@/components/studio/section-tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart3, Leaf, Package, FlaskConical, AlertCircle, CheckCircle2, Info, Globe } from 'lucide-react';
 import { ScopeBreakdown } from '@/hooks/data/useCompanyMetrics';
 import { RelatableMetric } from '@/components/shared/RelatableMetric';
@@ -57,6 +58,7 @@ export function CarbonDeepDive({
   isLoadingScope3,
 }: CarbonDeepDiveProps) {
   const [sortBy, setSortBy] = useState<'impact' | 'name' | 'quantity'>('impact');
+  const [tab, setTab] = useState('overview');
   const hasScope3Data = scope3Categories && scope3Categories.length > 0;
 
   // Check if we have any data to display
@@ -74,20 +76,20 @@ export function CarbonDeepDive({
     const hasPartialData = totalCO2 > 0;
 
     return (
-      <Card>
-        <CardContent className="p-8 space-y-4">
+      <section className="border-t border-studio-hairline pt-5">
+        <div className="space-y-3">
           <div className="text-center text-muted-foreground">
             <AlertCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
 
             {hasPartialData ? (
               <>
                 <p className="text-sm font-medium">Partial carbon data available</p>
-                <div className="mt-4 p-4 bg-blue-50 rounded-lg text-left">
-                  <p className="text-sm font-semibold text-blue-900">Summary metric: {(totalCO2 / 1000).toFixed(3)} tCO₂eq</p>
-                  <p className="text-xs text-blue-700 mt-2">
+                <div className="mt-4 p-4 rounded-[6px] text-left">
+                  <p className="text-sm font-semibold text-foreground">Summary metric: {(totalCO2 / 1000).toFixed(3)} tCO₂eq</p>
+                  <p className="text-xs text-muted-foreground mt-2">
                     Detailed breakdown pending. Run a full LCA calculation to see:
                   </p>
-                  <ul className="text-xs text-blue-700 mt-2 space-y-1 list-disc list-inside">
+                  <ul className="text-xs text-muted-foreground mt-2 space-y-1 list-disc list-inside">
                     <li>Material-level contributions</li>
                     <li>GHG gas inventory (CO₂, CH₄, N₂O)</li>
                     <li>Lifecycle stage breakdown</li>
@@ -99,12 +101,12 @@ export function CarbonDeepDive({
               <>
                 <p className="text-sm font-medium">No carbon breakdown data available</p>
                 <div className="mt-4 space-y-3">
-                  <div className="p-4 bg-orange-50 rounded-lg text-left">
-                    <p className="text-sm font-semibold text-orange-900">Getting Started</p>
-                    <p className="text-xs text-orange-700 mt-2">
+                  <div className="p-4 rounded-[6px] text-left">
+                    <p className="text-sm font-semibold text-studio-attention">Getting Started</p>
+                    <p className="text-xs text-studio-attention mt-2">
                       To see detailed carbon breakdowns:
                     </p>
-                    <ol className="text-xs text-orange-700 mt-2 space-y-1 list-decimal list-inside">
+                    <ol className="text-xs text-studio-attention mt-2 space-y-1 list-decimal list-inside">
                       <li>Navigate to Products → New Product</li>
                       <li>Add materials and packaging data</li>
                       <li>Run LCA calculation</li>
@@ -119,8 +121,8 @@ export function CarbonDeepDive({
               </>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
     );
   }
 
@@ -173,15 +175,15 @@ export function CarbonDeepDive({
 
   const getDataSourceBadge = (source?: string) => {
     const config: Record<string, { label: string; className: string }> = {
-      primary: { label: 'Primary Data', className: 'bg-green-600' },
-      secondary_modelled: { label: 'Secondary', className: 'bg-blue-600' },
-      secondary: { label: 'Secondary', className: 'bg-blue-600' },
-      missing: { label: 'Missing Data', className: 'bg-red-600' },
-      modelled: { label: 'Modelled', className: 'bg-amber-600' },
+      primary: { label: 'Primary Data', className: 'bg-studio-ink/40' },
+      secondary_modelled: { label: 'Secondary', className: 'bg-studio-ink/70' },
+      secondary: { label: 'Secondary', className: 'bg-studio-ink/70' },
+      missing: { label: 'Missing Data', className: 'bg-studio-ink' },
+      modelled: { label: 'Modelled', className: 'bg-studio-attention' },
     };
 
     const badgeConfig = config[source || 'secondary_modelled'] || config.secondary_modelled;
-    return <Badge variant="default" className={`${badgeConfig.className} text-xs`}>{badgeConfig.label}</Badge>;
+    return <StateChip>{badgeConfig.label}</StateChip>;
   };
 
   // Format emissions value with appropriate unit (kg or t) and max 2 decimal places
@@ -210,51 +212,38 @@ export function CarbonDeepDive({
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="scope3" className="flex items-center gap-1">
-            <Globe className="h-3 w-3" />
-            Scope 3
-          </TabsTrigger>
-          <TabsTrigger value="stages">Lifecycle</TabsTrigger>
-          <TabsTrigger value="materials">Materials</TabsTrigger>
-          <TabsTrigger value="ghg">GHG Detail</TabsTrigger>
-        </TabsList>
+      <SectionTabs
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { value: 'overview', label: 'Overview' },
+          { value: 'scope3', label: 'Scope 3' },
+          { value: 'stages', label: 'Lifecycle' },
+          { value: 'materials', label: 'Materials' },
+          { value: 'ghg', label: 'GHG detail' },
+        ]}
+      />
 
         {/* Overview Tab with Scope Breakdown */}
-        <TabsContent value="overview" className="space-y-4 mt-6">
-          {/* Compliance Standards Banner */}
-          <Card className="border-blue-300 bg-gradient-to-br from-blue-50 to-indigo-50">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <CheckCircle2 className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div className="space-y-2 flex-1">
-                  <p className="text-sm font-semibold text-blue-900">Reporting Standards Compliance</p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
-                        ISO 14067
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">Carbon footprint quantification</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
-                        GHG Protocol
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">Scope 1, 2, 3 accounting</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">
-                        CSRD E1-6
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">EU sustainability reporting</span>
-                    </div>
-                  </div>
+        {tab === 'overview' && (
+        <div className="mt-6 space-y-6">
+          {/* The standards this follows. Three mono names on a hairline; it
+              was a gradient card with three tinted badges, which gave a
+              footnote the visual weight of a headline. */}
+          <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2 border-b border-studio-hairline pb-4">
+            {[
+              ['ISO 14067', 'Carbon footprint quantification'],
+              ['GHG Protocol', 'Scope 1, 2, 3 accounting'],
+              ['CSRD E1-6', 'EU sustainability reporting'],
+            ].map(([name, what]) => (
+              <div key={name} className="min-w-0">
+                <div className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+                  {name}
                 </div>
+                <div className="mt-0.5 text-xs text-muted-foreground">{what}</div>
               </div>
-            </CardContent>
-          </Card>
+            ))}
+          </div>
 
           {/* Data Quality Validation Banner — ISO 14067 §6.4.2
               Compare carbon origin (fossil + biogenic + dLUC) against the product
@@ -275,32 +264,18 @@ export function CarbonDeepDive({
 
               if (!isValid) {
                 return (
-                  <Card className="border-amber-300 bg-amber-50">
-                    <CardContent className="p-4 flex items-start gap-3">
-                      <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
-                      <div className="space-y-1">
-                        <p className="text-sm font-semibold text-amber-900">Data Quality Warning</p>
-                        <p className="text-xs text-amber-700">
-                          Carbon origin sum ({(fossilBiogenicLuc / 1000).toFixed(3)} t) deviates {variancePercent.toFixed(1)}% from product LCA total ({(comparisonTotal / 1000).toFixed(3)} t).
-                          ISO 14067 recommends &lt;5% variance.
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <Notice tone="attention" title="Data quality warning">
+                    Carbon origin sum ({(fossilBiogenicLuc / 1000).toFixed(3)} t) deviates{' '}
+                    {variancePercent.toFixed(1)}% from the product LCA total (
+                    {(comparisonTotal / 1000).toFixed(3)} t). ISO 14067 recommends under 5%.
+                  </Notice>
                 );
               } else {
                 return (
-                  <Card className="border-green-300 bg-green-50">
-                    <CardContent className="p-4 flex items-start gap-3">
-                      <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
-                      <div className="space-y-1">
-                        <p className="text-sm font-semibold text-green-900">ISO 14067 Validated</p>
-                        <p className="text-xs text-green-700">
-                          Carbon origin breakdown validated with {variancePercent.toFixed(2)}% variance (within 5% tolerance).
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <Notice tone="good" title="ISO 14067 validated">
+                    Carbon origin breakdown reconciles to {variancePercent.toFixed(2)}% variance,
+                    inside the 5% tolerance.
+                  </Notice>
                 );
               }
             })()
@@ -309,25 +284,25 @@ export function CarbonDeepDive({
           <div className="grid md:grid-cols-2 gap-4">
             {/* Scope Breakdown Card */}
             {scopeBreakdown && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-blue-600" />
+              <section className="border-t border-studio-hairline pt-5">
+                <div className="mb-3">
+                  <Eyebrow>
+                    <BarChart3 className="h-5 w-5 text-muted-foreground" />
                     GHG Protocol Scopes
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                  </Eyebrow>
+                </div>
+                <div className="space-y-3">
                   <div className="space-y-3">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">Scope 1 (Direct)</span>
-                        <Badge variant="outline" className="bg-red-50 text-slate-900">
+                        <StateChip tone="stale">
                           {(scopeBreakdown.scope1 / 1000).toFixed(3)} tCO₂eq
-                        </Badge>
+                        </StateChip>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="w-full bg-studio-ink/10 rounded-full h-2">
                         <div
-                          className="bg-red-600 h-2 rounded-full"
+                          className="bg-studio-ink h-2 rounded-full"
                           style={{ width: `${scopeTotal > 0 ? (scopeBreakdown.scope1 / scopeTotal) * 100 : 0}%` }}
                         />
                       </div>
@@ -339,13 +314,13 @@ export function CarbonDeepDive({
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">Scope 2 (Energy)</span>
-                        <Badge variant="outline" className="bg-orange-50 text-slate-900">
+                        <StateChip tone="attention">
                           {(scopeBreakdown.scope2 / 1000).toFixed(3)} tCO₂eq
-                        </Badge>
+                        </StateChip>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="w-full bg-studio-ink/10 rounded-full h-2">
                         <div
-                          className="bg-orange-600 h-2 rounded-full"
+                          className="h-2 bg-studio-ink/70"
                           style={{ width: `${scopeTotal > 0 ? (scopeBreakdown.scope2 / scopeTotal) * 100 : 0}%` }}
                         />
                       </div>
@@ -357,13 +332,13 @@ export function CarbonDeepDive({
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">Scope 3 (Value Chain)</span>
-                        <Badge variant="outline" className="bg-yellow-50 text-slate-900">
+                        <StateChip tone="attention">
                           {(scopeBreakdown.scope3 / 1000).toFixed(3)} tCO₂eq
-                        </Badge>
+                        </StateChip>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="w-full bg-studio-ink/10 rounded-full h-2">
                         <div
-                          className="bg-yellow-600 h-2 rounded-full"
+                          className="h-2 bg-studio-ink/40"
                           style={{ width: `${scopeTotal > 0 ? (scopeBreakdown.scope3 / scopeTotal) * 100 : 0}%` }}
                         />
                       </div>
@@ -372,20 +347,20 @@ export function CarbonDeepDive({
                       </p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </section>
             )}
 
             {/* Summary Stats */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Carbon Footprint Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="mb-3">
+                <Eyebrow>Carbon Footprint Summary</Eyebrow>
+              </div>
+              <div className="space-y-3">
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
-                    <span className="text-sm font-medium text-slate-900">Total Emissions</span>
-                    <span className="text-lg font-bold text-orange-900">
+                  <div className="flex items-center justify-between p-3 rounded-[6px]">
+                    <span className="text-sm font-medium text-foreground">Total Emissions</span>
+                    <span className="text-lg font-bold text-studio-attention">
                       {(totalCO2 / 1000).toFixed(3)} tCO₂eq
                     </span>
                   </div>
@@ -400,23 +375,23 @@ export function CarbonDeepDive({
 
                   {materialBreakdown && materialBreakdown.length > 0 && (
                     <>
-                      <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                        <span className="text-sm font-medium text-slate-900">Materials Tracked</span>
-                        <span className="text-lg font-bold text-blue-900">
+                      <div className="flex items-center justify-between p-3 rounded-[6px]">
+                        <span className="text-sm font-medium text-foreground">Materials Tracked</span>
+                        <span className="text-lg font-bold text-foreground">
                           {materialBreakdown.length}
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                        <span className="text-sm font-medium text-slate-900">Top Contributor</span>
-                        <span className="text-sm font-bold text-green-900">
+                      <div className="flex items-center justify-between p-3 rounded-[6px]">
+                        <span className="text-sm font-medium text-foreground">Top Contributor</span>
+                        <span className="text-sm font-bold text-studio-good">
                           {materialBreakdown[0]?.name}
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
-                        <span className="text-sm font-medium text-slate-900">Contribution</span>
-                        <span className="text-sm font-bold text-purple-900">
+                      <div className="flex items-center justify-between p-3 rounded-[6px]">
+                        <span className="text-sm font-medium text-foreground">Contribution</span>
+                        <span className="text-sm font-bold text-foreground">
                           {(() => {
                             const climate = materialBreakdown[0]?.climate;
                             if (
@@ -435,13 +410,15 @@ export function CarbonDeepDive({
                     </>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           </div>
-        </TabsContent>
+        </div>
+        )}
 
         {/* Scope 3 Deep Dive Tab */}
-        <TabsContent value="scope3" className="space-y-4 mt-6">
+        {tab === 'scope3' && (
+        <div className="mt-6 space-y-6">
           {hasScope3Data ? (
             <Scope3CategoryBreakdown
               categories={scope3Categories}
@@ -454,8 +431,8 @@ export function CarbonDeepDive({
               isLoading={isLoadingScope3}
             />
           ) : (
-            <Card>
-              <CardContent className="p-8 text-center">
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="space-y-3">
                 <Globe className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
                 <p className="text-sm font-medium text-muted-foreground">
                   No Scope 3 breakdown data available
@@ -463,40 +440,42 @@ export function CarbonDeepDive({
                 <p className="text-xs text-muted-foreground mt-2">
                   Add product LCAs, business travel, or overhead data to see a detailed Scope 3 breakdown by GHG Protocol category.
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           )}
-        </TabsContent>
+        </div>
+        )}
 
         {/* Lifecycle Stages Tab */}
-        <TabsContent value="stages" className="space-y-4 mt-6">
-          <Card>
-            <CardHeader>
+        {tab === 'stages' && (
+        <div className="mt-6 space-y-6">
+          <section className="border-t border-studio-hairline pt-5">
+            <div className="mb-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Package className="h-5 w-5 text-green-600" />
-                  <CardTitle className="text-lg">Emissions by Lifecycle Stage</CardTitle>
+                  <Package className="h-5 w-5 text-studio-good" />
+                  <Eyebrow>Emissions by Lifecycle Stage</Eyebrow>
                 </div>
-                <Badge variant="outline" className="text-xs">ISO 14040/14044</Badge>
+                <StateChip>ISO 14040/14044</StateChip>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
+            </div>
+            <div className="space-y-3">
               {lifecycleStageBreakdown && lifecycleStageBreakdown.length > 0 ? (
                 <div className="space-y-4">
                   {lifecycleStageBreakdown.map((stage, index) => (
-                    <Card key={index} className="border-2">
-                      <CardContent className="p-4 space-y-3">
+                    <section key={index} className="border-t border-studio-hairline pt-5">
+                      <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <h3 className="font-semibold text-sm">{stage.stage_name}</h3>
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline">{(stage.percentage ?? 0).toFixed(1)}%</Badge>
+                            <StateChip>{(stage.percentage ?? 0).toFixed(1)}%</StateChip>
                             <span className="text-sm font-bold">{((stage.total_impact ?? 0) / 1000).toFixed(3)} tCO₂eq</span>
                           </div>
                         </div>
 
-                        <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div className="w-full bg-studio-ink/10 rounded-full h-3">
                           <div
-                            className="bg-gradient-to-r from-green-600 to-green-400 h-3 rounded-full"
+                            className="h-3 rounded-full"
                             style={{ width: `${stage.percentage ?? 0}%` }}
                           />
                         </div>
@@ -508,15 +487,15 @@ export function CarbonDeepDive({
                           {stage.top_contributors && stage.top_contributors.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-2">
                               {stage.top_contributors.map((contrib, idx) => (
-                                <Badge key={idx} variant="secondary" className="text-xs">
+                                <StateChip>
                                   {contrib.name}: {(contrib.impact ?? 0).toFixed(3)}
-                                </Badge>
+                                </StateChip>
                               ))}
                             </div>
                           )}
                         </div>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </section>
                   ))}
                 </div>
               ) : (
@@ -526,26 +505,26 @@ export function CarbonDeepDive({
                   <p className="text-xs mt-2">Ensure materials are classified with lifecycle stages in the LCA data</p>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
           {/* Facility Operations Breakdown */}
           {facilityEmissionsBreakdown && facilityEmissionsBreakdown.length > 0 && (
-            <Card className="mt-6">
-              <CardHeader>
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="mb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-blue-600" />
-                    <CardTitle className="text-lg">Emissions by Production Facility</CardTitle>
+                    <BarChart3 className="h-5 w-5 text-muted-foreground" />
+                    <Eyebrow>Emissions by Production Facility</Eyebrow>
                   </div>
-                  <Badge variant="outline" className="text-xs">Operations Data</Badge>
+                  <StateChip>Operations Data</StateChip>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
+              </div>
+              <div className="space-y-3">
                 <div className="space-y-4">
                   {facilityEmissionsBreakdown.map((facility, index) => (
-                    <Card key={index} className="border-2">
-                      <CardContent className="p-4 space-y-3">
+                    <section key={index} className="border-t border-studio-hairline pt-5">
+                      <div className="space-y-3">
                         <div className="flex items-start justify-between">
                           <div className="space-y-1">
                             <h3 className="font-semibold text-sm">{facility.facility_name}</h3>
@@ -554,132 +533,125 @@ export function CarbonDeepDive({
                             </p>
                           </div>
                           <div className="text-right">
-                            <Badge variant="outline">{(facility.percentage ?? 0).toFixed(1)}%</Badge>
+                            <StateChip>{(facility.percentage ?? 0).toFixed(1)}%</StateChip>
                             <p className="text-sm font-bold mt-1">{((facility.total_emissions ?? 0) / 1000).toFixed(3)} tCO₂eq</p>
                           </div>
                         </div>
 
-                        <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div className="w-full bg-studio-ink/10 rounded-full h-3">
                           <div
-                            className="bg-gradient-to-r from-blue-600 to-blue-400 h-3 rounded-full"
+                            className="h-3 rounded-full"
                             style={{ width: `${facility.percentage ?? 0}%` }}
                           />
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 text-xs">
-                          <div className="flex items-center justify-between p-2 bg-red-50 rounded">
-                            <span className="text-red-700">Scope 1</span>
-                            <span className="font-semibold text-red-900">{((facility.scope1_emissions ?? 0) / 1000).toFixed(3)} t</span>
+                          <div className="flex items-center justify-between p-2 rounded">
+                            <span className="text-studio-stale">Scope 1</span>
+                            <span className="font-semibold text-studio-stale">{((facility.scope1_emissions ?? 0) / 1000).toFixed(3)} t</span>
                           </div>
-                          <div className="flex items-center justify-between p-2 bg-orange-50 rounded">
-                            <span className="text-orange-700">Scope 2</span>
-                            <span className="font-semibold text-orange-900">{((facility.scope2_emissions ?? 0) / 1000).toFixed(3)} t</span>
+                          <div className="flex items-center justify-between p-2 rounded">
+                            <span className="text-studio-attention">Scope 2</span>
+                            <span className="font-semibold text-studio-attention">{((facility.scope2_emissions ?? 0) / 1000).toFixed(3)} t</span>
                           </div>
-                          <div className="flex items-center justify-between p-2 bg-blue-50 rounded">
-                            <span className="text-blue-700">Production</span>
-                            <span className="font-semibold text-blue-900">{(facility.production_volume ?? 0).toLocaleString()} units</span>
+                          <div className="flex items-center justify-between p-2 rounded">
+                            <span className="text-muted-foreground">Production</span>
+                            <span className="font-semibold text-foreground">{(facility.production_volume ?? 0).toLocaleString()} units</span>
                           </div>
-                          <div className="flex items-center justify-between p-2 bg-green-50 rounded">
-                            <span className="text-green-700">Intensity</span>
-                            <span className="font-semibold text-green-900">{((facility.facility_intensity ?? 0) / 1000).toFixed(6)} t/unit</span>
+                          <div className="flex items-center justify-between p-2 rounded">
+                            <span className="text-studio-good">Intensity</span>
+                            <span className="font-semibold text-studio-good">{((facility.facility_intensity ?? 0) / 1000).toFixed(6)} t/unit</span>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </section>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           )}
-        </TabsContent>
+        </div>
+        )}
 
         {/* GHG Gas Inventory Tab */}
-        <TabsContent value="ghg" className="space-y-4 mt-6">
-          <Card>
-            <CardHeader>
+        {tab === 'ghg' && (
+        <div className="mt-6 space-y-6">
+          <section className="border-t border-studio-hairline pt-5">
+            <div className="mb-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <FlaskConical className="h-5 w-5 text-orange-600" />
-                  <CardTitle className="text-lg">Greenhouse Gas Inventory</CardTitle>
+                  <FlaskConical className="h-5 w-5 text-studio-attention" />
+                  <Eyebrow>Greenhouse Gas Inventory</Eyebrow>
                 </div>
                 <div className="flex gap-2">
-                  <Badge variant="outline" className="text-xs">ISO 14067</Badge>
-                  <Badge variant="outline" className="text-xs">GHG Protocol</Badge>
+                  <StateChip>ISO 14067</StateChip>
+                  <StateChip>GHG Protocol</StateChip>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
+            </div>
+            <div className="space-y-3">
               {ghgBreakdown ? (
                 <>
                   {/* Summary Cards */}
                   <div className="grid grid-cols-4 gap-4">
-                    <Card className="bg-orange-50 border-orange-200">
-                      <CardContent className="p-4">
+                    <section className="border-t border-studio-hairline pt-5">
+                      <div className="space-y-3">
                         <div className="flex items-baseline gap-2">
-                          <span className="text-2xl font-bold text-orange-900">
+                          <span className="text-2xl font-bold text-studio-attention">
                             {(totalCO2 / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                           </span>
                           <span className="text-xs text-muted-foreground">tCO₂eq</span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">Total GHG Emissions</p>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </section>
 
-                    <Card className="bg-blue-50 border-blue-200">
-                      <CardContent className="p-4">
+                    <section className="border-t border-studio-hairline pt-5">
+                      <div className="space-y-3">
                         <div className="flex items-baseline gap-2">
-                          <span className="text-2xl font-bold text-blue-900">
+                          <span className="text-2xl font-bold text-foreground">
                             {'ch4_fossil_gwp100' in ghgBreakdown.gwp_factors ? ghgBreakdown.gwp_factors.ch4_fossil_gwp100 : 29.8}
                           </span>
                           <span className="text-xs text-muted-foreground">GWP</span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">CH₄ Fossil (IPCC AR6)</p>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </section>
 
-                    <Card className="bg-teal-50 border-teal-200">
-                      <CardContent className="p-4">
+                    <section className="border-t border-studio-hairline pt-5">
+                      <div className="space-y-3">
                         <div className="flex items-baseline gap-2">
-                          <span className="text-2xl font-bold text-teal-900">
+                          <span className="text-2xl font-bold text-foreground">
                             {'ch4_biogenic_gwp100' in ghgBreakdown.gwp_factors ? ghgBreakdown.gwp_factors.ch4_biogenic_gwp100 : 27.2}
                           </span>
                           <span className="text-xs text-muted-foreground">GWP</span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">CH₄ Biogenic (IPCC AR6)</p>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </section>
 
-                    <Card className="bg-blue-50 border-blue-200">
-                      <CardContent className="p-4">
+                    <section className="border-t border-studio-hairline pt-5">
+                      <div className="space-y-3">
                         <div className="flex items-baseline gap-2">
-                          <span className="text-2xl font-bold text-blue-900">
+                          <span className="text-2xl font-bold text-foreground">
                             {'n2o_gwp100' in ghgBreakdown.gwp_factors ? ghgBreakdown.gwp_factors.n2o_gwp100 : 273}
                           </span>
                           <span className="text-xs text-muted-foreground">GWP</span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">N₂O Factor (IPCC AR6)</p>
-                      </CardContent>
-                    </Card>
+                      </div>
+                    </section>
                   </div>
 
                   {/* Data Quality Indicator */}
                   {'data_quality' in ghgBreakdown && (
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium">Data Quality:</span>
-                      <Badge
-                        variant="outline"
-                        className={
-                          ghgBreakdown.data_quality === 'primary'
-                            ? 'bg-green-100 text-green-800 border-green-300'
-                            : ghgBreakdown.data_quality === 'secondary'
-                            ? 'bg-amber-100 text-amber-800 border-amber-300'
-                            : 'bg-slate-100 text-slate-800 border-slate-300'
-                        }
-                      >
+                      <StateChip tone="attention">
                         {ghgBreakdown.data_quality === 'primary' ? 'Primary (EcoInvent/Measured)' :
                          ghgBreakdown.data_quality === 'secondary' ? 'Secondary (Calculated)' :
                          'Tertiary (Estimated)'}
-                      </Badge>
+                      </StateChip>
                     </div>
                   )}
 
@@ -689,10 +661,10 @@ export function CarbonDeepDive({
                       <Info className="h-4 w-4" />
                       Gas-by-Gas Breakdown
                     </h3>
-                    <div className="border rounded-lg overflow-hidden">
+                    <div className="border rounded-[6px] overflow-hidden">
                       <Table>
                         <TableHeader>
-                          <TableRow className="bg-orange-50">
+                          <TableRow className="">
                             <TableHead className="font-semibold">Gas Species</TableHead>
                             <TableHead className="font-semibold text-right">Mass (kg)</TableHead>
                             <TableHead className="font-semibold text-center">GWP100 Factor</TableHead>
@@ -704,7 +676,7 @@ export function CarbonDeepDive({
                           <TableRow>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full bg-red-500" />
+                                <div className="w-3 h-3 rounded-full bg-studio-ink/70" />
                                 CO₂ (Fossil)
                               </div>
                             </TableCell>
@@ -723,7 +695,7 @@ export function CarbonDeepDive({
                           <TableRow>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full bg-green-500" />
+                                <div className="w-3 h-3 rounded-full bg-studio-ink/40" />
                                 CO₂ (Biogenic)
                               </div>
                             </TableCell>
@@ -743,9 +715,9 @@ export function CarbonDeepDive({
                           <TableRow>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full bg-blue-500" />
+                                <div className="w-3 h-3 rounded-full bg-studio-ink/70" />
                                 CH₄ (Fossil)
-                                <Badge variant="outline" className="text-[10px] ml-1">Industrial</Badge>
+                                <StateChip>Industrial</StateChip>
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
@@ -766,9 +738,9 @@ export function CarbonDeepDive({
                           <TableRow>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full bg-teal-500" />
+                                <div className="w-3 h-3 rounded-full bg-studio-ink/40" />
                                 CH₄ (Biogenic)
-                                <Badge variant="outline" className="text-[10px] ml-1">Agricultural</Badge>
+                                <StateChip>Agricultural</StateChip>
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
@@ -789,9 +761,9 @@ export function CarbonDeepDive({
                           <TableRow>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full bg-amber-500" />
+                                <div className="w-3 h-3 rounded-full bg-studio-ink/40" />
                                 Nitrous Oxide (N₂O)
-                                <Badge variant="outline" className="text-[10px] ml-1">Fertiliser</Badge>
+                                <StateChip>Fertiliser</StateChip>
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
@@ -812,7 +784,7 @@ export function CarbonDeepDive({
                             <TableRow>
                               <TableCell className="font-medium">
                                 <div className="flex items-center gap-2">
-                                  <div className="w-3 h-3 rounded-full bg-amber-500" />
+                                  <div className="w-3 h-3 rounded-full bg-studio-ink/40" />
                                   F-gases (HFC/PFC)
                                 </div>
                               </TableCell>
@@ -832,81 +804,83 @@ export function CarbonDeepDive({
                   </div>
 
                   {/* Methodology Note */}
-                  <Card className="bg-blue-50 border-blue-200">
-                    <CardContent className="p-4">
+                  <section className="border-t border-studio-hairline pt-5">
+                    <div className="space-y-3">
                       <div className="flex items-start gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-blue-600 mt-0.5" />
+                        <CheckCircle2 className="h-4 w-4 text-muted-foreground mt-0.5" />
                         <div className="space-y-1">
-                          <p className="text-sm font-semibold text-blue-900">Assessment Method: {ghgBreakdown.gwp_factors.method}</p>
+                          <p className="text-sm font-semibold text-foreground">Assessment Method: {ghgBreakdown.gwp_factors.method}</p>
                           <p className="text-xs text-muted-foreground">
                             Global Warming Potentials calculated using {ghgBreakdown.gwp_factors.method} characterisation factors.
                             All emissions converted to 100-year CO₂ equivalents per IPCC methodology.
                           </p>
                           {((ghgBreakdown.gas_inventory.methane > 0 || ghgBreakdown.gas_inventory.nitrous_oxide > 0) &&
                             (ghgBreakdown.gas_inventory.methane + ghgBreakdown.gas_inventory.nitrous_oxide) / (productLcaTotalCO2 || totalCO2) > 0.04) && (
-                            <p className="text-xs text-blue-700 mt-2 bg-blue-100 p-2 rounded">
+                            <p className="text-xs text-muted-foreground mt-2 p-2 rounded">
                               <strong>Note:</strong> CH₄ and N₂O values estimated using typical GHG composition ratios (~3% CH₄, ~2% N₂O in CO₂eq)
                               as material-specific gas breakdowns are not available. CO₂ values are actual measured data.
                             </p>
                           )}
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </section>
 
                   {/* CSRD E1 Compliance Note */}
-                  <Card className="bg-purple-50 border-purple-200">
-                    <CardContent className="p-4">
+                  <section className="border-t border-studio-hairline pt-5">
+                    <div className="space-y-3">
                       <div className="flex items-start gap-2">
-                        <Info className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
+                        <Info className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                         <div className="space-y-2">
-                          <p className="text-sm font-semibold text-purple-900">CSRD E1-6: GHG Emissions</p>
+                          <p className="text-sm font-semibold text-foreground">CSRD E1-6: GHG Emissions</p>
                           <p className="text-xs text-muted-foreground leading-relaxed">
                             This breakdown satisfies European Sustainability Reporting Standards (ESRS) E1-6 disclosure requirements for gross Scope 1, 2, and 3 GHG emissions,
                             including disaggregation by greenhouse gas type (CO₂, CH₄, N₂O, HFCs) and biogenic/fossil origin distinction as required for EU sustainability reporting.
                           </p>
                           <div className="grid grid-cols-2 gap-2 mt-3">
                             <div className="text-xs">
-                              <Badge variant="outline" className="bg-green-100 text-green-800 text-[10px] mb-1">Required</Badge>
+                              <StateChip tone="good">Required</StateChip>
                               <p className="text-muted-foreground">Scope 1, 2, 3 totals</p>
                             </div>
                             <div className="text-xs">
-                              <Badge variant="outline" className="bg-green-100 text-green-800 text-[10px] mb-1">Required</Badge>
+                              <StateChip tone="good">Required</StateChip>
                               <p className="text-muted-foreground">Gas-by-gas breakdown</p>
                             </div>
                             <div className="text-xs">
-                              <Badge variant="outline" className="bg-green-100 text-green-800 text-[10px] mb-1">Required</Badge>
+                              <StateChip tone="good">Required</StateChip>
                               <p className="text-muted-foreground">Biogenic CO₂ separate</p>
                             </div>
                             <div className="text-xs">
-                              <Badge variant="outline" className="bg-blue-100 text-blue-800 text-[10px] mb-1">Optional</Badge>
+                              <StateChip>Optional</StateChip>
                               <p className="text-muted-foreground">Land use change</p>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </section>
                 </>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <p className="text-sm">GHG breakdown not available for this calculation</p>
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
+          </section>
+        </div>
+        )}
 
         {/* Material Breakdown Tab */}
-        <TabsContent value="materials" className="space-y-4 mt-6">
+        {tab === 'materials' && (
+        <div className="mt-6 space-y-6">
           {materialBreakdown && materialBreakdown.length > 0 ? (
             <>
               {/* Summary Statistics */}
               <div className="grid grid-cols-3 gap-4">
-                <Card className="bg-green-50 border-green-200">
-                  <CardContent className="p-4">
+                <section className="border-t border-studio-hairline pt-5">
+                  <div className="space-y-3">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-bold text-green-900">
+                      <span className="text-2xl font-bold text-studio-good">
                         {ingredients.length}
                       </span>
                       <span className="text-xs text-muted-foreground">ingredients</span>
@@ -914,13 +888,13 @@ export function CarbonDeepDive({
                     <p className="text-xs text-muted-foreground mt-1">
                       {(ingredientsTotal / 1000).toFixed(3)} tCO₂eq total
                     </p>
-                  </CardContent>
-                </Card>
+                  </div>
+                </section>
 
-                <Card className="bg-blue-50 border-blue-200">
-                  <CardContent className="p-4">
+                <section className="border-t border-studio-hairline pt-5">
+                  <div className="space-y-3">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-bold text-blue-900">
+                      <span className="text-2xl font-bold text-foreground">
                         {packaging.length}
                       </span>
                       <span className="text-xs text-muted-foreground">packaging parts</span>
@@ -928,13 +902,13 @@ export function CarbonDeepDive({
                     <p className="text-xs text-muted-foreground mt-1">
                       {(packagingTotal / 1000).toFixed(3)} tCO₂eq total
                     </p>
-                  </CardContent>
-                </Card>
+                  </div>
+                </section>
 
-                <Card className="bg-orange-50 border-orange-200">
-                  <CardContent className="p-4">
+                <section className="border-t border-studio-hairline pt-5">
+                  <div className="space-y-3">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-bold text-orange-900">
+                      <span className="text-2xl font-bold text-studio-attention">
                         {materialBreakdown.length}
                       </span>
                       <span className="text-xs text-muted-foreground">total materials</span>
@@ -942,8 +916,8 @@ export function CarbonDeepDive({
                     <p className="text-xs text-muted-foreground mt-1">
                       {((ingredientsTotal + packagingTotal) / 1000).toFixed(2)} tCO₂eq combined
                     </p>
-                  </CardContent>
-                </Card>
+                  </div>
+                </section>
               </div>
 
               {/* Sort Options */}
@@ -952,45 +926,44 @@ export function CarbonDeepDive({
                   <BarChart3 className="h-4 w-4" />
                   Material-by-Material Impact Analysis
                 </h3>
-                <div className="flex gap-2">
-                  <Badge
-                    variant={sortBy === 'impact' ? 'default' : 'outline'}
-                    className="cursor-pointer"
-                    onClick={() => setSortBy('impact')}
-                  >
-                    By Impact
-                  </Badge>
-                  <Badge
-                    variant={sortBy === 'name' ? 'default' : 'outline'}
-                    className="cursor-pointer"
-                    onClick={() => setSortBy('name')}
-                  >
-                    By Name
-                  </Badge>
-                  <Badge
-                    variant={sortBy === 'quantity' ? 'default' : 'outline'}
-                    className="cursor-pointer"
-                    onClick={() => setSortBy('quantity')}
-                  >
-                    By Quantity
-                  </Badge>
+                <div className="flex items-baseline gap-4">
+                  {([
+                    ['impact', 'By impact'],
+                    ['name', 'By name'],
+                    ['quantity', 'By quantity'],
+                  ] as const).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setSortBy(key)}
+                      aria-pressed={sortBy === key}
+                      className={
+                        'border-b-2 pb-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] transition-colors duration-150 ease-studio ' +
+                        (sortBy === key
+                          ? 'border-room-accent text-foreground'
+                          : 'border-transparent text-studio-dim hover:text-foreground')
+                      }
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
               {/* Ingredients Section */}
               {ingredients.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Leaf className="h-4 w-4 text-green-600" />
+                <section className="border-t border-studio-hairline pt-5">
+                  <div className="mb-3">
+                    <Eyebrow>
+                      <Leaf className="h-4 w-4 text-studio-good" />
                       Ingredients ({ingredients.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="border rounded-lg overflow-hidden">
+                    </Eyebrow>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="border rounded-[6px] overflow-hidden">
                       <Table>
                         <TableHeader>
-                          <TableRow className="bg-green-50">
+                          <TableRow className="">
                             <TableHead className="font-semibold">Material Name</TableHead>
                             <TableHead className="font-semibold text-right">Quantity</TableHead>
                             <TableHead className="font-semibold text-right">Total Impact</TableHead>
@@ -1004,13 +977,13 @@ export function CarbonDeepDive({
                             const quantityValue = material.quantity ?? 0;
                             const percentageValue = material.percentage ?? 0;
                             return (
-                              <TableRow key={idx} className={percentageValue > 5 ? 'bg-orange-50/50' : ''}>
+                              <TableRow key={idx} className={percentageValue > 5 ? '/50' : ''}>
                                 <TableCell className="font-medium">
                                   {material.name}
                                   {material.warning && (
-                                    <Badge variant="destructive" className="ml-2 text-xs">
+                                    <StateChip tone="stale">
                                       {material.warning}
-                                    </Badge>
+                                    </StateChip>
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right">
@@ -1021,9 +994,9 @@ export function CarbonDeepDive({
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex items-center justify-end gap-2">
-                                    <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div className="w-16 h-2 bg-studio-ink/10 rounded-full overflow-hidden">
                                       <div
-                                        className="h-full bg-green-500"
+                                        className="h-full bg-studio-ink/40"
                                         style={{ width: `${Math.min(percentageValue, 100)}%` }}
                                       />
                                     </div>
@@ -1041,24 +1014,24 @@ export function CarbonDeepDive({
                         </TableBody>
                       </Table>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </section>
               )}
 
               {/* Packaging Section */}
               {packaging.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Package className="h-4 w-4 text-blue-600" />
+                <section className="border-t border-studio-hairline pt-5">
+                  <div className="mb-3">
+                    <Eyebrow>
+                      <Package className="h-4 w-4 text-muted-foreground" />
                       Packaging ({packaging.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="border rounded-lg overflow-hidden">
+                    </Eyebrow>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="border rounded-[6px] overflow-hidden">
                       <Table>
                         <TableHeader>
-                          <TableRow className="bg-blue-50">
+                          <TableRow className="">
                             <TableHead className="font-semibold">Material Name</TableHead>
                             <TableHead className="font-semibold text-right">Quantity</TableHead>
                             <TableHead className="font-semibold text-right">Total Impact</TableHead>
@@ -1072,13 +1045,13 @@ export function CarbonDeepDive({
                             const quantityValue = material.quantity ?? 0;
                             const percentageValue = material.percentage ?? 0;
                             return (
-                              <TableRow key={idx} className={percentageValue > 5 ? 'bg-orange-50/50' : ''}>
+                              <TableRow key={idx} className={percentageValue > 5 ? '/50' : ''}>
                                 <TableCell className="font-medium">
                                   {material.name}
                                   {material.warning && (
-                                    <Badge variant="destructive" className="ml-2 text-xs">
+                                    <StateChip tone="stale">
                                       {material.warning}
-                                    </Badge>
+                                    </StateChip>
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right">
@@ -1089,9 +1062,9 @@ export function CarbonDeepDive({
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex items-center justify-end gap-2">
-                                    <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div className="w-16 h-2 bg-studio-ink/10 rounded-full overflow-hidden">
                                       <div
-                                        className="h-full bg-blue-500"
+                                        className="h-full bg-studio-ink/70"
                                         style={{ width: `${Math.min(percentageValue, 100)}%` }}
                                       />
                                     </div>
@@ -1109,23 +1082,23 @@ export function CarbonDeepDive({
                         </TableBody>
                       </Table>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </section>
               )}
             </>
           ) : (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="space-y-3">
                 <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p className="text-sm font-medium">No material breakdown data available</p>
                 <p className="text-xs mt-2">
                   Material-level emissions will appear here after LCA calculation
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           )}
-        </TabsContent>
-      </Tabs>
+        </div>
+        )}
     </div>
   );
 }

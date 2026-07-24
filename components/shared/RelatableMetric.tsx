@@ -95,12 +95,12 @@ export function RelatableMetric(props: RelatableMetricProps) {
   if (comparisons.length === 0) return null
 
   const chipBg = variant === 'light'
-    ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'
-    : 'bg-white/10 border-white/15 text-slate-100'
+    ? 'border-studio-hairline text-muted-foreground'
+    : 'border-white/15 text-studio-cream/80'
 
   const accent = variant === 'light' ? 'text-studio-good' : 'text-studio-cream'
-  const muted = variant === 'light' ? 'text-slate-500 dark:text-slate-400' : 'text-slate-300/80'
-  const trigger = variant === 'light' ? 'text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300' : 'text-slate-400 hover:text-slate-200'
+  const muted = variant === 'light' ? 'text-studio-dim' : 'text-studio-cream/70'
+  const trigger = variant === 'light' ? 'text-studio-dim hover:text-foreground' : 'text-studio-cream/60 hover:text-studio-cream'
 
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
@@ -113,6 +113,8 @@ export function RelatableMetric(props: RelatableMetricProps) {
           <span
             key={idx}
             className={cn(
+              // A comparison is a quiet aside, not a badge: a hairline outline,
+              // no fill. Filled pills read as status and these carry none.
               'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs',
               chipBg,
             )}
