@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { StateChip } from '@/components/studio/state-chip';
+import { SectionTabs } from '@/components/studio/section-tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { TrendingUp, TrendingDown, Minus, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -121,14 +122,14 @@ export function CategoryContributionChart({
 
   if (orientation === 'horizontal') {
     return (
-      <Card className={className}>
+      <section className="border-t border-studio-hairline pt-5">
         {(title || subtitle) && (
-          <CardHeader className="pb-2">
-            {title && <CardTitle className="text-lg">{title}</CardTitle>}
+          <div className="mb-3">
+            {title && <Eyebrow>{title}</Eyebrow>}
             {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
-          </CardHeader>
+          </div>
         )}
-        <CardContent className="space-y-4">
+        <div className="space-y-3">
           <div className="flex h-8 rounded-[6px] overflow-hidden">
             {displayCategories.map((cat, idx) => {
               const width = total > 0 ? (cat.value / total) * 100 : 0;
@@ -207,8 +208,8 @@ export function CategoryContributionChart({
               </div>
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
     );
   }
 
@@ -251,9 +252,9 @@ export function CategoryContributionChart({
                   {formatValue(cat.value)}
                 </span>
                 {showPercentages && (
-                  <Badge variant="secondary" className="text-xs tabular-nums">
+                  <StateChip>
                     {percentage.toFixed(1)}%
-                  </Badge>
+                  </StateChip>
                 )}
                 {isClickable && (
                   <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -286,9 +287,9 @@ export function CategoryContributionChart({
             <div className="flex items-center gap-2">
               <span className="text-sm font-mono text-muted-foreground">{formatValue(otherTotal)}</span>
               {showPercentages && (
-                <Badge variant="outline" className="text-xs tabular-nums">
+                <StateChip>
                   {((otherTotal / total) * 100).toFixed(1)}%
-                </Badge>
+                </StateChip>
               )}
             </div>
           </div>

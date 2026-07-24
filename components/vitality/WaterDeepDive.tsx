@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { StateChip } from '@/components/studio/state-chip';
+import { SectionTabs } from '@/components/studio/section-tabs';
 import dynamic from 'next/dynamic';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -46,7 +46,7 @@ const FacilityWaterRiskMap = dynamic(
   () => import('@/components/water/FacilityWaterRiskMap').then(mod => mod.FacilityWaterRiskMap),
   {
     ssr: false,
-    loading: () => <Skeleton className="w-full h-[400px] rounded-lg" />,
+    loading: () => <Skeleton className="w-full h-[400px] rounded-[6px]" />,
   }
 );
 
@@ -75,6 +75,7 @@ export function WaterDeepDive({
   productLcaWaterScarcity = 0,
 }: WaterDeepDiveProps) {
   const [selectedFacility, setSelectedFacility] = useState<FacilityWaterSummary | null>(null);
+  const [tab, setTab] = useState('overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [riskFilter, setRiskFilter] = useState<RiskFilter>('all');
   const [sortBy, setSortBy] = useState<SortOption>('consumption');
@@ -309,8 +310,8 @@ export function WaterDeepDive({
       </div>
 
       {waterUseRatio.ratio !== null && (
-        <Card className="border-blue-500/30 bg-blue-500/[0.04]">
-          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
+        <section className="border-t border-studio-hairline pt-5">
+          <div className="space-y-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Water use ratio
@@ -324,9 +325,9 @@ export function WaterDeepDive({
                 production in litres.
               </p>
             </div>
-            <Droplets className="h-8 w-8 shrink-0 text-blue-500/70" aria-hidden="true" />
-          </CardContent>
-        </Card>
+            <Droplets className="h-8 w-8 shrink-0 text-muted-foreground/70" aria-hidden="true" />
+          </div>
+        </section>
       )}
 
       {displayTotalConsumption > 0 && (
@@ -337,42 +338,26 @@ export function WaterDeepDive({
         />
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview" className="gap-2">
-            <Map className="h-4 w-4" />
-            <span className="hidden sm:inline">Risk Overview</span>
-          </TabsTrigger>
-          <TabsTrigger value="consumption" className="gap-2">
-            <BarChart3 className="h-4 w-4" />
-            <span className="hidden sm:inline">Consumption</span>
-          </TabsTrigger>
-          <TabsTrigger value="sources" className="gap-2">
-            <Droplets className="h-4 w-4" />
-            <span className="hidden sm:inline">Sources</span>
-          </TabsTrigger>
-          <TabsTrigger value="trends" className="gap-2">
-            <Clock className="h-4 w-4" />
-            <span className="hidden sm:inline">Trends</span>
-          </TabsTrigger>
-        </TabsList>
+      
+        <SectionTabs value={tab} onChange={setTab} tabs={[{ value: 'overview', label: 'Risk Overview' }, { value: 'consumption', label: 'Consumption' }, { value: 'sources', label: 'Sources' }, { value: 'trends', label: 'Trends' }]} />
 
-        <TabsContent value="overview" className="space-y-6">
+        {tab === 'overview' && (
+<div className="mt-4 space-y-4">
           <FacilityWaterRiskMap
             facilities={filteredFacilities}
             loading={loading}
             onFacilityClick={setSelectedFacility}
           />
 
-          <Card>
-            <CardHeader className="pb-3">
+          <section className="border-t border-studio-hairline pt-5">
+            <div className="mb-3">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <CardTitle className="text-base">Facility Risk Details</CardTitle>
-                  <CardDescription>
+                  <Eyebrow>Facility Risk Details</Eyebrow>
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {filteredFacilities.length} facilities
                     {riskFilter !== 'all' && ` (${riskFilter} risk)`}
-                  </CardDescription>
+                  </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <div className="relative">
@@ -409,8 +394,8 @@ export function WaterDeepDive({
                   </Select>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
+            </div>
+            <div className="space-y-3">
               <div className="space-y-2">
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => (
@@ -431,11 +416,13 @@ export function WaterDeepDive({
                   ))
                 )}
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
+          </section>
+        </div>
+)}
 
-        <TabsContent value="consumption" className="space-y-6">
+        {tab === 'consumption' && (
+<div className="mt-4 space-y-4">
           <div className="grid lg:grid-cols-2 gap-6">
             <WaterConsumptionChart
               data={waterTimeSeries}
@@ -453,46 +440,48 @@ export function WaterDeepDive({
             />
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Consumption Summary</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <section className="border-t border-studio-hairline pt-5">
+            <div className="mb-3">
+              <Eyebrow>Consumption Summary</Eyebrow>
+            </div>
+            <div className="space-y-3">
               <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                <div className="p-4 rounded-[6px]/20 border">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Intake</p>
-                  <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                  <p className="text-2xl font-bold text-foreground">
                     {(companyOverview?.total_consumption_m3 || 0).toLocaleString('en-GB', { maximumFractionDigits: 0 })}
                   </p>
                   <p className="text-xs text-muted-foreground">cubic metres</p>
                 </div>
-                <div className="p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                <div className="p-4 rounded-[6px]/20 border">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Discharge</p>
-                  <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+                  <p className="text-2xl font-bold text-studio-good">
                     {(companyOverview?.total_discharge_m3 || 0).toLocaleString('en-GB', { maximumFractionDigits: 0 })}
                   </p>
                   <p className="text-xs text-muted-foreground">cubic metres</p>
                 </div>
-                <div className="p-4 rounded-lg bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800">
+                <div className="p-4 rounded-[6px]/20 border">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">Net Consumption</p>
-                  <p className="text-2xl font-bold text-cyan-900 dark:text-cyan-100">
+                  <p className="text-2xl font-bold text-foreground">
                     {(companyOverview?.net_consumption_m3 || 0).toLocaleString('en-GB', { maximumFractionDigits: 0 })}
                   </p>
                   <p className="text-xs text-muted-foreground">cubic metres</p>
                 </div>
-                <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                <div className="p-4 rounded-[6px]/20 border">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">Scarcity Weighted</p>
-                  <p className="text-2xl font-bold text-amber-900 dark:text-amber-100">
+                  <p className="text-2xl font-bold text-studio-attention">
                     {(companyOverview?.scarcity_weighted_consumption_m3 || 0).toLocaleString('en-GB', { maximumFractionDigits: 0 })}
                   </p>
                   <p className="text-xs text-muted-foreground">m³ world equivalent</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
+          </section>
+        </div>
+)}
 
-        <TabsContent value="sources" className="space-y-6">
+        {tab === 'sources' && (
+<div className="mt-4 space-y-4">
           <div className="grid lg:grid-cols-2 gap-6">
             <WaterSourceBreakdownChart
               data={derivedSourceBreakdown}
@@ -500,12 +489,12 @@ export function WaterDeepDive({
               title="Water Sources Breakdown"
               height={320}
             />
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Source Distribution</CardTitle>
-                <CardDescription>Percentage of water from each source type</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="mb-3">
+                <Eyebrow>Source Distribution</Eyebrow>
+                <p className="mt-1 text-sm text-muted-foreground">Percentage of water from each source type</p>
+              </div>
+              <div className="space-y-3">
                 {derivedSourceBreakdown.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <Droplets className="h-10 w-10 mx-auto mb-2 opacity-50" />
@@ -543,10 +532,10 @@ export function WaterDeepDive({
                 )}
 
                 {companyOverview && companyOverview.recycled_consumption_m3 > 0 && (
-                  <div className="mt-6 p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                  <div className="mt-6 p-4 rounded-[6px]/20 border">
                     <div className="flex items-center gap-2 mb-2">
-                      <Recycle className="h-4 w-4 text-green-600" />
-                      <span className="font-medium text-green-900 dark:text-green-100">Water Recycling</span>
+                      <Recycle className="h-4 w-4 text-studio-good" />
+                      <span className="font-medium text-studio-good">Water Recycling</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {companyOverview.recycled_percent.toFixed(1)}% of water consumed comes from recycled/reused sources,
@@ -554,12 +543,14 @@ export function WaterDeepDive({
                     </p>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           </div>
-        </TabsContent>
+        </div>
+)}
 
-        <TabsContent value="trends" className="space-y-6">
+        {tab === 'trends' && (
+<div className="mt-4 space-y-4">
           <WaterConsumptionChart
             data={waterTimeSeries}
             loading={loading}
@@ -570,11 +561,11 @@ export function WaterDeepDive({
           />
 
           <div className="grid lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Period Analysis</CardTitle>
-              </CardHeader>
-              <CardContent>
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="mb-3">
+                <Eyebrow>Period Analysis</Eyebrow>
+              </div>
+              <div className="space-y-3">
                 {waterTimeSeries.length < 2 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <Clock className="h-10 w-10 mx-auto mb-2 opacity-50" />
@@ -602,14 +593,14 @@ export function WaterDeepDive({
                     />
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </section>
 
-            <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-              <CardHeader>
-                <CardTitle className="text-base text-blue-900 dark:text-blue-100">About AWARE Methodology</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="mb-3">
+                <Eyebrow>About AWARE Methodology</Eyebrow>
+              </div>
+              <div className="space-y-3">
                 <p className="text-muted-foreground">
                   The AWARE (Available WAter REmaining) method quantifies relative water availability
                   per area in a watershed, after human and aquatic ecosystem demands have been met.
@@ -619,15 +610,16 @@ export function WaterDeepDive({
                   by the location-specific AWARE factor to provide m³ world equivalent.
                 </p>
                 <div className="flex flex-wrap gap-2 pt-2">
-                  <Badge variant="outline" className="text-xs">ISO 14046</Badge>
-                  <Badge variant="outline" className="text-xs">CSRD E3</Badge>
-                  <Badge variant="outline" className="text-xs">AWARE v1.3</Badge>
+                  <StateChip>ISO 14046</StateChip>
+                  <StateChip>CSRD E3</StateChip>
+                  <StateChip>AWARE v1.3</StateChip>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           </div>
-        </TabsContent>
-      </Tabs>
+        </div>
+)}
+      
     </div>
   );
 }
@@ -648,10 +640,10 @@ function MetricCard({
   subtitle?: string;
 }) {
   const colorClasses = {
-    blue: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-600',
-    amber: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-600',
-    cyan: 'bg-cyan-50 dark:bg-cyan-900/20 border-cyan-200 dark:border-cyan-800 text-cyan-600',
-    green: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-600',
+    blue: '/20 text-muted-foreground',
+    amber: '/20 text-studio-attention',
+    cyan: '/20 text-muted-foreground',
+    green: '/20 text-studio-good',
   };
 
   const formatValue = (val: number) => {
@@ -661,8 +653,8 @@ function MetricCard({
   };
 
   return (
-    <Card className={`${colorClasses[color]} border`}>
-      <CardContent className="p-4">
+    <section className="border-t border-studio-hairline pt-5">
+      <div className="space-y-3">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-medium uppercase tracking-wide opacity-80">{title}</span>
           <Icon className="h-4 w-4" />
@@ -676,8 +668,8 @@ function MetricCard({
             <span className="text-[10px] opacity-60">{subtitle}</span>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
@@ -690,33 +682,30 @@ function FacilityRow({
 }) {
   const riskConfig = {
     high: {
-      bgColor: 'bg-red-50 dark:bg-red-900/20',
-      borderColor: 'border-red-200 dark:border-red-800',
-      textColor: 'text-red-700 dark:text-red-300',
-      badgeClass: 'bg-red-600',
+      bgColor: '/20',
+      borderColor: '',
+      textColor: 'text-studio-stale',
+      badgeClass: 'bg-studio-stale',
     },
     medium: {
-      bgColor: 'bg-amber-50 dark:bg-amber-900/20',
-      borderColor: 'border-amber-200 dark:border-amber-800',
-      textColor: 'text-amber-700 dark:text-amber-300',
-      badgeClass: 'bg-amber-600',
+      bgColor: '/20',
+      borderColor: '',
+      textColor: 'text-studio-attention',
+      badgeClass: 'bg-studio-attention',
     },
     low: {
-      bgColor: 'bg-green-50 dark:bg-green-900/20',
-      borderColor: 'border-green-200 dark:border-green-800',
-      textColor: 'text-green-700 dark:text-green-300',
-      badgeClass: 'bg-green-600',
+      bgColor: '/20',
+      borderColor: '',
+      textColor: 'text-studio-good',
+      badgeClass: 'bg-studio-good',
     },
   };
 
   const config = riskConfig[facility.risk_level];
 
   return (
-    <Card
-      className={`${config.bgColor} ${config.borderColor} border cursor-pointer hover:shadow-md transition-all`}
-      onClick={onClick}
-    >
-      <CardContent className="p-4">
+    <section className="border-t border-studio-hairline pt-5">
+      <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="space-y-1.5 flex-1 min-w-0">
             <div className="flex items-center gap-2">
@@ -730,19 +719,19 @@ function FacilityRow({
                 <span>{facility.total_consumption_m3.toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³</span>
               )}
               {facility.recycling_rate_percent > 0 && (
-                <span className="text-green-600">{facility.recycling_rate_percent.toFixed(1)}% recycled</span>
+                <span className="text-studio-good">{facility.recycling_rate_percent.toFixed(1)}% recycled</span>
               )}
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <Badge variant="default" className={config.badgeClass}>
+            <StateChip>
               {facility.risk_level.toUpperCase()}
-            </Badge>
+            </StateChip>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
@@ -765,22 +754,22 @@ function FacilityDetailView({
 
   const riskConfig = {
     high: {
-      bgColor: 'bg-red-50 dark:bg-red-900/20',
-      borderColor: 'border-red-200 dark:border-red-800',
-      textColor: 'text-red-700 dark:text-red-300',
-      badgeClass: 'bg-red-600',
+      bgColor: '/20',
+      borderColor: '',
+      textColor: 'text-studio-stale',
+      badgeClass: 'bg-studio-stale',
     },
     medium: {
-      bgColor: 'bg-amber-50 dark:bg-amber-900/20',
-      borderColor: 'border-amber-200 dark:border-amber-800',
-      textColor: 'text-amber-700 dark:text-amber-300',
-      badgeClass: 'bg-amber-600',
+      bgColor: '/20',
+      borderColor: '',
+      textColor: 'text-studio-attention',
+      badgeClass: 'bg-studio-attention',
     },
     low: {
-      bgColor: 'bg-green-50 dark:bg-green-900/20',
-      borderColor: 'border-green-200 dark:border-green-800',
-      textColor: 'text-green-700 dark:text-green-300',
-      badgeClass: 'bg-green-600',
+      bgColor: '/20',
+      borderColor: '',
+      textColor: 'text-studio-good',
+      badgeClass: 'bg-studio-good',
     },
   };
 
@@ -850,8 +839,8 @@ function FacilityDetailView({
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
+      <section className="border-t border-studio-hairline pt-5">
+        <div className="mb-3">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={onBack} className="gap-2">
               <ArrowLeft className="h-4 w-4" />
@@ -860,47 +849,47 @@ function FacilityDetailView({
           </div>
           <div className="flex items-center justify-between mt-4">
             <div className="space-y-1">
-              <CardTitle className="flex items-center gap-2">
+              <Eyebrow>
                 <MapPin className="h-5 w-5" />
                 {facility.facility_name}
-              </CardTitle>
-              <CardDescription>
+              </Eyebrow>
+              <p className="mt-1 text-sm text-muted-foreground">
                 {facility.city && `${facility.city}, `}{facility.country || facility.country_code}
-              </CardDescription>
+              </p>
             </div>
-            <Badge variant="default" className={config.badgeClass}>
+            <StateChip>
               {facility.risk_level.toUpperCase()} RISK
-            </Badge>
+            </StateChip>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
+        </div>
+        <div className="space-y-3">
           {hasProducts && (
             <div className="flex flex-wrap gap-2 mb-4">
               <span className="text-sm text-muted-foreground">Products:</span>
               {facility.products_linked?.map((product, idx) => (
-                <Badge key={idx} variant="outline" className="text-xs">{product}</Badge>
+                <StateChip>{product}</StateChip>
               ))}
             </div>
           )}
 
           {!hasAnyWaterData && (
-            <Card className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
-              <CardContent className="p-4">
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="space-y-3">
                 <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+                  <AlertTriangle className="h-5 w-5 text-studio-attention mt-0.5" />
                   <div>
-                    <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">No Water Data Available</p>
-                    <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                    <p className="text-sm font-semibold text-studio-attention">No Water Data Available</p>
+                    <p className="text-xs text-studio-attention mt-1">
                       This facility has no water activity data logged and no production sites linked to completed product LCAs.
                     </p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           )}
 
-          <Card className={`${config.bgColor} border-2 ${config.borderColor}`}>
-            <CardContent className="p-6">
+          <section className="border-t border-studio-hairline pt-5">
+            <div className="space-y-3">
               <div className="grid md:grid-cols-3 gap-6">
                 <div className="space-y-2">
                   <h3 className="text-sm font-semibold">AWARE Factor</h3>
@@ -929,19 +918,19 @@ function FacilityDetailView({
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
           <div className="grid md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="mb-3">
+                <Eyebrow>
                   <Factory className="h-4 w-4" />
                   Facility Operational Water
-                </CardTitle>
-                <CardDescription className="text-xs">Direct water use at this facility</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
+                </Eyebrow>
+                <p className="mt-1 text-sm text-muted-foreground">Direct water use at this facility</p>
+              </div>
+              <div className="space-y-3">
                 {hasOperationalData ? (
                   <>
                     <div className="flex justify-between text-sm">
@@ -954,9 +943,9 @@ function FacilityDetailView({
                     </div>
                     <div className="flex justify-between text-sm border-t pt-2">
                       <span className="text-muted-foreground">Net Consumption</span>
-                      <span className="font-bold text-blue-600">{operationalNet.toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³</span>
+                      <span className="font-bold text-muted-foreground">{operationalNet.toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³</span>
                     </div>
-                    <div className="flex justify-between text-sm text-amber-600">
+                    <div className="flex justify-between text-sm text-studio-attention">
                       <span>Scarcity-Weighted</span>
                       <span className="font-medium">{(operationalNet * facility.aware_factor).toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³ eq</span>
                     </div>
@@ -967,18 +956,18 @@ function FacilityDetailView({
                     <p className="text-xs">No operational water data logged for this facility</p>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </section>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-2">
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="mb-3">
+                <Eyebrow>
                   <Waves className="h-4 w-4" />
                   Product Environmental Impact Embedded Water
-                </CardTitle>
-                <CardDescription className="text-xs">Supply chain water from linked products</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
+                </Eyebrow>
+                <p className="mt-1 text-sm text-muted-foreground">Supply chain water from linked products</p>
+              </div>
+              <div className="space-y-3">
                 {hasProductLcaData ? (
                   <>
                     <div className="flex justify-between text-sm">
@@ -993,10 +982,10 @@ function FacilityDetailView({
                         <span className="text-xs text-muted-foreground">Products:</span>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {facility.products_linked?.slice(0, 3).map((p, i) => (
-                            <Badge key={i} variant="outline" className="text-xs">{p}</Badge>
+                            <StateChip>{p}</StateChip>
                           ))}
                           {(facility.products_linked?.length || 0) > 3 && (
-                            <Badge variant="outline" className="text-xs">+{(facility.products_linked?.length || 0) - 3} more</Badge>
+                            <StateChip>+{(facility.products_linked?.length || 0) - 3} more</StateChip>
                           )}
                         </div>
                       </div>
@@ -1008,19 +997,19 @@ function FacilityDetailView({
                     <p className="text-xs">No products with LCAs linked to this facility</p>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           </div>
 
           <div className="grid md:grid-cols-2 gap-4">
 
-            <Card className="border-2 border-blue-200 dark:border-blue-800">
-              <CardHeader className="pb-3">
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="mb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-blue-600" />
+                  <Eyebrow>
+                    <Sparkles className="h-4 w-4 text-muted-foreground" />
                     AI-Powered Recommendations
-                  </CardTitle>
+                  </Eyebrow>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1035,8 +1024,8 @@ function FacilityDetailView({
                     )}
                   </Button>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
+              </div>
+              <div className="space-y-3">
                 {loadingAI ? (
                   <div className="space-y-2">
                     <Skeleton className="h-4 w-full" />
@@ -1044,7 +1033,7 @@ function FacilityDetailView({
                     <Skeleton className="h-4 w-5/6" />
                   </div>
                 ) : aiError ? (
-                  <div className="text-sm text-red-600 dark:text-red-400">
+                  <div className="text-sm text-studio-stale">
                     <p>{aiError}</p>
                     <Button variant="link" size="sm" onClick={fetchAIRecommendations} className="p-0 h-auto mt-1">
                       Try again
@@ -1053,9 +1042,9 @@ function FacilityDetailView({
                 ) : aiRecommendations ? (
                   <>
                     {aiRecommendations.priority_action && (
-                      <div className="p-2 rounded-md bg-blue-100 dark:bg-blue-900/30 mb-3">
-                        <p className="text-xs font-semibold text-blue-800 dark:text-blue-200 uppercase tracking-wide mb-1">Priority Action</p>
-                        <p className="text-xs text-blue-900 dark:text-blue-100">{aiRecommendations.priority_action}</p>
+                      <div className="p-2 rounded-md/30 mb-3">
+                        <p className="text-xs font-semibold text-foreground uppercase tracking-wide mb-1">Priority Action</p>
+                        <p className="text-xs text-foreground">{aiRecommendations.priority_action}</p>
                       </div>
                     )}
                     {aiRecommendations.recommendations.slice(0, 4).map((rec, idx) => (
@@ -1065,40 +1054,40 @@ function FacilityDetailView({
                 ) : (
                   <p className="text-xs text-muted-foreground">Loading recommendations...</p>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           </div>
 
           {aiRecommendations?.analysis && (
-            <Card className="bg-slate-50 dark:bg-slate-900/20 border-slate-200 dark:border-slate-800">
-              <CardContent className="p-4">
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="space-y-3">
                 <div className="flex items-start gap-3">
-                  <Sparkles className="h-5 w-5 text-slate-500 mt-0.5 flex-shrink-0" />
+                  <Sparkles className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">AI Analysis</p>
+                    <p className="text-sm font-semibold text-foreground mb-1">AI Analysis</p>
                     <p className="text-xs text-muted-foreground leading-relaxed">{aiRecommendations.analysis}</p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           )}
 
-          <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-            <CardContent className="p-4 space-y-2">
-              <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">About AWARE</p>
+          <section className="border-t border-studio-hairline pt-5">
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-foreground">About AWARE</p>
               <p className="text-xs text-muted-foreground">
                 The AWARE method quantifies relative available water remaining per area in a watershed,
                 after human and aquatic ecosystem demands have been met. A higher factor indicates greater water scarcity.
               </p>
               <div className="flex flex-wrap gap-2 mt-2">
-                <Badge variant="outline" className="text-xs">Low: &lt;1</Badge>
-                <Badge variant="outline" className="text-xs">Medium: 1-10</Badge>
-                <Badge variant="outline" className="text-xs">High: &gt;10</Badge>
+                <StateChip>Low: &lt;1</StateChip>
+                <StateChip>Medium: 1-10</StateChip>
+                <StateChip>High: &gt;10</StateChip>
               </div>
-            </CardContent>
-          </Card>
-        </CardContent>
-      </Card>
+            </div>
+          </section>
+        </div>
+      </section>
     </div>
   );
 }
@@ -1106,7 +1095,7 @@ function FacilityDetailView({
 function ActionItem({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-start gap-2">
-      <TrendingDown className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+      <TrendingDown className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
       <p className="text-xs">{children}</p>
     </div>
   );
@@ -1141,10 +1130,10 @@ function TrendMetric({
   }, [data, metric]);
 
   const TrendIcon = trend.direction === 'up' ? TrendingDown : trend.direction === 'down' ? TrendingDown : Clock;
-  const trendColor = trend.direction === 'down' ? 'text-green-600' : trend.direction === 'up' ? 'text-amber-600' : 'text-slate-500';
+  const trendColor = trend.direction === 'down' ? 'text-studio-good' : trend.direction === 'up' ? 'text-studio-attention' : 'text-muted-foreground';
 
   return (
-    <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+    <div className="flex items-center justify-between p-3 rounded-[6px] bg-muted/50">
       <span className="text-sm font-medium">{label}</span>
       <div className={`flex items-center gap-1.5 ${trendColor}`}>
         <TrendIcon className="h-4 w-4" />

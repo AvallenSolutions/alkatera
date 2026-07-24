@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { STUDIO } from '@/components/studio/theme';
 import { litresPerLitre } from '@/lib/calculations/water-use-ratio';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -128,8 +129,8 @@ export function WaterIntensityComparisonChart({
   const getBarColor = (entry: typeof chartData[0]) => {
     if (entry.status === 'best') return '#22c55e';
     if (entry.status === 'worst') return '#ef4444';
-    if (entry.aboveBenchmark) return '#f59e0b';
-    return '#3b82f6';
+    if (entry.aboveBenchmark) return STUDIO.ochreInk;
+    return STUDIO.forest;
   };
 
   const CustomTooltip = ({ active, payload }: any) => {
@@ -159,9 +160,9 @@ export function WaterIntensityComparisonChart({
             <Badge
               variant="outline"
               className={`text-xs ${
-                data.risk_level === 'high' ? 'bg-red-100 text-red-700' :
-                data.risk_level === 'medium' ? 'bg-amber-100 text-amber-700' :
-                'bg-green-100 text-green-700'
+                data.risk_level === 'high' ? ' text-studio-stale' :
+                data.risk_level === 'medium' ? ' text-studio-attention' :
+                ' text-studio-good'
               }`}
             >
               {data.risk_level.charAt(0).toUpperCase() + data.risk_level.slice(1)}
@@ -170,7 +171,7 @@ export function WaterIntensityComparisonChart({
           {industryBenchmark && (
             <div className="flex justify-between gap-4 pt-1 border-t">
               <span className="text-muted-foreground">vs Benchmark:</span>
-              <span className={data.aboveBenchmark ? 'text-amber-600' : 'text-green-600'}>
+              <span className={data.aboveBenchmark ? 'text-studio-attention' : 'text-studio-good'}>
                 {data.aboveBenchmark ? '+' : ''}{((data.intensity - industryBenchmark) / industryBenchmark * 100).toFixed(1)}%
               </span>
             </div>
@@ -221,15 +222,15 @@ export function WaterIntensityComparisonChart({
             {industryBenchmark && (
               <ReferenceLine
                 x={industryBenchmark}
-                stroke="#94a3b8"
+                stroke={STUDIO.dim}
                 strokeDasharray="5 5"
-                label={{ value: 'Benchmark', position: 'top', fontSize: 10, fill: '#94a3b8' }}
+                label={{ value: 'Benchmark', position: 'top', fontSize: 10, fill: STUDIO.dim }}
               />
             )}
 
             <ReferenceLine
               x={avgIntensity}
-              stroke="#3b82f6"
+              stroke={STUDIO.forest}
               strokeDasharray="3 3"
               strokeOpacity={0.5}
             />
@@ -256,9 +257,9 @@ export function WaterIntensityComparisonChart({
           <div className="flex gap-4">
             {bestPerformer && (
               <div className="flex items-center gap-1.5">
-                <Award className="h-3.5 w-3.5 text-green-600" />
+                <Award className="h-3.5 w-3.5 text-studio-good" />
                 <span className="text-muted-foreground">Best:</span>
-                <span className="font-medium text-green-600">
+                <span className="font-medium text-studio-good">
                   {bestPerformer.fullName.substring(0, 15)}
                   {bestPerformer.fullName.length > 15 ? '...' : ''}
                 </span>
@@ -266,9 +267,9 @@ export function WaterIntensityComparisonChart({
             )}
             {worstPerformer && worstPerformer !== bestPerformer && (
               <div className="flex items-center gap-1.5">
-                <TrendingUp className="h-3.5 w-3.5 text-red-600" />
+                <TrendingUp className="h-3.5 w-3.5 text-studio-stale" />
                 <span className="text-muted-foreground">Highest:</span>
-                <span className="font-medium text-red-600">
+                <span className="font-medium text-studio-stale">
                   {worstPerformer.fullName.substring(0, 15)}
                   {worstPerformer.fullName.length > 15 ? '...' : ''}
                 </span>

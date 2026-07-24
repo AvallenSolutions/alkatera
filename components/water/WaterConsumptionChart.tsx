@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { STUDIO } from '@/components/studio/theme';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -115,7 +116,7 @@ export function WaterConsumptionChart({
   }
 
   const TrendIcon = trend.direction === 'up' ? TrendingUp : trend.direction === 'down' ? TrendingDown : Minus;
-  const trendColor = trend.direction === 'down' ? 'text-green-600' : trend.direction === 'up' ? 'text-amber-600' : 'text-slate-500';
+  const trendColor = trend.direction === 'down' ? 'text-studio-good' : trend.direction === 'up' ? 'text-studio-attention' : 'text-muted-foreground';
 
   return (
     <Card className={className}>
@@ -167,16 +168,16 @@ export function WaterConsumptionChart({
           <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="consumptionGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                <stop offset="5%" stopColor={STUDIO.forest} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={STUDIO.forest} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="dischargeGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                <stop offset="5%" stopColor={STUDIO.teal} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={STUDIO.teal} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="scarcityGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                <stop offset="5%" stopColor={STUDIO.ochreInk} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={STUDIO.ochreInk} stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -216,7 +217,7 @@ export function WaterConsumptionChart({
                 <Area
                   type="monotone"
                   dataKey="consumption"
-                  stroke="#3b82f6"
+                  stroke={STUDIO.forest}
                   strokeWidth={2}
                   fill="url(#consumptionGradient)"
                   name="consumption"
@@ -225,7 +226,7 @@ export function WaterConsumptionChart({
                   <Area
                     type="monotone"
                     dataKey="discharge"
-                    stroke="#10b981"
+                    stroke={STUDIO.teal}
                     strokeWidth={2}
                     fill="url(#dischargeGradient)"
                     name="discharge"
@@ -233,9 +234,9 @@ export function WaterConsumptionChart({
                 )}
                 <ReferenceLine
                   y={averageConsumption}
-                  stroke="#94a3b8"
+                  stroke={STUDIO.dim}
                   strokeDasharray="5 5"
-                  label={{ value: 'Avg', position: 'right', fontSize: 10, fill: '#94a3b8' }}
+                  label={{ value: 'Avg', position: 'right', fontSize: 10, fill: STUDIO.dim }}
                 />
               </>
             )}
@@ -255,7 +256,7 @@ export function WaterConsumptionChart({
               <Area
                 type="monotone"
                 dataKey="scarcityWeighted"
-                stroke="#f59e0b"
+                stroke={STUDIO.ochreInk}
                 strokeWidth={2}
                 fill="url(#scarcityGradient)"
                 name="scarcityWeighted"
@@ -268,17 +269,17 @@ export function WaterConsumptionChart({
           {viewMode === 'consumption' && (
             <>
               <div className="flex items-center gap-1.5">
-                <div className="w-3 h-0.5 bg-blue-500 rounded" />
+                <div className="w-3 h-0.5 bg-studio-forest rounded" />
                 <span>Consumption</span>
               </div>
               {showDischarge && (
                 <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-0.5 bg-emerald-500 rounded" />
+                  <div className="w-3 h-0.5 bg-studio-teal rounded" />
                   <span>Discharge</span>
                 </div>
               )}
               <div className="flex items-center gap-1.5">
-                <div className="w-3 h-0.5 bg-slate-400 rounded border-dashed" />
+                <div className="w-3 h-0.5 bg-studio-dim rounded border-dashed" />
                 <span>Average</span>
               </div>
             </>
@@ -291,7 +292,7 @@ export function WaterConsumptionChart({
           )}
           {viewMode === 'scarcity' && (
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-0.5 bg-amber-500 rounded" />
+              <div className="w-3 h-0.5 bg-studio-ochre-ink rounded" />
               <span>Scarcity-Weighted (m³ world eq)</span>
             </div>
           )}

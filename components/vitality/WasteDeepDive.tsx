@@ -1,9 +1,9 @@
 "use client";
 
-import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import React, { useState } from 'react';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { StateChip } from '@/components/studio/state-chip';
+import { SectionTabs } from '@/components/studio/section-tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -99,7 +99,7 @@ function WasteHierarchyPyramid({ wasteByTreatment }: { wasteByTreatment: WasteBy
                 {level.level}
               </div>
               <div className="flex-1">
-                <div className="h-8 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden relative">
+                <div className="h-8 bg-studio-ink/10 rounded-[6px] overflow-hidden relative">
                   <div
                     className="h-full transition-all duration-500"
                     style={{
@@ -128,10 +128,10 @@ function WasteHierarchyPyramid({ wasteByTreatment }: { wasteByTreatment: WasteBy
 
 function CircularityGauge({ rate, target }: { rate: number; target?: number }) {
   const getStatusColor = (value: number) => {
-    if (value >= 80) return 'text-green-600';
-    if (value >= 60) return 'text-emerald-600';
-    if (value >= 40) return 'text-amber-600';
-    return 'text-red-600';
+    if (value >= 80) return 'text-studio-good';
+    if (value >= 60) return 'text-studio-good';
+    if (value >= 40) return 'text-studio-attention';
+    return 'text-studio-stale';
   };
 
   const getStatusLabel = (value: number) => {
@@ -184,9 +184,9 @@ function CircularityGauge({ rate, target }: { rate: number; target?: number }) {
           <span className="text-xs text-muted-foreground">Circular</span>
         </div>
       </div>
-      <Badge variant="outline" className={getStatusColor(rate)}>
+      <StateChip>
         {getStatusLabel(rate)}
-      </Badge>
+      </StateChip>
       {target && (
         <p className="text-xs text-muted-foreground">
           Target: {target}%
@@ -199,13 +199,13 @@ function CircularityGauge({ rate, target }: { rate: number; target?: number }) {
 function TargetProgressCard({ targets, currentMetrics }: { targets: CircularityTarget | null; currentMetrics: WasteMetrics }) {
   if (!targets) {
     return (
-      <Card className="border-dashed">
-        <CardContent className="p-6 text-center text-muted-foreground">
+      <section className="border-t border-studio-hairline pt-5">
+        <div className="space-y-3">
           <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
           <p className="text-sm">No circularity targets set</p>
           <p className="text-xs mt-1">Set targets to track progress</p>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
     );
   }
 
@@ -231,14 +231,14 @@ function TargetProgressCard({ targets, currentMetrics }: { targets: CircularityT
   ].filter((item) => item.target > 0);
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <Target className="h-4 w-4 text-blue-600" />
+    <section className="border-t border-studio-hairline pt-5">
+      <div className="mb-3">
+        <Eyebrow>
+          <Target className="h-4 w-4 text-muted-foreground" />
           {targets.target_year} Targets
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+        </Eyebrow>
+      </div>
+      <div className="space-y-3">
         {targetItems.map((item) => {
           const progress = item.target > 0 ? (item.current / item.target) * 100 : 0;
           const onTrack = progress >= 100;
@@ -246,7 +246,7 @@ function TargetProgressCard({ targets, currentMetrics }: { targets: CircularityT
             <div key={item.name} className="space-y-1">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium">{item.name}</span>
-                <span className={onTrack ? 'text-green-600' : 'text-amber-600'}>
+                <span className={onTrack ? 'text-studio-good' : 'text-studio-attention'}>
                   {item.current.toFixed(0)}{item.unit} / {item.target}{item.unit}
                 </span>
               </div>
@@ -255,35 +255,36 @@ function TargetProgressCard({ targets, currentMetrics }: { targets: CircularityT
           );
         })}
         {targets.zero_waste_to_landfill_target && (
-          <div className="flex items-center gap-2 p-2 rounded-lg bg-blue-50 dark:bg-blue-950/30">
+          <div className="flex items-center gap-2 p-2 rounded-[6px]/30">
             {currentMetrics.waste_by_treatment.find((t) => t.treatment_method === 'landfill')?.total_kg === 0 ? (
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <CheckCircle2 className="h-4 w-4 text-studio-good" />
             ) : (
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <AlertTriangle className="h-4 w-4 text-studio-attention" />
             )}
             <span className="text-xs font-medium">Zero Waste to Landfill Target</span>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
 export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
+  const [tab, setTab] = useState('overview');
   if (loading) {
     return (
       <div className="space-y-4">
-        <div className="h-64 bg-slate-100 dark:bg-slate-800 animate-pulse rounded-lg" />
+        <div className="h-64 bg-studio-ink/10 animate-pulse rounded-[6px]" />
       </div>
     );
   }
 
   if (!wasteMetrics || wasteMetrics.total_waste_kg === 0) {
     return (
-      <Card>
-        <CardContent className="p-8 space-y-4">
+      <section className="border-t border-studio-hairline pt-5">
+        <div className="space-y-3">
           <div className="flex items-center justify-center">
-            <Recycle className="h-16 w-16 text-amber-400" />
+            <Recycle className="h-16 w-16 text-studio-attention" />
           </div>
           <div className="text-center space-y-2">
             <h3 className="text-lg font-semibold">No Waste Data Available</h3>
@@ -292,10 +293,10 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
             </p>
           </div>
           <div className="flex justify-center">
-            <Badge variant="outline">Log waste data to begin</Badge>
+            <StateChip>Log waste data to begin</StateChip>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
     );
   }
 
@@ -316,63 +317,59 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
 
   return (
     <div className="space-y-6">
-      <Card className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800">
-        <CardContent className="p-4">
+      <section className="border-t border-studio-hairline pt-5">
+        <div className="space-y-3">
           <div className="flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/50">
-              <Info className="h-5 w-5 text-amber-700 dark:text-amber-400" />
+            <div className="p-2 rounded-[6px]/50">
+              <Info className="h-5 w-5 text-studio-attention" />
             </div>
             <div className="flex-1 space-y-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                <h4 className="text-sm font-semibold text-studio-attention">
                   Cradle-to-Gate Scope: Operational Waste Only
                 </h4>
-                <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
+                <StateChip tone="attention">
                   GHG Protocol Scope 3.5
-                </Badge>
+                </StateChip>
               </div>
               <div className="text-xs text-muted-foreground space-y-1.5">
                 <p>
-                  <strong className="text-amber-800 dark:text-amber-200">What is measured:</strong> All waste generated during production operations at your facilities - including raw material processing residues, damaged packaging, process waste, and hazardous operational materials.
+                  <strong className="text-studio-attention">What is measured:</strong> All waste generated during production operations at your facilities - including raw material processing residues, damaged packaging, process waste, and hazardous operational materials.
                 </p>
                 <p>
-                  <strong className="text-amber-800 dark:text-amber-200">What is NOT included:</strong> Consumer end-of-life waste (packaging disposed by customers after product use). This would require cradle-to-grave analysis extending beyond the factory gate.
+                  <strong className="text-studio-attention">What is NOT included:</strong> Consumer end-of-life waste (packaging disposed by customers after product use). This would require cradle-to-grave analysis extending beyond the factory gate.
                 </p>
                 <p>
-                  <strong className="text-amber-800 dark:text-amber-200">Data sources:</strong> Primary measured data from facility waste manifests, weighbridge records, and third-party waste contractor reports.
+                  <strong className="text-studio-attention">Data sources:</strong> Primary measured data from facility waste manifests, weighbridge records, and third-party waste contractor reports.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 pt-1">
-                <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 dark:text-amber-300">ISO 14064-1</Badge>
-                <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 dark:text-amber-300">CSRD ESRS E5</Badge>
-                <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 dark:text-amber-300">EU Waste Framework</Badge>
-                <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 dark:text-amber-300">Ellen MacArthur MCI</Badge>
+                <StateChip tone="attention">ISO 14064-1</StateChip>
+                <StateChip tone="attention">CSRD ESRS E5</StateChip>
+                <StateChip tone="attention">EU Waste Framework</StateChip>
+                <StateChip tone="attention">Ellen MacArthur MCI</StateChip>
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-4">
-          <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
-          <TabsTrigger value="streams" className="text-xs">Waste Streams</TabsTrigger>
-          <TabsTrigger value="circularity" className="text-xs">Circularity</TabsTrigger>
-          <TabsTrigger value="facilities" className="text-xs">By Facility</TabsTrigger>
-        </TabsList>
+      
+        <SectionTabs value={tab} onChange={setTab} tabs={[{ value: 'overview', label: 'Overview' }, { value: 'streams', label: 'Waste Streams' }, { value: 'circularity', label: 'Circularity' }, { value: 'facilities', label: 'By Facility' }]} />
 
-        <TabsContent value="overview" className="space-y-4">
+        {tab === 'overview' && (
+<div className="mt-4 space-y-4">
           <div className="grid md:grid-cols-3 gap-4">
-            <Card className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2 text-amber-900 dark:text-amber-100">
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="mb-3">
+                <Eyebrow>
                   <Trash2 className="h-4 w-4" />
                   Total Waste Generated
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+                </Eyebrow>
+              </div>
+              <div className="space-y-3">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-amber-900 dark:text-amber-100">
+                  <span className="text-3xl font-bold text-studio-attention">
                     {(wasteMetrics.total_waste_kg / 1000).toLocaleString('en-GB', { maximumFractionDigits: 2 })}
                   </span>
                   <span className="text-sm text-muted-foreground">tonnes</span>
@@ -388,19 +385,19 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
                     className="mt-3"
                   />
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </section>
 
-            <Card className="bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2 text-green-900 dark:text-green-100">
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="mb-3">
+                <Eyebrow>
                   <Recycle className="h-4 w-4" />
                   Waste Diversion Rate
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+                </Eyebrow>
+              </div>
+              <div className="space-y-3">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-green-900 dark:text-green-100">
+                  <span className="text-3xl font-bold text-studio-good">
                     {wasteMetrics.waste_diversion_rate.toFixed(1)}%
                   </span>
                   <span className="text-sm text-muted-foreground">diverted</span>
@@ -409,19 +406,19 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
                 <p className="text-xs text-muted-foreground mt-2">
                   {wasteMetrics.waste_diversion_rate >= 60 ? 'Good performance' : 'Room for improvement'}
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </section>
 
-            <Card className={`${wasteMetrics.hazardous_waste_percentage > 5 ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800' : 'bg-slate-50 dark:bg-slate-950/20 border-slate-200 dark:border-slate-800'}`}>
-              <CardHeader className="pb-2">
-                <CardTitle className={`text-sm flex items-center gap-2 ${wasteMetrics.hazardous_waste_percentage > 5 ? 'text-red-900 dark:text-red-100' : 'text-slate-900 dark:text-slate-100'}`}>
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="mb-3">
+                <Eyebrow>
                   <AlertTriangle className="h-4 w-4" />
                   Hazardous Waste
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+                </Eyebrow>
+              </div>
+              <div className="space-y-3">
                 <div className="flex items-baseline gap-2">
-                  <span className={`text-3xl font-bold ${wasteMetrics.hazardous_waste_percentage > 5 ? 'text-red-900 dark:text-red-100' : 'text-slate-900 dark:text-slate-100'}`}>
+                  <span className={`text-3xl font-bold ${wasteMetrics.hazardous_waste_percentage > 5 ? 'text-studio-stale' : 'text-foreground'}`}>
                     {wasteMetrics.hazardous_waste_percentage.toFixed(1)}%
                   </span>
                   <span className="text-sm text-muted-foreground">of total</span>
@@ -429,17 +426,17 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
                 <p className="text-xs text-muted-foreground mt-2">
                   {(wasteMetrics.hazardous_waste_kg / 1000).toFixed(2)} tonnes hazardous
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           </div>
 
           <div className="grid md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Waste by Category</CardTitle>
-                <CardDescription>Distribution across waste types</CardDescription>
-              </CardHeader>
-              <CardContent>
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="mb-3">
+                <Eyebrow>Waste by Category</Eyebrow>
+                <p className="mt-1 text-sm text-muted-foreground">Distribution across waste types</p>
+              </div>
+              <div className="space-y-3">
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -474,25 +471,25 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </section>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Waste Hierarchy Performance</CardTitle>
-                <CardDescription>EU Waste Framework Directive alignment</CardDescription>
-              </CardHeader>
-              <CardContent>
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="mb-3">
+                <Eyebrow>Waste Hierarchy Performance</Eyebrow>
+                <p className="mt-1 text-sm text-muted-foreground">EU Waste Framework Directive alignment</p>
+              </div>
+              <div className="space-y-3">
                 <WasteHierarchyPyramid wasteByTreatment={wasteMetrics.waste_by_treatment} />
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           </div>
 
-          <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
-            <CardContent className="p-4 flex items-start gap-3">
-              <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <section className="border-t border-studio-hairline pt-5">
+            <div className="space-y-3">
+              <Info className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
               <div className="space-y-2">
-                <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                <p className="text-sm font-semibold text-foreground">
                   GHG Emissions from Operational Waste (Scope 3 Category 5)
                 </p>
                 <p className="text-xs text-muted-foreground">
@@ -502,17 +499,19 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
                   Calculated using DEFRA 2024 emission factors for waste treatment methods. Emissions vary by treatment pathway: landfill generates methane, incineration produces CO₂, while recycling/composting avoid virgin material production emissions.
                 </p>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
+          </section>
+        </div>
+)}
 
-        <TabsContent value="streams" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Waste Treatment Breakdown</CardTitle>
-              <CardDescription>How waste is processed and disposed</CardDescription>
-            </CardHeader>
-            <CardContent>
+        {tab === 'streams' && (
+<div className="mt-4 space-y-4">
+          <section className="border-t border-studio-hairline pt-5">
+            <div className="mb-3">
+              <Eyebrow>Waste Treatment Breakdown</Eyebrow>
+              <p className="mt-1 text-sm text-muted-foreground">How waste is processed and disposed</p>
+            </div>
+            <div className="space-y-3">
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={treatmentChartData} layout="vertical">
@@ -530,19 +529,19 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Detailed Waste Streams</CardTitle>
-              <CardDescription>All recorded waste entries</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="border rounded-lg overflow-hidden">
+          <section className="border-t border-studio-hairline pt-5">
+            <div className="mb-3">
+              <Eyebrow>Detailed Waste Streams</Eyebrow>
+              <p className="mt-1 text-sm text-muted-foreground">All recorded waste entries</p>
+            </div>
+            <div className="space-y-3">
+              <div className="border rounded-[6px] overflow-hidden">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-slate-50 dark:bg-slate-800">
+                    <TableRow className="">
                       <TableHead className="font-semibold text-xs">Category</TableHead>
                       <TableHead className="font-semibold text-xs">Treatment</TableHead>
                       <TableHead className="font-semibold text-xs text-right">Mass (kg)</TableHead>
@@ -559,11 +558,11 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
                         <TableCell className="text-sm">
                           <div className="flex items-center gap-2">
                             {stream.is_circular ? (
-                              <Recycle className="h-4 w-4 text-green-600" />
+                              <Recycle className="h-4 w-4 text-studio-good" />
                             ) : stream.treatment_method === 'landfill' ? (
-                              <Trash2 className="h-4 w-4 text-slate-400" />
+                              <Trash2 className="h-4 w-4 text-muted-foreground" />
                             ) : (
-                              <Flame className="h-4 w-4 text-amber-500" />
+                              <Flame className="h-4 w-4 text-studio-attention" />
                             )}
                             {stream.treatment_display}
                           </div>
@@ -575,50 +574,49 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
                           {((wasteMetrics.total_waste_emissions_kg_co2e * stream.percentage) / 100).toFixed(1)} kg
                         </TableCell>
                         <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={stream.is_circular ? 'border-green-500 text-green-700' : 'border-slate-300 text-slate-500'}
-                          >
+                          <StateChip tone="good">
                             {stream.circularity_score}%
-                          </Badge>
+                          </StateChip>
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
+          </section>
+        </div>
+)}
 
-        <TabsContent value="circularity" className="space-y-4">
+        {tab === 'circularity' && (
+<div className="mt-4 space-y-4">
           <div className="grid md:grid-cols-3 gap-4">
-            <Card className="md:col-span-1">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Circularity Score</CardTitle>
-                <CardDescription>Overall circular economy performance</CardDescription>
-              </CardHeader>
-              <CardContent>
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="mb-3">
+                <Eyebrow>Circularity Score</Eyebrow>
+                <p className="mt-1 text-sm text-muted-foreground">Overall circular economy performance</p>
+              </div>
+              <div className="space-y-3">
                 <CircularityGauge
                   rate={wasteMetrics.circularity_rate}
                   target={wasteMetrics.targets?.circularity_score_target}
                 />
-              </CardContent>
-            </Card>
+              </div>
+            </section>
 
-            <Card className="md:col-span-2">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Material Circularity Metrics</CardTitle>
-                <CardDescription>Product-level circularity indicators</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <section className="border-t border-studio-hairline pt-5">
+              <div className="mb-3">
+                <Eyebrow>Material Circularity Metrics</Eyebrow>
+                <p className="mt-1 text-sm text-muted-foreground">Product-level circularity indicators</p>
+              </div>
+              <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-4">
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-800">
+                        <div className="p-4 rounded-[6px]">
                           <div className="flex items-center gap-2 mb-2">
-                            <Package className="h-4 w-4 text-blue-600" />
+                            <Package className="h-4 w-4 text-muted-foreground" />
                             <span className="text-xs font-medium">Recycled Content</span>
                           </div>
                           <div className="text-2xl font-bold">
@@ -636,9 +634,9 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-800">
+                        <div className="p-4 rounded-[6px]">
                           <div className="flex items-center gap-2 mb-2">
-                            <Recycle className="h-4 w-4 text-green-600" />
+                            <Recycle className="h-4 w-4 text-studio-good" />
                             <span className="text-xs font-medium">Recyclability</span>
                           </div>
                           <div className="text-2xl font-bold">
@@ -657,82 +655,84 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
                 {wasteMetrics.circularity_metrics && (
                   <div className="grid grid-cols-3 gap-3 pt-2 border-t">
                     <div className="text-center">
-                      <div className="text-lg font-bold text-green-600">
+                      <div className="text-lg font-bold text-studio-good">
                         {wasteMetrics.circularity_metrics.reusable_materials_percentage.toFixed(0)}%
                       </div>
                       <div className="text-xs text-muted-foreground">Reusable</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-lg font-bold text-emerald-600">
+                      <div className="text-lg font-bold text-studio-good">
                         {wasteMetrics.circularity_metrics.compostable_materials_percentage.toFixed(0)}%
                       </div>
                       <div className="text-xs text-muted-foreground">Compostable</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-lg font-bold text-blue-600">
+                      <div className="text-lg font-bold text-muted-foreground">
                         {wasteMetrics.circularity_metrics.total_materials_assessed}
                       </div>
                       <div className="text-xs text-muted-foreground">Materials</div>
                     </div>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           </div>
 
           <TargetProgressCard targets={wasteMetrics.targets} currentMetrics={wasteMetrics} />
 
-          <Card className="bg-amber-50 dark:bg-amber-950/20 border-amber-200">
-            <CardContent className="p-4 space-y-2">
+          <section className="border-t border-studio-hairline pt-5">
+            <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <Recycle className="h-4 w-4 text-amber-600" />
-                <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">Circular Economy Standards</p>
+                <Recycle className="h-4 w-4 text-studio-attention" />
+                <p className="text-sm font-semibold text-studio-attention">Circular Economy Standards</p>
               </div>
               <p className="text-xs text-muted-foreground">
                 Metrics aligned with Ellen MacArthur Foundation Material Circularity Indicator (MCI) methodology.
                 Circularity score reflects material kept in use through recycling, reuse, and composting pathways.
               </p>
               <div className="flex gap-2 mt-2">
-                <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">CSRD E5</Badge>
-                <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">Ellen MacArthur</Badge>
-                <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">EU Taxonomy</Badge>
+                <StateChip tone="attention">CSRD E5</StateChip>
+                <StateChip tone="attention">Ellen MacArthur</StateChip>
+                <StateChip tone="attention">EU Taxonomy</StateChip>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
+          </section>
+        </div>
+)}
 
-        <TabsContent value="facilities" className="space-y-4">
-          <Card className="bg-gradient-to-r from-blue-50 to-slate-50 dark:from-blue-950/30 dark:to-slate-950/30 border-blue-200 dark:border-blue-800">
-            <CardContent className="p-4">
+        {tab === 'facilities' && (
+<div className="mt-4 space-y-4">
+          <section className="border-t border-studio-hairline pt-5">
+            <div className="space-y-3">
               <div className="flex items-start gap-3">
-                <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <Info className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
                 <div className="space-y-2">
-                  <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                  <h4 className="text-sm font-semibold text-foreground">
                     Reporting Boundary: Owned vs Contract Facilities
                   </h4>
                   <div className="text-xs text-muted-foreground space-y-1">
                     <p>
-                      <strong className="text-blue-800 dark:text-blue-200">Owned/Operated (In Scope):</strong> Facilities under your operational control. Waste is reported as Scope 3 Category 5 per GHG Protocol.
+                      <strong className="text-foreground">Owned/Operated (In Scope):</strong> Facilities under your operational control. Waste is reported as Scope 3 Category 5 per GHG Protocol.
                     </p>
                     <p>
-                      <strong className="text-blue-800 dark:text-blue-200">Third Party/Contract (Flagged):</strong> Contract manufacturers report their own waste. Data shown here is for transparency but may be counted in their Scope 3 Category 5, not yours.
+                      <strong className="text-foreground">Third Party/Contract (Flagged):</strong> Contract manufacturers report their own waste. Data shown here is for transparency but may be counted in their Scope 3 Category 5, not yours.
                     </p>
                   </div>
                   <div className="flex gap-2 pt-1">
-                    <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300">Owned = In Scope</Badge>
-                    <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300">Third Party = Flagged</Badge>
+                    <StateChip tone="good">Owned = In Scope</StateChip>
+                    <StateChip tone="attention">Third Party = Flagged</StateChip>
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Waste by Facility</CardTitle>
-              <CardDescription>Performance breakdown across sites with ownership status</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <section className="border-t border-studio-hairline pt-5">
+            <div className="mb-3">
+              <Eyebrow>Waste by Facility</Eyebrow>
+              <p className="mt-1 text-sm text-muted-foreground">Performance breakdown across sites with ownership status</p>
+            </div>
+            <div className="space-y-3">
               {wasteMetrics.waste_by_facility.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Factory className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -743,33 +743,26 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
                   {wasteMetrics.waste_by_facility.map((facility) => (
                     <div
                       key={facility.facility_id}
-                      className={`p-4 rounded-lg border ${
+                      className={`p-4 rounded-[6px] border ${
                         facility.is_in_scope
-                          ? 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20'
-                          : 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20'
+                          ? '/50/20'
+                          : '/50/20'
                       }`}
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div>
                           <div className="flex items-center gap-2">
                             <h4 className="font-medium text-sm">{facility.facility_name}</h4>
-                            <Badge
-                              variant="outline"
-                              className={`text-xs ${
-                                facility.is_in_scope
-                                  ? 'bg-green-100 text-green-800 border-green-300'
-                                  : 'bg-amber-100 text-amber-800 border-amber-300'
-                              }`}
-                            >
+                            <StateChip tone="attention">
                               {facility.operational_control === 'owned' ? 'Owned' :
                                facility.operational_control === 'third_party' ? 'Contract' :
                                facility.operational_control === 'joint_venture' ? 'JV' : 'Unknown'}
-                            </Badge>
+                            </StateChip>
                             {!facility.is_in_scope && (
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger>
-                                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                    <AlertTriangle className="h-4 w-4 text-studio-attention" />
                                   </TooltipTrigger>
                                   <TooltipContent>
                                     <p className="text-xs max-w-48">
@@ -784,12 +777,9 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
                             {facility.percentage.toFixed(1)}% of total waste
                           </p>
                         </div>
-                        <Badge
-                          variant="outline"
-                          className={facility.diversion_rate >= 60 ? 'border-green-500 text-green-700' : 'border-amber-500 text-amber-700'}
-                        >
+                        <StateChip tone="attention">
                           {facility.diversion_rate.toFixed(0)}% diverted
-                        </Badge>
+                        </StateChip>
                       </div>
 
                       <div className="grid grid-cols-3 gap-4 text-center">
@@ -800,13 +790,13 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
                           <div className="text-xs text-muted-foreground">tonnes total</div>
                         </div>
                         <div>
-                          <div className={`text-lg font-bold ${facility.hazardous_kg > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          <div className={`text-lg font-bold ${facility.hazardous_kg > 0 ? 'text-studio-stale' : 'text-studio-good'}`}>
                             {(facility.hazardous_kg / 1000).toFixed(2)}
                           </div>
                           <div className="text-xs text-muted-foreground">tonnes hazardous</div>
                         </div>
                         <div>
-                          <div className="text-lg font-bold text-green-600">
+                          <div className="text-lg font-bold text-studio-good">
                             {facility.diversion_rate.toFixed(0)}%
                           </div>
                           <div className="text-xs text-muted-foreground">diversion rate</div>
@@ -818,11 +808,11 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
-          <Card className="bg-slate-50 dark:bg-slate-950/30">
-            <CardContent className="p-4 space-y-2">
+          <section className="border-t border-studio-hairline pt-5">
+            <div className="space-y-3">
               <h4 className="text-sm font-semibold">Standards Reference: Facility Scope</h4>
               <p className="text-xs text-muted-foreground">
                 <strong>GHG Protocol:</strong> Scope 3 Category 5 covers waste from operations under your operational control. Contract manufacturer waste falls under their own reporting boundary.
@@ -830,10 +820,11 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
               <p className="text-xs text-muted-foreground">
                 <strong>CSRD ESRS E5:</strong> Resource use and circular economy metrics should cover own operations. Upstream value chain waste is reported separately.
               </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </div>
+          </section>
+        </div>
+)}
+      
     </div>
   );
 }

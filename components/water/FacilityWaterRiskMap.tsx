@@ -25,14 +25,15 @@ const riskColors = {
   low: "#22c55e",
 };
 
+/** Water risk as a working tone. Filled pills read louder than the figures. */
 function getRiskBadgeVariant(riskLevel: 'high' | 'medium' | 'low') {
   switch (riskLevel) {
     case 'high':
-      return 'bg-red-100 text-red-700 border-red-200';
+      return 'border-studio-stale text-studio-stale';
     case 'medium':
-      return 'bg-amber-100 text-amber-700 border-amber-200';
+      return 'border-studio-attention text-studio-attention';
     case 'low':
-      return 'bg-green-100 text-green-700 border-green-200';
+      return 'border-studio-good text-studio-good';
   }
 }
 
