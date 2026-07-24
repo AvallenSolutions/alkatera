@@ -27,6 +27,7 @@ import PassportManagementPanel from "@/components/passport/PassportManagementPan
 import { ProductGuideTrigger } from "@/components/products/ProductGuide";
 import { DownloadLCAButton } from "@/components/products/DownloadLCAButton";
 import { useProductData } from "@/hooks/data/useProductData";
+import { deleteProduct } from "@/lib/products/delete-product";
 
 // Lazy-load ProductGuide (uses framer-motion, ~60KB) and only shows
 // for users who haven't dismissed the guide.
@@ -171,48 +172,9 @@ export default function ProductDashboardPage() {
 
   const handleDelete = async () => {
     try {
-      const supabase = getSupabaseBrowserClient();
-
-      // Guard against a silent cascade: multipack_components.component_product_id
-      // is ON DELETE CASCADE, so deleting a product would quietly remove it from
-      // every multipack that contains it (and leave those multipacks with a
-      // stale total). Block the delete and tell the user which multipacks to fix
-      // first.
-      const { data: memberships } = await supabase
-        .from("multipack_components")
-        .select("multipack:products!multipack_product_id(name)")
-        .eq("component_product_id", productId);
-      if (memberships && memberships.length > 0) {
-        const names = memberships
-          .map((m: any) => m.multipack?.name)
-          .filter(Boolean);
-        const list = names.length > 0 ? `: ${names.join(", ")}` : "";
-        toast.error(
-          `This product is part of ${memberships.length} multipack${memberships.length === 1 ? "" : "s"}${list}. Remove it from ${memberships.length === 1 ? "that multipack" : "those multipacks"} before deleting it.`,
-        );
-        throw new Error("Product is in use by a multipack");
-      }
-
-      // Delete materials first
-      await supabase
-        .from("product_materials")
-        .delete()
-        .eq("product_id", productId);
-
-      // Delete LCAs
-      await supabase
-        .from("product_carbon_footprints")
-        .delete()
-        .eq("product_id", productId);
-
-      // Delete product
-      const { error } = await supabase
-        .from("products")
-        .delete()
-        .eq("id", productId);
-
-      if (error) throw error;
-
+      // The guard against a silent multipack cascade lives in the shared
+      // helper, so the products list cannot forget it (it used to).
+      await deleteProduct(getSupabaseBrowserClient() as any, productId);
       toast.success("Product deleted successfully");
       router.push("/products");
     } catch (error: any) {

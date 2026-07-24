@@ -1,34 +1,27 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import dynamic from 'next/dynamic';
 import { useRosaPageContext } from "@/lib/rosa/RosaContextProvider";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { UniversalDropzone } from "@/components/layouts/UniversalDropzone";
 import { Eyebrow } from "@/components/studio/eyebrow";
 import { BigNumber } from "@/components/studio/big-number";
-import { StateChip } from "@/components/studio/state-chip";
 import { PillButton } from "@/components/studio/pill-button";
+import { MonoSwitch, MonoToggle } from "@/components/studio/mono-switch";
+import { ProductCard } from "@/components/products/ProductCard";
 import { FlagThresholdBanner } from '@/components/flag/FlagThresholdBanner';
 import { PageLoader } from "@/components/ui/page-loader";
-import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 // Round 4 (auto-research): import wizard is a modal (open-gated), so defer it.
 const WebsiteImportFlow = dynamic(() => import("@/components/products/WebsiteImportFlow").then((m) => m.WebsiteImportFlow), { ssr: false });
-import { Trash2, MoreVertical, Search, Copy, Loader2, Sparkles } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
+import { Search } from "lucide-react";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { duplicateProduct } from "@/lib/products";
+import { deleteProduct, ProductInUseError } from "@/lib/products/delete-product";
 import { useRouter } from "next/navigation";
-import { normaliseBoundary, getBoundaryLabel } from "@/lib/system-boundaries";
 import { useOrganization } from "@/lib/organizationContext";
 import { useSubscription } from "@/hooks/useSubscription";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,46 +35,22 @@ import {
 import { toast } from "sonner";
 // Round 4 (auto-research): recharts matrix only renders under the 'portfolio' view.
 const ProductPortfolioMatrix = dynamic(() => import("@/components/products/ProductPortfolioMatrix").then((m) => m.ProductPortfolioMatrix), { ssr: false });
-import { buildPortfolioPoints, sumFacilityVolume, type PortfolioResult } from "@/lib/products/portfolio";
-import { cn } from "@/lib/utils";
-import { ProvenanceChip } from "@/components/studio/provenance-chip";
-import { provenanceFromPcfStatus } from "@/lib/provenance";
+import { buildPortfolioPoints, type PortfolioResult } from "@/lib/products/portfolio";
+import type { CellarProductRow } from "@/app/api/cellar/products/route";
 
-interface ProductCarbonFootprint {
-  system_boundary: string | null;
-}
-
-interface Product {
-  id: string;
-  name: string;
-  product_description: string | null;
-  product_image_url: string | null;
-  functional_unit: string | null;
-  unit_size_value: number | null;
-  unit_size_unit: string | null;
-  // Legacy fields (kept for backwards compatibility)
-  functional_unit_type: string | null;
-  functional_unit_volume: number | null;
-  functional_unit_measure: string | null;
-  system_boundary: string;
-  product_carbon_footprints: ProductCarbonFootprint[];
-  /** Impact-weighted data quality score (0-100) from the latest completed PCF. */
-  dqi_score: number | null;
-  /** Per-unit climate footprint (kg CO2e) from the latest completed PCF. */
-  footprint_per_unit: number | null;
-  /** Latest PCF's raw status ('draft' | 'estimate' | 'completed' | ...), for the provenance chip. */
-  latest_pcf_status: string | null;
-  created_at: string;
-}
+const VIEWS = [
+  { value: 'list', label: 'List' },
+  { value: 'portfolio', label: 'Portfolio' },
+] as const;
 
 export default function ProductsPage() {
   const { currentOrganization } = useOrganization();
   const router = useRouter();
   const { isReadOnly } = useSubscription();
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<CellarProductRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [productToDelete, setProductToDelete] = useState<CellarProductRow | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -89,8 +58,43 @@ export default function ProductsPage() {
   const [portfolio, setPortfolio] = useState<PortfolioResult | null>(null);
   const [view, setView] = useState<'list' | 'portfolio'>('list');
   const [matchCount, setMatchCount] = useState(0);
-  const [findingMatches, setFindingMatches] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [findingMatches, setFindingMatches] = useState(false);
+
+  // One request: /api/cellar/products assembles the rows server-side. This
+  // page used to make four sequential browser round trips and stitch three
+  // Maps together before it could render anything.
+  const fetchProducts = useCallback(async () => {
+    if (!currentOrganization?.id) return;
+    try {
+      const params = new URLSearchParams({ organization_id: currentOrganization.id });
+      if (showArchived) params.set('archived', '1');
+      const res = await fetch(`/api/cellar/products?${params.toString()}`);
+      if (!res.ok) throw new Error('Could not load the products');
+      const body = await res.json();
+      const rows: CellarProductRow[] = body.products ?? [];
+      setProducts(rows);
+
+      setPortfolio(
+        buildPortfolioPoints(
+          rows
+            .filter((p) => p.footprint_per_unit != null)
+            .map((p) => ({
+              id: p.id,
+              name: p.name,
+              perUnitKgCo2e: p.footprint_per_unit,
+              annualVolume: p.annual_volume,
+              functionalUnit: p.unit_size_unit ?? p.functional_unit ?? null,
+            })),
+        ),
+      );
+    } catch (error) {
+      console.error("Error fetching products:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentOrganization?.id, showArchived]);
 
   useEffect(() => {
     if (currentOrganization?.id) {
@@ -98,26 +102,20 @@ export default function ProductsPage() {
     } else {
       setLoading(false);
     }
-  }, [currentOrganization?.id, showArchived]);
+  }, [currentOrganization?.id, fetchProducts]);
 
   // Tell Rosa what's on this list so she can answer questions like
   // "which of my products don't have an LCA yet?" or "what's my newest
   // product?" without making a separate query.
   const rosaSlice = useMemo(() => {
     if (!currentOrganization?.id) return null;
-    const productSummaries = products.map(p => {
-      const hasLca = (p.product_carbon_footprints || []).length > 0;
-      const boundaryLabels = (p.product_carbon_footprints || [])
-        .map(f => f.system_boundary)
-        .filter(Boolean);
-      return {
-        name: p.name,
-        functional_unit: p.functional_unit,
-        boundary: boundaryLabels.length > 0 ? boundaryLabels.join(', ') : null,
-        has_lca: hasLca,
-      };
-    });
-    const without = productSummaries.filter(p => !p.has_lca);
+    const productSummaries = products.map((p) => ({
+      name: p.name,
+      functional_unit: p.functional_unit,
+      boundary: p.pcf_boundary,
+      has_lca: p.latest_pcf_status != null,
+    }));
+    const without = productSummaries.filter((p) => !p.has_lca);
     return {
       id: 'products-list',
       label: `Products list (${products.length})`,
@@ -135,121 +133,7 @@ export default function ProductsPage() {
 
   useRosaPageContext(rosaSlice);
 
-  const fetchProducts = async () => {
-    try {
-      let query = supabase
-        .from("products")
-        .select("*")
-        // Only true products belong in this list — hospitality meals/drinks/room
-        // nights reuse the products table but are surfaced under Hospitality.
-        .eq("product_kind", "product")
-        .eq("organization_id", currentOrganization!.id);
-      // Hide archived products by default (archived_at is the real archive flag).
-      if (!showArchived) query = query.is("archived_at", null);
-      const { data, error } = await query
-        .order("created_at", { ascending: false })
-        .limit(200);
-
-      if (error) throw error;
-
-      // Fetch the latest system_boundary from product_carbon_footprints for each product
-      const productIds = (data || []).map((p: any) => p.id);
-      const { data: pcfData } = productIds.length > 0
-        ? await supabase
-            .from("product_carbon_footprints")
-            .select("product_id, system_boundary")
-            .in("product_id", productIds)
-            .not("system_boundary", "is", null)
-            .order("created_at", { ascending: false })
-        : { data: [] };
-
-      // Build a map of product_id -> latest PCF boundary
-      const pcfBoundaryMap = new Map<string, string>();
-      for (const pcf of pcfData || []) {
-        // First entry per product_id wins (ordered by created_at desc)
-        if (pcf.product_id && !pcfBoundaryMap.has(String(pcf.product_id))) {
-          pcfBoundaryMap.set(String(pcf.product_id), pcf.system_boundary);
-        }
-      }
-
-      // Latest PCF status per product, regardless of value — feeds the
-      // provenance chip via lib/provenance's provenanceFromPcfStatus.
-      // Separate from dqiData below, which only ever fetches completed PCFs.
-      const { data: pcfStatusData } = productIds.length > 0
-        ? await supabase
-            .from("product_carbon_footprints")
-            .select("product_id, status")
-            .in("product_id", productIds)
-            .order("created_at", { ascending: false })
-        : { data: [] };
-      const pcfStatusMap = new Map<string, string | null>();
-      for (const pcf of pcfStatusData || []) {
-        if (pcf.product_id && !pcfStatusMap.has(String(pcf.product_id))) {
-          pcfStatusMap.set(String(pcf.product_id), pcf.status ?? null);
-        }
-      }
-
-      // Fetch each product's data quality score (DQI) from its completed PCF.
-      // dqi_score is the impact-weighted confidence across all materials,
-      // written by the aggregator on every calculation.
-      // Completed PCFs carry the DQI plus the per-unit climate figure and the
-      // facility detail we sum into an annual volume for the portfolio matrix.
-      // JSON-path selects keep the payload slim (no full aggregated_impacts).
-      const { data: dqiData } = productIds.length > 0
-        ? await supabase
-            .from("product_carbon_footprints")
-            .select(
-              "product_id, dqi_score, status, perUnit:aggregated_impacts->climate_change_gwp100, facilityDetail:aggregated_impacts->facility_detail"
-            )
-            .in("product_id", productIds)
-            .eq("status", "completed")
-            .order("created_at", { ascending: false })
-        : { data: [] };
-
-      const dqiMap = new Map<string, number>();
-      const perUnitMap = new Map<string, number>();
-      const volumeMap = new Map<string, number>();
-      for (const pcf of dqiData || []) {
-        const pid = pcf.product_id ? String(pcf.product_id) : null;
-        if (!pid || dqiMap.has(pid) || perUnitMap.has(pid)) continue; // first (latest) per product wins
-        if (pcf.dqi_score != null) dqiMap.set(pid, Number(pcf.dqi_score));
-        if (pcf.perUnit != null) perUnitMap.set(pid, Number(pcf.perUnit));
-        volumeMap.set(pid, sumFacilityVolume(pcf.facilityDetail as any));
-      }
-
-      const productsWithMeta = (data || []).map((p: any) => ({
-        ...p,
-        product_carbon_footprints: pcfBoundaryMap.has(String(p.id))
-          ? [{ system_boundary: pcfBoundaryMap.get(String(p.id))! }]
-          : [],
-        dqi_score: dqiMap.get(String(p.id)) ?? null,
-        footprint_per_unit: perUnitMap.get(String(p.id)) ?? null,
-        latest_pcf_status: pcfStatusMap.get(String(p.id)) ?? null,
-      }));
-      setProducts(productsWithMeta);
-
-      // Portfolio matrix data: only products with a completed footprint.
-      setPortfolio(
-        buildPortfolioPoints(
-          productsWithMeta
-            .filter((p: any) => perUnitMap.has(String(p.id)))
-            .map((p: any) => ({
-              id: p.id,
-              name: p.name,
-              perUnitKgCo2e: perUnitMap.get(String(p.id)) ?? null,
-              annualVolume: volumeMap.get(String(p.id)) ?? null,
-              functionalUnit: p.unit_size_unit ?? p.functional_unit ?? null,
-            }))
-        )
-      );
-    } catch (error) {
-      console.error("Error fetching products:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadMatchCount = async () => {
+  const loadMatchCount = useCallback(async () => {
     if (!currentOrganization?.id) return;
     try {
       const res = await fetch(`/api/products/ingredient-matches?organization_id=${currentOrganization.id}`);
@@ -258,12 +142,11 @@ export default function ProductsPage() {
     } catch {
       // non-fatal
     }
-  };
+  }, [currentOrganization?.id]);
 
   useEffect(() => {
     loadMatchCount();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentOrganization?.id]);
+  }, [loadMatchCount]);
 
   const findSupplierMatches = async () => {
     if (!currentOrganization?.id) return;
@@ -292,53 +175,14 @@ export default function ProductsPage() {
     }
   };
 
-  const formatFunctionalUnit = (product: Product) => {
-    // Prefer the structured unit_size fields (updated by the edit form)
-    if (product.unit_size_value && product.unit_size_unit) {
-      return `${product.unit_size_value} ${product.unit_size_unit}`;
-    }
-
-    // Fallback: legacy functional_unit text field
-    if (product.functional_unit) {
-      return product.functional_unit;
-    }
-
-    // Legacy fallback: check old functional_unit_type fields
-    if (product.functional_unit_type) {
-      return `${product.functional_unit_volume || "?"} ${product.functional_unit_measure || ""} ${product.functional_unit_type}`;
-    }
-
-    return "Not specified";
-  };
-
-  const getEffectiveBoundary = (product: Product): string => {
-    // Prefer the boundary set by the LCA wizard (stored in product_carbon_footprints)
-    // over the products table default which may never have been updated
-    const pcfBoundary = product.product_carbon_footprints?.find(
-      (pcf) => pcf.system_boundary
-    )?.system_boundary;
-    return pcfBoundary || product.system_boundary || "cradle_to_gate";
-  };
-
-  const boundaryLabel = (boundary: string) => {
-    // Normalise both DB enum format (underscores) and PCF format (hyphens),
-    // plus the capitalised values older rows carry.
-    return getBoundaryLabel(normaliseBoundary(boundary));
-  };
-
-  /** Format a per-unit footprint figure for the card number. */
-  const formatFootprint = (value: number) =>
-    value.toLocaleString("en-GB", { maximumFractionDigits: 2 });
-
-  const handleDeleteClick = (product: Product, e: React.MouseEvent) => {
+  const handleDeleteClick = (product: CellarProductRow, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setProductToDelete(product);
     setDeleteDialogOpen(true);
   };
 
-  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
-  const handleDuplicateClick = async (product: Product, e: React.MouseEvent) => {
+  const handleDuplicateClick = async (product: CellarProductRow, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (duplicatingId) return;
@@ -357,24 +201,23 @@ export default function ProductsPage() {
 
   const handleDeleteConfirm = async () => {
     if (!productToDelete) return;
-
     setIsDeleting(true);
-
     try {
-      const { error } = await supabase
-        .from("products")
-        .delete()
-        .eq("id", productToDelete.id);
-
-      if (error) throw error;
-
-      toast.success(`Product "${productToDelete.name}" deleted successfully`);
+      // The shared helper carries the multipack guard and clears materials and
+      // footprints first. This page used to delete the product row on its own,
+      // which cascaded it out of every multipack that contained it.
+      await deleteProduct(getSupabaseBrowserClient() as any, productToDelete.id);
+      toast.success(`"${productToDelete.name}" deleted.`);
       await fetchProducts();
       setDeleteDialogOpen(false);
       setProductToDelete(null);
     } catch (error: any) {
       console.error("Error deleting product:", error);
-      toast.error(error.message || "Failed to delete product");
+      toast.error(
+        error instanceof ProductInUseError
+          ? error.message
+          : error.message || "Failed to delete product",
+      );
     } finally {
       setIsDeleting(false);
     }
@@ -382,13 +225,12 @@ export default function ProductsPage() {
 
   const filteredProducts = products.filter((product) => {
     if (!searchQuery) return true;
-
     const query = searchQuery.toLowerCase();
     return (
       product.name.toLowerCase().includes(query) ||
       product.product_description?.toLowerCase().includes(query) ||
       product.functional_unit?.toLowerCase().includes(query) ||
-      product.functional_unit_type?.toLowerCase().includes(query)
+      product.unit_size_unit?.toLowerCase().includes(query)
     );
   });
 
@@ -396,12 +238,15 @@ export default function ProductsPage() {
     return <PageLoader message="Loading products..." />;
   }
 
+  // Compose is the front door: pick a liquid, pick a pack, and the product
+  // inherits the recipe and the specs rather than asking for forty fields
+  // again. The long form stays one quiet link away for the edge cases.
   const addProduct = isReadOnly ? (
     <PillButton variant="room" href="/complete-subscription">
       Subscribe to add
     </PillButton>
   ) : (
-    <PillButton variant="room" href="/products/new">
+    <PillButton variant="room" href="/products/new/compose">
       Add product
     </PillButton>
   );
@@ -464,14 +309,14 @@ export default function ProductsPage() {
                     Bulk upload with our template
                   </span>
                 </Link>
+                <Link href="/products/new" className={rowClasses} onClick={() => setBringInOpen(false)}>
+                  <span className="block text-sm font-medium text-foreground">One from scratch</span>
+                  <span className="block text-xs text-muted-foreground">
+                    The long form, for anything unusual
+                  </span>
+                </Link>
               </PopoverContent>
             </Popover>
-            {products.length > 0 && (
-              <PillButton variant="outline" onClick={findSupplierMatches} disabled={findingMatches}>
-                {findingMatches ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                Find supplier matches
-              </PillButton>
-            )}
             {addProduct}
           </div>
         </div>
@@ -493,45 +338,38 @@ export default function ProductsPage() {
       )}
 
       {products.length > 0 && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-3 border-b border-studio-hairline sm:flex-row sm:items-center">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search products by name, description, or functional unit..."
+            <Search
+              className="pointer-events-none absolute left-0 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <input
+              type="search"
+              placeholder="SEARCH THE RANGE"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              aria-label="Search the range"
+              className="w-full bg-transparent py-2 pl-6 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-foreground placeholder:text-muted-foreground focus:outline-none [&::-webkit-search-cancel-button]:appearance-none"
             />
           </div>
-          <div className="flex items-center gap-5">
-            {(['list', 'portfolio'] as const).map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setView(v)}
-                className={cn(
-                  'relative py-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] transition-opacity duration-150 ease-studio',
-                  view === v ? 'opacity-100' : 'opacity-60 hover:opacity-100',
-                )}
-              >
-                {v}
-                {view === v && (
-                  <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] bg-room-accent" />
-                )}
-              </button>
-            ))}
+          {/* Scrolls rather than clips: on a 375px screen the four controls do
+              not fit, and the last one was cut off at the edge. */}
+          <div className="-mx-4 flex items-center gap-5 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
+            <MonoSwitch options={VIEWS} value={view} onChange={setView} label="View" />
+            <MonoToggle label="Archived" pressed={showArchived} onChange={setShowArchived} />
+            {/* Discovery is one quiet act, not a header button: the nudge row
+                above is the loud form, and it only appears when there is
+                something to review. */}
+            <button
+              type="button"
+              onClick={findSupplierMatches}
+              disabled={findingMatches}
+              className="whitespace-nowrap py-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground transition-opacity duration-150 ease-studio hover:text-foreground disabled:opacity-50"
+            >
+              {findingMatches ? 'Looking…' : 'Find supplier matches'}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowArchived((v) => !v)}
-            className={cn(
-              'rounded-md border border-border/60 px-3 py-1.5 text-xs font-medium transition-colors',
-              showArchived ? 'bg-[#ccff00]/20 text-foreground' : 'text-muted-foreground',
-            )}
-          >
-            {showArchived ? 'Hide archived' : 'Show archived'}
-          </button>
         </div>
       )}
 
@@ -544,113 +382,26 @@ export default function ProductsPage() {
       {products.length === 0 ? (
         <div className="space-y-4 py-6">
           <p className="max-w-md text-sm text-muted-foreground">
-            No products yet. Add your first one, or bring a batch in from a website or spreadsheet.
+            Nothing in the cellar yet. Add your first product, or bring a batch in from a website or
+            spreadsheet.
           </p>
           {addProduct}
         </div>
       ) : view !== 'list' ? null : filteredProducts.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No products match &ldquo;{searchQuery}&rdquo;. Try a different search.
+          Nothing matches &ldquo;{searchQuery}&rdquo;. Try a different search.
         </p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProducts.map((product) => {
-            const hasFootprint = product.footprint_per_unit != null;
-            const hasPcf = (product.product_carbon_footprints || []).length > 0;
-            const status: { tone: 'good' | 'attention' | 'quiet'; label: string } = hasFootprint
-              ? { tone: 'good', label: 'LCA complete' }
-              : hasPcf
-                ? { tone: 'attention', label: 'In progress' }
-                : { tone: 'quiet', label: 'No LCA yet' };
-            return (
-              <div key={product.id} className="group relative">
-                <div className="absolute right-3 top-3 z-10 opacity-0 transition-opacity group-hover:opacity-100">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 border border-studio-hairline bg-studio-cream"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={(e) => handleDuplicateClick(product, e)}
-                        disabled={duplicatingId === product.id}
-                      >
-                        <Copy className="h-4 w-4 mr-2" />
-                        {duplicatingId === product.id ? 'Duplicating…' : 'Duplicate product'}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-studio-stale focus:text-studio-stale"
-                        onClick={(e) => handleDeleteClick(product, e)}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete product
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-
-                <Link
-                  href={`/products/${product.id}`}
-                  className="block rounded-[6px] border border-studio-hairline bg-studio-cream p-4 transition-colors duration-150 ease-studio hover:border-room-accent"
-                >
-                  {product.product_image_url ? (
-                    <div className="mb-4 flex aspect-video items-center justify-center overflow-hidden rounded-[4px] bg-studio-paper">
-                      <img
-                        src={product.product_image_url}
-                        alt={product.name}
-                        className="max-h-full max-w-full object-contain"
-                      />
-                    </div>
-                  ) : (
-                    <div className="mb-4 flex aspect-video items-center justify-center rounded-[4px] border border-studio-hairline bg-studio-paper">
-                      <span className="font-display text-3xl font-bold text-muted-foreground/40">
-                        {product.name.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="flex items-start gap-2">
-                    <h3 className="line-clamp-2 font-display text-[15px] font-semibold text-foreground">
-                      {product.name}
-                    </h3>
-                    {(product as any).archived_at && <StateChip tone="quiet">Archived</StateChip>}
-                  </div>
-                  <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-                    {formatFunctionalUnit(product)}
-                  </p>
-
-                  <div className="mt-4">
-                    {hasFootprint ? (
-                      <BigNumber
-                        size="panel"
-                        value={formatFootprint(product.footprint_per_unit!)}
-                        label="kg CO₂e / unit"
-                      />
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Footprint not calculated yet.</p>
-                    )}
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between border-t border-studio-hairline pt-3">
-                    <div className="flex items-center gap-2">
-                      <StateChip tone={status.tone}>{status.label}</StateChip>
-                      {product.latest_pcf_status && (
-                        <ProvenanceChip provenance={provenanceFromPcfStatus(product.latest_pcf_status)} compact />
-                      )}
-                    </div>
-                    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                      {boundaryLabel(getEffectiveBoundary(product))}
-                    </span>
-                  </div>
-                </Link>
-              </div>
-            );
-          })}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredProducts.map((product) => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              duplicating={duplicatingId === product.id}
+              onDuplicate={handleDuplicateClick}
+              onDelete={handleDeleteClick}
+            />
+          ))}
         </div>
       )}
 
@@ -672,7 +423,8 @@ export default function ProductsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete product</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete &quot;{productToDelete?.name}&quot;? This action cannot be undone and will remove all associated data including materials, LCA results, and calculations.
+              Delete &quot;{productToDelete?.name}&quot;? This cannot be undone. Its ingredients,
+              packaging and footprints go with it.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

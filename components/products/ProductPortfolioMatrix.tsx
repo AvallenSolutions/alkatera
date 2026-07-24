@@ -21,6 +21,7 @@ import {
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { STUDIO } from '@/components/studio/theme';
 import { QUADRANT_LABELS, type PortfolioResult } from '@/lib/products/portfolio';
 
 const CORNERS: Array<{ pos: string; label: string }> = [
@@ -114,9 +115,12 @@ export function ProductPortfolioMatrix({ data }: { data: PortfolioResult }) {
                 />
                 <Scatter
                   data={points}
-                  fill="#2B46C0"
+                  // The cellar's ink, not the workbench's: this chart sat in
+                  // cobalt on a plum page. A hex literal rather than the room
+                  // variable because var() does not resolve in SVG attributes.
+                  fill={STUDIO.plum}
                   fillOpacity={0.55}
-                  stroke="#2B46C0"
+                  stroke={STUDIO.plum}
                   onClick={(p: any) => p?.id != null && router.push(`/products/${p.id}`)}
                   className="cursor-pointer"
                 />

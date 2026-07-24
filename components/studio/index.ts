@@ -10,6 +10,7 @@ export { StudioShell } from './studio-shell';
 export { RoomBand } from './room-band';
 export { InkBand } from './ink-band';
 export { MonoTabs } from './mono-tabs';
+export { MonoSwitch, MonoToggle } from './mono-switch';
 export { Statement } from './statement';
 export { Eyebrow } from './eyebrow';
 export { FieldLabel } from './field-label';
