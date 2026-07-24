@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Command,
@@ -29,24 +28,30 @@ import {
   removeMultipackComponent,
 } from "@/lib/multipacks";
 import { supabase } from "@/lib/supabaseClient";
-import { LcaStalenessBanner } from "@/components/products/LcaStalenessBanner";
 import type { MultipackComponent, Product } from "@/lib/types/products";
 
 interface MultipackContentsEditorProps {
   /** The multipack product being edited. */
   productId: string;
   organizationId: string;
+  /**
+   * Called after any change to the contents. The staleness banner lives on the
+   * hub now rather than in here, so the hub needs telling that the footprint
+   * has just gone out of date.
+   */
+  onChanged?: () => void;
 }
 
-export function MultipackContentsEditor({ productId, organizationId }: MultipackContentsEditorProps) {
+export function MultipackContentsEditor({
+  productId,
+  organizationId,
+  onChanged,
+}: MultipackContentsEditorProps) {
   const [components, setComponents] = useState<MultipackComponent[]>([]);
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  // Bumped after every successful mutation so the staleness banner remounts and
-  // re-checks the server (it also has a value we key on to force a fresh check).
-  const [bannerKey, setBannerKey] = useState(0);
   // Tracks which component rows have an in-flight mutation so we can disable
   // their controls without freezing the whole card.
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
@@ -110,7 +115,7 @@ export function MultipackContentsEditor({ productId, organizationId }: Multipack
     loadData();
   }, [loadData]);
 
-  const markStale = () => setBannerKey((k) => k + 1);
+  const markStale = () => onChanged?.();
 
   const handleAdd = async (product: Product) => {
     setSearchOpen(false);
@@ -190,32 +195,25 @@ export function MultipackContentsEditor({ productId, organizationId }: Multipack
 
   return (
     <div className="space-y-4">
-      {/* After any change this flags the LCA as out of date and offers a one-click
-          recalculate. Keyed on bannerKey so a mutation forces a fresh check. */}
-      <LcaStalenessBanner
-        key={bannerKey}
-        productId={productId}
-        organizationId={organizationId}
-      />
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CardTitle className="flex items-center gap-2">
-                <Layers className="h-5 w-5" />
-                Multipack Contents
-              </CardTitle>
-              {!isLoading && (
-                <Badge variant="secondary">{totalUnits} unit{totalUnits !== 1 ? "s" : ""}</Badge>
-              )}
-            </div>
-          </div>
-          <CardDescription>
-            Add or remove products and change quantities. Recalculate the LCA after any change.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      {/* The staleness banner used to render here as well. On the old tabbed
+          hub the two were never on screen together (one sat under Overview,
+          this one under Specification); the one-page hub put them side by
+          side. The hub owns it now and `onChanged` tells it to re-check. */}
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-baseline gap-x-3">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+            The contents
+          </p>
+          {!isLoading && (
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-foreground">
+              {totalUnits} unit{totalUnits !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Add or remove products and change quantities. Recalculate after any change.
+        </p>
+        <div className="space-y-4">
           {/* Add product picker */}
           <Popover open={searchOpen} onOpenChange={setSearchOpen}>
             <PopoverTrigger asChild>
@@ -407,17 +405,17 @@ export function MultipackContentsEditor({ productId, organizationId }: Multipack
 
           {/* Summary */}
           {!isLoading && components.length > 0 && (
-            <div className="flex items-center justify-between pt-4 border-t">
-              <div className="text-sm text-muted-foreground">
+            <div className="flex items-center justify-between border-t border-studio-hairline pt-4">
+              <div className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
                 {components.length} product{components.length !== 1 ? "s" : ""}
               </div>
-              <div className="font-medium">
-                Total: {totalUnits} unit{totalUnits !== 1 ? "s" : ""}
+              <div className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-foreground">
+                {totalUnits} unit{totalUnits !== 1 ? "s" : ""} in all
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

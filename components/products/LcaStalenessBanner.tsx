@@ -15,8 +15,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Loader2, RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { PillButton } from '@/components/studio/pill-button';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { recalculateProductLca } from '@/lib/utils/recalculate-product-lca';
 
@@ -86,35 +85,36 @@ export function LcaStalenessBanner({ productId, organizationId, onRecalculated }
 
   if (justRecalculated && !stale) {
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300">
-        <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
-        LCA recalculated. Your reports are up to date.
-      </div>
+      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-good">
+        Recalculated. Your reports are up to date.
+      </p>
     );
   }
 
   if (!stale && !note) return null;
 
   const reasonText = reasons.length > 0
-    ? `Changes to ${reasons.join(', ')} have not been reflected in the LCA yet.`
-    : 'Some inputs have changed since the last LCA calculation.';
+    ? `Changes to ${reasons.join(', ')} have not reached it yet.`
+    : 'Some inputs have changed since it was last calculated.';
 
+  // A hairline attention row, not a yellow box. This is a true thing worth
+  // saying, not an alarm: the figure above is simply older than the recipe.
   return (
-    <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/20">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-start gap-2 text-sm text-amber-900 dark:text-amber-300">
-          <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-          <span>
-            This product&apos;s LCA is out of date. {reasonText} Recalculate so your reports and
-            footprint are up to date.
-          </span>
+    <div className="border-y border-studio-hairline py-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+        <div className="min-w-0 flex-1">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-attention">
+            Out of date
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {reasonText} Recalculate so the footprint and the reports agree.
+          </p>
+          {note && <p className="mt-1 text-xs text-muted-foreground">{note}</p>}
         </div>
-        <Button size="sm" onClick={recalculate} disabled={busy} className="gap-2">
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          {busy ? 'Recalculating…' : 'Recalculate LCA'}
-        </Button>
+        <PillButton variant="outline" onClick={recalculate} disabled={busy}>
+          {busy ? 'Recalculating…' : 'Recalculate'}
+        </PillButton>
       </div>
-      {note && <p className="mt-2 pl-6 text-xs text-amber-800 dark:text-amber-400">{note}</p>}
     </div>
   );
 }

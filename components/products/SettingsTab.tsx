@@ -54,7 +54,7 @@ export function SettingsTab({ productName, onArchive, onDelete }: SettingsTabPro
   return (
     <div className="max-w-3xl space-y-10">
       <div className="flex items-center gap-3">
-        <Eyebrow>Settings</Eyebrow>
+        <Eyebrow>Housekeeping</Eyebrow>
         <StateChip tone="attention">Careful</StateChip>
       </div>
 

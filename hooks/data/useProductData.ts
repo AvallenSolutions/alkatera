@@ -79,11 +79,27 @@ export interface Product {
   passport_settings?: Record<string, unknown> | null;
 }
 
+/** The barrel, cask or tank a product matures in, when it matures at all. */
+export interface ProductMaturation {
+  barrel_type?: string | null;
+  climate_zone?: string | null;
+  maturation_years?: number | null;
+  angels_share_percent?: number | null;
+}
+
 export interface ProductData {
   product: Product | null;
   ingredients: ProductIngredient[];
   packaging: ProductPackaging[];
+  /** Completed footprints, newest first. The reports list and the map read this. */
   lcaReports: ProductLCA[];
+  /**
+   * The newest footprint of ANY status, so an estimate shows a number rather
+   * than a blank. Every product is born with a footprint; `lcaReports` alone
+   * would say "not calculated yet" about a figure the dossier is displaying.
+   */
+  latestPcf: ProductLCA | null;
+  maturation: ProductMaturation | null;
   isHealthy: boolean;
   loading: boolean;
   error: string | null;
@@ -95,6 +111,8 @@ export function useProductData(productId: string | undefined) {
     ingredients: [],
     packaging: [],
     lcaReports: [],
+    latestPcf: null,
+    maturation: null,
     isHealthy: false,
     loading: true,
     error: null,
@@ -111,83 +129,81 @@ export function useProductData(productId: string | undefined) {
     try {
       const supabase = getSupabaseBrowserClient();
 
-      // Fetch product details
-      const { data: productData, error: productError } = await supabase
-        .from("products")
-        .select("*")
-        .eq("id", productId)
-        .maybeSingle();
+      const materialsFor = (type: "ingredient" | "packaging") =>
+        supabase
+          .from("product_materials")
+          .select(`
+            *,
+            supplier_products (
+              supplier_id,
+              suppliers (
+                name
+              )
+            )
+          `)
+          .eq("product_id", productId)
+          .eq("material_type", type);
+
+      // These five reads do not depend on one another, so they go together.
+      // They used to run in sequence, which meant the hub waited out five
+      // round trips before it could draw anything.
+      //
+      // The multipack component count is fetched unconditionally (it returns 0
+      // for a single SKU) rather than waiting on the product row to say whether
+      // this is a multipack. One cheap head-count buys the parallelism.
+      //
+      // PCFs are ordered by created_at, not updated_at: wizard auto-save bumps
+      // updated_at on older records, which would float a stale PCF to the top.
+      const [
+        { data: productData, error: productError },
+        { data: ingredientsData, error: ingredientsError },
+        { data: packagingData, error: packagingError },
+        { count: multipackCount, error: componentsError },
+        { data: pcfData, error: lcaError },
+        { data: maturationData },
+      ] = await Promise.all([
+        supabase.from("products").select("*").eq("id", productId).maybeSingle(),
+        materialsFor("ingredient"),
+        materialsFor("packaging"),
+        supabase
+          .from("multipack_components")
+          .select("id", { count: "exact", head: true })
+          .eq("multipack_product_id", productId),
+        supabase
+          .from("product_carbon_footprints")
+          .select("id, created_at, updated_at, system_boundary, aggregated_impacts, status")
+          .eq("product_id", productId)
+          .order("created_at", { ascending: false }),
+        // Folded in from SpecificationTab, which fetched it separately.
+        supabase
+          .from("maturation_profiles")
+          .select("barrel_type, climate_zone, maturation_years, angels_share_percent")
+          .eq("product_id", productId)
+          .maybeSingle(),
+      ]);
 
       if (productError) throw productError;
       if (!productData) {
         throw new Error("Product not found");
       }
-
-      // Fetch ingredients with supplier information
-      const { data: ingredientsData, error: ingredientsError } = await supabase
-        .from("product_materials")
-        .select(`
-          *,
-          supplier_products (
-            supplier_id,
-            suppliers (
-              name
-            )
-          )
-        `)
-        .eq("product_id", productId)
-        .eq("material_type", "ingredient");
-
       if (ingredientsError) throw ingredientsError;
-
-      // Fetch packaging with supplier information
-      const { data: packagingData, error: packagingError } = await supabase
-        .from("product_materials")
-        .select(`
-          *,
-          supplier_products (
-            supplier_id,
-            suppliers (
-              name
-            )
-          )
-        `)
-        .eq("product_id", productId)
-        .eq("material_type", "packaging");
-
       if (packagingError) throw packagingError;
-
-      // A multipack carries no ingredients of its own — its "contents" are its
-      // component products. Fetch the component count so readiness can key off
-      // that instead of ingredients (which a multipack never has).
-      let multipackComponentCount = 0;
-      if (productData.is_multipack) {
-        const { count, error: componentsError } = await supabase
-          .from("multipack_components")
-          .select("id", { count: "exact", head: true })
-          .eq("multipack_product_id", productId);
-        if (componentsError) {
-          console.warn("Error fetching multipack component count:", componentsError);
-        }
-        multipackComponentCount = count || 0;
+      if (componentsError) {
+        console.warn("Error fetching multipack component count:", componentsError);
       }
-
-      // Fetch LCA reports - filter by completed status and order by created_at
-      // to match passport fetch behavior and ensure consistency.
-      // Use created_at (not updated_at) to ensure the newest calculation is always
-      // selected. updated_at can be bumped by wizard auto-save on older records,
-      // causing a stale PCF to appear "newer" than the latest calculation.
-      const { data: lcaData, error: lcaError } = await supabase
-        .from("product_carbon_footprints")
-        .select("id, created_at, updated_at, system_boundary, aggregated_impacts, status")
-        .eq("product_id", productId)
-        .eq("status", "completed")
-        .order("created_at", { ascending: false });
-
       // LCA error is non-critical
       if (lcaError) {
         console.warn("Error fetching LCA data:", lcaError);
       }
+
+      const multipackComponentCount = multipackCount || 0;
+      const allPcfs = (pcfData || []) as ProductLCA[];
+      const lcaData = allPcfs.filter((p) => p.status === "completed");
+      // The newest footprint whatever its status, but only if it actually
+      // carries a figure: a bare draft must not blank a number an earlier
+      // completed run produced.
+      const latestPcf =
+        allPcfs.find((p) => p.aggregated_impacts?.climate_change_gwp100 != null) ?? null;
 
       // Transform data to flatten supplier information
       const transformedIngredients = (ingredientsData || []).map((item: any) => ({
@@ -214,7 +230,9 @@ export function useProductData(productId: string | undefined) {
         product: productData,
         ingredients: transformedIngredients,
         packaging: transformedPackaging,
-        lcaReports: lcaData || [],
+        lcaReports: lcaData,
+        latestPcf,
+        maturation: (maturationData as ProductMaturation) ?? null,
         isHealthy,
         loading: false,
         error: null,

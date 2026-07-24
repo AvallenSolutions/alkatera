@@ -1,50 +1,35 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PageLoader } from "@/components/ui/page-loader";
 import { Statement } from "@/components/studio/statement";
 import { BigNumber } from "@/components/studio/big-number";
 import { StateChip } from "@/components/studio/state-chip";
+import { ProvenanceChip } from "@/components/studio/provenance-chip";
 import { PillButton } from "@/components/studio/pill-button";
-import { Panel } from "@/components/studio/panel";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { provenanceFromPcfStatus } from "@/lib/provenance";
 import { BrewwLinkBadge } from "@/components/products/BrewwLinkBadge";
 import { BrewwSuggestionBanner } from "@/components/products/BrewwSuggestionBanner";
-import { OverviewTab } from "@/components/products/OverviewTab";
 import { LcaStalenessBanner } from "@/components/products/LcaStalenessBanner";
-import { SpecificationTab } from "@/components/products/SpecificationTab";
+import { FootprintStory } from "@/components/products/hub/FootprintStory";
+import { CompositionSection } from "@/components/products/hub/CompositionSection";
+import { ProofSection } from "@/components/products/hub/ProofSection";
 import { MultipackContentsEditor } from "@/components/products/MultipackContentsEditor";
 import { MultipackPackagingSection } from "@/components/products/MultipackPackagingSection";
 import { FacilitiesTab } from "@/components/products/FacilitiesTab";
 import { SettingsTab } from "@/components/products/SettingsTab";
 import { EditProductForm } from "@/components/products/EditProductForm";
-import dynamic from "next/dynamic";
-import PassportManagementPanel from "@/components/passport/PassportManagementPanel";
-import { ProductGuideTrigger } from "@/components/products/ProductGuide";
-import { DownloadLCAButton } from "@/components/products/DownloadLCAButton";
 import { useProductData } from "@/hooks/data/useProductData";
 import { deleteProduct } from "@/lib/products/delete-product";
-
-// Lazy-load ProductGuide (uses framer-motion, ~60KB) and only shows
-// for users who haven't dismissed the guide.
-const ProductGuide = dynamic(
-  () => import("@/components/products/ProductGuide").then(mod => ({ default: mod.ProductGuide })),
-  { ssr: false }
-);
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { useOrganization } from "@/lib/organizationContext";
+import { getBoundaryLabel, normaliseBoundary } from "@/lib/system-boundaries";
 import { toast } from "sonner";
-
-/** Quiet mono tab trigger: uppercase, tracked, 3px underline when active. */
-const MONO_TAB =
-  'relative -mb-px rounded-none border-b-[3px] border-transparent bg-transparent px-0 pb-2.5 pt-1 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim shadow-none transition-colors data-[state=active]:border-room-accent data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none';
-
-const MONO_TAB_LIST =
-  'h-auto w-full justify-start gap-6 overflow-x-auto rounded-none border-b border-border bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
 
 /**
  * Editing ingredients or packaging updates product_materials but does NOT
@@ -114,27 +99,79 @@ function useRecipeStale(productId: string | undefined): boolean {
   return stale;
 }
 
+/**
+ * A product's one-page story.
+ *
+ * This page used to be five shadcn tabs (Overview, Specification, Facilities,
+ * Passport, Settings) under a studio header: the old app in new clothes, which
+ * the design canon names as the thing never to do. Nothing here is a mode, so
+ * nothing here is a tab. It reads down the page: what it is, what its
+ * footprint says, what it is made of, where it is made, what it can show the
+ * world, and the housekeeping at the foot.
+ *
+ * The number appears here and on the dossier, deliberately: the hub says what
+ * the footprint IS, the dossier says where every part of it came from and lets
+ * it be corrected.
+ */
 export default function ProductDashboardPage() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   const productId = params.id as string;
 
-  const { product, ingredients, packaging, lcaReports, isHealthy, loading, error, refetch } = useProductData(productId);
+  const {
+    product,
+    ingredients,
+    packaging,
+    lcaReports,
+    latestPcf,
+    maturation,
+    isHealthy,
+    loading,
+    error,
+    refetch,
+  } = useProductData(productId);
   const { currentOrganization } = useOrganization();
   const recipeStale = useRecipeStale(productId);
+  const facilitiesRef = useRef<HTMLDivElement>(null);
 
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || "overview");
   const [showEditDialog, setShowEditDialog] = useState(false);
+  // Bumped when something on this page invalidates the stored footprint, so the
+  // staleness banner remounts and re-checks rather than waiting for a refocus.
+  const [stalenessKey, setStalenessKey] = useState(0);
 
-  const latestLca = lcaReports[0];
-  const footprint = latestLca?.aggregated_impacts?.climate_change_gwp100;
+  const footprint = latestPcf?.aggregated_impacts?.climate_change_gwp100;
+  const boundary = latestPcf?.system_boundary ?? (product as any)?.system_boundary ?? null;
 
-  // The dossier is where a footprint is read and corrected. The wizard still
-  // exists for the rare expert who wants every ISO field, reached through
-  // "Open the full record" on the dossier itself, but it is no longer the
-  // front door: walking ten to fourteen steps should not be the price of
-  // seeing your own number.
+  // /company/production-allocation deep-links here with ?tab=facilities, from
+  // when facilities was a tab. It is a section now, so the link scrolls.
+  //
+  // Two things make a single scroll unreliable: the section is gated on the
+  // organisation resolving, so the ref is still null on the first render after
+  // loading finishes, and the sections above it fetch their own data, so the
+  // page grows underneath us afterwards. So: wait for the element, then settle
+  // once more when the async content above has landed.
+  // Deep links land on the section through the URL fragment (#facilities), which
+  // the browser and the router already know how to honour, so there is no scroll
+  // code here. `?tab=facilities` is the older form, kept working by turning it
+  // into that fragment once the section exists to receive it.
+  const deepLinked = useRef(false);
+  useEffect(() => {
+    if (loading || deepLinked.current) return;
+    if (searchParams.get("tab") !== "facilities") return;
+    if (!facilitiesRef.current) return;
+    deepLinked.current = true;
+    // Waits for the sections above to finish arriving, otherwise the anchor
+    // moves out from under the jump.
+    const settle = window.setTimeout(() => {
+      facilitiesRef.current?.scrollIntoView({ block: "start" });
+    }, 900);
+    return () => window.clearTimeout(settle);
+  }, [loading, searchParams, currentOrganization]);
+
+  // "Open" rather than "Create": a product with a recipe already has an
+  // estimated footprint, so there is nothing to create, only something to look
+  // at and correct.
   const handleOpenFootprint = () => {
     if (!isHealthy) {
       toast.error(
@@ -202,14 +239,20 @@ export default function ProductDashboardPage() {
     );
   }
 
-  // "Open" rather than "Create": with Phase 4 a product with a recipe already
-  // has an estimated footprint, so there is nothing to create, only something
-  // to look at and correct.
   const ctaLabel = footprint != null ? "Open the footprint" : "Start the footprint";
 
+  const metaFacts = [
+    product.sku ? `SKU ${product.sku}` : null,
+    product.product_category,
+    product.unit_size_value && product.unit_size_unit
+      ? `${product.unit_size_value} ${product.unit_size_unit}`
+      : null,
+    boundary ? getBoundaryLabel(normaliseBoundary(boundary)) : null,
+  ].filter(Boolean);
+
   return (
-    <div className="container mx-auto max-w-6xl px-6 py-8">
-      <div data-guide="product-header">
+    <div className="container mx-auto max-w-4xl px-6 py-8">
+      <div data-guide="product-statement">
         <div className="mb-8">
           <Link
             href="/products"
@@ -224,7 +267,7 @@ export default function ProductDashboardPage() {
             {product.product_image_url ? (
               <Image
                 src={product.product_image_url}
-                alt={product.name}
+                alt=""
                 width={64}
                 height={64}
                 className="h-full w-full object-contain"
@@ -243,53 +286,47 @@ export default function ProductDashboardPage() {
                   size="display"
                   tone="room"
                   value={footprint.toFixed(2)}
-                  label="KG CO₂E"
+                  label="KG CO₂E PER UNIT"
                 />
               )}
             </Statement>
           </div>
         </div>
 
+        {/* Provenance is the status vocabulary. The old chip row said "LCA
+            complete" beside a dossier reading "0% confirmed"; only one of them
+            could be right. Everything left here is actionable. */}
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-          {product.sku && (
+          {metaFacts.length > 0 && (
             <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
-              SKU {product.sku}
+              {metaFacts.join(" · ")}
             </span>
           )}
-          {product.product_category && (
-            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
-              {product.product_category}
-            </span>
+          {latestPcf?.status && (
+            <ProvenanceChip provenance={provenanceFromPcfStatus(latestPcf.status)} />
           )}
           {product.is_multipack && <StateChip tone="quiet">Multipack</StateChip>}
-          <StateChip tone={footprint != null ? "good" : "quiet"}>
-            {footprint != null ? "LCA complete" : "No LCA yet"}
-          </StateChip>
           {recipeStale && <StateChip tone="attention">Recipe changed</StateChip>}
-          <StateChip tone={isHealthy ? "good" : "attention"}>
-            {isHealthy ? "Ready to calculate" : "Setup incomplete"}
-          </StateChip>
+          {!isHealthy && <StateChip tone="attention">Setup incomplete</StateChip>}
           {product.id != null && <BrewwLinkBadge productId={product.id} />}
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <span data-guide="product-calculate-btn">
+          <span data-guide="product-footprint-cta">
             <PillButton variant="room" onClick={handleOpenFootprint}>
               {ctaLabel}
             </PillButton>
           </span>
-          {latestLca?.id && (
-            <DownloadLCAButton
-              lcaId={latestLca.id}
-              productName={product.name}
-              productId={Number(productId)}
-              size="default"
-            />
-          )}
-          <PillButton variant="outline" onClick={() => setShowEditDialog(true)}>
-            Edit details
+          <PillButton variant="outline" href={`/products/${productId}/recipe`}>
+            Edit the recipe
           </PillButton>
-          <ProductGuideTrigger />
+          <button
+            type="button"
+            onClick={() => setShowEditDialog(true)}
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground transition-colors duration-150 ease-studio hover:text-foreground"
+          >
+            Edit details
+          </button>
         </div>
       </div>
 
@@ -297,81 +334,65 @@ export default function ProductDashboardPage() {
         <BrewwSuggestionBanner productId={productId} productName={product.name} />
       </div>
 
-      {!isHealthy && (
-        <Panel className="mt-6">
-          <p className="text-sm text-muted-foreground">
-            Add ingredients and packaging to this product before calculating its environmental impact.
-          </p>
-        </Panel>
+      {currentOrganization && (
+        <div className="mt-6">
+          <LcaStalenessBanner
+            key={stalenessKey}
+            productId={productId}
+            organizationId={currentOrganization.id}
+            onRecalculated={() => window.location.reload()}
+          />
+        </div>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-10 space-y-8">
-        <TabsList data-guide="product-tabs" className={MONO_TAB_LIST}>
-          <TabsTrigger value="overview" className={MONO_TAB}>
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="specification" data-guide="product-specification" className={MONO_TAB}>
-            Specification
-          </TabsTrigger>
-          <TabsTrigger value="facilities" className={MONO_TAB}>
-            Facilities
-          </TabsTrigger>
-          <TabsTrigger value="passport" data-guide="product-passport-tab" className={MONO_TAB}>
-            Passport
-          </TabsTrigger>
-          <TabsTrigger value="settings" className={MONO_TAB}>
-            Settings
-          </TabsTrigger>
-        </TabsList>
+      <div className="mt-10 space-y-10">
+        <FootprintStory
+          productId={productId}
+          category={product.product_category}
+          unitSizeUnit={product.unit_size_unit}
+          unitSizeValue={product.unit_size_value}
+          pcf={latestPcf}
+          isHealthy={isHealthy}
+        />
 
-        <TabsContent value="overview" data-guide="product-overview" className="space-y-8">
-          {currentOrganization && (
-            <LcaStalenessBanner
-              productId={productId}
-              organizationId={currentOrganization.id}
-              onRecalculated={() => window.location.reload()}
-            />
-          )}
-          <OverviewTab
-            product={product}
-            ingredients={ingredients}
-            packaging={packaging}
-            lcaReports={lcaReports}
-            isHealthy={isHealthy}
-            onEditMultipack={() => setActiveTab('specification')}
-          />
-        </TabsContent>
-
-        <TabsContent value="specification" className="space-y-8">
+        <div data-guide="product-recipe">
           {product.is_multipack && currentOrganization ? (
-            // A multipack has no single-SKU recipe of its own to edit here; its
-            // footprint comes from its component products. Show the contents
-            // editor (add/remove products, change quantities) plus an editor for
-            // the pack's OWN transit/grouping packaging (shipper box, shrink
-            // wrap, pallet), which is otherwise only settable at create time.
-            <>
-              <MultipackContentsEditor
-                productId={productId}
-                organizationId={currentOrganization.id}
-              />
-              <MultipackPackagingSection
-                productId={productId}
-                organizationId={currentOrganization.id}
-              />
-            </>
+            // A multipack has no single-SKU recipe of its own; its footprint
+            // comes from its component products. It gets the contents editor
+            // plus its own transit packaging instead of a composition.
+            <section className="border-t border-studio-hairline pt-8">
+              <Eyebrow className="mb-6">WHAT IT CONTAINS</Eyebrow>
+              <div className="space-y-8">
+                <MultipackContentsEditor
+                  productId={productId}
+                  organizationId={currentOrganization.id}
+                  onChanged={() => setStalenessKey((k) => k + 1)}
+                />
+                <MultipackPackagingSection
+                  productId={productId}
+                  organizationId={currentOrganization.id}
+                />
+              </div>
+            </section>
           ) : (
-            <SpecificationTab
+            <CompositionSection
               productId={productId}
+              liquidId={(product as any).liquid_id ?? null}
+              packFormatId={(product as any).pack_format_id ?? null}
               ingredients={ingredients}
               packaging={packaging}
-              productCategory={product?.product_category ?? null}
-              productAbvPercent={product?.alcohol_content_abv ?? null}
+              maturation={maturation}
             />
           )}
-        </TabsContent>
+        </div>
 
-        <TabsContent value="facilities" className="space-y-8">
-          {currentOrganization && (
+        {currentOrganization && (
+          <section
+            ref={facilitiesRef}
+            id="facilities"
+            className="scroll-mt-24 border-t border-studio-hairline pt-8"
+          >
+            <Eyebrow className="mb-6">WHERE IT IS MADE</Eyebrow>
             <FacilitiesTab
               productId={parseInt(productId)}
               organizationId={currentOrganization.id}
@@ -380,42 +401,24 @@ export default function ProductDashboardPage() {
               unitSizeUnit={product.unit_size_unit ?? null}
               onProductUpdated={refetch}
             />
-          )}
-        </TabsContent>
+          </section>
+        )}
 
-        <TabsContent value="passport" className="space-y-8">
-          <PassportManagementPanel
-            productId={productId}
-            productName={product.name}
-            initialPassportEnabled={product.passport_enabled || false}
-            initialPassportToken={product.passport_token || null}
-            initialViewsCount={product.passport_views_count || 0}
-            initialLastViewedAt={product.passport_last_viewed_at || null}
-            initialPassportSettings={(product.passport_settings as Record<string, unknown>) || {}}
-          />
-        </TabsContent>
+        <div data-guide="product-story">
+          <ProofSection productId={productId} product={product} lcaReports={lcaReports} />
+        </div>
 
-        <TabsContent value="settings" className="space-y-8">
+        <section className="border-t border-studio-hairline pt-8">
           <SettingsTab
             productName={product.name}
             onArchive={handleArchive}
             onDelete={handleDelete}
           />
-        </TabsContent>
-      </Tabs>
+        </section>
+      </div>
 
-      {/* Product Guide */}
-      <ProductGuide
-        onAction={(action) => {
-          if (action === 'open-ingredients') {
-            router.push(`/products/${productId}/recipe?tab=ingredients`);
-          }
-        }}
-      />
-
-      {/* Edit Product Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit product details</DialogTitle>
           </DialogHeader>
